@@ -7,17 +7,11 @@
     "clean_corrupt_data.py": [
       "src/optimizer_v3/database/__init__.py"
     ],
-    "debug_backtest_error.py": [
-      "src/optimizer_v3/core/backtest_data_provider.py"
-    ],
     "debug_config_structure.py": [
       "src/optimizer_v3/database/strategy_manager.py"
     ],
     "debug_signals.py": [
       "src/strategy_builder/core/block_registry_adapter.py"
-    ],
-    "deep_nan_trace.py": [
-      "src/strategy_builder/integration/strategy_builder_orchestrator.py"
     ],
     "delete_old_strategy.py": [
       "src/optimizer_v3/database/__init__.py"
@@ -42,6 +36,12 @@
       "src/touch_index/bug_worker.py",
       "src/touch_index/git_extractor.py"
     ],
+    "scripts/backfill_touch_index_source.py": [
+      "src/touch_index/db.py",
+      "src/touch_index/comment_extractor.py",
+      "src/touch_index/git_extractor.py",
+      "src/touch_index/paperclip_client.py"
+    ],
     "scripts/binance/backfill_1h_gaps.py": [
       "src/data_manager/unified_manager.py"
     ],
@@ -55,14 +55,6 @@
     ],
     "scripts/blast_radius_cli.py": [
       "src/blast_radius/__main__.py"
-    ],
-    "scripts/btcaaaaa_1007_retune_sensitivity.py": [
-      "src/optimizer_v3/core/multicore_backtest_engine.py"
-    ],
-    "scripts/btcaaaaa_979_entry_comparison.py": [
-      "src/optimizer_v3/core/multicore_backtest_engine.py",
-      "src/optimizer_v3/core/institutional_signal_evaluator.py",
-      "src/detectors/building_blocks/price_levels/asia_session_50_percent.py"
     ],
     "scripts/demo_signal_catalog.py": [
       "src/ai_consultant/signal_catalog.py",
@@ -106,18 +98,7 @@
       "src/optimizer_v3/core/backtest_data_provider.py",
       "src/optimizer_v3/core/training_thread.py"
     ],
-    "scripts/qa_live_1085_calibration_cache.py": [
-      "src/strategy_builder/ui/backtest_config_panel.py"
-    ],
-    "scripts/qa_live_1092_disk_cache_persistence.py": [
-      "src/strategy_builder/ui/backtest_config_panel.py"
-    ],
     "scripts/qa_live_1096_training_panel_cache_gate.py": [
-      "src/optimizer_v3/database/__init__.py",
-      "src/optimizer_v3/ui/training_panel.py",
-      "src/strategy_builder/ui/backtest_config_panel.py"
-    ],
-    "scripts/qa_live_1097_trainingpanel_cache_gate.py": [
       "src/optimizer_v3/database/__init__.py",
       "src/optimizer_v3/ui/training_panel.py",
       "src/strategy_builder/ui/backtest_config_panel.py"
@@ -126,10 +107,6 @@
       "src/optimizer_v3/core/institutional_signal_evaluator.py",
       "src/strategy_builder/ui/backtest_config_panel.py",
       "src/optimizer_v3/core/trade_registry.py"
-    ],
-    "scripts/qa_live_1196_mode2_trades_list.py": [
-      "src/optimizer_v3/core/trade_registry.py",
-      "src/strategy_builder/ui/backtest_config_panel.py"
     ],
     "scripts/qa_live_1205_config_discovery_mode2.py": [
       "src/strategy_builder/ui/strategy_builder_main_window.py",
@@ -145,15 +122,16 @@
       "tests/integration/test_scenarios.py",
       "src/strategy_builder/ui/config_discovery_results_dialog.py"
     ],
-    "scripts/qa_live_quick_preview.py": [
-      "src/strategy_builder/ui/strategy_builder_main_window.py"
+    "scripts/repro_btcaaaaa_2172_bars_regression.py": [
+      "src/data_manager/unified_manager.py",
+      "src/optimizer_v3/core/data_cache_manager.py"
     ],
     "scripts/run_blast_radius_worker.py": [
-      "src/blast_radius/worker.py"
+      "src/blast_radius/__main__.py"
     ],
     "scripts/run_impact_gate_worker.py": [
-      "src/impact_gate/worker.py",
-      "src/touch_index/paperclip_client.py"
+      "src/blast_radius/worker.py",
+      "src/impact_gate/worker.py"
     ],
     "scripts/run_testnet_dry_run.py": [
       "src/itm/dry_run/runner.py"
@@ -169,17 +147,23 @@
     ],
     "scripts/scan_fix_issues_done.py": [
       "src/touch_index/paperclip_client.py",
-      "src/impact_gate/worker.py"
+      "src/impact_gate/worker.py",
+      "src/blast_radius/worker.py"
     ],
     "scripts/test_all_building_blocks.py": [
       "tests/building_blocks_registry_envoked/registry_test_library.py",
       "src/detectors/building_blocks/registry.py"
     ],
+    "scripts/validate_data_quality.py": [
+      "src/data_manager/unified_manager.py"
+    ],
     "scripts/validate_touch_index_bug.py": [
-      "src/touch_index/db.py"
+      "src/touch_index/db.py",
+      "src/touch_index/quality.py"
     ],
     "scripts/validate_touch_index_fr.py": [
-      "src/touch_index/db.py"
+      "src/touch_index/db.py",
+      "src/touch_index/quality.py"
     ],
     "scripts/verify_trade_prices.py": [
       "src/optimizer_v3/core/backtest_data_provider.py"
@@ -373,58 +357,16 @@
     "src/detectors/building_blocks/patterns/candle_2_close.py": [
       "src/detectors/building_blocks/registry.py"
     ],
-    "src/detectors/building_blocks/patterns/cup_and_handle.py": [
-      "src/detectors/building_blocks/registry.py"
-    ],
-    "src/detectors/building_blocks/patterns/descending_triangle.py": [
-      "src/detectors/building_blocks/registry.py"
-    ],
-    "src/detectors/building_blocks/patterns/double_bottom.py": [
-      "src/detectors/building_blocks/registry.py"
-    ],
-    "src/detectors/building_blocks/patterns/double_top.py": [
-      "src/detectors/building_blocks/registry.py"
-    ],
-    "src/detectors/building_blocks/patterns/falling_wedge.py": [
-      "src/detectors/building_blocks/registry.py"
-    ],
-    "src/detectors/building_blocks/patterns/flag_pattern.py": [
-      "src/detectors/building_blocks/registry.py"
-    ],
-    "src/detectors/building_blocks/patterns/head_and_shoulders.py": [
-      "src/detectors/building_blocks/registry.py"
-    ],
     "src/detectors/building_blocks/patterns/initial_balance_breakout.py": [
       "src/detectors/building_blocks/registry.py"
     ],
     "src/detectors/building_blocks/patterns/internal_pivot_pattern.py": [
       "src/detectors/building_blocks/registry.py"
     ],
-    "src/detectors/building_blocks/patterns/inverse_head_and_shoulders.py": [
-      "src/detectors/building_blocks/registry.py"
-    ],
-    "src/detectors/building_blocks/patterns/pennant_pattern.py": [
-      "src/detectors/building_blocks/registry.py"
-    ],
-    "src/detectors/building_blocks/patterns/rising_wedge.py": [
-      "src/detectors/building_blocks/registry.py"
-    ],
-    "src/detectors/building_blocks/patterns/rounding_bottom.py": [
-      "src/detectors/building_blocks/registry.py"
-    ],
     "src/detectors/building_blocks/patterns/swing_breakout_sequence.py": [
       "src/detectors/building_blocks/registry.py"
     ],
-    "src/detectors/building_blocks/patterns/symmetrical_triangle.py": [
-      "src/detectors/building_blocks/registry.py"
-    ],
     "src/detectors/building_blocks/patterns/three_bar_reversal.py": [
-      "src/detectors/building_blocks/registry.py"
-    ],
-    "src/detectors/building_blocks/patterns/triple_bottom.py": [
-      "src/detectors/building_blocks/registry.py"
-    ],
-    "src/detectors/building_blocks/patterns/triple_top.py": [
       "src/detectors/building_blocks/registry.py"
     ],
     "src/detectors/building_blocks/price_action/breaker_block.py": [
@@ -989,24 +931,15 @@
     "src/strategies/signal_accumulator/signal_accumulator.py": [
       "src/strategies/universal_optimizer/modules/confluence_calculator.py"
     ],
-    "src/strategies/strategy_001_01_hod_rejection.py": [
-      "src/detectors/building_blocks/oscillators/stochastic_rsi.py",
-      "src/detectors/building_blocks/price_levels/hod.py",
-      "src/strategies/universal_optimizer/modules/confluence_calculator.py"
-    ],
-    "src/strategies/strategy_001_hod_rejection.py": [
-      "src/detectors/building_blocks/fibonacci/fibonacci_retracements.py",
-      "src/detectors/building_blocks/price_levels/hod.py",
-      "src/strategies/universal_optimizer/modules/confluence_calculator.py",
-      "src/strategies/signal_accumulator/__init__.py"
-    ],
     "src/strategies/strategy_002_lod_rejection.py": [
+      "src/strategies/risk_enforcer.py",
       "src/detectors/building_blocks/oscillators/stochastic_rsi.py",
       "src/detectors/building_blocks/price_levels/lod.py",
       "src/strategies/universal_optimizer/modules/confluence_calculator.py",
       "src/strategies/signal_accumulator/__init__.py"
     ],
     "src/strategies/strategy_003_hod_continuation.py": [
+      "src/strategies/risk_enforcer.py",
       "src/detectors/building_blocks/market_structure/range_liquidity.py",
       "src/detectors/building_blocks/oscillators/stochastic_rsi.py",
       "src/detectors/building_blocks/price_levels/hod.py",
@@ -1015,6 +948,7 @@
       "src/strategies/signal_accumulator/__init__.py"
     ],
     "src/strategies/strategy_01_reversal_m_pattern.py": [
+      "src/strategies/risk_enforcer.py",
       "src/detectors/building_blocks/patterns/double_top.py",
       "src/detectors/building_blocks/oscillators/rsi_divergence.py",
       "src/detectors/building_blocks/price_levels/hod.py",
@@ -1030,6 +964,7 @@
       "src/strategies/universal_optimizer/modules/confluence_calculator.py"
     ],
     "src/strategies/strategy_04_ema_trend_continuation.py": [
+      "src/strategies/risk_enforcer.py",
       "src/detectors/building_blocks/moving_averages/ema_20_50_trend.py",
       "src/detectors/building_blocks/moving_averages/ema_200_trend.py",
       "src/detectors/building_blocks/moving_averages/ema_20_50_cross.py",
@@ -1040,6 +975,7 @@
       "src/strategies/universal_optimizer/modules/confluence_calculator.py"
     ],
     "src/strategies/strategy_06_range_breakout.py": [
+      "src/strategies/risk_enforcer.py",
       "src/detectors/building_blocks/patterns/initial_balance_breakout.py",
       "src/detectors/building_blocks/market_structure/wave_consolidation.py",
       "src/detectors/building_blocks/volatility/bollinger_bands.py",
@@ -1050,6 +986,7 @@
       "src/strategies/universal_optimizer/modules/confluence_calculator.py"
     ],
     "src/strategies/strategy_08_micro_trend_scalping.py": [
+      "src/strategies/risk_enforcer.py",
       "src/detectors/building_blocks/moving_averages/ema_20_50_cross.py",
       "src/detectors/building_blocks/oscillators/macd_signal.py",
       "src/detectors/building_blocks/oscillators/stochastic_rsi.py",
@@ -1058,6 +995,7 @@
       "src/strategies/universal_optimizer/modules/confluence_calculator.py"
     ],
     "src/strategies/strategy_09_order_flow_scalping.py": [
+      "src/strategies/risk_enforcer.py",
       "src/detectors/building_blocks/institutional/order_flow_imbalance.py",
       "src/detectors/building_blocks/institutional/market_depth.py",
       "src/detectors/building_blocks/institutional/vwap.py",
@@ -1066,6 +1004,7 @@
       "src/strategies/universal_optimizer/modules/confluence_calculator.py"
     ],
     "src/strategies/strategy_15_bollinger_mean_reversion.py": [
+      "src/strategies/risk_enforcer.py",
       "src/detectors/building_blocks/volatility/bollinger_bands.py",
       "src/detectors/building_blocks/oscillators/rsi_divergence.py",
       "src/detectors/building_blocks/oscillators/stochastic_rsi.py",
@@ -1261,6 +1200,7 @@
       "src/strategy_builder/ui/block_search_panel.py",
       "src/strategy_builder/ui/strategy_blocks_panel.py",
       "src/strategy_builder/ui/validation_report_window.py",
+      "src/strategy_builder/ui/validation_dialog.py",
       "src/strategy_builder/ui/backtest_config_dialog.py",
       "src/optimizer_v3/validation/institutional_validator.py",
       "src/strategy_builder/ui/data_update_modal.py",
@@ -1346,7 +1286,8 @@
       "src/touch_index/__main__.py"
     ],
     "src/touch_index/quality.py": [
-      "src/touch_index/paperclip_client.py"
+      "src/touch_index/paperclip_client.py",
+      "src/touch_index/git_extractor.py"
     ],
     "test_actual_save.py": [
       "src/optimizer_v3/database/__init__.py"
@@ -1360,9 +1301,10 @@
       "src/optimizer_v3/core/comprehensive_ai_request_builder.py",
       "src/optimizer_v3/core/ai_request_preview_window.py"
     ],
-    "test_backtest_trace.py": [
-      "src/strategy_builder/testing/walkforward_test_engine.py",
-      "src/strategy_builder/core/strategy_config_engine.py"
+    "test_backtest_engine_validation.py": [
+      "src/optimizer_v3/core/multicore_backtest_engine.py",
+      "src/optimizer_v3/core/trade_registry.py",
+      "src/strategy_builder/ui/backtest_config_panel.py"
     ],
     "test_button_font.py": [
       "src/strategy_builder/ui/styles.py"
@@ -1378,9 +1320,6 @@
     "test_create_strategy_orm_validation.py": [
       "src/optimizer_v3/database/strategy_manager.py",
       "src/optimizer_v3/database/models.py"
-    ],
-    "test_data_availability.py": [
-      "src/optimizer_v3/core/backtest_data_provider.py"
     ],
     "test_database_save.py": [
       "src/optimizer_v3/database/__init__.py"
@@ -1399,24 +1338,20 @@
       "src/optimizer_v3/database/__init__.py",
       "src/strategy_builder/integration/strategy_builder_orchestrator.py"
     ],
+    "test_multi_strategy_full.py": [
+      "src/optimizer_v3/core/multicore_backtest_engine.py"
+    ],
+    "test_multi_strategy_validation.py": [
+      "src/optimizer_v3/core/multicore_backtest_engine.py",
+      "src/optimizer_v3/core/trade_registry.py"
+    ],
     "test_real_data_save.py": [
       "src/optimizer_v3/database/__init__.py",
       "src/strategy_builder/persistence/strategy_persistence.py"
     ],
-    "test_signal_evaluation_trace.py": [
-      "src/optimizer_v3/core/institutional_signal_evaluator.py",
-      "src/optimizer_v3/core/backtest_data_provider.py",
-      "src/debugger_logger/config_debugger.py"
-    ],
     "test_text_wrapper_validation.py": [
       "src/optimizer_v3/database/ai_recommendations_manager.py",
       "src/optimizer_v3/database/__init__.py"
-    ],
-    "test_timing_display.py": [
-      "src/strategy_builder/integration/strategy_builder_orchestrator.py"
-    ],
-    "test_unified_manager_data_for_NautilusTrader_backtest.py": [
-      "src/data_manager/unified_manager.py"
     ],
     "tests/Strategy_Builder/test_integration.py": [
       "src/detectors/building_blocks/registry.py"
@@ -1443,6 +1378,31 @@
     "tests/ai_consultant/test_signal_catalog.py": [
       "src/ai_consultant/signal_catalog.py"
     ],
+    "tests/bug_regression/test_btcaaaaa_1168_regression.py": [
+      "src/blast_radius/query.py",
+      "src/blast_radius/report.py",
+      "src/blast_radius/generator.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_1236_regression.py": [
+      "src/blast_radius/worker.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_1297_regression.py": [
+      "tests/test_blast_radius/test_worker.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_1327_regression.py": [
+      "src/touch_index/__main__.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_1335_regression.py": [
+      "tests/test_blast_radius/test_worker.py",
+      "tests/test_blast_radius/test_main.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_140_regression.py": [
+      "tests/test_impact_gate/test_e2e.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_1421_regression.py": [
+      "tests/test_blast_radius/test_worker.py",
+      "tests/test_blast_radius/test_main.py"
+    ],
     "tests/bug_regression/test_btcaaaaa_1497_backtest_worker_chain.py": [
       "src/strategy_builder/ui/backtest_config_panel.py",
       "src/optimizer_v3/core/trade_registry.py"
@@ -1450,6 +1410,88 @@
     "tests/bug_regression/test_btcaaaaa_1497_backtestworker_real_data_chain.py": [
       "src/strategy_builder/ui/backtest_config_panel.py",
       "src/optimizer_v3/core/trade_registry.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_15014_regression.py": [
+      "tests/test_touch_index/test_paperclip_client.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_15031_regression.py": [
+      "tests/test_touch_index/test_bug_worker.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_1552_regression.py": [
+      "scripts/opencode_watchdog.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_1573_regression.py": [
+      "tests/test_blast_radius/test_generator.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_1623_regression.py": [
+      "tests/test_blast_radius/test_worker.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_1720_regression.py": [
+      "src/blast_radius/worker.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_1723_regression.py": [
+      "tests/test_blast_radius/test_worker.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_20256_regression.py": [
+      "tests/test_impact_gate/test_scan_done.py",
+      "tests/test_impact_gate/test_runner.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_23716_regression.py": [
+      "tests/test_blast_radius/test_worker.py",
+      "tests/test_blast_radius/test_main.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_23724_regression.py": [
+      "tests/test_blast_radius/test_worker.py",
+      "tests/test_blast_radius/test_main.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_23729_regression.py": [
+      "tests/test_blast_radius/test_worker.py",
+      "tests/test_blast_radius/test_main.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_2740_regression.py": [
+      "tests/test_impact_gate/test_worker.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_2741_regression.py": [
+      "tests/test_impact_gate/test_scan_done.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_2742_regression.py": [
+      "tests/test_impact_gate/test_worker.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_2743_regression.py": [
+      "tests/test_impact_gate/test_runner.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_2744_regression.py": [
+      "tests/test_impact_gate/test_e2e.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_2745_regression.py": [
+      "tests/test_impact_gate/test_e2e.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_2746_regression.py": [
+      "tests/test_impact_gate/test_e2e.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_2747_regression.py": [
+      "tests/test_impact_gate/test_e2e.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_2748_regression.py": [
+      "tests/test_impact_gate/test_e2e.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_2749_regression.py": [
+      "tests/test_impact_gate/test_e2e.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_2750_regression.py": [
+      "tests/test_impact_gate/test_e2e.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_3233_regression.py": [
+      "tests/test_touch_index/test_git_extractor.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_3621_regression.py": [
+      "tests/bug_regression/test_btcaaaaa_1236_regression.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_3622_regression.py": [
+      "tests/test_impact_gate/test_e2e.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_4892_regression.py": [
+      "tests/test_touch_index/test_bug_worker.py"
     ],
     "tests/bug_regression/test_btcaaaaa_736_regression.py": [
       "tests/integration/test_btcaaaaa_736_mode2_regression.py"
@@ -1534,6 +1576,9 @@
       "src/itm/orchestrator/performance_monitor.py",
       "src/itm/orchestrator/registry.py",
       "src/itm/orchestrator/sb_contract.py"
+    ],
+    "tests/freeze_lift/test_freeze_lift_evidence.py": [
+      "scripts/lock_gate.py"
     ],
     "tests/integration/refresh_ci_regression_hashes.py": [
       "src/optimizer_v3/core/multicore_backtest_engine.py"
@@ -1913,12 +1958,6 @@
     "tests/strategies/debug_walkforward.py": [
       "src/strategies/strategy_01_reversal_m_pattern.py"
     ],
-    "tests/strategies/test_001_01_hod_rejection.py": [
-      "src/strategies/strategy_001_01_hod_rejection.py"
-    ],
-    "tests/strategies/test_001_hod_rejection.py": [
-      "src/strategies/strategy_001_hod_rejection.py"
-    ],
     "tests/strategies/test_002_lod_rejection.py": [
       "src/strategies/strategy_002_lod_rejection.py"
     ],
@@ -2093,6 +2132,9 @@
     "tests/test_blast_radius/test_worker.py": [
       "src/blast_radius/worker.py"
     ],
+    "tests/test_impact_gate/test_scan_done_alert.py": [
+      "src/touch_index/paperclip_client.py"
+    ],
     "tests/test_impact_gate/test_worker.py": [
       "src/impact_gate/worker.py",
       "src/blast_radius/query.py"
@@ -2117,6 +2159,9 @@
     "tests/test_touch_index/test_git_extractor.py": [
       "src/touch_index/git_extractor.py"
     ],
+    "tests/test_touch_index/test_paperclip_client.py": [
+      "src/touch_index/paperclip_client.py"
+    ],
     "tests/test_touch_index/test_quality.py": [
       "src/touch_index/quality.py"
     ],
@@ -2131,6 +2176,9 @@
       "src/optimizer_v3/core/trade_registry.py",
       "src/strategy_builder/ui/backtest_config_panel.py"
     ],
+    "tests/ui_qt/test_data_verify_dialog.py": [
+      "src/strategy_builder/ui/data_verify_dialog.py"
+    ],
     "tests/ui_qt/test_quick_preview.py": [
       "src/strategy_builder/ui/strategy_builder_main_window.py"
     ],
@@ -2141,6 +2189,9 @@
       "src/strategy_builder/ui/validation_report_window.py",
       "src/optimizer_v3/validation/institutional_validator.py",
       "src/strategy_builder/testing/walkforward_test_engine.py"
+    ],
+    "tests/ui_qt/test_runtime_update_visibility.py": [
+      "src/strategy_builder/ui/strategy_builder_main_window.py"
     ],
     "tests/ui_qt/test_settings.py": [
       "src/strategy_builder/ui/settings_dialog.py",
@@ -2186,9 +2237,6 @@
     "tests/unit/test_tp_sl_calculations.py": [
       "src/strategies/universal_optimizer/modules/dynamic_tp_calculator.py",
       "src/strategies/universal_optimizer/modules/dynamic_sl_calculator.py"
-    ],
-    "trace_none_multiplication.py": [
-      "test_unified_manager_data_for_NautilusTrader_backtest.py"
     ]
   },
   "reverse": {
@@ -2230,7 +2278,6 @@
       "delete_orphan.py",
       "scripts/migrate_strategy_type.py",
       "scripts/qa_live_1096_training_panel_cache_gate.py",
-      "scripts/qa_live_1097_trainingpanel_cache_gate.py",
       "src/optimizer_v3/ui/training_panel.py",
       "src/strategy_builder/integration/strategy_builder_orchestrator.py",
       "src/strategy_builder/ui/backtest_config_panel.py",
@@ -2248,17 +2295,6 @@
       "tests/database/test_ai_recommendations_text_wrapper.py",
       "tests/strategy_builder/ui/test_backtest_config_panel_calibration_gate.py"
     ],
-    "src/optimizer_v3/core/backtest_data_provider.py": [
-      "debug_backtest_error.py",
-      "scripts/p1_2_compare_data_sources.py",
-      "scripts/qa_btcaaaaa_1089_cache_key_fix.py",
-      "scripts/verify_trade_prices.py",
-      "src/optimizer_v3/core/nautilus_training_system.py",
-      "src/strategy_builder/ui/backtest_config_panel.py",
-      "test_data_availability.py",
-      "test_signal_evaluation_trace.py",
-      "tests/optimizer_v3/test_backtest_data_provider.py"
-    ],
     "src/optimizer_v3/database/strategy_manager.py": [
       "debug_config_structure.py",
       "src/optimizer_v3/database/__init__.py",
@@ -2275,24 +2311,6 @@
       "debug_signals.py",
       "src/strategy_builder/ui/strategy_builder_main_window.py",
       "test_complete_cycle.py"
-    ],
-    "src/strategy_builder/integration/strategy_builder_orchestrator.py": [
-      "deep_nan_trace.py",
-      "src/strategy_builder/ui/block_search_panel.py",
-      "src/strategy_builder/ui/strategy_blocks_panel.py",
-      "src/strategy_builder/ui/strategy_browser_dialog.py",
-      "src/strategy_builder/ui/strategy_builder_main_window.py",
-      "src/strategy_builder/ui/strategy_info_panel.py",
-      "src/strategy_builder/ui/validation_dialog.py",
-      "src/strategy_builder/ui/validation_panel.py",
-      "test_complete_cycle.py",
-      "test_load_trace.py",
-      "test_timing_display.py",
-      "tests/integration/test_backtest_configuration_coverage.py",
-      "tests/strategy_builder/integration/test_strategy_builder_orchestrator.py",
-      "tests/strategy_builder/ui/test_block_search_panel.py",
-      "tests/strategy_builder/ui/test_strategy_blocks_panel.py",
-      "tests/strategy_builder/ui/test_strategy_info_panel.py"
     ],
     "src/data_manager/download/__init__.py": [
       "scripts/LakeAPI/download_synchronize_data.py"
@@ -2339,24 +2357,10 @@
       "src/detectors/building_blocks/oscillators/stochastic_rsi.py",
       "src/detectors/building_blocks/patterns/ascending_triangle.py",
       "src/detectors/building_blocks/patterns/candle_2_close.py",
-      "src/detectors/building_blocks/patterns/cup_and_handle.py",
-      "src/detectors/building_blocks/patterns/descending_triangle.py",
-      "src/detectors/building_blocks/patterns/double_bottom.py",
-      "src/detectors/building_blocks/patterns/double_top.py",
-      "src/detectors/building_blocks/patterns/falling_wedge.py",
-      "src/detectors/building_blocks/patterns/flag_pattern.py",
-      "src/detectors/building_blocks/patterns/head_and_shoulders.py",
       "src/detectors/building_blocks/patterns/initial_balance_breakout.py",
       "src/detectors/building_blocks/patterns/internal_pivot_pattern.py",
-      "src/detectors/building_blocks/patterns/inverse_head_and_shoulders.py",
-      "src/detectors/building_blocks/patterns/pennant_pattern.py",
-      "src/detectors/building_blocks/patterns/rising_wedge.py",
-      "src/detectors/building_blocks/patterns/rounding_bottom.py",
       "src/detectors/building_blocks/patterns/swing_breakout_sequence.py",
-      "src/detectors/building_blocks/patterns/symmetrical_triangle.py",
       "src/detectors/building_blocks/patterns/three_bar_reversal.py",
-      "src/detectors/building_blocks/patterns/triple_bottom.py",
-      "src/detectors/building_blocks/patterns/triple_top.py",
       "src/detectors/building_blocks/price_action/breaker_block.py",
       "src/detectors/building_blocks/price_action/fair_value_gap.py",
       "src/detectors/building_blocks/price_action/liquidity_sweep.py",
@@ -2416,11 +2420,11 @@
     "src/touch_index/paperclip_client.py": [
       "scripts/backfill_close_stale_runs.py",
       "scripts/backfill_touch_index.py",
+      "scripts/backfill_touch_index_source.py",
       "scripts/lock_exception_signoff.py",
       "scripts/lock_gate_create_signoff.py",
       "scripts/lock_gate_nightly_alert.py",
       "scripts/nightly_test_alert.py",
-      "scripts/run_impact_gate_worker.py",
       "scripts/scan_done_alert.py",
       "scripts/scan_fix_issues_done.py",
       "src/blast_radius/api_server.py",
@@ -2432,11 +2436,14 @@
       "src/touch_index/comment_extractor.py",
       "src/touch_index/fr_worker.py",
       "src/touch_index/quality.py",
+      "tests/test_impact_gate/test_scan_done_alert.py",
       "tests/test_touch_index/test_comment_extractor.py",
-      "tests/test_touch_index/test_fr_worker.py"
+      "tests/test_touch_index/test_fr_worker.py",
+      "tests/test_touch_index/test_paperclip_client.py"
     ],
     "src/touch_index/db.py": [
       "scripts/backfill_touch_index.py",
+      "scripts/backfill_touch_index_source.py",
       "scripts/validate_touch_index_bug.py",
       "scripts/validate_touch_index_fr.py",
       "src/blast_radius/api_server.py",
@@ -2459,21 +2466,30 @@
     ],
     "src/touch_index/git_extractor.py": [
       "scripts/backfill_touch_index.py",
+      "scripts/backfill_touch_index_source.py",
       "src/blast_radius/generator.py",
       "src/impact_gate/worker.py",
       "src/touch_index/bug_worker.py",
       "src/touch_index/comment_extractor.py",
       "src/touch_index/fr_worker.py",
+      "src/touch_index/quality.py",
       "tests/test_touch_index/test_git_extractor.py"
+    ],
+    "src/touch_index/comment_extractor.py": [
+      "scripts/backfill_touch_index_source.py",
+      "src/touch_index/bug_worker.py",
+      "src/touch_index/fr_worker.py",
+      "tests/test_touch_index/test_comment_extractor.py"
     ],
     "src/data_manager/unified_manager.py": [
       "scripts/binance/backfill_1h_gaps.py",
+      "scripts/repro_btcaaaaa_2172_bars_regression.py",
+      "scripts/validate_data_quality.py",
       "src/data_manager/nautilus_loader.py",
       "src/optimizer_v3/core/backtest_data_provider.py",
       "src/strategy_builder/ui/data_update_modal.py",
       "src/strategy_builder/ui/data_verify_dialog.py",
       "src/strategy_builder/ui/strategy_builder_main_window.py",
-      "test_unified_manager_data_for_NautilusTrader_backtest.py",
       "tests/integration/test_unified_manager_tz_compat.py",
       "tests/unit/test_data_manager_integrity.py",
       "tests/unit/test_rc4c_rc6_fixes.py"
@@ -2489,36 +2505,8 @@
     ],
     "src/blast_radius/__main__.py": [
       "scripts/blast_radius_cli.py",
+      "scripts/run_blast_radius_worker.py",
       "src/blast_radius/worker.py"
-    ],
-    "src/optimizer_v3/core/multicore_backtest_engine.py": [
-      "scripts/btcaaaaa_1007_retune_sensitivity.py",
-      "scripts/btcaaaaa_979_entry_comparison.py",
-      "src/strategy_builder/ui/backtest_config_panel.py",
-      "src/strategy_builder/ui/config_permutation_engine.py",
-      "tests/integration/refresh_ci_regression_hashes.py",
-      "tests/integration/test_btcaaaaa_693_registry_clear_regression.py",
-      "tests/integration/test_btcaaaaa_745_multicore_real_data_regression.py",
-      "tests/integration/test_ci_regression_btcaaaaa987.py",
-      "tests/optimizer_v3/test_multicore_backtest_engine.py"
-    ],
-    "src/optimizer_v3/core/institutional_signal_evaluator.py": [
-      "scripts/btcaaaaa_979_entry_comparison.py",
-      "scripts/qa_live_1195_mode2_trades_list.py",
-      "src/optimizer_v3/core/multicore_backtest_engine.py",
-      "src/strategy_builder/ui/backtest_config_panel.py",
-      "test_signal_evaluation_trace.py",
-      "tests/integration/test_btcaaaaa_685_timing_chain.py",
-      "tests/integration/test_btcaaaaa_736_mode2_regression.py",
-      "tests/integration/test_btcaaaaa_778_none_exit_conditions.py",
-      "tests/integration/test_exit_conditions_comprehensive.py",
-      "tests/strategy_builder/ui/test_backtest_worker_mode2_live_replay.py"
-    ],
-    "src/detectors/building_blocks/price_levels/asia_session_50_percent.py": [
-      "scripts/btcaaaaa_979_entry_comparison.py",
-      "src/strategies/.backups/strategy_01_reversal_m_pattern_backup_20260109_171349.py",
-      "src/strategies/strategy_01_reversal_m_pattern.py",
-      "tests/unit/test_asia_session_50_percent_session_reset.py"
     ],
     "src/ai_consultant/signal_catalog.py": [
       "scripts/demo_signal_catalog.py",
@@ -2535,17 +2523,26 @@
       "scripts/launch_strategy_builder.py",
       "scripts/qa_live_1205_config_discovery_mode2.py",
       "scripts/qa_live_1205_config_discovery_mode2_v2.py",
-      "scripts/qa_live_quick_preview.py",
       "tests/strategy_builder/ui/test_about_dialog.py",
       "tests/ui_qt/test_quick_preview.py",
-      "tests/ui_qt/test_quick_preview_mainwindow.py"
+      "tests/ui_qt/test_quick_preview_mainwindow.py",
+      "tests/ui_qt/test_runtime_update_visibility.py"
     ],
     "scripts/lock_gate.py": [
       "scripts/lock_gate_nightly_alert.py",
+      "tests/freeze_lift/test_freeze_lift_evidence.py",
       "tests/unit/test_lock_gate.py"
     ],
     "src/optimizer_v3/database/backup.py": [
       "scripts/manage_backups.py"
+    ],
+    "src/optimizer_v3/core/backtest_data_provider.py": [
+      "scripts/p1_2_compare_data_sources.py",
+      "scripts/qa_btcaaaaa_1089_cache_key_fix.py",
+      "scripts/verify_trade_prices.py",
+      "src/optimizer_v3/core/nautilus_training_system.py",
+      "src/strategy_builder/ui/backtest_config_panel.py",
+      "tests/optimizer_v3/test_backtest_data_provider.py"
     ],
     "src/optimizer_v3/core/training_thread.py": [
       "scripts/qa_btcaaaaa_1089_cache_key_fix.py",
@@ -2553,17 +2550,17 @@
       "src/strategy_builder/ui/backtest_config_panel.py",
       "tests/optimizer_v3/test_training_system.py"
     ],
+    "src/optimizer_v3/ui/training_panel.py": [
+      "scripts/qa_live_1096_training_panel_cache_gate.py"
+    ],
     "src/strategy_builder/ui/backtest_config_panel.py": [
-      "scripts/qa_live_1085_calibration_cache.py",
-      "scripts/qa_live_1092_disk_cache_persistence.py",
       "scripts/qa_live_1096_training_panel_cache_gate.py",
-      "scripts/qa_live_1097_trainingpanel_cache_gate.py",
       "scripts/qa_live_1195_mode2_trades_list.py",
-      "scripts/qa_live_1196_mode2_trades_list.py",
       "scripts/qa_live_1205_config_discovery_mode2_v2.py",
       "src/optimizer_v3/core/multicore_backtest_engine.py",
       "src/strategy_builder/ui/backtest_config_dialog.py",
       "src/strategy_builder/ui/strategy_builder_main_window.py",
+      "test_backtest_engine_validation.py",
       "tests/bug_regression/test_btcaaaaa_1497_backtest_worker_chain.py",
       "tests/bug_regression/test_btcaaaaa_1497_backtestworker_real_data_chain.py",
       "tests/bug_regression/test_canary_trade_execution.py",
@@ -2584,18 +2581,25 @@
       "tests/ui_qt/capture_trades_screenshots.py",
       "tests/ui_qt/test_backtest_worker_evidence.py"
     ],
-    "src/optimizer_v3/ui/training_panel.py": [
-      "scripts/qa_live_1096_training_panel_cache_gate.py",
-      "scripts/qa_live_1097_trainingpanel_cache_gate.py"
+    "src/optimizer_v3/core/institutional_signal_evaluator.py": [
+      "scripts/qa_live_1195_mode2_trades_list.py",
+      "src/optimizer_v3/core/multicore_backtest_engine.py",
+      "src/strategy_builder/ui/backtest_config_panel.py",
+      "tests/integration/test_btcaaaaa_685_timing_chain.py",
+      "tests/integration/test_btcaaaaa_736_mode2_regression.py",
+      "tests/integration/test_btcaaaaa_778_none_exit_conditions.py",
+      "tests/integration/test_exit_conditions_comprehensive.py",
+      "tests/strategy_builder/ui/test_backtest_worker_mode2_live_replay.py"
     ],
     "src/optimizer_v3/core/trade_registry.py": [
       "scripts/qa_live_1195_mode2_trades_list.py",
-      "scripts/qa_live_1196_mode2_trades_list.py",
       "scripts/qa_live_1205_config_discovery_mode2_v2.py",
       "src/optimizer_v3/core/multicore_backtest_engine.py",
       "src/optimizer_v3/ui/trades_panel.py",
       "src/strategy_builder/ui/backtest_config_panel.py",
       "src/strategy_builder/ui/config_permutation_engine.py",
+      "test_backtest_engine_validation.py",
+      "test_multi_strategy_validation.py",
       "tests/bug_regression/test_btcaaaaa_1497_backtest_worker_chain.py",
       "tests/bug_regression/test_btcaaaaa_1497_backtestworker_real_data_chain.py",
       "tests/bug_regression/test_canary_trade_execution.py",
@@ -2624,10 +2628,17 @@
       "tests/strategy_builder/ui/test_numeric_sort_proxy_filter.py",
       "tests/ui_qt/test_apply_config_dialog_btcaaaaa_1090.py"
     ],
+    "src/optimizer_v3/core/data_cache_manager.py": [
+      "scripts/repro_btcaaaaa_2172_bars_regression.py",
+      "src/strategy_builder/ui/backtest_config_panel.py"
+    ],
     "src/blast_radius/worker.py": [
-      "scripts/run_blast_radius_worker.py",
+      "scripts/run_impact_gate_worker.py",
+      "scripts/scan_fix_issues_done.py",
       "src/blast_radius/__main__.py",
       "src/blast_radius/api_server.py",
+      "tests/bug_regression/test_btcaaaaa_1236_regression.py",
+      "tests/bug_regression/test_btcaaaaa_1720_regression.py",
       "tests/test_blast_radius/test_worker.py"
     ],
     "src/itm/dry_run/runner.py": [
@@ -2638,6 +2649,14 @@
     ],
     "tests/building_blocks_registry_envoked/registry_test_library.py": [
       "scripts/test_all_building_blocks.py"
+    ],
+    "src/touch_index/quality.py": [
+      "scripts/validate_touch_index_bug.py",
+      "scripts/validate_touch_index_fr.py",
+      "src/blast_radius/api_server.py",
+      "src/touch_index/__main__.py",
+      "tests/test_touch_index/test_bug_worker.py",
+      "tests/test_touch_index/test_quality.py"
     ],
     "src/ai_consultant/audit_writer.py": [
       "src/ai_consultant/__init__.py",
@@ -2654,6 +2673,7 @@
       "src/blast_radius/generator.py",
       "src/blast_radius/report.py",
       "src/impact_gate/worker.py",
+      "tests/bug_regression/test_btcaaaaa_1168_regression.py",
       "tests/test_blast_radius/test_api_server.py",
       "tests/test_blast_radius/test_generator.py",
       "tests/test_blast_radius/test_main.py",
@@ -2664,21 +2684,17 @@
     "src/blast_radius/generator.py": [
       "src/blast_radius/__main__.py",
       "src/blast_radius/worker.py",
+      "tests/bug_regression/test_btcaaaaa_1168_regression.py",
       "tests/test_blast_radius/test_generator.py"
     ],
     "src/blast_radius/api_server.py": [
       "src/blast_radius/__main__.py",
       "tests/test_blast_radius/test_api_server.py"
     ],
-    "src/touch_index/quality.py": [
-      "src/blast_radius/api_server.py",
-      "src/touch_index/__main__.py",
-      "tests/test_touch_index/test_bug_worker.py",
-      "tests/test_touch_index/test_quality.py"
-    ],
     "src/blast_radius/report.py": [
       "src/blast_radius/generator.py",
       "src/impact_gate/worker.py",
+      "tests/bug_regression/test_btcaaaaa_1168_regression.py",
       "tests/test_blast_radius/test_report.py"
     ],
     "src/blast_radius/db.py": [
@@ -2730,8 +2746,7 @@
       "src/optimizer_v3/ui/trades_panel.py",
       "src/strategy_builder/ui/backtest_config_panel.py",
       "src/strategy_builder/ui/strategy_builder_main_window.py",
-      "test_config_debugger.py",
-      "test_signal_evaluation_trace.py"
+      "test_config_debugger.py"
     ],
     "src/debugger_logger/audit_logger.py": [
       "src/debugger_logger/__init__.py"
@@ -2762,8 +2777,6 @@
     "src/detectors/building_blocks/price_levels/hod.py": [
       "src/detectors/building_blocks/price_levels/__init__.py",
       "src/strategies/.backups/strategy_01_reversal_m_pattern_backup_20260109_171349.py",
-      "src/strategies/strategy_001_01_hod_rejection.py",
-      "src/strategies/strategy_001_hod_rejection.py",
       "src/strategies/strategy_003_hod_continuation.py",
       "src/strategies/strategy_01_reversal_m_pattern.py"
     ],
@@ -3387,6 +3400,11 @@
       "src/strategies/strategy_01_reversal_m_pattern.py",
       "src/strategies/strategy_15_bollinger_mean_reversion.py"
     ],
+    "src/detectors/building_blocks/price_levels/asia_session_50_percent.py": [
+      "src/strategies/.backups/strategy_01_reversal_m_pattern_backup_20260109_171349.py",
+      "src/strategies/strategy_01_reversal_m_pattern.py",
+      "tests/unit/test_asia_session_50_percent_session_reset.py"
+    ],
     "src/detectors/building_blocks/institutional/vwap.py": [
       "src/strategies/.backups/strategy_01_reversal_m_pattern_backup_20260109_171349.py",
       "src/strategies/strategy_01_reversal_m_pattern.py",
@@ -3409,8 +3427,6 @@
     "src/strategies/universal_optimizer/modules/confluence_calculator.py": [
       "src/strategies/.backups/strategy_01_reversal_m_pattern_backup_20260109_171349.py",
       "src/strategies/signal_accumulator/signal_accumulator.py",
-      "src/strategies/strategy_001_01_hod_rejection.py",
-      "src/strategies/strategy_001_hod_rejection.py",
       "src/strategies/strategy_002_lod_rejection.py",
       "src/strategies/strategy_003_hod_continuation.py",
       "src/strategies/strategy_01_reversal_m_pattern.py",
@@ -3424,20 +3440,23 @@
     "src/strategies/signal_accumulator/signal_accumulator.py": [
       "src/strategies/signal_accumulator/__init__.py"
     ],
+    "src/strategies/risk_enforcer.py": [
+      "src/strategies/strategy_002_lod_rejection.py",
+      "src/strategies/strategy_003_hod_continuation.py",
+      "src/strategies/strategy_01_reversal_m_pattern.py",
+      "src/strategies/strategy_04_ema_trend_continuation.py",
+      "src/strategies/strategy_06_range_breakout.py",
+      "src/strategies/strategy_08_micro_trend_scalping.py",
+      "src/strategies/strategy_09_order_flow_scalping.py",
+      "src/strategies/strategy_15_bollinger_mean_reversion.py"
+    ],
     "src/detectors/building_blocks/oscillators/stochastic_rsi.py": [
-      "src/strategies/strategy_001_01_hod_rejection.py",
       "src/strategies/strategy_002_lod_rejection.py",
       "src/strategies/strategy_003_hod_continuation.py",
       "src/strategies/strategy_08_micro_trend_scalping.py",
       "src/strategies/strategy_15_bollinger_mean_reversion.py"
     ],
-    "src/detectors/building_blocks/fibonacci/fibonacci_retracements.py": [
-      "src/strategies/strategy_001_hod_rejection.py",
-      "src/strategies/strategy_04_ema_trend_continuation.py",
-      "src/strategies/universal_optimizer/modules/dynamic_tp_calculator.py"
-    ],
     "src/strategies/signal_accumulator/__init__.py": [
-      "src/strategies/strategy_001_hod_rejection.py",
       "src/strategies/strategy_002_lod_rejection.py",
       "src/strategies/strategy_003_hod_continuation.py",
       "src/strategies/universal_optimizer/modules/ultra_hybrid_simulator.py"
@@ -3467,6 +3486,10 @@
       "src/strategies/strategy_04_ema_trend_continuation.py",
       "src/strategies/strategy_06_range_breakout.py",
       "src/strategies/strategy_08_micro_trend_scalping.py"
+    ],
+    "src/detectors/building_blocks/fibonacci/fibonacci_retracements.py": [
+      "src/strategies/strategy_04_ema_trend_continuation.py",
+      "src/strategies/universal_optimizer/modules/dynamic_tp_calculator.py"
     ],
     "src/detectors/building_blocks/patterns/initial_balance_breakout.py": [
       "src/strategies/strategy_06_range_breakout.py"
@@ -3561,7 +3584,6 @@
       "src/strategy_builder/validation/auto_fix.py",
       "src/strategy_builder/validation/strategy_validator.py",
       "src/strategy_builder/validation/undo_manager.py",
-      "test_backtest_trace.py",
       "tests/integration/test_recheck_system.py",
       "tests/strategy_builder/core/test_nautilus_code_generator.py",
       "tests/strategy_builder/core/test_signal_dependency_resolver.py",
@@ -3595,7 +3617,6 @@
     "src/strategy_builder/testing/walkforward_test_engine.py": [
       "src/strategy_builder/integration/strategy_builder_orchestrator.py",
       "src/strategy_builder/ui/validation_report_window.py",
-      "test_backtest_trace.py",
       "tests/strategy_builder/testing/test_walkforward_test_engine.py",
       "tests/ui_qt/test_reports.py"
     ],
@@ -3618,9 +3639,6 @@
       "src/strategy_builder/ui/block_search_panel.py",
       "src/strategy_builder/ui/strategy_browser_dialog.py",
       "src/strategy_builder/ui/timing_constraint_dialog.py"
-    ],
-    "src/optimizer_v3/core/data_cache_manager.py": [
-      "src/strategy_builder/ui/backtest_config_panel.py"
     ],
     "src/optimizer_v3/ui/live_output_panel.py": [
       "src/strategy_builder/ui/backtest_config_panel.py",
@@ -3649,6 +3667,34 @@
       "src/strategy_builder/ui/config_discovery_results_dialog.py",
       "tests/strategy_builder/integration/test_config_discovery_engine.py",
       "tests/strategy_builder/integration/test_discovery_flow_integration.py"
+    ],
+    "src/optimizer_v3/core/multicore_backtest_engine.py": [
+      "src/strategy_builder/ui/backtest_config_panel.py",
+      "src/strategy_builder/ui/config_permutation_engine.py",
+      "test_backtest_engine_validation.py",
+      "test_multi_strategy_full.py",
+      "test_multi_strategy_validation.py",
+      "tests/integration/refresh_ci_regression_hashes.py",
+      "tests/integration/test_btcaaaaa_693_registry_clear_regression.py",
+      "tests/integration/test_btcaaaaa_745_multicore_real_data_regression.py",
+      "tests/integration/test_ci_regression_btcaaaaa987.py",
+      "tests/optimizer_v3/test_multicore_backtest_engine.py"
+    ],
+    "src/strategy_builder/integration/strategy_builder_orchestrator.py": [
+      "src/strategy_builder/ui/block_search_panel.py",
+      "src/strategy_builder/ui/strategy_blocks_panel.py",
+      "src/strategy_builder/ui/strategy_browser_dialog.py",
+      "src/strategy_builder/ui/strategy_builder_main_window.py",
+      "src/strategy_builder/ui/strategy_info_panel.py",
+      "src/strategy_builder/ui/validation_dialog.py",
+      "src/strategy_builder/ui/validation_panel.py",
+      "test_complete_cycle.py",
+      "test_load_trace.py",
+      "tests/integration/test_backtest_configuration_coverage.py",
+      "tests/strategy_builder/integration/test_strategy_builder_orchestrator.py",
+      "tests/strategy_builder/ui/test_block_search_panel.py",
+      "tests/strategy_builder/ui/test_strategy_blocks_panel.py",
+      "tests/strategy_builder/ui/test_strategy_info_panel.py"
     ],
     "src/strategy_builder/ui/exit_condition_dialog.py": [
       "src/strategy_builder/ui/block_search_panel.py",
@@ -3697,6 +3743,10 @@
       "tests/ui_qt/test_reports.py",
       "tests/ui_qt/test_window_geometry.py"
     ],
+    "src/strategy_builder/ui/validation_dialog.py": [
+      "src/strategy_builder/ui/strategy_builder_main_window.py",
+      "tests/strategy_builder/ui/test_window_maximize_resize_btcaaaaa390.py"
+    ],
     "src/strategy_builder/ui/data_update_modal.py": [
       "src/strategy_builder/ui/strategy_builder_main_window.py",
       "tests/unit/test_data_manager_integrity.py",
@@ -3704,6 +3754,7 @@
     ],
     "src/strategy_builder/ui/data_verify_dialog.py": [
       "src/strategy_builder/ui/strategy_builder_main_window.py",
+      "tests/ui_qt/test_data_verify_dialog.py",
       "tests/unit/test_data_verify_dialog_btcaaaaa459.py"
     ],
     "src/strategy_builder/ui/stepper_ribbon.py": [
@@ -3744,17 +3795,72 @@
     "src/strategy_builder/utils/institutional_logger.py": [
       "src/strategy_builder/utils/__init__.py"
     ],
-    "src/touch_index/comment_extractor.py": [
-      "src/touch_index/bug_worker.py",
-      "src/touch_index/fr_worker.py",
-      "tests/test_touch_index/test_comment_extractor.py"
-    ],
     "src/touch_index/__main__.py": [
       "src/touch_index/bug_worker.py",
       "src/touch_index/fr_worker.py",
+      "tests/bug_regression/test_btcaaaaa_1327_regression.py",
       "tests/test_touch_index/test___main__.py",
       "tests/test_touch_index/test_bug_worker.py",
       "tests/test_touch_index/test_fr_worker.py"
+    ],
+    "tests/test_blast_radius/test_worker.py": [
+      "tests/bug_regression/test_btcaaaaa_1297_regression.py",
+      "tests/bug_regression/test_btcaaaaa_1335_regression.py",
+      "tests/bug_regression/test_btcaaaaa_1421_regression.py",
+      "tests/bug_regression/test_btcaaaaa_1623_regression.py",
+      "tests/bug_regression/test_btcaaaaa_1723_regression.py",
+      "tests/bug_regression/test_btcaaaaa_23716_regression.py",
+      "tests/bug_regression/test_btcaaaaa_23724_regression.py",
+      "tests/bug_regression/test_btcaaaaa_23729_regression.py"
+    ],
+    "tests/test_blast_radius/test_main.py": [
+      "tests/bug_regression/test_btcaaaaa_1335_regression.py",
+      "tests/bug_regression/test_btcaaaaa_1421_regression.py",
+      "tests/bug_regression/test_btcaaaaa_23716_regression.py",
+      "tests/bug_regression/test_btcaaaaa_23724_regression.py",
+      "tests/bug_regression/test_btcaaaaa_23729_regression.py"
+    ],
+    "tests/test_impact_gate/test_e2e.py": [
+      "tests/bug_regression/test_btcaaaaa_140_regression.py",
+      "tests/bug_regression/test_btcaaaaa_2744_regression.py",
+      "tests/bug_regression/test_btcaaaaa_2745_regression.py",
+      "tests/bug_regression/test_btcaaaaa_2746_regression.py",
+      "tests/bug_regression/test_btcaaaaa_2747_regression.py",
+      "tests/bug_regression/test_btcaaaaa_2748_regression.py",
+      "tests/bug_regression/test_btcaaaaa_2749_regression.py",
+      "tests/bug_regression/test_btcaaaaa_2750_regression.py",
+      "tests/bug_regression/test_btcaaaaa_3622_regression.py"
+    ],
+    "tests/test_touch_index/test_paperclip_client.py": [
+      "tests/bug_regression/test_btcaaaaa_15014_regression.py"
+    ],
+    "tests/test_touch_index/test_bug_worker.py": [
+      "tests/bug_regression/test_btcaaaaa_15031_regression.py",
+      "tests/bug_regression/test_btcaaaaa_4892_regression.py"
+    ],
+    "scripts/opencode_watchdog.py": [
+      "tests/bug_regression/test_btcaaaaa_1552_regression.py"
+    ],
+    "tests/test_blast_radius/test_generator.py": [
+      "tests/bug_regression/test_btcaaaaa_1573_regression.py"
+    ],
+    "tests/test_impact_gate/test_scan_done.py": [
+      "tests/bug_regression/test_btcaaaaa_20256_regression.py",
+      "tests/bug_regression/test_btcaaaaa_2741_regression.py"
+    ],
+    "tests/test_impact_gate/test_runner.py": [
+      "tests/bug_regression/test_btcaaaaa_20256_regression.py",
+      "tests/bug_regression/test_btcaaaaa_2743_regression.py"
+    ],
+    "tests/test_impact_gate/test_worker.py": [
+      "tests/bug_regression/test_btcaaaaa_2740_regression.py",
+      "tests/bug_regression/test_btcaaaaa_2742_regression.py"
+    ],
+    "tests/test_touch_index/test_git_extractor.py": [
+      "tests/bug_regression/test_btcaaaaa_3233_regression.py"
+    ],
+    "tests/bug_regression/test_btcaaaaa_1236_regression.py": [
+      "tests/bug_regression/test_btcaaaaa_3621_regression.py"
     ],
     "tests/integration/test_btcaaaaa_736_mode2_regression.py": [
       "tests/bug_regression/test_btcaaaaa_736_regression.py"
@@ -3822,12 +3928,6 @@
       "tests/strategies/test_strategy_with_backtest.py",
       "tests/strategies/walkforward_test.py"
     ],
-    "src/strategies/strategy_001_01_hod_rejection.py": [
-      "tests/strategies/test_001_01_hod_rejection.py"
-    ],
-    "src/strategies/strategy_001_hod_rejection.py": [
-      "tests/strategies/test_001_hod_rejection.py"
-    ],
     "src/strategies/strategy_002_lod_rejection.py": [
       "tests/strategies/test_002_lod_rejection.py"
     ],
@@ -3847,17 +3947,9 @@
     ],
     "src/optimizer_v3/core/__init__.py": [
       "tests/strategy_builder/ui/test_btcaaaaa_668_trade_registry_and_signals_key.py"
-    ],
-    "src/strategy_builder/ui/validation_dialog.py": [
-      "tests/strategy_builder/ui/test_window_maximize_resize_btcaaaaa390.py"
-    ],
-    "test_unified_manager_data_for_NautilusTrader_backtest.py": [
-      "trace_none_multiplication.py"
     ]
   },
   "all_files": [
-    ".lake_cache/joblib/lakeapi/_read_parquet/_read_parquet_nocache/func_code.py",
-    ".lake_cache/joblib/lakeapi/main/_download_one/func_code.py",
     "alembic/env.py",
     "alembic/versions/20260124_add_strategy_versioning.py",
     "alembic/versions/20260127_add_exit_conditions.py",
@@ -3869,13 +3961,14 @@
     "alembic/versions/20260509_add_ai_readonly_role.py",
     "alembic/versions/20260511_add_touch_index_tables.py",
     "alembic/versions/20260511_phase2_touch_index_deps.py",
+    "alembic/versions/20260512_add_bug_files_source_col.py",
+    "alembic/versions/20260512_add_bug_files_updated_at.py",
     "alembic/versions/20260512_add_fr_files_source_col.py",
+    "alembic/versions/20260512_add_source_column_to_touch_index_tables.py",
     "clean_corrupt_data.py",
     "conftest.py",
-    "debug_backtest_error.py",
     "debug_config_structure.py",
     "debug_signals.py",
-    "deep_nan_trace.py",
     "delete_old_strategy.py",
     "delete_orphan.py",
     "docs/v3/building_blocks/LuxAlgo Concepts/ASFX_A2_VWAP/luxalgo_asfx_a2_vwap.py",
@@ -3913,7 +4006,6 @@
     "docs/v3/expert_reviews/archive/67_supply_demand_zones_research/67_test_luxalgo_supply_demand_zones.py",
     "docs/v3/expert_reviews/archive/67_supply_demand_zones_research/luxalgo_supply_demand_zones.py",
     "docs/v3/expert_reviews/extract_expert_reviews.py",
-    "scripts/LakeAPI/.lake_cache/joblib/lakeapi/main/_download_one/func_code.py",
     "scripts/LakeAPI/download_cryptolake_orderbook.py",
     "scripts/LakeAPI/download_liquidations_funding_oi.py",
     "scripts/LakeAPI/download_synchronize_data.py",
@@ -3925,18 +4017,16 @@
     "scripts/LakeAPI/test_lakeapi_december.py",
     "scripts/analyze_signal_occurrences.py",
     "scripts/analyze_trade_3_1_forensic.py",
-    "scripts/audit/candle_pipeline_audit.py",
     "scripts/audit/secrets_audit.py",
     "scripts/backfill_close_stale_runs.py",
     "scripts/backfill_touch_index.py",
+    "scripts/backfill_touch_index_source.py",
     "scripts/binance/backfill_1h_gaps.py",
     "scripts/binance/backfill_december.py",
     "scripts/binance/daily_sync.py",
     "scripts/binance/diagnose_network.py",
     "scripts/binance/download_binance_liquidations.py",
     "scripts/blast_radius_cli.py",
-    "scripts/btcaaaaa_1007_retune_sensitivity.py",
-    "scripts/btcaaaaa_979_entry_comparison.py",
     "scripts/demo_signal_catalog.py",
     "scripts/dep_extractor.py",
     "scripts/depgraph.py",
@@ -3958,17 +4048,13 @@
     "scripts/patches/0002-add-stale-run-evaluation-dedup.py",
     "scripts/qa_btcaaaaa_1089_cache_key_fix.py",
     "scripts/qa_dep_graph_1163.py",
-    "scripts/qa_live_1085_calibration_cache.py",
-    "scripts/qa_live_1092_disk_cache_persistence.py",
     "scripts/qa_live_1096_training_panel_cache_gate.py",
-    "scripts/qa_live_1097_trainingpanel_cache_gate.py",
     "scripts/qa_live_1195_mode2_trades_list.py",
-    "scripts/qa_live_1196_mode2_trades_list.py",
     "scripts/qa_live_1205_config_discovery_mode2.py",
     "scripts/qa_live_1205_config_discovery_mode2_v2.py",
-    "scripts/qa_live_quick_preview.py",
     "scripts/regenerate_dep_graph.py",
     "scripts/reingest/reingest_corrected_utc.py",
+    "scripts/repro_btcaaaaa_2172_bars_regression.py",
     "scripts/run_blast_radius_worker.py",
     "scripts/run_impact_gate_worker.py",
     "scripts/run_testnet_dry_run.py",
@@ -3980,9 +4066,11 @@
     "scripts/static_dep_graph.py",
     "scripts/strategy_builder_gui.py",
     "scripts/test_all_building_blocks.py",
+    "scripts/validate_data_quality.py",
     "scripts/validate_dependencies.py",
     "scripts/validate_touch_index_bug.py",
     "scripts/validate_touch_index_fr.py",
+    "scripts/verify_dep_graph_refresh.py",
     "scripts/verify_trade_prices.py",
     "src/ai_consultant/__init__.py",
     "src/ai_consultant/audit_writer.py",
@@ -4268,12 +4356,9 @@
     "src/optimizer_v3/validation/institutional_validator.py",
     "src/strategies/.backups/strategy_01_reversal_m_pattern_backup_20260109_171349.py",
     "src/strategies/__init__.py",
-    "src/strategies/completestrategy.py",
-    "src/strategies/lifecyclestrategy.py",
+    "src/strategies/risk_enforcer.py",
     "src/strategies/signal_accumulator/__init__.py",
     "src/strategies/signal_accumulator/signal_accumulator.py",
-    "src/strategies/strategy_001_01_hod_rejection.py",
-    "src/strategies/strategy_001_hod_rejection.py",
     "src/strategies/strategy_002_lod_rejection.py",
     "src/strategies/strategy_003_hod_continuation.py",
     "src/strategies/strategy_01_reversal_m_pattern.py",
@@ -4282,7 +4367,6 @@
     "src/strategies/strategy_08_micro_trend_scalping.py",
     "src/strategies/strategy_09_order_flow_scalping.py",
     "src/strategies/strategy_15_bollinger_mean_reversion.py",
-    "src/strategies/teststrategy.py",
     "src/strategies/universal_optimizer/__init__.py",
     "src/strategies/universal_optimizer/modules/__init__.py",
     "src/strategies/universal_optimizer/modules/block_intelligence.py",
@@ -4368,22 +4452,20 @@
     "test_actual_save.py",
     "test_ai_recommendations_text_wrapper_live.py",
     "test_ai_request_preview_system.py",
-    "test_backtest_trace.py",
+    "test_backtest_engine_validation.py",
     "test_button_font.py",
     "test_complete_cycle.py",
     "test_config_debugger.py",
     "test_create_strategy_orm_validation.py",
-    "test_data_availability.py",
     "test_database_save.py",
     "test_fresh_api.py",
     "test_groupbox_font.py",
     "test_intelligent_recommendations.py",
     "test_load_trace.py",
+    "test_multi_strategy_full.py",
+    "test_multi_strategy_validation.py",
     "test_real_data_save.py",
-    "test_signal_evaluation_trace.py",
     "test_text_wrapper_validation.py",
-    "test_timing_display.py",
-    "test_unified_manager_data_for_NautilusTrader_backtest.py",
     "tests/Strategy_Builder/__init__.py",
     "tests/Strategy_Builder/test_generator.py",
     "tests/Strategy_Builder/test_integration.py",
@@ -4397,9 +4479,51 @@
     "tests/ai_consultant/test_query_engine.py",
     "tests/ai_consultant/test_signal_catalog.py",
     "tests/bug_regression/__init__.py",
+    "tests/bug_regression/test_btcaaaaa_1168_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1236_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1272_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1297_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1327_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1335_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1378_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1390_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1402_regression.py",
+    "tests/bug_regression/test_btcaaaaa_140_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1421_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1448_regression.py",
     "tests/bug_regression/test_btcaaaaa_1497_backtest_worker_chain.py",
     "tests/bug_regression/test_btcaaaaa_1497_backtestworker_real_data_chain.py",
+    "tests/bug_regression/test_btcaaaaa_15014_regression.py",
+    "tests/bug_regression/test_btcaaaaa_15031_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1552_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1554_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1573_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1621_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1623_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1720_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1721_regression.py",
+    "tests/bug_regression/test_btcaaaaa_1723_regression.py",
+    "tests/bug_regression/test_btcaaaaa_20256_regression.py",
+    "tests/bug_regression/test_btcaaaaa_23716_regression.py",
+    "tests/bug_regression/test_btcaaaaa_23724_regression.py",
+    "tests/bug_regression/test_btcaaaaa_23729_regression.py",
+    "tests/bug_regression/test_btcaaaaa_2740_regression.py",
+    "tests/bug_regression/test_btcaaaaa_2741_regression.py",
+    "tests/bug_regression/test_btcaaaaa_2742_regression.py",
+    "tests/bug_regression/test_btcaaaaa_2743_regression.py",
+    "tests/bug_regression/test_btcaaaaa_2744_regression.py",
+    "tests/bug_regression/test_btcaaaaa_2745_regression.py",
+    "tests/bug_regression/test_btcaaaaa_2746_regression.py",
+    "tests/bug_regression/test_btcaaaaa_2747_regression.py",
+    "tests/bug_regression/test_btcaaaaa_2748_regression.py",
+    "tests/bug_regression/test_btcaaaaa_2749_regression.py",
+    "tests/bug_regression/test_btcaaaaa_2750_regression.py",
+    "tests/bug_regression/test_btcaaaaa_3233_regression.py",
+    "tests/bug_regression/test_btcaaaaa_3621_regression.py",
+    "tests/bug_regression/test_btcaaaaa_3622_regression.py",
+    "tests/bug_regression/test_btcaaaaa_4892_regression.py",
     "tests/bug_regression/test_btcaaaaa_736_regression.py",
+    "tests/bug_regression/test_btcaaaaa_8034_regression.py",
     "tests/bug_regression/test_canary_trade_execution.py",
     "tests/building_blocks_registry_envoked/generate_all_test_files.py",
     "tests/building_blocks_registry_envoked/registry_test_library.py",
@@ -4506,6 +4630,7 @@
     "tests/database/test_test_results_get_version_results_orm.py",
     "tests/fr_acceptance/__init__.py",
     "tests/fr_acceptance/test_fdr_850.py",
+    "tests/freeze_lift/test_freeze_lift_evidence.py",
     "tests/integration/__init__.py",
     "tests/integration/refresh_ci_regression_hashes.py",
     "tests/integration/test_backtest_configuration_coverage.py",
@@ -4615,8 +4740,6 @@
     "tests/strategies/02_test_strategy_Reversal_W_Pattern_Standard.py",
     "tests/strategies/backtest_simulator.py",
     "tests/strategies/debug_walkforward.py",
-    "tests/strategies/test_001_01_hod_rejection.py",
-    "tests/strategies/test_001_hod_rejection.py",
     "tests/strategies/test_002_lod_rejection.py",
     "tests/strategies/test_003_hod_continuation.py",
     "tests/strategies/test_strategy_with_backtest.py",
@@ -4701,15 +4824,18 @@
     "tests/test_touch_index/test_fr_runner.py",
     "tests/test_touch_index/test_fr_worker.py",
     "tests/test_touch_index/test_git_extractor.py",
+    "tests/test_touch_index/test_paperclip_client.py",
     "tests/test_touch_index/test_quality.py",
     "tests/test_touch_index/test_validate_bug.py",
     "tests/test_touch_index/test_validate_fr.py",
     "tests/ui_qt/capture_trades_screenshots.py",
     "tests/ui_qt/test_apply_config_dialog_btcaaaaa_1090.py",
     "tests/ui_qt/test_backtest_worker_evidence.py",
+    "tests/ui_qt/test_data_verify_dialog.py",
     "tests/ui_qt/test_quick_preview.py",
     "tests/ui_qt/test_quick_preview_mainwindow.py",
     "tests/ui_qt/test_reports.py",
+    "tests/ui_qt/test_runtime_update_visibility.py",
     "tests/ui_qt/test_settings.py",
     "tests/ui_qt/test_strategy.py",
     "tests/ui_qt/test_trades.py",
@@ -4723,18 +4849,30 @@
     "tests/unit/test_lock_gate.py",
     "tests/unit/test_rc4c_rc6_fixes.py",
     "tests/unit/test_recheck_validation.py",
-    "tests/unit/test_tp_sl_calculations.py",
-    "trace_none_multiplication.py",
-    "trace_nonetype_error.py"
+    "tests/unit/test_tp_sl_calculations.py"
   ],
   "parse_errors": [
-    "scripts/LakeAPI/scan_lakeapi_s3_availability.py"
+    "scripts/LakeAPI/scan_lakeapi_s3_availability.py",
+    "src/detectors/building_blocks/patterns/cup_and_handle.py",
+    "src/detectors/building_blocks/patterns/descending_triangle.py",
+    "src/detectors/building_blocks/patterns/double_bottom.py",
+    "src/detectors/building_blocks/patterns/double_top.py",
+    "src/detectors/building_blocks/patterns/falling_wedge.py",
+    "src/detectors/building_blocks/patterns/flag_pattern.py",
+    "src/detectors/building_blocks/patterns/head_and_shoulders.py",
+    "src/detectors/building_blocks/patterns/inverse_head_and_shoulders.py",
+    "src/detectors/building_blocks/patterns/pennant_pattern.py",
+    "src/detectors/building_blocks/patterns/rising_wedge.py",
+    "src/detectors/building_blocks/patterns/rounding_bottom.py",
+    "src/detectors/building_blocks/patterns/symmetrical_triangle.py",
+    "src/detectors/building_blocks/patterns/triple_bottom.py",
+    "src/detectors/building_blocks/patterns/triple_top.py"
   ],
   "stats": {
-    "total_files": 870,
-    "parsed_files": 869,
-    "error_files": 1,
-    "parse_rate_pct": 99.89,
-    "edge_count": 1134
+    "total_files": 900,
+    "parsed_files": 885,
+    "error_files": 15,
+    "parse_rate_pct": 98.33,
+    "edge_count": 1160
   }
 }
