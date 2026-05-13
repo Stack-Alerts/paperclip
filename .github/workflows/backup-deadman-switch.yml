@@ -1,0 +1,59 @@
+name: Backup Dead-Man's-Switch
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (log only, do not create alerts)'
+        required: false
+        default: 'false'
+      grace:
+        description: 'Grace period in hours'
+        required: false
+        default: '8'
+
+permissions:
+  contents: read
+
+jobs:
+  deadman-switch:
+    name: Monitor backup pipeline liveness
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests python-dotenv
+
+      - name: Run dead-man's-switch
+        env:
+          PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+          PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+          PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+        run: |
+          FLAGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            FLAGS="$FLAGS --dry-run"
+          fi
+          if [ -n "${{ github.event.inputs.grace }}" ]; then
+            FLAGS="$FLAGS --grace ${{ github.event.inputs.grace }}"
+          fi
+          python scripts/backup_deadman_switch.py $FLAGS
+
+      - name: Upload deadman logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deadman-switch-logs
+          path: ~/.paperclip/backup_deadman_switch.log
+          retention-days: 7
