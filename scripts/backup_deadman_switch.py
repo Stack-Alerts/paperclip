@@ -11,6 +11,7 @@ Usage:
     python scripts/backup_deadman_switch.py              # normal run
     python scripts/backup_deadman_switch.py --dry-run     # log only, no alert
     python scripts/backup_deadman_switch.py --grace 6    # 6h grace period
+    python scripts/backup_deadman_switch.py --json-summary # JSON summary output
 """
 
 from __future__ import annotations
@@ -33,6 +34,8 @@ BACKUP_STATE_FILE = Path.home() / ".paperclip" / "instances" / "default" / "back
 BACKUP_INTERVAL_HOURS = 4
 DEFAULT_GRACE_HOURS = 8
 DEADMAN_LOG = Path.home() / ".paperclip" / "backup_deadman_switch.log"
+DEADMAN_STATE = Path.home() / ".paperclip" / "backup_deadman_switch_state.json"
+MAX_LOG_BYTES = 1 * 1024 * 1024
 ALERT_SEARCH_QUERY = "Backup dead-man triggered"
 CTO_AGENT_ID = "41b5ede6-e209-40ba-b923-dc969c722e6d"
 
@@ -45,6 +48,14 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger("backup_deadman_switch")
+
+
+def _rotate_log_if_needed():
+    if DEADMAN_LOG.exists() and DEADMAN_LOG.stat().st_size > MAX_LOG_BYTES:
+        bak = DEADMAN_LOG.with_suffix(".log.1")
+        bak.write_text(DEADMAN_LOG.read_text())
+        DEADMAN_LOG.write_text("")
+        logger.info("Rotated log (size exceeded %d bytes)", MAX_LOG_BYTES)
 
 
 def _read_last_success() -> dict | None:
@@ -70,6 +81,20 @@ def _get_backup_age_hours(state: dict) -> float | None:
         return None
     age = datetime.now(timezone.utc) - ts.astimezone(timezone.utc)
     return age.total_seconds() / 3600
+
+
+def _load_self_state() -> dict:
+    if DEADMAN_STATE.exists():
+        try:
+            return json.loads(DEADMAN_STATE.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def _save_self_state(state: dict):
+    DEADMAN_STATE.parent.mkdir(parents=True, exist_ok=True)
+    DEADMAN_STATE.write_text(json.dumps(state, indent=2))
 
 
 def _find_existing_alert() -> dict | None:
@@ -152,7 +177,7 @@ def _create_alert(age_hours: float | None, grace_hours: int, dry_run: bool) -> b
 
     if dry_run:
         logger.info("DRY RUN: would create alert issue '%s'", title)
-        print(json.dumps(payload, indent=2))
+        print(json.dumps(payload, indent=2))  # noqa: T201
         return True
 
     try:
@@ -174,36 +199,72 @@ def _create_alert(age_hours: float | None, grace_hours: int, dry_run: bool) -> b
         return False
 
 
-def run(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = False) -> bool:
+def run(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = False) -> dict:
+    _rotate_log_if_needed()
+
+    prev = _load_self_state()
+    prev_runs = prev.get("total_runs", 0)
+    prev_last = prev.get("last_run_utc", "never")
+
     state = _read_last_success()
     age_hours = _get_backup_age_hours(state) if state else None
     threshold = BACKUP_INTERVAL_HOURS + grace_hours
 
+    alert_fired = False
+    alert_skipped = False
+    alert_reason = ""
+
     if age_hours is None:
         logger.warning("No successful backup recorded — alert will fire")
+        alert_reason = "no_success_ever"
     elif age_hours <= threshold:
         logger.info(
             "Backup current: %.1fh old (threshold %.1fh)",
             age_hours,
             threshold,
         )
-        return True
     else:
         logger.warning(
             "Backup overdue: %.1fh old (threshold %.1fh) — alert will fire",
             age_hours,
             threshold,
         )
+        alert_reason = "overdue"
 
-    existing = _find_existing_alert()
-    if existing:
-        logger.info(
-            "Existing alert %s already open — skipping duplicate creation",
-            existing.get("identifier", existing["id"]),
-        )
-        return True
+    if alert_reason:
+        existing = _find_existing_alert()
+        if existing:
+            logger.info(
+                "Existing alert %s already open — skipping duplicate creation",
+                existing.get("identifier", existing["id"]),
+            )
+            alert_skipped = True
+        else:
+            ok = _create_alert(age_hours, grace_hours, dry_run)
+            if ok:
+                alert_fired = True
 
-    return _create_alert(age_hours, grace_hours, dry_run)
+    now_utc = datetime.now(timezone.utc).isoformat()
+    _save_self_state({
+        "total_runs": prev_runs + 1,
+        "last_run_utc": now_utc,
+        "last_alert_utc": now_utc if alert_fired else prev.get("last_alert_utc"),
+    })
+
+    summary = {
+        "status": "healthy" if not alert_reason else "alert",
+        "backup_age_hours": age_hours,
+        "backup_interval_hours": BACKUP_INTERVAL_HOURS,
+        "grace_hours": grace_hours,
+        "threshold_hours": threshold,
+        "alert_fired": alert_fired,
+        "alert_skipped": alert_skipped,
+        "alert_reason": alert_reason or "none",
+        "self_last_run_utc": now_utc,
+        "self_prev_run_utc": prev_last,
+        "self_total_runs": prev_runs + 1,
+    }
+    return summary
 
 
 def main():
@@ -221,9 +282,19 @@ def main():
         action="store_true",
         help="Log actions without creating alerts",
     )
+    parser.add_argument(
+        "--json-summary",
+        action="store_true",
+        help="Output JSON summary to stdout (for CI step summaries)",
+    )
     args = parser.parse_args()
 
-    ok = run(grace_hours=args.grace, dry_run=args.dry_run)
+    summary = run(grace_hours=args.grace, dry_run=args.dry_run)
+
+    if args.json_summary:
+        print(json.dumps(summary, indent=2))  # noqa: T201
+
+    ok = summary["status"] != "alert" or summary["alert_fired"] or summary["alert_skipped"]
     sys.exit(0 if ok else 1)
 
 

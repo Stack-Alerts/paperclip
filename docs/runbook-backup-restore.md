@@ -408,6 +408,9 @@ The dead-man switch monitors backup liveness:
 - **Threshold:** 4h (backup interval) + 8h (grace) = 12h since last success
 - **Action:** Creates a critical Paperclip issue assigned to CTO if backup is overdue
 - **State file:** `~/.paperclip/instances/default/backup-state/last-success.json`
+- **Self-health state:** `~/.paperclip/backup_deadman_switch_state.json` (tracks total runs, last run, last alert)
+- **Log file:** `~/.paperclip/backup_deadman_switch.log` (auto-rotated at 1 MB)
+- **CI step summary:** Workflow writes a step summary with backup age, threshold, and self-health metrics
 
 Manual dead-man check:
 
@@ -415,6 +418,32 @@ Manual dead-man check:
 python scripts/backup_deadman_switch.py
 python scripts/backup_deadman_switch.py --dry-run
 python scripts/backup_deadman_switch.py --grace 6
+python scripts/backup_deadman_switch.py --json-summary    # JSON output for CI
+```
+
+#### 6.6.1 Log Rotation
+
+The dead-man switch log (`~/.paperclip/backup_deadman_switch.log`) auto-rotates
+when it exceeds 1 MB. The old log is preserved as
+`~/.paperclip/backup_deadman_switch.log.1`.
+
+#### 6.6.2 Self-Health State
+
+The state file `~/.paperclip/backup_deadman_switch_state.json` tracks:
+
+```json
+{
+  "total_runs": 42,
+  "last_run_utc": "2026-05-13T20:00:00+00:00",
+  "last_alert_utc": "2026-05-10T04:30:00+00:00"
+}
+```
+
+#### 6.6.3 Tests
+
+```bash
+pytest tests/test_scripts/test_backup_deadman_switch.py -v
+pytest tests/bug_regression/test_btcaaaaa_25851_regression.py -v
 ```
 
 ### 6.7 Troubleshooting
@@ -425,6 +454,8 @@ python scripts/backup_deadman_switch.py --grace 6
 | No DB dumps found | `ls ~/.paperclip/instances/default/data/backups/` — Paperclip embedded PG may not be producing dumps |
 | Timer not firing | `systemctl --user status paperclip-backup.timer` — check linger: `loginctl show-user sirrus --property=Linger` |
 | Dead-man alert fired | Backup overdue >12h. Run manual backup, then check dead-man log: `~/.paperclip/backup_deadman_switch.log` |
+| Dead-man log rotated unexpectedly | Check `~/.paperclip/backup_deadman_switch.log.1` for the rotated content |
+| Dead-man self-health shows old last_run_utc | The GH Actions workflow may have stopped. Check `~/.paperclip/backup_deadman_switch_state.json` and verify the CI schedule is active |
 | Service fails with "status=216/GROUP" | Remove any `User=` directive from the service unit — it's redundant in `systemctl --user` and causes GROUP permission errors. Also ensure `WantedBy=default.target` (not `multi-user.target`) for user units. |
 | Timer not firing despite being enabled | Run `loginctl show-user sirrus --property=Linger` — must be `yes`. If `no`: `sudo loginctl enable-linger sirrus`. |
 | | Lock held (flock) | Stale lock file: `rm /tmp/paperclip-backup.lock` |
