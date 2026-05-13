@@ -500,10 +500,193 @@ class TestProcessIssue:
 
         r = process_issue("rate-uuid", dry_run=False)
         assert r["gate_status"] == "FAIL"
-        # Two FR items both failing → 2 create calls → 2 sleep calls
-        assert len(sleep_calls) == 2, f"Expected 2 sleep calls, got {sleep_calls}"
+        # Two FR items both failing:
+        #   item1: throttle before dedup-search (free — first call), throttle before create (sleep)
+        #   item2: throttle before dedup-search (sleep), throttle before create (sleep)
+        # Total: 3 sleeps for 2 creates + 2 searches minus the first free call
+        assert len(sleep_calls) == 3, f"Expected 3 sleep calls, got {sleep_calls}"
         for s in sleep_calls:
-            assert s == BLOCKING_ISSUE_CREATE_INTERVAL
+            assert s == pytest.approx(BLOCKING_ISSUE_CREATE_INTERVAL, rel=0.1)
+
+    def test_rate_limiting_across_fr_and_bug_loops(self, monkeypatch):
+        """Rate limiting must apply between FR and bug loops too."""
+        _FAIL_MIXED = {
+            "timestamp": "2026-01-01T00:00:00",
+            "status": "FAIL",
+            "summary": {"total": 2, "passed": 0, "failed": 2, "errors": 0},
+            "fr_results": {
+                "FDR-900": {
+                    "status": "FAIL",
+                    "tests": [{"nodeid": "test::a", "outcome": "failed", "message": "e"}],
+                },
+            },
+            "bug_results": {
+                "BTCAAAAA-900": {
+                    "status": "FAIL",
+                    "test_file": "tests/bug_regression/test_btcaaaaa_900_regression.py",
+                    "tests": [{"nodeid": "test::b", "outcome": "failed", "message": "e"}],
+                    "passed": 0,
+                    "failed": 1,
+                },
+            },
+        }
+        from blast_radius.query import BlastRadiusData, FRImpact
+
+        br_data = BlastRadiusData()
+        br_data.fr_impact_set = [
+            FRImpact(fr_identifier="FDR-900", fr_owner_agent_id="", fr_issue_id=""),
+        ]
+        monkeypatch.setattr(
+            "impact_gate.worker.query_blast_radius", lambda fps: br_data
+        )
+
+        self._mock_fetch(
+            monkeypatch,
+            {**_FIX_IN_REVIEW, "id": "mixed-uuid", "identifier": "BTCAAAAA-900"},
+        )
+        monkeypatch.setattr(
+            "impact_gate.worker.run_impact_gate", lambda f, b: _FAIL_MIXED
+        )
+
+        posted, transitions = self._mock_actions(monkeypatch)
+
+        sleep_calls = []
+        monkeypatch.setattr(worker_mod.time, "sleep", lambda s: sleep_calls.append(s))
+        monkeypatch.setattr(
+            worker_mod,
+            "_create_blocking_issue",
+            lambda fi, fid, d, t: {"id": f"b-{fid}", "identifier": f"BTCAAAAA-{fid[-3:]}"},
+        )
+        monkeypatch.setattr(
+            worker_mod,
+            "_find_existing_blocking_issue",
+            lambda fi, fid, t: None,
+        )
+
+        r = process_issue("mixed-uuid", dry_run=False)
+        assert r["gate_status"] == "FAIL"
+        # 1 failing FR + 1 failing bug
+        #   FR: dedup-search throttle (free — first call), create throttle (sleep)
+        #   bug: dedup-search throttle (sleep), create throttle (sleep)
+        # Total: 3 sleeps (saved by free first call)
+        assert len(sleep_calls) == 3, f"Expected 3 sleep calls across FR+bug, got {sleep_calls}"
+
+    def test_rate_limiting_dedup_hit_skips_create(self, monkeypatch):
+        """When dedup finds existing, no create call is made and only search throttles apply."""
+        _FAIL_ONE = {
+            "timestamp": "2026-01-01T00:00:00",
+            "status": "FAIL",
+            "summary": {"total": 1, "passed": 0, "failed": 1, "errors": 0},
+            "fr_results": {
+                "FDR-777": {
+                    "status": "FAIL",
+                    "tests": [{"nodeid": "test::a", "outcome": "failed", "message": "e"}],
+                },
+            },
+            "bug_results": {},
+        }
+        from blast_radius.query import BlastRadiusData, FRImpact
+
+        br_data = BlastRadiusData()
+        br_data.fr_impact_set = [
+            FRImpact(fr_identifier="FDR-777", fr_owner_agent_id="", fr_issue_id=""),
+        ]
+        monkeypatch.setattr(
+            "impact_gate.worker.query_blast_radius", lambda fps: br_data
+        )
+
+        self._mock_fetch(
+            monkeypatch,
+            {**_FIX_IN_REVIEW, "id": "dedup-hit-uuid", "identifier": "BTCAAAAA-777"},
+        )
+        monkeypatch.setattr(
+            "impact_gate.worker.run_impact_gate", lambda f, b: _FAIL_ONE
+        )
+
+        posted, transitions = self._mock_actions(monkeypatch)
+
+        create_calls = []
+        monkeypatch.setattr(
+            worker_mod,
+            "_create_blocking_issue",
+            lambda fi, fid, d, t: create_calls.append((fi, fid, t)) or {"id": f"b-{fid}"},
+        )
+        # Dedup finds an existing issue
+        monkeypatch.setattr(
+            worker_mod,
+            "_find_existing_blocking_issue",
+            lambda fi, fid, t: {"id": "existing-id", "identifier": "BTCAAAAA-888"},
+        )
+        sleep_calls = []
+        monkeypatch.setattr(worker_mod.time, "sleep", lambda s: sleep_calls.append(s))
+
+        r = process_issue("dedup-hit-uuid", dry_run=False)
+        assert r["gate_status"] == "FAIL"
+        assert len(create_calls) == 0, "Should not create when dedup hits"
+        # Only search throttle (free — first call, no sleep) — no create throttle needed
+        assert len(sleep_calls) == 0, f"Expected 0 sleep calls on dedup hit, got {sleep_calls}"
+
+    def test_create_blocking_issue_failure_continues_loop(self, monkeypatch):
+        """When _create_blocking_issue returns None, the loop must continue."""
+        _FAIL_TWO = {
+            "timestamp": "2026-01-01T00:00:00",
+            "status": "FAIL",
+            "summary": {"total": 2, "passed": 0, "failed": 2, "errors": 0},
+            "fr_results": {
+                "FDR-101": {
+                    "status": "FAIL",
+                    "tests": [{"nodeid": "test::a", "outcome": "failed", "message": "e"}],
+                },
+                "FDR-102": {
+                    "status": "FAIL",
+                    "tests": [{"nodeid": "test::b", "outcome": "failed", "message": "e"}],
+                },
+            },
+            "bug_results": {},
+        }
+        from blast_radius.query import BlastRadiusData, FRImpact
+
+        br_data = BlastRadiusData()
+        br_data.fr_impact_set = [
+            FRImpact(fr_identifier="FDR-101", fr_owner_agent_id="", fr_issue_id=""),
+            FRImpact(fr_identifier="FDR-102", fr_owner_agent_id="", fr_issue_id=""),
+        ]
+        monkeypatch.setattr(
+            "impact_gate.worker.query_blast_radius", lambda fps: br_data
+        )
+
+        self._mock_fetch(
+            monkeypatch,
+            {**_FIX_IN_REVIEW, "id": "create-fail-uuid", "identifier": "BTCAAAAA-101"},
+        )
+        monkeypatch.setattr(
+            "impact_gate.worker.run_impact_gate", lambda f, b: _FAIL_TWO
+        )
+
+        posted, transitions = self._mock_actions(monkeypatch)
+
+        create_count = [0]
+        def _failing_create(fi, fid, d, t):
+            create_count[0] += 1
+            if create_count[0] == 1:
+                return None  # First create fails
+            return {"id": f"b-{fid}", "identifier": f"BTCAAAAA-{fid[-3:]}"}
+
+        monkeypatch.setattr(worker_mod, "_create_blocking_issue", _failing_create)
+        monkeypatch.setattr(
+            worker_mod,
+            "_find_existing_blocking_issue",
+            lambda fi, fid, t: None,
+        )
+        sleep_calls = []
+        monkeypatch.setattr(worker_mod.time, "sleep", lambda s: sleep_calls.append(s))
+
+        r = process_issue("create-fail-uuid", dry_run=False)
+        assert r["gate_status"] == "FAIL"
+        assert create_count[0] == 2, "Should have attempted both creates despite first failure"
+        # Verify blocking_issues only has the successful creation
+        blocking_identifiers = r.get("blocking_issues", [])
+        assert len(blocking_identifiers) == 1, f"Expected 1 blocking issue, got {blocking_identifiers}"
 
 
 # ---------------------------------------------------------------------------

@@ -516,6 +516,17 @@ def process_issue(
 
     # FAIL or ERROR — revert to in_progress, create blocking sub-issues
     blocking_issues: list[dict] = []
+    _last_create_time: float = 0.0
+
+    def _maybe_throttle() -> None:
+        """Ensure at least BLOCKING_ISSUE_CREATE_INTERVAL between API mutation calls."""
+        nonlocal _last_create_time
+        if _last_create_time > 0:
+            elapsed = time.monotonic() - _last_create_time
+            needed = BLOCKING_ISSUE_CREATE_INTERVAL - elapsed
+            if needed > 0:
+                time.sleep(needed)
+        _last_create_time = time.monotonic()
 
     # Create blocking issues for each failing FR (with dedup and rate limiting)
     fr_results = result.get("fr_results", {})
@@ -531,13 +542,15 @@ def process_issue(
                 if detail_lines
                 else f"Status: {fr_entry.get('status')}"
             )
+            _maybe_throttle()
             existing = _find_existing_blocking_issue(identifier, fid, "fr")
             if existing:
                 blocking_issues.append(existing)
             else:
-                time.sleep(BLOCKING_ISSUE_CREATE_INTERVAL)
+                _maybe_throttle()
                 bi = _create_blocking_issue(identifier, fid, detail, "fr")
                 if bi:
+                    _last_create_time = time.monotonic()
                     blocking_issues.append(bi)
 
     # Create blocking issues for each failing bug regression (with dedup and rate limiting)
@@ -554,13 +567,15 @@ def process_issue(
                 if detail_lines
                 else f"Status: {bug_entry.get('status')}"
             )
+            _maybe_throttle()
             existing = _find_existing_blocking_issue(identifier, bid, "bug")
             if existing:
                 blocking_issues.append(existing)
             else:
-                time.sleep(BLOCKING_ISSUE_CREATE_INTERVAL)
+                _maybe_throttle()
                 bi = _create_blocking_issue(identifier, bid, detail, "bug")
                 if bi:
+                    _last_create_time = time.monotonic()
                     blocking_issues.append(bi)
 
     # Post failure comment
