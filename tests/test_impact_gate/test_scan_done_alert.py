@@ -139,7 +139,7 @@ class TestCreateAlert:
         payload = kw["json"]
         assert payload["priority"] == "medium"
         assert payload["labels"] == ["impact-gate-alert"]
-        assert "BTCAAAAA-100" in payload["body"]
+        assert "BTCAAAAA-100" in payload["description"]
 
     def test_api_error_returns_false(self):
         sess = MagicMock()
@@ -163,7 +163,7 @@ class TestCreateAlert:
         }
         create_alert("http://base", "comp", sess, scan_data, dry_run=False)
         _, kw = sess.post.call_args
-        body = kw["json"]["body"]
+        body = kw["json"]["description"]
         assert "| BTCAAAAA-100 | Fix A |" in body
         assert "| BTCAAAAA-101 | Fix B |" in body
 
