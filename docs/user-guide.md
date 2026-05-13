@@ -3,7 +3,7 @@
 **Version:** 1.0
 **Platform:** BTC Trade Engine (Powered by NautilusTrader)
 **Audience:** Trade Engineers — systematic traders who build and automate strategies
-**Last Updated:** 2026-05-08
+**Last Updated:** 2026-05-13
 
 ---
 
@@ -630,3 +630,18 @@ Both console and log file logging are enabled by default on startup.
 | Data Update Modal | `DataUpdateModal` |
 | Data Verify dialog | `DataVerifyDialog` |
 | Log Viewer | `LogViewerWindow` |
+
+---
+
+## 11. Reference Documentation
+
+### 11.1 Data Management Pipeline
+
+The BTC Trade Engine uses a multi-source data management system (Data Manager) to provide market data for backtesting and live trading. See the [Data Manager Quick Start](architecture/data-manager/QUICK_START.md) for setup, and the [Data Manager Architecture](architecture/data-manager/COMPLETE_ARCHITECTURE.md) for a deep dive into the unified manager, bar aggregation, and source routing.
+
+### 11.2 Touch Index System
+
+The platform maintains a **Touch Index** — a relational mapping of Paperclip issues to files changed in commits. This powers automated file-dependency tracking for bug fixes and feature requests. See:
+- [Touch Index Git Extractor](touch-index-git-extractor.md) — how issue-to-file mapping works
+- [TOUCH_INDEX_BUG_WORKER](architecture/TOUCH_INDEX_BUG_WORKER.md) — bug-close ingestion pipeline
+- [TOUCH_INDEX_FR_WORKER](architecture/TOUCH_INDEX_FR_WORKER.md) — FR ingestion pipeline

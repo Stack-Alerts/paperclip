@@ -3,7 +3,7 @@
 **Version:** 1.0  
 **Platform:** BTC Trade Engine (Powered by NautilusTrader)  
 **Audience:** New Trade Engineers — systematic traders learning to use the platform  
-**Last Updated:** 2026-05-08
+**Last Updated:** 2026-05-13
 
 ---
 
@@ -881,3 +881,17 @@ Design → Validate (in-sample) → Validate (out-of-sample) → Testnet → Liv
 ---
 
 *For day-to-day operational reference, see the [User Guide](user-guide.md). For architecture and developer documentation, see `docs/architecture/`. For operational procedures (CI/CD, migrations, incident response), see `docs/runbook-*.md`.*
+
+---
+
+## Module 7: Supplementary References
+
+### 7.1 Data Management
+
+For detailed instructions on downloading, aggregating, and validating market data, see the [Data Manager Quick Start](architecture/data-manager/QUICK_START.md). The [Strategy Developer Guide](architecture/data-manager/STRATEGY_DEVELOPER_GUIDE.md) covers using the data manager API in your own strategies.
+
+### 7.2 Touch Index
+
+The Touch Index system tracks which files change with each issue. This is used for automated impact analysis and quality gates:
+- [Git Extractor Overview](touch-index-git-extractor.md)
+

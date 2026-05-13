@@ -1,6 +1,6 @@
 # Data Manager - Complete Strategy Developer Guide
 
-**Author:** BTC_Engine_v3  
+**Author:** BTC-Trade-Engine-PaperClip  
 **Date:** January 8, 2026  
 **Status:** Production-Ready  
 
@@ -242,10 +242,10 @@ bars = load_warmup_bars(count=5000, timeframe='15m')
 
 ### Installation
 
-The Data Manager is already installed as part of BTC_Engine_v3:
+The Data Manager is already installed as part of BTC-Trade-Engine-PaperClip:
 
 ```bash
-cd /home/sirrus/projects/BTC_Engine_v3
+cd /home/sirrus/projects/BTC-Trade-Engine-PaperClip
 source venv/bin/activate
 ```
 
@@ -906,7 +906,7 @@ The daily sync runs automatically via cron:
 
 ```bash
 # Cron job (set up once):
-10 0 * * * cd /home/sirrus/projects/BTC_Engine_v3 && \
+10 0 * * * cd /home/sirrus/projects/BTC-Trade-Engine-PaperClip && \
   python scripts/binance/daily_sync.py >> logs/daily_sync.log 2>&1
 
 # What it does:

@@ -1,6 +1,6 @@
 # Data Manager Complete Architecture Guide
 
-**Author:** BTC_Engine_v3  
+**Author:** BTC-Trade-Engine-PaperClip  
 **Date:** February 6, 2026  
 **Purpose:** Institutional-grade reference for data_manager system
 

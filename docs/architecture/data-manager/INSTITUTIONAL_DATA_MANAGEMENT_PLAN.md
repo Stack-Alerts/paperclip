@@ -1,5 +1,5 @@
 # INSTITUTIONAL-GRADE DATA MANAGEMENT SYSTEM
-## BTC_Engine_v3 Comprehensive Data Architecture
+## BTC-Trade-Engine-PaperClip Comprehensive Data Architecture
 
 **Version:** 1.0  
 **Date:** 2026-01-08  
@@ -10,7 +10,7 @@
 
 ## 📋 EXECUTIVE SUMMARY
 
-This document defines the complete institutional-grade data management architecture for BTC_Engine_v3, ensuring reliable, efficient, and scalable data flow from raw tick data through to live trading execution.
+This document defines the complete institutional-grade data management architecture for BTC-Trade-Engine-PaperClip, ensuring reliable, efficient, and scalable data flow from raw tick data through to live trading execution.
 
 ### ✅ KEY DESIGN GOALS
 
@@ -636,7 +636,7 @@ def load_backtest_data(timeframe='15min', days=180):
 
 ```bash
 # Cron: Run on 1st of each month at 2 AM
-0 2 1 * * /home/sirrus/projects/BTC_Engine_v3/scripts/LakeAPI/download_synchronize_data.py --mode=historical
+0 2 1 * * /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/LakeAPI/download_synchronize_data.py --mode=historical
 ```
 
 ### SCHEDULE 2: CURRENT MONTH (Daily)
@@ -647,7 +647,7 @@ def load_backtest_data(timeframe='15min', days=180):
 
 ```bash
 # Cron: Run daily at 3 AM
-0 3 * * * /home/sirrus/projects/BTC_Engine_v3/scripts/LakeAPI/download_synchronize_data.py --mode=current
+0 3 * * * /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/LakeAPI/download_synchronize_data.py --mode=current
 ```
 
 ### SCHEDULE 3: WALKFORWARD DATA (Daily)
@@ -658,7 +658,7 @@ def load_backtest_data(timeframe='15min', days=180):
 
 ```bash
 # Cron: Run daily at 4 AM (after downloads complete)
-0 4 * * * /home/sirrus/projects/BTC_Engine_v3/scripts/LakeAPI/aggregate_all_timeframes.py
+0 4 * * * /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/LakeAPI/aggregate_all_timeframes.py
 ```
 
 ### SCHEDULE 4: NAUTILUS CATALOG (Daily)
@@ -669,7 +669,7 @@ def load_backtest_data(timeframe='15min', days=180):
 
 ```bash
 # Cron: Run daily at 5 AM (after aggregation)
-0 5 * * * /home/sirrus/projects/BTC_Engine_v3/scripts/LakeAPI/update_nautilus_catalog.py
+0 5 * * * /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/LakeAPI/update_nautilus_catalog.py
 ```
 
 ### SCHEDULE 5: PAPER TRADING DATA (Hourly)
@@ -680,7 +680,7 @@ def load_backtest_data(timeframe='15min', days=180):
 
 ```bash
 # Cron: Run every hour
-0 * * * * /home/sirrus/projects/BTC_Engine_v3/scripts/LakeAPI/update_paper_trading_data.py
+0 * * * * /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/LakeAPI/update_paper_trading_data.py
 ```
 
 ### SCHEDULE 6: LIVE TRADING (Real-time WebSocket)

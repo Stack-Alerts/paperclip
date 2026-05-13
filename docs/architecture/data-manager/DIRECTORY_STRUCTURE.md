@@ -191,8 +191,8 @@ class DataSynchronizer:
 import sys
 from pathlib import Path
 
-# Add BTC_Engine_v3 to path
-sys.path.insert(0, '/home/sirrus/projects/BTC_Engine_v3')
+# Add BTC-Trade-Engine-PaperClip to path
+sys.path.insert(0, '/home/sirrus/projects/BTC-Trade-Engine-PaperClip')
 
 # Import data_manager modules
 from src.data_manager.aggregation.tick_to_bars import aggregate_trades_to_bars
@@ -257,7 +257,7 @@ LAKEAPI_KEY=your_access_key_here
 LAKEAPI_SECRET=your_secret_key_here
 
 # Project paths
-BTC_ENGINE_ROOT=/home/sirrus/projects/BTC_Engine_v3
+BTC_ENGINE_ROOT=/home/sirrus/projects/BTC-Trade-Engine-PaperClip
 
 # Configuration
 LAKEAPI_LIMIT_GB=300
@@ -350,22 +350,22 @@ pip install python-dotenv
 # /etc/cron.d/btc_engine_data_manager
 
 # Monthly: Historical data download (1st of month, 2 AM)
-0 2 1 * * /home/sirrus/projects/BTC_Engine_v3/scripts/data_manager/download_synchronize_data.py --mode=historical
+0 2 1 * * /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/data_manager/download_synchronize_data.py --mode=historical
 
 # Daily: Current month download (3 AM)
-0 3 * * * /home/sirrus/projects/BTC_Engine_v3/scripts/data_manager/download_synchronize_data.py --mode=current
+0 3 * * * /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/data_manager/download_synchronize_data.py --mode=current
 
 # Daily: Multicore processing pipeline (4 AM)
-0 4 * * * /home/sirrus/projects/BTC_Engine_v3/scripts/data_manager/process_multicore_pipeline.py
+0 4 * * * /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/data_manager/process_multicore_pipeline.py
 
 # Hourly: Paper trading data update
-0 * * * * /home/sirrus/projects/BTC_Engine_v3/scripts/data_manager/update_paper_trading_data.py
+0 * * * * /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/data_manager/update_paper_trading_data.py
 
 # Daily: Data freshness check (5 AM)
-0 5 * * * /home/sirrus/projects/BTC_Engine_v3/scripts/data_manager/check_data_freshness.py
+0 5 * * * /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/data_manager/check_data_freshness.py
 
 # Weekly: Backup critical data (Sunday, 1 AM)
-0 1 * * 0 /home/sirrus/projects/BTC_Engine_v3/scripts/data_manager/backup_critical_data.py
+0 1 * * 0 /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/data_manager/backup_critical_data.py
 ```
 
 ---

@@ -1,13 +1,13 @@
 # Touch Index — Git Extractor
 
-**Last updated:** 2026-05-12
+**Last updated:** 2026-05-13
 **Owner:** DocWriter
 
 ---
 
 ## 1. Overview
 
-The Git Extractor (`src/touch_index/git_extractor.py`) extracts file paths changed by a Paperclip issue by scanning git commit messages for the issue identifier (e.g. `BTCAAAAA-1085`). This is the primary data source for the Touch Index bug-close and FR ingestion workers.
+The Git Extractor (`src/touch_index/git_extractor.py`) maps Paperclip issue identifiers to files changed by scanning git commit messages. It is the primary data source for the Touch Index bug-close and FR ingestion workers.
 
 ### How It Works
 
@@ -19,8 +19,9 @@ git log --all --format=%H --grep=BTCAAAAA-1085
     │  finds all commits referencing the issue
     ▼
 For each commit SHA:
-    git diff-tree --no-commit-id -r --name-only <SHA>
-    │  extracts the list of touched files
+    git show --name-only --format= --diff-filter=ACMRT <SHA>
+    │  extracts list of touched files (Added, Copied, Modified, Renamed, Type-changed)
+    │  filters to source files only (skips docs/, .json, .md, etc.)
     ▼
 Deduplicated file list → upserted into touch_index_*_files tables
 ```
@@ -44,21 +45,23 @@ hashes = get_commit_hashes("BTCAAAAA-1085")
 
 ### `get_files_for_commit(sha, repo)`
 
-Returns the list of files changed in a single commit.
+Returns the list of source files changed in a single commit (ACMRT filter applied).
 
 ```python
 files = get_files_for_commit("a1b2c3d4")
 # → ["src/touch_index/db.py", "src/touch_index/worker.py"]
 ```
 
-### `get_files_for_issue(issue_identifier, repo)`
+### `get_files_for_issue(issue_identifier, repo, *, max_commits=50)`
 
-Combines the above two: finds all commits for an issue, collects all files, deduplicates.
+Combines the above two: finds up to `max_commits` commits for an issue, collects all files, deduplicates.
 
 ```python
 files = get_files_for_issue("BTCAAAAA-1085")
 # → ["src/touch_index/db.py", "src/touch_index/worker.py", "tests/test_touch_index.py"]
 ```
+
+The `max_commits` limit prevents unbounded processing on issues with very large histories (default: 50).
 
 ### `get_all_referenced_issue_ids(repo)`
 
@@ -77,7 +80,8 @@ ids = get_all_referenced_issue_ids()
 |---|---|
 | **Scope** | All branches (`git log --all`) |
 | **Matching** | Substring match on issue ID in commit message |
-| **Files** | Changed files per commit via `git diff-tree --name-only` |
+| **Files** | Changed source files per commit via `git show --name-only --diff-filter=ACMRT` |
+| **Filtering** | Skips `docs/`, `.md`, `.json`, `.sql`, `.lock`, `.csv`, `.png` and other non-source artifacts |
 | **Timeout** | 30 seconds per git command |
 | **Failure mode** | Logs warning, returns empty list — never crashes |
 
@@ -86,6 +90,7 @@ ids = get_all_referenced_issue_ids()
 - Issues referenced only in PR descriptions (not commit messages) are NOT detected
 - Squash merges that lose individual commit messages may reduce coverage
 - Only `BTCAAAAA-\d+` pattern is matched; other ID formats are ignored
+- Commits beyond the first 50 per issue are excluded (configurable via `max_commits`)
 
 ---
 
@@ -95,4 +100,5 @@ ids = get_all_referenced_issue_ids()
 - [TOUCH_INDEX_BUG_WORKER.md](architecture/TOUCH_INDEX_BUG_WORKER.md) — Bug ingestion pipeline
 - [TOUCH_INDEX_QUALITY.md](architecture/TOUCH_INDEX_QUALITY.md) — Data quality monitoring
 - [DATABASE_GUIDE.md](architecture/DATABASE_GUIDE.md) — touch_index table schemas
+- [Data Manager Developer Guide](architecture/data-manager/STRATEGY_DEVELOPER_GUIDE.md) — market data pipeline
 - [src/touch_index/git_extractor.py](../src/touch_index/git_extractor.py)
