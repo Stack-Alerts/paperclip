@@ -81,6 +81,7 @@ def _make_bug_report():
             unknown_source_rows = 0
             duplicate_pairs = 0
             orphan_bug_issue_ids = []
+            source_distribution = {}
 
     return MockReport()
 
@@ -218,6 +219,7 @@ class TestBuildBugReport:
         assert d["missing_total_count"] == 4
         assert d["total_rows"] == 938
         assert d["stale_rows"] == 0
+        assert "source_distribution" in d
 
     def test_none_report(self):
         d = _build_bug_report(None)
@@ -257,6 +259,7 @@ class TestBuildBugReport:
                 unknown_source_rows = 0
                 duplicate_pairs = 0
                 orphan_bug_issue_ids = ["orphan-x"]
+                source_distribution = {}
 
         d = _build_bug_report(MockReport())
         assert d["orphan_count"] == 1
@@ -286,6 +289,7 @@ class TestBuildBugReport:
                 unknown_source_rows = 0
                 duplicate_pairs = 0
                 orphan_bug_issue_ids = []
+                source_distribution = {}
 
         d = _build_bug_report(MockReport())
         assert d["stale_rows"] == 5

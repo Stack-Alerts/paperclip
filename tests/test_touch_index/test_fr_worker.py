@@ -996,6 +996,92 @@ class TestMain:
         done_logs = [r for r in caplog.records if "FR worker done" in r.message]
         assert len(done_logs) == 0
 
+    def test_main_no_issues_with_catchup_results(self, monkeypatch, caplog):
+        """No issues with catch-up results: catch-up summary is logged."""
+        import logging
+
+        engine = MagicMock()
+        catchup_results = [
+            FRIngestionResult(
+                issue_identifier="BTCAAAAA-500",
+                issue_id="catchup-uuid-1",
+                files_indexed=3,
+                source="git",
+                skipped_no_commits=False,
+            ),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.paperclip_client.get_fdr_issues", return_value=[]),
+            patch("touch_index.fr_worker.run_fr_worker") as mock_worker,
+            caplog.at_level(logging.INFO),
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues",
+                return_value=catchup_results,
+            ) as mock_catchup,
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            main()
+
+        mock_worker.assert_not_called()
+        mock_catchup.assert_called_once()
+        assert any("Catch-up indexed 3 file(s) across 1 issue(s)" in r.message for r in caplog.records)
+
+    def test_main_polling_with_catchup_results(self, monkeypatch, caplog):
+        """Polling with catch-up results: catch-up summary is logged after worker results."""
+        import logging
+
+        engine = MagicMock()
+        issues = [{"id": "id-1", "identifier": "BTCAAAAA-100", "description": ""}]
+        worker_results = [
+            FRIngestionResult(
+                issue_identifier="BTCAAAAA-100",
+                issue_id="id-1",
+                files_indexed=2,
+                source="git",
+                skipped_no_commits=False,
+            ),
+        ]
+        catchup_results = [
+            FRIngestionResult(
+                issue_identifier="BTCAAAAA-500",
+                issue_id="catchup-uuid-1",
+                files_indexed=3,
+                source="comments",
+                skipped_no_commits=False,
+            ),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
+            patch("touch_index.fr_worker.run_fr_worker", return_value=worker_results),
+            patch(
+                "touch_index.paperclip_client.transition_issue_status_board",
+            ) as mock_transition,
+            caplog.at_level(logging.INFO),
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues",
+                return_value=catchup_results,
+            ) as mock_catchup,
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            main()
+
+        mock_catchup.assert_called_once()
+        assert any("Catch-up indexed 3 file(s) across 1 issue(s)" in r.message for r in caplog.records)
+        if any("FR worker done" in r.message for r in caplog.records):
+            summary = [r for r in caplog.records if "FR worker done" in r.message][0]
+            assert "2 issues processed" in summary.message
+            assert "5 files indexed" in summary.message
+        mock_transition.assert_has_calls(
+            [call("id-1", "done"), call("catchup-uuid-1", "done")],
+            any_order=True,
+        )
+
     def test_main_validate_no_issues_passed(self, monkeypatch, caplog):
         """--validate with no issues: validation runs on existing data."""
         import logging

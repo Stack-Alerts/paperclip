@@ -83,6 +83,7 @@ def _build_bug_report(bug_report) -> dict:
         d["unknown_source_rows"] = bug_report.consistency.unknown_source_rows
         d["duplicate_pairs"] = bug_report.consistency.duplicate_pairs
         d["orphan_count"] = len(bug_report.consistency.orphan_bug_issue_ids)
+        d["source_distribution"] = bug_report.consistency.source_distribution or {}
     return d
 
 
