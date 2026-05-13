@@ -242,6 +242,18 @@ def catch_up_eligible_fr_issues(
                 dry_run=dry_run,
                 issue_status=issue.get("status"),
             )
+            if result.source == "none" and not issue.get("description"):
+                full = get_issue_by_id(issue["id"])
+                if full and full.get("description"):
+                    result = ingest_fr_issue(
+                        engine,
+                        issue_id=full["id"],
+                        issue_identifier=full["identifier"],
+                        owner_agent_id=full.get("assigneeAgentId"),
+                        description=full.get("description", "") or "",
+                        dry_run=dry_run,
+                        issue_status=full.get("status"),
+                    )
             results.append(result)
         except Exception:
             logger.exception("Catch-up ingestion error for %s", issue.get("identifier"))

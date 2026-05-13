@@ -2422,6 +2422,93 @@ class TestCatchUpEligibleFrIssues:
         assert results[1].issue_status == "in_progress"
 
 
+    def test_catch_up_fetches_description_when_list_endpoint_omits_it(self):
+        """When list endpoint omits description, catch-up fetches full issue and retries."""
+        engine, conn = self._connect_engine()
+        conn.execute.return_value.fetchall.return_value = []
+        fdr_issues = [
+            {"id": "fdr-uuid-omit", "identifier": "BTCAAAAA-900", "labelIds": [FDR_LABEL_ID]},
+        ]
+        full_issue = {
+            "id": "fdr-uuid-omit",
+            "identifier": "BTCAAAAA-900",
+            "assigneeAgentId": OWNER_AGENT_ID,
+            "description": "Changed `src/touch_index/fr_worker.py`",
+            "labelIds": [FDR_LABEL_ID],
+        }
+
+        with (
+            patch(
+                "touch_index.paperclip_client.get_fdr_issues", return_value=fdr_issues
+            ),
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.fr_worker.get_issue_by_id", return_value=full_issue),
+            patch(
+                "touch_index.fr_worker.extract_files_from_text",
+                return_value=["src/touch_index/fr_worker.py"],
+            ),
+        ):
+            results = catch_up_eligible_fr_issues(engine)
+
+        assert len(results) == 1
+        r = results[0]
+        assert r.source == "description"
+        assert r.files_indexed == 1
+        assert r.skipped_no_commits is False
+        assert r.issue_identifier == "BTCAAAAA-900"
+
+    def test_catch_up_skips_description_retry_when_git_found_files(self):
+        """When git already found files, the description retry is skipped."""
+        engine, conn = self._connect_engine()
+        conn.execute.return_value.fetchall.return_value = []
+        fdr_issues = [
+            {"id": "fdr-uuid-git", "identifier": "BTCAAAAA-901", "description": ""},
+        ]
+
+        with (
+            patch(
+                "touch_index.paperclip_client.get_fdr_issues", return_value=fdr_issues
+            ),
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch(
+                "touch_index.fr_worker.get_files_for_issue",
+                return_value=["src/git_found.py"],
+            ),
+            patch("touch_index.fr_worker.get_issue_by_id") as mock_fetch,
+        ):
+            results = catch_up_eligible_fr_issues(engine)
+
+        assert len(results) == 1
+        assert results[0].source == "git"
+        mock_fetch.assert_not_called()
+
+    def test_catch_up_skips_description_retry_when_full_issue_still_no_description(self):
+        """When full issue also lacks description, original 'none' result is preserved."""
+        engine, conn = self._connect_engine()
+        conn.execute.return_value.fetchall.return_value = []
+        fdr_issues = [
+            {"id": "fdr-uuid-no-desc", "identifier": "BTCAAAAA-902"},
+        ]
+
+        with (
+            patch(
+                "touch_index.paperclip_client.get_fdr_issues", return_value=fdr_issues
+            ),
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+            patch(
+                "touch_index.fr_worker.get_issue_by_id",
+                return_value={"id": "fdr-uuid-no-desc", "identifier": "BTCAAAAA-902"},
+            ),
+        ):
+            results = catch_up_eligible_fr_issues(engine)
+
+        assert len(results) == 1
+        assert results[0].source == "none"
+        assert results[0].skipped_no_commits is True
+
+
 
 class TestEmitJsonSummaryRequiresWorker:
     """_emit_json_summary must reject calls without the worker argument."""
