@@ -210,5 +210,7 @@
   "ad484e75-2f10-48e4-94af-1904d162515b": "ERROR",
   "79e0b23e-25e8-467f-8a46-bfc95c3aa980": "FAIL",
   "8f7c380c-d2b8-4073-a6e4-bcb6a9a3abb3": "PASS",
-  "8beada25-58ef-4395-893e-6c80689204ab": "PASS"
+  "8beada25-58ef-4395-893e-6c80689204ab": "PASS",
+  "03740f7b-1973-4437-a06e-caa8bb71cba5": "FAIL",
+  "6bc002d3-3997-4d37-a857-04e34990b4ae": "ERROR"
 }
