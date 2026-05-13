@@ -88,8 +88,44 @@ class TestRetryStrategy:
 
 
 # ---------------------------------------------------------------------------
-# Timestamp filtering — each API function must include (not skip) issues
-# that have a null/missing timestamp when a time filter is applied.
+# ---------------------------------------------------------------------------
+# _parse_iso_ts — ISO timestamp parser used across all paperclip API functions
+# ---------------------------------------------------------------------------
+
+
+class TestParseIsoTs:
+    """Direct unit tests for _parse_iso_ts (used by get_fdr_issues, etc.)."""
+
+    def test_z_suffix(self):
+        from touch_index.paperclip_client import _parse_iso_ts
+
+        result = _parse_iso_ts("2026-05-11T10:30:00Z")
+        from datetime import timezone, datetime
+        assert result == datetime(2026, 5, 11, 10, 30, 0, tzinfo=timezone.utc)
+
+    def test_none_value(self):
+        from touch_index.paperclip_client import _parse_iso_ts
+        assert _parse_iso_ts(None) is None
+
+    def test_empty_string(self):
+        from touch_index.paperclip_client import _parse_iso_ts
+        assert _parse_iso_ts("") is None
+
+    def test_malformed_timestamp(self):
+        """Malformed ISO string returns None instead of crashing."""
+        from touch_index.paperclip_client import _parse_iso_ts
+        result = _parse_iso_ts("not-a-date")
+        assert result is None
+
+    def test_non_string_value(self):
+        """Non-string raw (e.g. int, list) returns None instead of AttributeError crash."""
+        from touch_index.paperclip_client import _parse_iso_ts
+        result = _parse_iso_ts(12345)
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Timestamp filtering
 # ---------------------------------------------------------------------------
 
 
