@@ -242,18 +242,26 @@ def scan(
                 retro_results.append({"issue": entry["identifier"], "error": str(exc)})
         result["retroactive_results"] = retro_results
 
-        # Re-scan previously ungated issues to update counts after retroactive gating
-        remaining_ungated: list[dict] = []
-        for entry in ungated:
-            gate_status = _check_gate_status(entry["id"])
-            if gate_status is None:
-                remaining_ungated.append(entry)
-            else:
+        # Update counts from retroactive results (avoids redundant comment-fetch API calls)
+        remaining_ungated = list(ungated)
+        for retro in retro_results:
+            issue_id = retro.get("issue", "")
+            gate_status = retro.get("gate_status")
+            if gate_status and gate_status.upper() in (
+                "PASS",
+                "FAIL",
+                "BYPASSED",
+                "ERROR",
+                "SKIPPED",
+            ):
                 status_key = gate_status.lower()
                 gated[status_key] = gated.get(status_key, 0) + 1
                 gated_issues.append(
-                    {"identifier": entry["identifier"], "gate_status": gate_status}
+                    {"identifier": issue_id, "gate_status": gate_status.upper()}
                 )
+                remaining_ungated = [
+                    e for e in remaining_ungated if e["identifier"] != issue_id
+                ]
         result["ungated_count"] = len(remaining_ungated)
         result["ungated_issues"] = remaining_ungated
         result["gated"] = gated
