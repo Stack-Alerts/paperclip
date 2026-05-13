@@ -171,9 +171,7 @@ def _run_bug_cli() -> None:
 
     if not issues:
         logger.info("Nothing to do")
-        catchup_results = catch_up_eligible_bug_issues(
-            engine, dry_run=args.dry_run
-        )
+        catchup_results = catch_up_eligible_bug_issues(engine, dry_run=args.dry_run)
         if catchup_results:
             logger.info(
                 "Catch-up indexed %d file(s) across %d issue(s)",
@@ -207,9 +205,7 @@ def _run_bug_cli() -> None:
     results = run_bug_worker(engine, issues, dry_run=args.dry_run)
     worker_count = len(results)
 
-    catchup_results = catch_up_eligible_bug_issues(
-        engine, dry_run=args.dry_run
-    )
+    catchup_results = catch_up_eligible_bug_issues(engine, dry_run=args.dry_run)
     if catchup_results:
         logger.info(
             "Catch-up indexed %d file(s) across %d issue(s)",
@@ -324,7 +320,10 @@ def _run_fr_cli() -> None:
         process_fr_issue,
         run_fr_worker,
     )
-    from touch_index.paperclip_client import get_fdr_issues, transition_issue_status_board
+    from touch_index.paperclip_client import (
+        get_fdr_issues,
+        transition_issue_status_board,
+    )
     from touch_index.quality import run_quality_checks
 
     logging.basicConfig(
@@ -433,9 +432,7 @@ def _run_fr_cli() -> None:
 
     if not issues:
         logger.info("Nothing to do")
-        catchup_results = catch_up_eligible_fr_issues(
-            engine, dry_run=args.dry_run
-        )
+        catchup_results = catch_up_eligible_fr_issues(engine, dry_run=args.dry_run)
         if catchup_results:
             logger.info(
                 "Catch-up indexed %d file(s) across %d issue(s)",
@@ -459,9 +456,7 @@ def _run_fr_cli() -> None:
     results = run_fr_worker(engine, issues, dry_run=args.dry_run)
     worker_count = len(results)
 
-    catchup_results = catch_up_eligible_fr_issues(
-        engine, dry_run=args.dry_run
-    )
+    catchup_results = catch_up_eligible_fr_issues(engine, dry_run=args.dry_run)
     if catchup_results:
         logger.info(
             "Catch-up indexed %d file(s) across %d issue(s)",

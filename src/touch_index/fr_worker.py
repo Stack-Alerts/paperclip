@@ -234,9 +234,7 @@ def catch_up_eligible_fr_issues(
             )
             results.append(result)
         except Exception:
-            logger.exception(
-                "Catch-up ingestion error for %s", issue.get("identifier")
-            )
+            logger.exception("Catch-up ingestion error for %s", issue.get("identifier"))
     if results:
         logger.info(
             "Catch-up complete: %d FDR issues processed, %d files indexed, %d skipped",
