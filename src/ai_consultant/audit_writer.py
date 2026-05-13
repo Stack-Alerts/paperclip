@@ -92,7 +92,7 @@ class AuditWriter:
             try:
                 self._pool = await asyncpg.create_pool(self._db_url, min_size=1, max_size=3)
             except Exception as exc:
-                print(f"[AuditWriter] DB pool creation failed: {exc}", file=sys.stderr)
+                print(f"[AuditWriter] DB pool creation failed: {exc}", file=sys.stderr)  # noqa: T201
                 self._pool = None
         self._jsonl_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -101,7 +101,7 @@ class AuditWriter:
             try:
                 await self._pool.close()
             except Exception as exc:
-                print(f"[AuditWriter] DB pool close error: {exc}", file=sys.stderr)
+                print(f"[AuditWriter] DB pool close error: {exc}", file=sys.stderr)  # noqa: T201
             self._pool = None
 
     async def __aenter__(self) -> "AuditWriter":
@@ -171,7 +171,7 @@ class AuditWriter:
                     token_cost_usd,
                 )
         except Exception as exc:
-            print(f"[AuditWriter] DB write failed ({event_type}): {exc}", file=sys.stderr)
+            print(f"[AuditWriter] DB write failed ({event_type}): {exc}", file=sys.stderr)  # noqa: T201
 
     async def _write_jsonl(self, record: dict[str, Any]) -> None:
         try:
@@ -181,7 +181,7 @@ class AuditWriter:
                     None, self._append_line, line
                 )
         except Exception as exc:
-            print(f"[AuditWriter] JSONL write failed: {exc}", file=sys.stderr)
+            print(f"[AuditWriter] JSONL write failed: {exc}", file=sys.stderr)  # noqa: T201
 
     def _append_line(self, line: str) -> None:
         with open(self._jsonl_path, "a", encoding="utf-8") as fh:

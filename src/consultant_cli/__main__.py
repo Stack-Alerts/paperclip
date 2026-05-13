@@ -36,7 +36,7 @@ def _build_service():
             from ai_consultant.db.query_engine import QueryEngine
             query_engine = QueryEngine()
         except Exception as exc:
-            print(f"[warn] DB tools unavailable: {exc}", file=sys.stderr)
+            print(f"[warn] DB tools unavailable: {exc}", file=sys.stderr)  # noqa: T201
 
     try:
         from ai_consultant.signal_catalog import SignalCatalogService
@@ -47,37 +47,37 @@ def _build_service():
         catalog = SignalCatalogService(db_url=db_url)
         catalog.load(with_live_stats=(db_url is not None))
     except Exception as exc:
-        print(f"[warn] Signal catalog unavailable: {exc}", file=sys.stderr)
+        print(f"[warn] Signal catalog unavailable: {exc}", file=sys.stderr)  # noqa: T201
 
     return ConsultantService(query_engine=query_engine, catalog=catalog)
 
 
 async def _repl(service, session_id: str) -> None:
-    print("AI Consultant — type 'exit' or press Ctrl-D to quit.\n")
+    print("AI Consultant — type 'exit' or press Ctrl-D to quit.\n")  # noqa: T201
     while True:
         try:
             line = await asyncio.get_event_loop().run_in_executor(None, lambda: input("You: "))
         except (EOFError, KeyboardInterrupt):
-            print("\nGoodbye.")
+            print("\nGoodbye.")  # noqa: T201
             break
         line = line.strip()
         if not line:
             continue
         if line.lower() in {"exit", "quit", "bye"}:
-            print("Goodbye.")
+            print("Goodbye.")  # noqa: T201
             break
         try:
             reply = await service.chat(session_id, line)
-            print(f"\nConsultant: {reply}\n")
+            print(f"\nConsultant: {reply}\n")  # noqa: T201
         except Exception as exc:
-            print(f"[error] {exc}", file=sys.stderr)
+            print(f"[error] {exc}", file=sys.stderr)  # noqa: T201
 
 
 async def main() -> None:
     service = _build_service()
     session_id = str(uuid.uuid4())
     tool_count = len(service._tools)
-    print(f"Session: {session_id[:8]}…  Tools registered: {tool_count}")
+    print(f"Session: {session_id[:8]}…  Tools registered: {tool_count}")  # noqa: T201
     await _repl(service, session_id)
 
 
