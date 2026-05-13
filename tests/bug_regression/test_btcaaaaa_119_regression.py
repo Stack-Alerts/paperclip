@@ -22,7 +22,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 pytest.importorskip("PyQt5", reason="PyQt5 not available — skipping Qt regression tests")
-pytest.importorskip("pytest_qt", reason="pytest-qt not installed — skipping Qt regression tests")
+pytest.importorskip("pytestqt", reason="pytest-qt not installed — skipping Qt regression tests")
 
 from PyQt5.QtWidgets import QApplication
 

@@ -18,7 +18,7 @@ from unittest.mock import patch, MagicMock
 # Gate: skip the whole module if PyQt5 is not present.
 pytest.importorskip("PyQt5", reason="PyQt5 not available — skipping Qt signal tests")
 # Gate: skip the whole module if pytest-qt (qtbot fixture) is not installed.
-pytest.importorskip("pytest_qt", reason="pytest-qt not installed — skipping Qt signal tests")
+pytest.importorskip("pytestqt", reason="pytest-qt not installed — skipping Qt signal tests")
 
 from PyQt5.QtWidgets import QApplication
 

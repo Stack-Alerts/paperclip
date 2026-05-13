@@ -136,8 +136,8 @@ class ValidationReportWindow(WindowGeometryMixin, QMainWindow):
         layout.addWidget(header)
         
         # Tab widget for organized content
-        tabs = self._create_tabs()
-        layout.addWidget(tabs, 1)
+        self.tabs = self._create_tabs()
+        layout.addWidget(self.tabs, 1)
         
         # Footer with actions
         footer = self._create_footer()
@@ -2097,9 +2097,8 @@ class ValidationReportWindow(WindowGeometryMixin, QMainWindow):
         layout.addWidget(header)
         
         # Tabs (no status banner between header and tabs)
-        tabs = self._create_tabs()
-        self.tabs = tabs  # Store reference so callers can navigate after reinit
-        layout.addWidget(tabs, 1)
+        self.tabs = self._create_tabs()
+        layout.addWidget(self.tabs, 1)
         
         # Footer
         footer = self._create_footer()
