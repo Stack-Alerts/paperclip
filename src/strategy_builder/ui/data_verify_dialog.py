@@ -596,7 +596,7 @@ class DataVerifyDialog(WindowGeometryMixin, QDialog):
     @staticmethod
     def _format_utc_now() -> str:
         """Return a human-readable current UTC time string for display in the header."""
-        return "Current UTC time: " + datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+        return "Current UTC time: " + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
 
     def _on_progress(self, current: int, total: int, message: str):
         self._progress_bar.setMaximum(total)

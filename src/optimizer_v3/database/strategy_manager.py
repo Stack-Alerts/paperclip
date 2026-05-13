@@ -500,7 +500,7 @@ class StrategyDatabaseManager:
                 serialisable[k] = v
 
         # Tag the snapshot with its save source and timestamp
-        serialisable['_saved_at'] = _dt.utcnow().isoformat()
+        serialisable["_saved_at"] = datetime.now(timezone.utc).isoformat()
         serialisable['_save_source'] = source
 
         return self.update_strategy_version(version_id, {'backtest_config': serialisable})
