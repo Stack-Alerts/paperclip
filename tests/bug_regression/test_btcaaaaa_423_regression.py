@@ -40,6 +40,20 @@ class TestSwitchToMetricsTabStructural:
         assert ai_pos != -1, "'ai' fallback not found"
         assert metric_pos < ai_pos, "'metric' check must precede 'ai' fallback"
 
+    def test_switch_falls_back_to_ai_recommendations(self):
+        """_switch_to_metrics_tab must fall back to 'ai'/'rec' tab when Metrics tab is absent."""
+        from src.optimizer_v3.ui.metrics_display_panel import MetricsDisplayPanel
+        src = inspect.getsource(MetricsDisplayPanel._switch_to_metrics_tab)
+        assert "'ai'" in src or "'rec'" in src, "Fallback to AI/Recommendations tab must exist"
+
+    def test_switch_logs_warning_when_no_tabwidget(self):
+        """_switch_to_metrics_tab must log a warning when no QTabWidget is found."""
+        from src.optimizer_v3.ui.metrics_display_panel import MetricsDisplayPanel
+        src = inspect.getsource(MetricsDisplayPanel._switch_to_metrics_tab)
+        assert "warning" in src.lower() or "WARNING" in src, (
+            "Must log warning when tab widget not found"
+        )
+
 
 class TestTabOrderStructural:
     """Structural checks for tab order in BacktestConfigPanel."""
@@ -61,6 +75,12 @@ class TestTabOrderStructural:
         assert "_on_ai_request_approved" in source
         assert "display_recommendations" in source
 
+    def test_all_six_tab_titles_present(self):
+        """All six expected tab titles must appear in backtest_config_panel.py source."""
+        source = pathlib.Path("src/strategy_builder/ui/backtest_config_panel.py").read_text()
+        for keyword in ["Config", "Live Output", "Trades", "AI Recommendations", "Metrics", "Compare"]:
+            assert keyword in source, f"Tab '{keyword}' not found in source"
+
 
 class TestFindMainWindowStructural:
     """Structural checks for _find_main_window walking the full parent chain."""
@@ -74,7 +94,27 @@ class TestFindMainWindowStructural:
         src = inspect.getsource(MetricsDisplayPanel._find_main_window)
         assert "blocks_panel" in src
 
+    def test_find_main_window_walks_parent_chain(self):
+        """_find_main_window must use a while loop with widget.parent(), not just self.window()."""
+        from src.optimizer_v3.ui.metrics_display_panel import MetricsDisplayPanel
+        src = inspect.getsource(MetricsDisplayPanel._find_main_window)
+        assert "parent()" in src, "Must walk Qt parent chain via widget.parent()"
+
+    def test_find_main_window_returns_none_as_fallback(self):
+        """_find_main_window must return None when no blocks_panel ancestor exists."""
+        from src.optimizer_v3.ui.metrics_display_panel import MetricsDisplayPanel
+        src = inspect.getsource(MetricsDisplayPanel._find_main_window)
+        assert "return None" in src, "Must return None when main window not found"
+
     def test_refresh_uses_refresh_from_orchestrator(self):
         from src.optimizer_v3.ui.metrics_display_panel import MetricsDisplayPanel
         src = inspect.getsource(MetricsDisplayPanel._refresh_strategy_builder_ui)
         assert "refresh_from_orchestrator" in src
+
+    def test_refresh_handles_none_main_window(self):
+        """_refresh_strategy_builder_ui must guard against main_window being None."""
+        from src.optimizer_v3.ui.metrics_display_panel import MetricsDisplayPanel
+        src = inspect.getsource(MetricsDisplayPanel._refresh_strategy_builder_ui)
+        assert "main_window is None" in src or "MainWindow not found" in src, (
+            "Must guard against None main_window"
+        )
