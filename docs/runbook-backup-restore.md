@@ -446,6 +446,36 @@ pytest tests/test_scripts/test_backup_deadman_switch.py -v
 pytest tests/bug_regression/test_btcaaaaa_25851_regression.py -v
 ```
 
+#### 6.6.4 Dead-Man Switch Monitor (Watchdog on the Watchdog)
+
+The dead-man switch monitor watches the backup dead-man's-switch itself.
+It runs on GitHub-hosted runners (`ubuntu-latest`) to avoid being affected
+by the same self-hosted runner failures it monitors.
+
+- **Workflow:** `.github/workflows/deadman-switch-monitor.yml`
+- **Interval:** Every 30 min (at :15 and :45, offset from the dead-man switch)
+- **Threshold:** 45 min since last successful dead-man-switch run
+- **Runner:** `ubuntu-latest` (GitHub-hosted, **not** self-hosted)
+- **Action:** Creates a critical Paperclip issue if the dead-man's-switch has no successful runs within the threshold
+- **State file:** `~/.paperclip/deadman_switch_monitor_state.json`
+- **Log file:** `~/.paperclip/deadman_switch_monitor.log` (auto-rotated at 1 MB)
+
+Manual monitor check:
+
+```bash
+python scripts/deadman_switch_monitor.py
+python scripts/deadman_switch_monitor.py --dry-run
+python scripts/deadman_switch_monitor.py --threshold 30
+python scripts/deadman_switch_monitor.py --json-summary
+```
+
+Tests:
+
+```bash
+pytest tests/test_scripts/test_deadman_switch_monitor.py -v
+```
+
+
 ### 6.7 Troubleshooting
 
 | Symptom | Check |
@@ -456,6 +486,7 @@ pytest tests/bug_regression/test_btcaaaaa_25851_regression.py -v
 | Dead-man alert fired | Backup overdue >12h. Run manual backup, then check dead-man log: `~/.paperclip/backup_deadman_switch.log` |
 | Dead-man log rotated unexpectedly | Check `~/.paperclip/backup_deadman_switch.log.1` for the rotated content |
 | Dead-man self-health shows old last_run_utc | The GH Actions workflow may have stopped. Check `~/.paperclip/backup_deadman_switch_state.json` and verify the CI schedule is active |
+| Dead-man switch monitor alert fired | The dead-man's-switch itself is not running. Check GitHub Actions for `backup-deadman-switch.yml` run history. The self-hosted runner may be down. Check monitor log: `~/.paperclip/deadman_switch_monitor.log` |
 | Service fails with "status=216/GROUP" | Remove any `User=` directive from the service unit — it's redundant in `systemctl --user` and causes GROUP permission errors. Also ensure `WantedBy=default.target` (not `multi-user.target`) for user units. |
 | Timer not firing despite being enabled | Run `loginctl show-user sirrus --property=Linger` — must be `yes`. If `no`: `sudo loginctl enable-linger sirrus`. |
 | | Lock held (flock) | Stale lock file: `rm /tmp/paperclip-backup.lock` |
