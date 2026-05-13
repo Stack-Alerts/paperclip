@@ -85,6 +85,7 @@ jobs:
             tests/optimizer_v3/test_error_recovery.py \
             tests/itm/state/ \
             tests/bug_regression/test_btcaaaaa_20_regression.py \
+            tests/bug_regression/test_btcaaaaa_22_regression.py \
             tests/bug_regression/test_btcaaaaa_79_regression.py \
             tests/bug_regression/test_btcaaaaa_87_regression.py \
             tests/bug_regression/test_btcaaaaa_92_regression.py \
