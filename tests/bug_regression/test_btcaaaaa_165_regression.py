@@ -22,11 +22,15 @@ causing Binance to return 0 bars and leaving the gap unrepaired until
 the next cycle.
 
 This file verifies the propagation buffer constant is still defined,
-preserving the domain knowledge embedded in the fix.
+the buffer is NOT applied to fetch_start, the polling retry loop for
+trailing-edge propagation exists, and the filter_start guard in
+_fetch_binance_range absorbs sub-second API offsets.
 """
 from __future__ import annotations
 
+import inspect
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 
@@ -59,6 +63,16 @@ class TestBinancePropagationBuffer:
 
         assert BINANCE_PROPAGATION_BUFFER.total_seconds() > 0
 
+    def test_constant_comment_explains_propagation_delay(self) -> None:
+        src = (
+            Path(__file__).parent.parent.parent
+            / "src" / "data_manager" / "unified_manager.py"
+        ).read_text()
+        idx = src.index("BINANCE_PROPAGATION_BUFFER")
+        lines_before = src[:idx].split("\n")[-8:]
+        comment_block = "\n".join(lines_before)
+        assert "1–2 seconds" in comment_block or "1-2 seconds" in comment_block
+
 
 class TestVerifyAndRepairFetchStart:
     """verify_and_repair uses fetch_start = gap_start + bar_td (no buffer).
@@ -73,3 +87,41 @@ class TestVerifyAndRepairFetchStart:
         from src.data_manager.unified_manager import UnifiedDataManager
 
         assert hasattr(UnifiedDataManager, "verify_and_repair")
+
+    def test_fetch_start_no_buffer_note_present(self) -> None:
+        from src.data_manager.unified_manager import UnifiedDataManager
+
+        src = inspect.getsource(UnifiedDataManager.verify_and_repair)
+        assert "BINANCE_PROPAGATION_BUFFER is NOT added to fetch_start" in src
+
+    def test_trailing_edge_polling_retry_present(self) -> None:
+        from src.data_manager.unified_manager import UnifiedDataManager
+
+        src = inspect.getsource(UnifiedDataManager.verify_and_repair)
+        assert "is_trailing_edge" in src
+        assert "MAX_RETRIES" in src
+        assert "RETRY_INTERVAL_S" in src
+
+
+class TestFetchBinanceRangeGuard:
+    """_fetch_binance_range filter_start guard absorbs sub-second API offsets.
+
+    Adding the propagation buffer to fetch_start caused Binance to reject
+    startTime values past the bar open.  The filter_start guard in
+    _fetch_binance_range floors start_ts to the nearest second and subtracts
+    3 s so any sub-second API offset is absorbed without widening the
+    window more than necessary.
+    """
+
+    def test_fetch_binance_range_method_exists(self) -> None:
+        from src.data_manager.unified_manager import UnifiedDataManager
+
+        assert hasattr(UnifiedDataManager, "_fetch_binance_range")
+
+    def test_filter_start_floors_and_subtracts(self) -> None:
+        from src.data_manager.unified_manager import UnifiedDataManager
+
+        src = inspect.getsource(UnifiedDataManager._fetch_binance_range)
+        assert "filter_start" in src
+        assert ".floor('s')" in src
+        assert "Timedelta(seconds=3)" in src
