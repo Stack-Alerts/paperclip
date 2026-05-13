@@ -56,6 +56,11 @@ def _is_placeholder(val: str) -> bool:
     return val.lower() in KNOWN_PLACEHOLDERS or val.startswith("${")
 
 
+def _redact_value(snippet: str, value: str) -> str:
+    """Redact a matched credential value from the output snippet."""
+    return snippet.replace(value, "[REDACTED]")
+
+
 def _check_pattern(
     pattern: re.Pattern, line: str, lineno: int, file_str: str, label: str, findings: list[str]
 ) -> bool:
@@ -64,7 +69,8 @@ def _check_pattern(
         val = m.group(1)
         if not _is_placeholder(val):
             snippet = line.strip()[:80]
-            findings.append(f"{file_str}:{lineno}: {label}: {snippet}")
+            redacted = _redact_value(snippet, val)
+            findings.append(f"{file_str}:{lineno}: {label}: {redacted}")
         return True
     return False
 
@@ -102,7 +108,7 @@ def scan_file(path: Path) -> list[str]:
         m = PAT_BINANCE_ENV_LITERAL.search(line)
         if m:
             snippet = line.strip()[:80]
-            findings.append(f"{file_str}:{lineno}: binance_env_literal: {snippet}")
+            findings.append(f"{file_str}:{lineno}: binance_env_literal: {_redact_value(snippet, m.group(1))}")
             continue
 
         for m in PAT_STRING_LITERAL.finditer(line):
@@ -113,7 +119,7 @@ def scan_file(path: Path) -> list[str]:
                 if re.search(r'\.(?:get|pop|setdefault)\s*\(\s*["'"'"']' + re.escape(val) + r'["'"'"']', line):
                     continue
                 snippet = line.strip()[:80]
-                findings.append(f"{file_str}:{lineno}: binance_literal_string: {snippet}")
+                findings.append(f"{file_str}:{lineno}: binance_literal_string: {_redact_value(snippet, val)}")
                 break
 
     return findings
