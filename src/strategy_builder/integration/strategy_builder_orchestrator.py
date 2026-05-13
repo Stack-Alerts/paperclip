@@ -1339,7 +1339,7 @@ class StrategyBuilderOrchestrator:
         configuration changes made via intelligent recommendations.
         
         CRITICAL FIX: Uses self.loaded_strategy_path to save to the LOADED strategy file,
-        not hardcoded current_strategy.json. Works for ANY loaded strategy (HOD Rejection,
+        not hardcoded to a single JSON file — dynamically follows the loaded strategy path. Works for ANY loaded strategy (HOD Rejection,
         RSI VWAP, or any of 100s of strategies).
         
         Args:
@@ -1364,7 +1364,7 @@ class StrategyBuilderOrchestrator:
             else:
                 # Fallback to current_strategy.json if no strategy loaded
                 config_file = project_root / "user_strategies" / "current_strategy.json"
-                logger.info(f"💾 No loaded strategy path - saving to: current_strategy.json")
+                logger.info(f"💾 No loaded strategy path - saving to: user_strategies/current_strategy.json")
             
             config_file.parent.mkdir(parents=True, exist_ok=True)
             
