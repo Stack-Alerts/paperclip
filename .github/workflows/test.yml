@@ -86,6 +86,7 @@ jobs:
             tests/itm/state/ \
             tests/bug_regression/test_btcaaaaa_99_regression.py \
             tests/bug_regression/test_btcaaaaa_149_regression.py \
+            tests/bug_regression/test_btcaaaaa_182_regression.py  \
             tests/bug_regression/test_btcaaaaa_1477_regression.py \
             tests/bug_regression/test_btcaaaaa_198_regression.py \
             tests/bug_regression/test_btcaaaaa_20263_regression.py \
