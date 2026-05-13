@@ -59,7 +59,14 @@ def _rotate_log_if_needed():
         logger.info("Rotated monitor log (size exceeded %d bytes)", MAX_LOG_BYTES)
 
 
-def _gh_run_list(workflow: str, limit: int = 5) -> list[dict]:
+_GH_AUTH_ERROR_PATTERNS = [
+    "To get started with GitHub CLI, please run:  gh auth login",
+    "no oauth token found",
+    "populate the GH_TOKEN environment variable",
+]
+
+
+def _gh_run_list(workflow: str, limit: int = 5) -> list[dict] | None:
     result = subprocess.run(
         [
             "gh", "run", "list",
@@ -72,6 +79,14 @@ def _gh_run_list(workflow: str, limit: int = 5) -> list[dict]:
         timeout=30,
     )
     if result.returncode != 0:
+        stderr_lower = result.stderr.lower() if result.stderr else ""
+        for pattern in _GH_AUTH_ERROR_PATTERNS:
+            if pattern.lower() in stderr_lower:
+                logger.error(
+                    "gh CLI not authenticated — cannot query workflow runs. "
+                    "Run 'gh auth login' or set GH_TOKEN. Skipping alert."
+                )
+                return None
         logger.error("gh run list failed: %s", result.stderr.strip())
         return []
     try:
@@ -246,14 +261,24 @@ def run(
     prev_last = prev.get("last_run_utc", "never")
 
     runs = _gh_run_list(TARGET_WORKFLOW, limit=10)
-    age_minutes = _get_latest_success_age_minutes(runs)
 
     alert_fired = False
     alert_skipped = False
     alert_reason = ""
     status = "healthy"
 
-    if age_minutes is None:
+    if runs is None:
+        logger.error(
+            "gh CLI auth failure — cannot determine workflow health. No alert fired."
+        )
+        age_minutes = None
+        status = "auth_error"
+    else:
+        age_minutes = _get_latest_success_age_minutes(runs)
+
+    if runs is None:
+        pass
+    elif age_minutes is None:
         if not _has_any_recent_runs(runs, threshold_minutes):
             logger.warning(
                 "Dead-man's-switch workflow has no runs at all "
@@ -311,7 +336,7 @@ def run(
         "deadman_interval_minutes": DEADMAN_INTERVAL_MINUTES,
         "monitor_threshold_minutes": threshold_minutes,
         "last_success_age_minutes": age_minutes,
-        "total_runs_checked": len(runs),
+        "total_runs_checked": len(runs) if runs is not None else 0,
         "alert_fired": alert_fired,
         "alert_skipped": alert_skipped,
         "alert_reason": alert_reason or "none",
