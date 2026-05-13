@@ -6,8 +6,12 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
+      full_scan:
+        description: 'Scan ALL done fix issues (ignores days_back)'
+        required: false
+        default: 'false'
       days_back:
-        description: 'Only scan issues completed within the last N days'
+        description: 'Only scan issues completed within the last N days (ignored when full_scan=true)'
         required: false
         default: '7'
       dry_run:
@@ -79,9 +83,13 @@ jobs:
             if [ "${{ github.event.inputs.retroactive }}" = "true" ]; then
               FLAGS="$FLAGS --retroactive"
             fi
-            DAYS="${{ github.event.inputs.days_back }}"
-            if [ -n "$DAYS" ]; then
-              FLAGS="$FLAGS --days-back $DAYS"
+            if [ "${{ github.event.inputs.full_scan }}" = "true" ]; then
+              echo "Full scan mode — ignoring days_back"
+            else
+              DAYS="${{ github.event.inputs.days_back }}"
+              if [ -n "$DAYS" ]; then
+                FLAGS="$FLAGS --days-back $DAYS"
+              fi
             fi
           fi
           python scripts/scan_fix_issues_done.py $FLAGS > /tmp/scan-output.json

@@ -324,6 +324,25 @@ class TestProcessIssue:
         assert r["gate_status"] == "FAIL"
         assert transitions == [("fail-uuid", "in_progress")]
 
+
+    def test_fail_force_does_not_revert_done(self, monkeypatch):
+        """Retroactive FAIL on a done issue must NOT revert to in_progress."""
+        self._mock_fetch(
+            monkeypatch,
+            {**_FIX_DONE, "id": "fail-done-uuid", "identifier": "BTCAAAAA-400"},
+        )
+        self._mock_br(monkeypatch)
+        monkeypatch.setattr(
+            "impact_gate.worker.run_impact_gate", lambda f, b: _FAIL_RESULT
+        )
+        posted, transitions = self._mock_actions(monkeypatch)
+        r = process_issue("fail-done-uuid", dry_run=False, force=True)
+        assert r["gate_status"] == "FAIL"
+        assert transitions == [], (
+            f"Expected no transitions for retroactive FAIL, got {transitions}"
+        )
+        assert len(posted) == 1, "Should have posted a fail comment"
+
     def test_fail_dry_run(self, monkeypatch):
         self._mock_fetch(
             monkeypatch,
