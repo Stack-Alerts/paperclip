@@ -154,7 +154,9 @@ class TestProgressIndeterminateModeGuard:
         from src.optimizer_v3.ui.metrics_display_panel import MetricsDisplayPanel
 
         src = inspect.getsource(MetricsDisplayPanel._on_ai_progress)
-        assert ("setRange(0, 100)" in src and "percentage == 95" in src) or "elif percentage == 95" in src, (
+        assert (
+            "setRange(0, 100)" in src and "percentage == 95" in src
+        ) or "elif percentage == 95" in src, (
             "_on_ai_progress must restore setRange(0, 100) in the percentage == 95 branch"
         )
 
