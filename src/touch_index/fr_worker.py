@@ -160,7 +160,13 @@ def run_fr_worker(
     *,
     dry_run: bool = False,
 ) -> list[FRIngestionResult]:
-    """Ingest a list of FDR issue dicts (from paperclip_client.get_fdr_issues)."""
+    """Ingest a list of FDR issue dicts (from paperclip_client.get_fdr_issues).
+
+    When the list endpoint does not return the ``description`` field, the
+    description fallback in ``ingest_fr_issue`` would never fire.  This
+    function detects that case and fetches the full issue by ID to obtain
+    the description, then retries.
+    """
     results = []
     for issue in issues:
         try:
@@ -172,6 +178,17 @@ def run_fr_worker(
                 description=issue.get("description", "") or "",
                 dry_run=dry_run,
             )
+            if result.source == "none" and not issue.get("description"):
+                full = get_issue_by_id(issue["id"])
+                if full and full.get("description"):
+                    result = ingest_fr_issue(
+                        engine,
+                        issue_id=full["id"],
+                        issue_identifier=full["identifier"],
+                        owner_agent_id=full.get("assigneeAgentId"),
+                        description=full.get("description", "") or "",
+                        dry_run=dry_run,
+                    )
             results.append(result)
         except Exception:
             logger.exception("FR worker error for %s", issue.get("identifier"))

@@ -346,6 +346,7 @@ class TestRunFrWorker:
         with (
             patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
             patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.fr_worker.get_issue_by_id", return_value=None),
         ):
             results = run_fr_worker(engine, self._issues(4))
 
@@ -404,39 +405,103 @@ class TestRunFrWorker:
         # Should complete without error; git fallback used
 
 
-# ---------------------------------------------------------------------------
-# process_fr_issue — single-issue webhook entry point
-# ---------------------------------------------------------------------------
-
-
-class TestProcessFrIssue:
-    def test_fetches_and_ingests_issue(self):
-        """process_fr_issue fetches issue from API and delegates to ingest_fr_issue."""
+    def test_fetches_description_when_list_endpoint_omits_it(self):
+        """When list endpoint omits description, run_fr_worker fetches full issue and retries."""
         engine, conn = _mock_engine()
-        issue = {
+        full_issue = {
             "id": ISSUE_ID,
             "identifier": ISSUE_IDENTIFIER,
             "assigneeAgentId": OWNER_AGENT_ID,
-            "description": "Some FR description",
-            "labelIds": [FDR_LABEL_ID],
+            "description": "Changed `src/optimizer_v3/core.py` and `src/optimizer_v3/db.py`",
         }
-        files = ["src/touch_index/fr_worker.py"]
+        expected_files = ["src/optimizer_v3/core.py", "src/optimizer_v3/db.py"]
+
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.fr_worker.get_issue_by_id", return_value=full_issue),
+            patch(
+                "touch_index.fr_worker.extract_files_from_text",
+                return_value=expected_files,
+            ),
+        ):
+            results = run_fr_worker(
+                engine,
+                [{"id": ISSUE_ID, "identifier": ISSUE_IDENTIFIER}],
+            )
+
+        assert len(results) == 1
+        r = results[0]
+        assert r.source == "description"
+        assert r.files_indexed == 2
+        assert r.skipped_no_commits is False
+        assert r.issue_identifier == ISSUE_IDENTIFIER
+
+    def test_skips_description_retry_when_full_issue_still_has_no_description(self):
+        """When full issue also lacks description, the original 'none' result is preserved."""
+        engine, _ = _mock_engine()
+
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+            patch(
+                "touch_index.fr_worker.get_issue_by_id",
+                return_value={"id": ISSUE_ID, "identifier": ISSUE_IDENTIFIER},
+            ),
+        ):
+            results = run_fr_worker(
+                engine,
+                [{"id": ISSUE_ID, "identifier": ISSUE_IDENTIFIER}],
+            )
+
+        assert len(results) == 1
+        assert results[0].source == "none"
+        assert results[0].skipped_no_commits is True
+
+    def test_skips_description_retry_when_source_is_git(self):
+        """Description retry should not trigger when git already found files."""
+        engine, _ = _mock_engine()
+
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch(
+                "touch_index.fr_worker.get_files_for_issue",
+                return_value=["src/git_found.py"],
+            ),
+            patch("touch_index.fr_worker.get_issue_by_id") as mock_fetch,
+        ):
+            results = run_fr_worker(
+                engine,
+                [{"id": ISSUE_ID, "identifier": ISSUE_IDENTIFIER}],
+            )
+
+        assert len(results) == 1
+        assert results[0].source == "git"
+        mock_fetch.assert_not_called()
+
+    def test_skips_description_retry_when_initial_source_is_comments(self):
+        """Description retry should not trigger when comments already found files."""
+        engine, _ = _mock_engine()
 
         with (
             patch(
-                "touch_index.fr_worker.get_issue_by_id", return_value=issue
-            ) as mock_get,
-            patch(
-                "touch_index.fr_worker.fetch_and_extract", return_value=files
-            ) as mock_comments,
+                "touch_index.fr_worker.fetch_and_extract",
+                return_value=["src/comments_found.py"],
+            ),
             patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.fr_worker.get_issue_by_id") as mock_fetch,
         ):
-            result = process_fr_issue(engine, ISSUE_ID)
+            results = run_fr_worker(
+                engine,
+                [{"id": ISSUE_ID, "identifier": ISSUE_IDENTIFIER}],
+            )
 
-        assert result is not None
-        assert result.files_indexed == 1
-        assert result.issue_identifier == ISSUE_IDENTIFIER
-        mock_get.assert_called_once_with(ISSUE_ID)
+        assert len(results) == 1
+        assert results[0].source == "comments"
+        mock_fetch.assert_not_called()
+
+
+
 
     def test_returns_none_when_issue_not_found(self):
         """When get_issue_by_id returns None, process_fr_issue returns None."""
@@ -542,6 +607,33 @@ class TestProcessFrIssue:
 # ---------------------------------------------------------------------------
 
 
+class TestProcessFrIssue:
+    def test_fetches_and_ingests_issue(self):
+        """process_fr_issue fetches issue from API and delegates to ingest_fr_issue."""
+        engine, conn = _mock_engine()
+        issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "assigneeAgentId": OWNER_AGENT_ID,
+            "description": "Some FR description",
+            "labelIds": [FDR_LABEL_ID],
+        }
+        files = ["src/touch_index/fr_worker.py"]
+
+        with (
+            patch(
+                "touch_index.fr_worker.get_issue_by_id", return_value=issue
+            ) as mock_get,
+            patch(
+                "touch_index.fr_worker.fetch_and_extract", return_value=files
+            ) as mock_comments,
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+        ):
+            result = process_fr_issue(engine, ISSUE_ID)
+
+        assert result is not None
+        assert result.files_indexed == 1
+        assert result.issue_identifier == ISSUE_IDENTIFIER
 class TestMain:
     """Tests for fr_worker.main() CLI entry point."""
 
