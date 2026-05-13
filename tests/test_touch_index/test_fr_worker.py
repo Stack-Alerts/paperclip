@@ -2382,6 +2382,46 @@ class TestCatchUpEligibleFrIssues:
 # _emit_json_summary — required worker param (regression for BTCAAAAA-4892)
 # ---------------------------------------------------------------------------
 
+    def test_propagates_issue_status_in_catch_up(self):
+        """catch_up_eligible_fr_issues captures issue_status from the issue dict."""
+        from tests.test_touch_index.test_fr_worker import FDR_LABEL_ID, OWNER_AGENT_ID
+        engine, conn = _mock_engine()
+        conn.execute.return_value.fetchall.return_value = []
+        fdr_issues = [
+            {
+                "id": "fdr-uuid-0100",
+                "identifier": "BTCAAAAA-100",
+                "status": "done",
+                "assigneeAgentId": OWNER_AGENT_ID,
+                "description": "",
+                "labelIds": [FDR_LABEL_ID],
+            },
+            {
+                "id": "fdr-uuid-0101",
+                "identifier": "BTCAAAAA-101",
+                "status": "in_progress",
+                "assigneeAgentId": OWNER_AGENT_ID,
+                "description": "",
+                "labelIds": [FDR_LABEL_ID],
+            },
+        ]
+
+        with (
+            patch(
+                "touch_index.paperclip_client.get_fdr_issues", return_value=fdr_issues
+            ),
+            patch(
+                "touch_index.fr_worker.fetch_and_extract", return_value=["src/a.py"]
+            ),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+        ):
+            results = catch_up_eligible_fr_issues(engine)
+
+        assert len(results) == 2
+        assert results[0].issue_status == "done"
+        assert results[1].issue_status == "in_progress"
+
+
 
 class TestEmitJsonSummaryRequiresWorker:
     """_emit_json_summary must reject calls without the worker argument."""
