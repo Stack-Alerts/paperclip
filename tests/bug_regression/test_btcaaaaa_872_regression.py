@@ -122,6 +122,80 @@ class TestDetectGapsTzCompat:
         gaps = manager.detect_gaps_in_binance_files(timeframe="15m")
         assert isinstance(gaps, list)
 
+    def test_mixed_tz_start_aware_end_naive(self, manager):
+        start = datetime(2026, 3, 10, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 3, 10, 12, 0)
+        gaps = manager.detect_gaps_in_binance_files(
+            timeframe="15m", start_date=start, end_date=end,
+        )
+        assert isinstance(gaps, list)
+
+    def test_mixed_tz_start_naive_end_aware(self, manager):
+        start = datetime(2026, 3, 10, 0, 0)
+        end = datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc)
+        gaps = manager.detect_gaps_in_binance_files(
+            timeframe="15m", start_date=start, end_date=end,
+        )
+        assert isinstance(gaps, list)
+
+    def test_actual_gap_detected(self, manager):
+        df = _make_15m_bars(datetime(2026, 3, 11, 0, 0), n=5)
+        file_path = manager.binance_dir / "2026-03" / "BTCUSDT_PERP_15m_2026-03.parquet"
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        existing = pd.read_parquet(file_path)
+        combined = pd.concat([existing, df], ignore_index=True)
+        combined.to_parquet(file_path, compression="snappy", index=False)
+        gaps = manager.detect_gaps_in_binance_files(
+            timeframe="15m",
+            start_date=datetime(2026, 3, 10, 0, 0),
+            end_date=datetime(2026, 3, 11, 6, 0),
+        )
+        assert len(gaps) >= 1
+        assert gaps[0]["missing_bars"] >= 1
+
+    def test_gap_dict_has_expected_keys(self, manager):
+        df = _make_15m_bars(datetime(2026, 3, 11, 0, 0), n=5)
+        file_path = manager.binance_dir / "2026-03" / "BTCUSDT_PERP_15m_2026-03.parquet"
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        existing = pd.read_parquet(file_path)
+        combined = pd.concat([existing, df], ignore_index=True)
+        combined.to_parquet(file_path, compression="snappy", index=False)
+        gaps = manager.detect_gaps_in_binance_files(
+            timeframe="15m",
+            start_date=datetime(2026, 3, 10, 0, 0),
+            end_date=datetime(2026, 3, 11, 6, 0),
+        )
+        assert len(gaps) >= 1
+        expected_keys = {"gap_start", "gap_end", "duration", "missing_bars", "timeframe"}
+        assert expected_keys.issubset(gaps[0].keys())
+        assert gaps[0]["timeframe"] == "15m"
+
+    def test_trailing_gap_detected_when_end_past_last_bar(self, manager):
+        gaps = manager.detect_gaps_in_binance_files(
+            timeframe="15m",
+            start_date=datetime(2026, 3, 10, 0, 0),
+            end_date=datetime(2026, 3, 10, 12, 0),
+        )
+        assert len(gaps) >= 1
+        assert any(g["missing_bars"] >= 1 for g in gaps)
+
+    def test_aware_dates_same_gap_as_naive_with_trailing_gap(self, manager):
+        gaps_naive = manager.detect_gaps_in_binance_files(
+            timeframe="15m",
+            start_date=datetime(2026, 3, 10, 0, 0),
+            end_date=datetime(2026, 3, 10, 12, 0),
+        )
+        gaps_aware = manager.detect_gaps_in_binance_files(
+            timeframe="15m",
+            start_date=datetime(2026, 3, 10, 0, 0, tzinfo=timezone.utc),
+            end_date=datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc),
+        )
+        assert len(gaps_naive) == len(gaps_aware)
+
+    def test_unknown_timeframe_raises_value_error(self, manager):
+        with pytest.raises(ValueError, match="Unknown timeframe"):
+            manager.detect_gaps_in_binance_files(timeframe="99m")
+
 
 # ---------------------------------------------------------------------------
 # get_last_bar_timestamp -- must not raise TypeError
@@ -140,3 +214,32 @@ class TestGetLastBarTimestamp:
     def test_missing_timeframe_returns_none(self, manager):
         ts = manager.get_last_bar_timestamp("4h")
         assert ts is None
+
+    def test_returns_correct_value_15m(self, manager):
+        ts = manager.get_last_bar_timestamp("15m")
+        assert ts == datetime(2026, 3, 10, 4, 45)
+
+    def test_returns_correct_value_1h(self, manager):
+        ts = manager.get_last_bar_timestamp("1h")
+        assert ts == datetime(2026, 3, 10, 1, 0)
+
+
+# ---------------------------------------------------------------------------
+# post_ingest_sanity_check -- tz compat
+# ---------------------------------------------------------------------------
+
+
+class TestPostIngestSanityCheck:
+    """post_ingest_sanity_check must accept tz-naive and tz-aware datetimes."""
+
+    def test_naive_expected_ts_passes(self, manager):
+        manager.post_ingest_sanity_check("15m", datetime(2026, 3, 10, 4, 45), tolerance_s=60.0)
+
+    def test_aware_expected_ts_passes(self, manager):
+        manager.post_ingest_sanity_check(
+            "15m", datetime(2026, 3, 10, 4, 45, tzinfo=timezone.utc), tolerance_s=60.0,
+        )
+
+    def test_mismatch_raises_runtime_error(self, manager):
+        with pytest.raises(RuntimeError, match="post_ingest_sanity_check"):
+            manager.post_ingest_sanity_check("15m", datetime(2026, 3, 10, 0, 0), tolerance_s=1.0)
