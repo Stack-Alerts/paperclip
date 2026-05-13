@@ -1332,20 +1332,25 @@ class StrategyBuilderOrchestrator:
     
     def save_config_version(self, message: str) -> bool:
         """
-        Save current configuration version with Git commit
-        
+        Save current configuration version with Git commit + DB sync
+
         Sprint 1.6 Requirement (Task 1.6.8):
         Version control integration using Git commits for tracking
         configuration changes made via intelligent recommendations.
-        
+
         CRITICAL FIX: Uses self.loaded_strategy_path to save to the LOADED strategy file,
-        not hardcoded to a single JSON file — dynamically follows the loaded strategy path. Works for ANY loaded strategy (HOD Rejection,
-        RSI VWAP, or any of 100s of strategies).
-        
+        not hardcoded to a single JSON file — dynamically follows the loaded strategy path.
+        Works for ANY loaded strategy (HOD Rejection, RSI VWAP, etc.).
+
+        DB SYNC (BTCAAAAA-25629): After JSON + git commit, also creates a new version
+        in the database so the DB stays in sync with the file. Previously, recommendations
+        like ADD_BLOCK liquidity_sweep were only persisted to JSON but never saved to the
+        strategy_versions table, causing silent drift.
+
         Args:
             message: Commit message describing the change
                     (e.g., "Added building block: liquidity_sweep (via metrics recommendation)")
-        
+
         Returns:
             True if successfully saved, False otherwise
         """
@@ -1353,10 +1358,10 @@ class StrategyBuilderOrchestrator:
             import subprocess
             import os
             from pathlib import Path
-            
+
             # Get project root (assumption: orchestrator is in src/strategy_builder/integration)
             project_root = Path(__file__).parent.parent.parent.parent
-            
+
             # CRITICAL: Use loaded strategy path if available (dynamically tracks ANY loaded strategy)
             if self.loaded_strategy_path:
                 config_file = Path(self.loaded_strategy_path)
@@ -1365,15 +1370,15 @@ class StrategyBuilderOrchestrator:
                 # Fallback to current_strategy.json if no strategy loaded
                 config_file = project_root / "user_strategies" / "current_strategy.json"
                 logger.info(f"💾 No loaded strategy path - saving to: user_strategies/current_strategy.json")
-            
+
             config_file.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Persist current config
             save_result = self.save_strategy(str(config_file))
             if not save_result.success:
                 logger.error(f"⚠️ Failed to save config file before version commit")
                 return False
-            
+
             # Git add the configuration file
             result_add = subprocess.run(
                 ['git', 'add', str(config_file)],
@@ -1382,11 +1387,11 @@ class StrategyBuilderOrchestrator:
                 text=True,
                 timeout=5
             )
-            
+
             if result_add.returncode != 0:
                 logger.error(f"⚠️ Git add failed: {result_add.stderr}")
                 return False
-            
+
             # Git commit with message
             result_commit = subprocess.run(
                 ['git', 'commit', '-m', f"[Strategy Config] {message}"],
@@ -1395,17 +1400,122 @@ class StrategyBuilderOrchestrator:
                 text=True,
                 timeout=10
             )
-            
+
+            commit_hash = None
+            commit_ok = False
+
             if result_commit.returncode == 0:
                 logger.info(f"✅ Configuration version saved: {message}")
-                return True
+                commit_ok = True
+                for line in result_commit.stdout.splitlines():
+                    if line.startswith('['):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            commit_hash = parts[1].rstrip(']')
+                            break
             elif "nothing to commit" in result_commit.stdout.lower():
                 logger.info(f"ℹ️ No changes to commit (already saved)")
-                return True
+                commit_ok = True
+                try:
+                    result_log = subprocess.run(
+                        ['git', 'log', '-1', '--format=%h'],
+                        cwd=str(project_root),
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    if result_log.returncode == 0:
+                        commit_hash = result_log.stdout.strip()
+                except Exception:
+                    pass
             else:
                 logger.error(f"⚠️ Git commit failed: {result_commit.stderr}")
                 return False
-            
+
+            # ── DB SYNC: persist new version to database ────────────────────
+            if commit_ok and self.current_strategy_id:
+                try:
+                    from src.optimizer_v3.database import get_database_manager
+
+                    config = self.config_engine.config
+                    blocks_serialized = []
+                    for block in config.blocks:
+                        block_dict = {
+                            'name': block.name,
+                            'logic': block.logic,
+                            'signals': [],
+                            'exit_conditions': [],
+                        }
+                        for signal in block.signals:
+                            signal_dict = {
+                                'name': signal.name,
+                                'logic': signal.logic,
+                                'weight': getattr(signal, 'weight', 10),
+                            }
+                            if hasattr(signal, 'exit_conditions') and signal.exit_conditions:
+                                signal_dict['exit_conditions'] = []
+                                for ec in signal.exit_conditions:
+                                    signal_dict['exit_conditions'].append({
+                                        'signal_name': ec.signal_name,
+                                        'percentage': float(ec.percentage),
+                                        'exit_mode': getattr(ec, 'exit_mode', 'ABSOLUTE'),
+                                        'binding_level': 'SIGNAL',
+                                    })
+                            block_dict['signals'].append(signal_dict)
+                        if hasattr(block, 'exit_conditions') and block.exit_conditions:
+                            for ec in block.exit_conditions:
+                                block_dict['exit_conditions'].append({
+                                    'signal_name': ec.signal_name,
+                                    'percentage': float(ec.percentage),
+                                    'exit_mode': getattr(ec, 'exit_mode', 'ABSOLUTE'),
+                                    'binding_level': 'BLOCK',
+                                })
+                        blocks_serialized.append(block_dict)
+
+                    exit_conditions_serialized = []
+                    for ec in getattr(config, 'exit_conditions', []):
+                        exit_conditions_serialized.append({
+                            'signal_name': ec.signal_name,
+                            'percentage': float(ec.percentage),
+                            'exit_mode': getattr(ec, 'exit_mode', 'ABSOLUTE'),
+                            'binding_level': 'STRATEGY',
+                        })
+
+                    strategy_data = {
+                        'strategy_id': self.current_strategy_id,
+                        'name': config.name or 'GeneratedStrategy',
+                        'description': getattr(config, 'description', ''),
+                        'strategy_type': getattr(config, 'strategy_type', 'Bullish'),
+                        'blocks': blocks_serialized,
+                        'signals': {},
+                        'parameters': {},
+                        'entry_conditions': {},
+                        'exit_conditions': exit_conditions_serialized,
+                        'risk_management': {},
+                        'backtest_config': {},
+                        'git_commit_hash': commit_hash,
+                        'notes': message,
+                        'created_by': 'NautilusEngineer',
+                    }
+
+                    db = get_database_manager()
+                    new_version_id = db.strategy.create_strategy_version(strategy_data)
+                    self.current_version_id = new_version_id
+                    logger.info(
+                        f"✅ DB version synced: strategy={strategy_data['strategy_id'][:8]}... "
+                        f"new version_id={new_version_id[:8]}..."
+                    )
+
+                    if hasattr(db, 'engine') and db.engine is not None:
+                        db.engine.dispose()
+
+                except Exception as db_exc:
+                    logger.warning(
+                        f"⚠️ DB sync failed (config saved to JSON + git, DB version skipped): {db_exc}"
+                    )
+
+            return True
+
         except subprocess.TimeoutExpired:
             logger.error(f"❌ Git operation timed out")
             return False
