@@ -161,6 +161,7 @@ jobs:
                   "ungated_count": ungated,
                   "coverage_pct": coverage_pct,
                   "window_days": data.get("days_back"),
+                  "last_24h": data.get("last_24h"),
               },
           }
 
@@ -170,6 +171,17 @@ jobs:
           print(f"Wrote {out}")
           SNAPSHOT_EOF
           echo "snapshot_written=true" >> "$GITHUB_OUTPUT"
+
+      - name: Check coverage threshold
+        id: coverage
+        run: |
+          PCT=$(python3 -c "import json; d=json.load(open('/tmp/scan-output.json')); t=d.get('total_done_fix_issues',0); u=d.get('ungated_count',0); print(round((1-u/t)*100,1) if t>0 else 0.0)")
+          echo "coverage_pct=$PCT" >> "$GITHUB_OUTPUT"
+          LOW=$(python3 -c "import sys; v=float($PCT); sys.exit(0 if v < 50.0 else 1)" 2>/dev/null && echo "true" || echo "false")
+          echo "below_threshold=$LOW" >> "$GITHUB_OUTPUT"
+          if [ "$LOW" = "true" ]; then
+            echo "::warning::Impact Gate coverage $PCT% is below 50% threshold"
+          fi
 
       - name: Check for changes
         id: diff

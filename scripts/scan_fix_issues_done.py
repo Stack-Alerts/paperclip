@@ -134,10 +134,31 @@ def scan(
     ungated: list[dict] = []
     gated_issues: list[dict] = []
 
+    recent_cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    recent_total = 0
+    recent_gated: dict[str, int] = {
+        "pass": 0,
+        "fail": 0,
+        "bypassed": 0,
+        "error": 0,
+        "skipped": 0,
+    }
+    recent_ungated = 0
+
     for issue in fix_issues:
         issue_id = issue.get("id", "")
         identifier = issue.get("identifier", "")
         title = issue.get("title", "")
+
+        raw = issue.get("completedAt") or issue.get("updatedAt")
+        is_recent = False
+        if raw:
+            try:
+                ts = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                if ts >= recent_cutoff:
+                    is_recent = True
+            except ValueError:
+                pass
 
         gate_status = _check_gate_status(issue_id)
 
@@ -149,6 +170,9 @@ def scan(
                     "title": title,
                 }
             )
+            if is_recent:
+                recent_ungated += 1
+                recent_total += 1
         else:
             status_key = gate_status.lower()
             gated[status_key] = gated.get(status_key, 0) + 1
@@ -158,6 +182,15 @@ def scan(
                     "gate_status": gate_status,
                 }
             )
+            if is_recent:
+                recent_gated[status_key] = recent_gated.get(status_key, 0) + 1
+                recent_total += 1
+
+    last_24h = {
+        "total_done_fix_issues": recent_total,
+        "gated": recent_gated,
+        "ungated_count": recent_ungated,
+    }
 
     result = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -166,6 +199,7 @@ def scan(
         "ungated_count": len(ungated),
         "ungated_issues": ungated,
         "gated_issues": gated_issues,
+        "last_24h": last_24h,
         "days_back": days_back,
     }
 
@@ -287,6 +321,7 @@ def main() -> int:
             "ungated_count": result["ungated_count"],
             "ungated_issues": result["ungated_issues"],
             "gated_issues": result["gated_issues"],
+            "last_24h": result.get("last_24h"),
         }
         if "retroactive_results" in result:
             summary["retroactive_results"] = result["retroactive_results"]

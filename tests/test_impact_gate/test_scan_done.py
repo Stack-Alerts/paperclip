@@ -456,6 +456,66 @@ class TestScanFunction:
         assert result["gated"]["skipped"] == 1
         assert result["ungated_count"] == 0
 
+    def test_last_24h_aggregates_recent_issues(self, monkeypatch):
+        from datetime import datetime, timezone, timedelta
+        recent = (
+            (datetime.now(timezone.utc) - timedelta(hours=1))
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
+        old = (
+            (datetime.now(timezone.utc) - timedelta(hours=48))
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
+        monkeypatch.setattr(
+            _scan,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "identifier": "BTCAAAAA-100",
+                    "title": "Fix recent gated",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                    "completedAt": recent,
+                },
+                {
+                    "id": "u2",
+                    "identifier": "BTCAAAAA-101",
+                    "title": "Fix recent ungated",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                    "completedAt": recent,
+                },
+                {
+                    "id": "u3",
+                    "identifier": "BTCAAAAA-102",
+                    "title": "Fix old gated",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                    "completedAt": old,
+                },
+            ],
+        )
+        monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
+        call_count = 0
+        def mock_comments(iid):
+            nonlocal call_count
+            call_count += 1
+            if iid in ("u1", "u3"):
+                return [{"body": "## Impact Gate: PASS"}]
+            return [{"body": "Other comment"}]
+        monkeypatch.setattr(_scan, "fetch_issue_comments", mock_comments)
+        result = _scan.scan()
+        l24 = result.get("last_24h", {})
+        assert l24["total_done_fix_issues"] == 2, (
+            f"Expected 2 recent issues, got {l24['total_done_fix_issues']}"
+        )
+        assert l24["gated"]["pass"] == 1
+        assert l24["ungated_count"] == 1
+        assert result["total_done_fix_issues"] == 3
+
     def test_scan_no_completed_at_falls_back_to_updated_at(self, monkeypatch):
         from datetime import datetime, timezone, timedelta
 
