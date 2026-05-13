@@ -223,6 +223,39 @@ class TestStrategyConfig:
         config = StrategyConfig()
         assert config.get_block("NonExistent") is None
 
+    def test_serialization_round_trip_includes_side(self):
+        """Test dataclass asdict/reconstruct preserves side field"""
+        from dataclasses import asdict
+        original = StrategyConfig(
+            name="ser_test", strategy_type="Bullish", side="LONG",
+            blocks=[BlockConfig(name="B1", logic="AND",
+                                signals=[SignalConfig(name="S1", logic="OR")])])
+        data = asdict(original)
+        assert "side" in data
+        assert data["side"] == "LONG"
+        restored = StrategyConfig(**data)
+        assert restored.side == original.side
+        assert restored.name == original.name
+        assert restored.strategy_type == original.strategy_type
+
+    def test_serialization_round_trip_with_short_side(self):
+        """Test SHORT side survives asdict/reconstruct"""
+        from dataclasses import asdict
+        original = StrategyConfig(name="short_test", side="SHORT")
+        data = asdict(original)
+        assert data["side"] == "SHORT"
+        restored = StrategyConfig(**data)
+        assert restored.side == "SHORT"
+
+    def test_serialization_round_trip_default_side(self):
+        """Test default empty side survives asdict/reconstruct"""
+        from dataclasses import asdict
+        original = StrategyConfig()
+        data = asdict(original)
+        assert data["side"] == ""
+        restored = StrategyConfig(**data)
+        assert restored.side == ""
+
 
 class TestBlockConfig:
     """Test BlockConfig data class"""
@@ -336,30 +369,30 @@ if __name__ == "__main__":
 class TestDirectionConsistency:
     """Test direction consistency validation"""
 
-    def test_bullish_strategy_with_bearish_signal_warns(self):
-        """Bullish strategy with bearish signal produces warning"""
+    def test_bullish_strategy_with_bearish_signal_rejects(self):
+        """Bullish strategy with bearish signal produces error"""
         engine = StrategyConfigEngine(registry=None)
         engine.config.strategy_type = "Bullish"
         engine.add_block("Block1", logic="AND")
         engine.add_signal("Block1", "BEARISH_BREAKDOWN", logic="AND")
 
         result = engine.validate()
-        assert result.valid is True
-        assert any("bearish" in w.lower() and "BEARISH_BREAKDOWN" in w for w in result.warnings)
+        assert result.valid is False
+        assert any("bearish" in w.lower() and "BEARISH_BREAKDOWN" in w for w in result.errors)
 
-    def test_bearish_strategy_with_bullish_signal_warns(self):
-        """Bearish strategy with bullish signal produces warning"""
+    def test_bearish_strategy_with_bullish_signal_rejects(self):
+        """Bearish strategy with bullish signal produces error"""
         engine = StrategyConfigEngine(registry=None)
         engine.config.strategy_type = "Bearish"
         engine.add_block("Block1", logic="AND")
         engine.add_signal("Block1", "BULLISH_BREAKOUT", logic="AND")
 
         result = engine.validate()
-        assert result.valid is True
-        assert any("bullish" in w.lower() and "BULLISH_BREAKOUT" in w for w in result.warnings)
+        assert result.valid is False
+        assert any("bullish" in w.lower() and "BULLISH_BREAKOUT" in w for w in result.errors)
 
     def test_bullish_strategy_with_bullish_signal_clean(self):
-        """Bullish strategy with bullish signal produces no warning"""
+        """Bullish strategy with bullish signal passes"""
         engine = StrategyConfigEngine(registry=None)
         engine.config.strategy_type = "Bullish"
         engine.add_block("Block1", logic="AND")
@@ -367,10 +400,9 @@ class TestDirectionConsistency:
 
         result = engine.validate()
         assert result.valid is True
-        assert not any("direction" in w.lower() for w in result.warnings)
 
     def test_bearish_strategy_with_bearish_signal_clean(self):
-        """Bearish strategy with bearish signal produces no warning"""
+        """Bearish strategy with bearish signal passes"""
         engine = StrategyConfigEngine(registry=None)
         engine.config.strategy_type = "Bearish"
         engine.add_block("Block1", logic="AND")
@@ -378,10 +410,9 @@ class TestDirectionConsistency:
 
         result = engine.validate()
         assert result.valid is True
-        assert not any("direction" in w.lower() for w in result.warnings)
 
-    def test_neutral_signal_no_warning(self):
-        """Neutral signal (no direction keywords) produces no warning"""
+    def test_neutral_signal_no_error(self):
+        """Neutral signal (no direction keywords) passes"""
         engine = StrategyConfigEngine(registry=None)
         engine.config.strategy_type = "Bullish"
         engine.add_block("Block1", logic="AND")
@@ -389,26 +420,25 @@ class TestDirectionConsistency:
 
         result = engine.validate()
         assert result.valid is True
-        assert not any("direction" in w.lower() for w in result.warnings)
 
-    def test_long_keyword_triggers_bullish_detection(self):
-        """"long" in signal name is treated as bullish"""
+    def test_long_keyword_in_bearish_strategy_rejects(self):
+        """"long" signal in Bearish strategy produces error"""
         engine = StrategyConfigEngine(registry=None)
         engine.config.strategy_type = "Bearish"
         engine.add_block("Block1", logic="AND")
         engine.add_signal("Block1", "LONG_ENTRY", logic="AND")
 
         result = engine.validate()
-        assert result.valid is True
-        assert any("bullish" in w.lower() for w in result.warnings)
+        assert result.valid is False
+        assert any("bullish" in w.lower() for w in result.errors)
 
-    def test_short_keyword_triggers_bearish_detection(self):
-        """"short" in signal name is treated as bearish"""
+    def test_short_keyword_in_bullish_strategy_rejects(self):
+        """"short" signal in Bullish strategy produces error"""
         engine = StrategyConfigEngine(registry=None)
         engine.config.strategy_type = "Bullish"
         engine.add_block("Block1", logic="AND")
         engine.add_signal("Block1", "SHORT_EXIT", logic="AND")
 
         result = engine.validate()
-        assert result.valid is True
-        assert any("bearish" in w.lower() for w in result.warnings)
+        assert result.valid is False
+        assert any("bearish" in w.lower() for w in result.errors)
