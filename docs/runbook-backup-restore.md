@@ -292,3 +292,137 @@ python scripts/manage_migrations.py history
 | Stats | `python scripts/manage_backups.py stats` |
 | Apply migrations | `python scripts/manage_migrations.py upgrade` |
 | Re-apply AI grants | `python -c "from src.optimizer_v3.database.backup import get_backup_manager; get_backup_manager().reapply_ai_grants()"` |
+
+---
+
+## 6. Offsite Backup Pipeline (Paperclip Instance → Google Drive)
+
+**Owner:** AutomationEngineer
+**Scripts:** `~/.paperclip/scripts/backup-to-drive.sh` (main)
+**Monitor:** `.github/workflows/backup-deadman-switch.yml` (runs every 30 min)
+**State file:** `~/.paperclip/instances/default/backup-state/last-success.json`
+
+### 6.1 Overview
+
+The `backup-to-drive.sh` script bundles the latest Paperclip database dump
+with instance data (companies, projects, skills, storage) and uploads the
+payload to Google Drive via rclone.
+
+- **Source:** `~/.paperclip/instances/default/data/backups/` (freshest DB dump)
+- **Destination:** `gdrive:Paperclip-Backups/<companyId>/YYYY/MM/DD/HHMM/`
+- **Includes:** DB dump, sanitized config.json, companies/, projects/, skills/, storage/
+- **Manifest:** `MANIFEST.json` with SHA-256 checksum and payload size
+
+### 6.2 Scheduling
+
+The backup runs every 4 hours via a user-level systemd timer.
+
+```bash
+# Check timer status
+systemctl --user status paperclip-backup.timer
+
+# View next trigger
+systemctl --user list-timers paperclip-backup.timer
+
+# Trigger a backup immediately
+systemctl --user start paperclip-backup.service
+
+# View logs
+journalctl --user -u paperclip-backup.service -f
+
+# Service/timer definitions
+ls ~/.config/systemd/user/paperclip-backup.{service,timer}
+```
+
+**Timer schedule:** `00:00, 04:00, 08:00, 12:00, 16:00, 20:00` (UTC-based via systemd `OnCalendar`, randomized by up to 10 min)
+
+### 6.3 rclone Configuration
+
+The `gdrive` rclone remote must be configured with OAuth tokens.
+
+```bash
+# Check if gdrive remote is configured
+rclone listremotes | grep gdrive
+
+# Verify remote works
+rclone lsd gdrive:Paperclip-Backups
+```
+
+#### 6.3.1 Headless OAuth Setup
+
+This server has no display. Use the headless auth helper:
+
+```bash
+# On a machine WITH a browser (your laptop):
+rclone authorize "drive" "drive.file" --auth-no-open-browser
+# → Open URL → authorize Google → paste verification code → copy JSON token block
+
+# On THIS server:
+~/.paperclip/scripts/rclone-headless-auth.sh --apply-token
+# → Paste the JSON token block → press Ctrl+D
+```
+
+Or use SSH forwarding:
+
+```bash
+# On your laptop:
+ssh -L 53682:127.0.0.1:53682 sirrus-serv
+
+# On the server:
+rclone config reconnect gdrive:
+# → Open URL — callback forwarded to server
+```
+
+#### 6.3.2 Bootstrap (interactive, needs display)
+
+```bash
+~/.paperclip/scripts/rclone-bootstrap.sh
+```
+
+### 6.4 Manual Backup
+
+```bash
+# Run a full backup (DB dump + instance data → GDrive)
+~/.paperclip/scripts/backup-to-drive.sh
+```
+
+### 6.5 Restore from Google Drive
+
+```bash
+# List available backups
+~/.paperclip/scripts/restore-from-drive.sh list
+
+# Restore most recent backup
+~/.paperclip/scripts/restore-from-drive.sh latest /tmp/restore
+
+# Restore specific backup
+~/.paperclip/scripts/restore-from-drive.sh 2026/05/13/0152 /tmp/restore
+```
+
+### 6.6 Dead-Man Switch
+
+The dead-man switch monitors backup liveness:
+
+- **Workflow:** `.github/workflows/backup-deadman-switch.yml`
+- **Interval:** Every 30 min
+- **Threshold:** 4h (backup interval) + 8h (grace) = 12h since last success
+- **Action:** Creates a critical Paperclip issue assigned to CTO if backup is overdue
+- **State file:** `~/.paperclip/instances/default/backup-state/last-success.json`
+
+Manual dead-man check:
+
+```bash
+python scripts/backup_deadman_switch.py
+python scripts/backup_deadman_switch.py --dry-run
+python scripts/backup_deadman_switch.py --grace 6
+```
+
+### 6.7 Troubleshooting
+
+| Symptom | Check |
+|---------|-------|
+| Backup fails at rclone step | `rclone lsd gdrive:` — token may be expired. Run `rclone-headless-auth.sh --apply-token` |
+| No DB dumps found | `ls ~/.paperclip/instances/default/data/backups/` — Paperclip embedded PG may not be producing dumps |
+| Timer not firing | `systemctl --user status paperclip-backup.timer` — check linger: `loginctl show-user sirrus --property=Linger` |
+| Dead-man alert fired | Backup overdue >12h. Run manual backup, then check dead-man log: `~/.paperclip/backup_deadman_switch.log` |
+| Lock held (flock) | Stale lock file: `rm /tmp/paperclip-backup.lock` |
