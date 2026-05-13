@@ -6,6 +6,7 @@ All extraction logic is pure string processing; no external I/O needed.
 from __future__ import annotations
 
 from touch_index.comment_extractor import (
+    _has_allowed_prefix,
     _normalise,
     extract_files_from_text,
 )
@@ -42,6 +43,37 @@ class TestNormalise:
 
     def test_empty_string(self):
         assert _normalise("") == ""
+
+
+# ---------------------------------------------------------------------------
+# _has_allowed_prefix
+# ---------------------------------------------------------------------------
+
+
+class TestHasAllowedPrefix:
+    def test_allows_src(self):
+        assert _has_allowed_prefix("src/foo/bar.py") is True
+
+    def test_allows_tests(self):
+        assert _has_allowed_prefix("tests/test_foo.py") is True
+
+    def test_allows_scripts(self):
+        assert _has_allowed_prefix("scripts/deploy.py") is True
+
+    def test_rejects_bare_filename(self):
+        assert _has_allowed_prefix("setup.py") is False
+
+    def test_rejects_docs(self):
+        assert _has_allowed_prefix("docs/guide.py") is False
+
+    def test_rejects_alembic(self):
+        assert _has_allowed_prefix("alembic/versions/abc.py") is False
+
+    def test_rejects_dot_github(self):
+        assert _has_allowed_prefix(".github/workflows/ci.py") is False
+
+    def test_rejects_empty_string(self):
+        assert _has_allowed_prefix("") is False
 
 
 # ---------------------------------------------------------------------------
@@ -104,6 +136,14 @@ class TestExtractFilesFromText:
         """Line-number suffix combined with repo prefix inside backticks."""
         files = extract_files_from_text("Changed `BTC_Engine_v3/src/foo.py:10-20`")
         assert files == ["src/foo.py"]
+
+    def test_rejects_bare_filename_without_source_prefix(self):
+        files = extract_files_from_text("Changed `setup.py` to fix X")
+        assert files == []
+
+    def test_allows_path_with_known_prefix(self):
+        files = extract_files_from_text("Changed `src/git_extractor.py`")
+        assert files == ["src/git_extractor.py"]
 
 
 # ---------------------------------------------------------------------------

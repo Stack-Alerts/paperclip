@@ -129,6 +129,12 @@ class TestIsSourceFile:
     def test_skips_pkl(self):
         assert _is_source_file("data/model.pkl") is False
 
+    def test_bare_root_level_py(self):
+        assert _is_source_file("setup.py") is True
+
+    def test_root_level_py_in_tests(self):
+        assert _is_source_file("tests/conftest.py") is True
+
 
 # ---------------------------------------------------------------------------
 # get_commit_hashes
