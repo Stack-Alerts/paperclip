@@ -447,7 +447,7 @@ def compute_bug_freshness(
     engine: Engine,
     stale_threshold_days: int = 30,
 ) -> BugFreshnessReport:
-    """Report age statistics for touch_index_bug_files entries using closed_at."""
+    """Report age statistics for touch_index_bug_files entries using updated_at."""
     with engine.connect() as conn:
         total = (
             conn.execute(text("SELECT COUNT(*) FROM touch_index_bug_files")).scalar()
@@ -455,10 +455,10 @@ def compute_bug_freshness(
         )
 
         oldest = conn.execute(
-            text("SELECT MIN(closed_at) FROM touch_index_bug_files")
+            text("SELECT MIN(updated_at) FROM touch_index_bug_files")
         ).scalar()
         newest = conn.execute(
-            text("SELECT MAX(closed_at) FROM touch_index_bug_files")
+            text("SELECT MAX(updated_at) FROM touch_index_bug_files")
         ).scalar()
 
     now = datetime.now(timezone.utc)
@@ -472,7 +472,7 @@ def compute_bug_freshness(
             conn.execute(
                 text(
                     "SELECT COUNT(*) FROM touch_index_bug_files "
-                    "WHERE closed_at IS NOT NULL AND closed_at < :cutoff"
+                    "WHERE updated_at < :cutoff"
                 ),
                 {"cutoff": cutoff},
             ).scalar()
