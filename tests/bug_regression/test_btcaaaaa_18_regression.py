@@ -21,8 +21,13 @@ Root cause / changes:
   6. Updated subtitle copy to "BTCUSDT Perpetual across all timeframes".
 
 This file re-exports the existing unit tests from tests/unit/ so the Impact
-Gate runner can discover them by bug ID. The canonical tests live in
-tests/unit/ and must not drift.
+Gate runner can discover them by bug ID, plus AST-based contract checks
+that validate source-level fix requirements directly.
+
+NOTE: Tests from tests/unit/test_data_verify_dialog_btcaaaaa459.py are NOT
+re-exported here because they require a mocked Qt stub environment
+incompatible with real PyQt5 imports needed by other bug regression tests.
+The Impact Gate runner discovers those tests at their canonical path.
 """
 
 from __future__ import annotations
@@ -35,18 +40,6 @@ pytestmark = [
     pytest.mark.bug("BTCAAAAA-18"),
     pytest.mark.regression,
 ]
-
-# Import data verify dialog tests first — these set up Qt stubs in sys.modules
-# that the dialog module requires.  No other test file here imports PyQt5 so
-# there is no conflict.
-from tests.unit.test_data_verify_dialog_btcaaaaa459 import (  # noqa: E402, F401
-    TestTableStructure,
-    TestWindowSize,
-    TestLastCandleRendering,
-    TestNoRegressions,
-    TestDataVerifyThreadReportStructure,
-    TestMixedGapSecondaryRow,
-)
 
 # Data manager integrity tests cover gap detection, repair, and UTC timestamp
 # handling exercised by the BTCAAAAA-18 fixes.

@@ -232,18 +232,64 @@ def _make_qt_stubs():
     return widgets, core, gui
 
 
-# Install Qt stubs (replaces conftest's MagicMock stubs with trackable doubles).
-# The real src.data_manager.unified_manager and src.strategy_builder.ui.styles
-# are intentionally NOT stubbed here — using them as-is prevents sys.modules
-# pollution into test_data_manager_integrity.py.
-_make_qt_stubs()
+# ---------------------------------------------------------------------------
+# Stub lifecycle management
+#
+# The stubs must be active when importing the dialog (so it finds stub
+# QWidgets), but MUST NOT remain in sys.modules afterward --- downstream
+# test files (e.g. bug-regression re-exports from test_btcaaaaa_18.py)
+# need real PyQt5 classes like QFileDialog.
+#
+# Strategy: install stubs -> import dialog -> restore real Qt immediately.
+# ---------------------------------------------------------------------------
 
-# Now import the dialog (Qt objects are all stubs)
+_WIDGETS_STUB: types.ModuleType | None = None
+_CORE_STUB: types.ModuleType | None = None
+_GUI_STUB: types.ModuleType | None = None
+
+
+def _install_stubs() -> None:
+    """Install Qt stubs into sys.modules.  Call before importing any
+    Qt-dependent module; caller must restore via _restore_real_pyqt5()."""
+    global _WIDGETS_STUB, _CORE_STUB, _GUI_STUB
+    _WIDGETS_STUB, _CORE_STUB, _GUI_STUB = _make_qt_stubs()
+
+
+def _restore_real_pyqt5() -> None:
+    """Remove stub entries from sys.modules and force-reimport real PyQt5."""
+    # Delete stub attributes from the PyQt5 module object
+    pyqt5 = sys.modules.get("PyQt5")
+    if pyqt5 is not None:
+        for attr in ("QtCore", "QtWidgets", "QtGui", "QtTest", "sip"):
+            if hasattr(pyqt5, attr):
+                delattr(pyqt5, attr)
+
+    # Remove all PyQt5 entries so import machinery re-discovers real modules
+    for key in list(sys.modules):
+        if key.startswith("PyQt5"):
+            del sys.modules[key]
+
+    # Re-import real PyQt5 modules
+    for mod_name in (
+        "PyQt5", "PyQt5.sip", "PyQt5.QtCore",
+        "PyQt5.QtGui", "PyQt5.QtWidgets",
+    ):
+        try:
+            __import__(mod_name)
+        except ImportError:
+            pass
+
+
+# --- Module-level bootstrap ------------------------------------------------
+_install_stubs()
+
 from src.strategy_builder.ui.data_verify_dialog import (  # noqa: E402
     DataVerifyDialog,
     DataVerifyThread,
     _BINANCE_HORIZON_DAYS,
 )
+
+_restore_real_pyqt5()
 
 
 # ---------------------------------------------------------------------------
