@@ -27,7 +27,8 @@ REGISTRY_PATH = REPO_ROOT / ".module_lock_registry.json"
 DEP_GRAPH_PATH = REPO_ROOT / "dep_graph.json"
 EXCEPTIONS_PATH = REPO_ROOT / "lock_gate_exceptions.json"
 
-VALID_APPROVED_BY = {"board", "ceo-emergency"}
+VALID_APPROVED_BY = {"board", "ceo-emergency", "board-emergency"}
+EMERGENCY_TYPES = {"ceo-emergency", "board-emergency"}
 EMERGENCY_MAX_HOURS = 4
 
 
@@ -42,7 +43,10 @@ def parse_iso(dt_str):
         return None
     try:
         dt_str = dt_str.replace("Z", "+00:00")
-        return datetime.fromisoformat(dt_str)
+        parsed = datetime.fromisoformat(dt_str)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed
     except (ValueError, TypeError):
         return None
 
@@ -85,7 +89,7 @@ def validate_exception_entry(entry, now=None):
             parsed = parse_iso(expires_iso)
             if parsed is None:
                 errors.append(f"'expires_iso' is not valid ISO 8601: '{expires_iso}'")
-            elif approved_by in VALID_APPROVED_BY:
+            elif approved_by in EMERGENCY_TYPES:
                 delta = parsed - now
                 if delta.total_seconds() > EMERGENCY_MAX_HOURS * 3600 + 60:
                     errors.append(

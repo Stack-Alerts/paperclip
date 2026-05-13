@@ -61,14 +61,14 @@ def locked_entries(registry):
 
 
 HIT_DIFF_CONTENT = """\
-diff --git a/src/data_manager/unified_manager.py b/src/data_manager/unified_manager.py
+diff --git a/src/optimizer_v3/core/trade_registry.py b/src/optimizer_v3/core/trade_registry.py
 index abc123..def456 100644
---- a/src/data_manager/unified_manager.py
-+++ b/src/data_manager/unified_manager.py
+--- a/src/optimizer_v3/core/trade_registry.py
++++ b/src/optimizer_v3/core/trade_registry.py
 @@ -1,5 +1,6 @@
- # Unified Data Manager
+ # Trade Registry
 +print("hello")
- class UnifiedDataManager:
+ class TradeRegistry:
      def __init__(self):
          pass
 """
@@ -163,7 +163,7 @@ def exception_diff_path(tmp_path):
 class TestGetChangedFilesFromDiff:
     def test_hit_diff(self, hit_diff_path):
         files = get_changed_files_from_diff(hit_diff_path)
-        assert "src/data_manager/unified_manager.py" in files
+        assert "src/optimizer_v3/core/trade_registry.py" in files
 
     def test_clean_diff(self, clean_diff_path):
         files = get_changed_files_from_diff(clean_diff_path)
@@ -174,7 +174,7 @@ class TestGetChangedFilesFromDiff:
         files = get_changed_files_from_diff(mixed_diff_path)
         assert len(files) == 3
         assert "src/strategies/completestrategy.py" in files
-        assert "src/data_manager/unified_manager.py" in files
+        assert "src/optimizer_v3/core/trade_registry.py" in files
         assert "src/optimizer_v3/core/trade_registry.py" in files
 
     def test_exception_diff(self, exception_diff_path):
@@ -303,7 +303,7 @@ class TestValidateExceptionEntry:
         assert errors == []
 
     def test_rejects_expiry_over_4h_board_emergency(self):
-        entry = make_entry(approved_by="board", expires_iso=now_iso(5))
+        entry = make_entry(approved_by="board-emergency", expires_iso=now_iso(5))
         errors = validate_exception_entry(entry)
         assert any("4h" in e or "4" in e for e in errors)
 
