@@ -502,17 +502,20 @@ def process_issue(
     )
     _post_comment(issue_id, fail_comment)
 
-    # Revert to in_progress
-    transition_issue_status_board(issue_id, "in_progress")
+    # Revert to in_progress (skip for retroactive — don't undo "done" status)
+    if not force:
+        transition_issue_status_board(issue_id, "in_progress")
 
     # Set blockedByIssueIds
     blocking_ids = [bi.get("id", "") for bi in blocking_issues if bi.get("id")]
     if blocking_ids:
         _set_blocked_by(issue_id, blocking_ids)
 
+    action = "posted retroactive fail comment (status unchanged)" if force else "reverted to in_progress"
     log.info(
-        "Gate FAIL for %s — reverted to in_progress, %d blocking issues created",
+        "Gate FAIL for %s — %s, %d blocking issues created",
         identifier,
+        action,
         len(blocking_issues),
     )
 

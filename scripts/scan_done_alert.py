@@ -32,9 +32,9 @@ ALERT_LABEL = "impact-gate-alert"
 
 def _setup_session():
     sys.path.insert(0, str(REPO_ROOT / "src"))
-    from touch_index.paperclip_client import _session, _base, _company
+    from touch_index.paperclip_client import _board_session, _base, _company
 
-    return _session(), _base(), _company()
+    return _board_session(), _base(), _company()
 
 
 def _find_todays_alert(
