@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import sys
 import os
 from pathlib import Path
@@ -27,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 from touch_index.paperclip_client import (
     _base,
     _company,
+    _paginate,
     _session,
     _board_session,
     transition_issue_status_board,
@@ -45,7 +47,49 @@ COMPANY_PREFIX = "BTCAAAAA"
 # individual test cases (FR acceptance + bug regression combined) before
 # it can declare a PASS.  This is the "10-fix bar" required for production
 # acceptance: sufficient coverage to justify promoting a fix to done.
+
 MIN_TESTS_BAR = 10
+
+# Rate limiting between blocking issue API calls to avoid flooding the Paperclip API
+BLOCKING_ISSUE_CREATE_INTERVAL = 1.0  # seconds
+
+
+def _build_dedup_key(fix_identifier: str, failing_item_id: str, issue_type: str) -> str:
+    """Build a deterministic dedup marker embedded in blocking issue bodies.
+    
+    Used to detect and skip duplicate blocking issue creation when
+    the same fix issue fails the same gate multiple times.
+    """
+    return f"<!-- dedup:impact-gate:{fix_identifier}:{failing_item_id}:{issue_type} -->"
+
+
+
+def _find_existing_blocking_issue(
+    fix_identifier: str,
+    failing_item_id: str,
+    issue_type: str,
+) -> dict | None:
+    """Search for an existing blocking issue matching (fix, item, type)."""
+    dedup_key = _build_dedup_key(fix_identifier, failing_item_id, issue_type)
+    try:
+        issues = _paginate(
+            f"/api/companies/{_company()}/issues",
+            {"q": fix_identifier, "limit": 50},
+            page_size=50,
+        )
+        for issue in issues:
+            body = issue.get("body") or ""
+            if dedup_key in body:
+                log.info(
+                    "Found existing blocking issue %s for %s/%s — skipping",
+                    issue.get("identifier", ""),
+                    fix_identifier,
+                    failing_item_id,
+                )
+                return issue
+    except Exception as exc:
+        log.warning("Failed to search for existing blocking issues: %s", exc)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -92,13 +136,15 @@ def _create_blocking_issue(
     }
     title = title_map.get(issue_type, f"Impact Gate failure for {failing_item_id}")
 
+    dedup_key = _build_dedup_key(fix_identifier, failing_item_id, issue_type)
     body = (
         f"Blocking issue auto-created by Impact Gate worker.\n\n"
         f"**Source fix:** {fix_identifier}\n"
         f"**Failing item:** {failing_item_id}\n"
         f"**Type:** {issue_type}\n\n"
         f"**Failure detail:**\n```\n{failure_detail}\n```\n\n"
-        f"This issue must be resolved before {fix_identifier} can proceed to review."
+        f"This issue must be resolved before {fix_identifier} can proceed to review.\n\n"
+        f"{dedup_key}"
     )
 
     try:
@@ -471,7 +517,7 @@ def process_issue(
     # FAIL or ERROR — revert to in_progress, create blocking sub-issues
     blocking_issues: list[dict] = []
 
-    # Create blocking issues for each failing FR
+    # Create blocking issues for each failing FR (with dedup and rate limiting)
     fr_results = result.get("fr_results", {})
     for fid in fr_ids:
         fr_entry = fr_results.get(fid, {})
@@ -485,11 +531,16 @@ def process_issue(
                 if detail_lines
                 else f"Status: {fr_entry.get('status')}"
             )
-            bi = _create_blocking_issue(identifier, fid, detail, "fr")
-            if bi:
-                blocking_issues.append(bi)
+            existing = _find_existing_blocking_issue(identifier, fid, "fr")
+            if existing:
+                blocking_issues.append(existing)
+            else:
+                time.sleep(BLOCKING_ISSUE_CREATE_INTERVAL)
+                bi = _create_blocking_issue(identifier, fid, detail, "fr")
+                if bi:
+                    blocking_issues.append(bi)
 
-    # Create blocking issues for each failing bug regression
+    # Create blocking issues for each failing bug regression (with dedup and rate limiting)
     bug_results = result.get("bug_results", {})
     for bid in bug_ids:
         bug_entry = bug_results.get(bid, {})
@@ -503,9 +554,14 @@ def process_issue(
                 if detail_lines
                 else f"Status: {bug_entry.get('status')}"
             )
-            bi = _create_blocking_issue(identifier, bid, detail, "bug")
-            if bi:
-                blocking_issues.append(bi)
+            existing = _find_existing_blocking_issue(identifier, bid, "bug")
+            if existing:
+                blocking_issues.append(existing)
+            else:
+                time.sleep(BLOCKING_ISSUE_CREATE_INTERVAL)
+                bi = _create_blocking_issue(identifier, bid, detail, "bug")
+                if bi:
+                    blocking_issues.append(bi)
 
     # Post failure comment
     fail_comment = _build_fail_comment(

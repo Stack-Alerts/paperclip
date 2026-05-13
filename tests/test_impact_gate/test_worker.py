@@ -9,6 +9,8 @@ import pytest
 
 from impact_gate.worker import (
     _has_bypass_label,
+    _build_dedup_key,
+    _find_existing_blocking_issue,
     _build_pass_comment,
     _build_fail_comment,
     _build_bypass_comment,
@@ -16,6 +18,7 @@ from impact_gate.worker import (
     process_issue,
     scan_done_issues,
     MIN_TESTS_BAR,
+    BLOCKING_ISSUE_CREATE_INTERVAL,
 )
 import impact_gate.worker as worker_mod
 
@@ -75,6 +78,38 @@ class TestHasBypassLabel:
         assert (
             _has_bypass_label({"labels": [{"name": "  impact-gate-bypass  "}]}) is True
         )
+
+
+# ---------------------------------------------------------------------------
+# _build_dedup_key
+# ---------------------------------------------------------------------------
+
+
+class TestBuildDedupKey:
+    def test_returns_html_comment(self):
+        key = _build_dedup_key("BTCAAAAA-100", "FDR-850", "fr")
+        assert "<!--" in key
+        assert "-->" in key
+
+    def test_contains_all_components(self):
+        key = _build_dedup_key("BTCAAAAA-100", "FDR-850", "fr")
+        assert "BTCAAAAA-100" in key
+        assert "FDR-850" in key
+        assert "fr" in key
+
+    def test_deterministic(self):
+        a = _build_dedup_key("BTCAAAAA-100", "FDR-850", "fr")
+        b = _build_dedup_key("BTCAAAAA-100", "FDR-850", "fr")
+        assert a == b
+
+    def test_distinguishes_type(self):
+        fr_key = _build_dedup_key("BTCAAAAA-100", "FDR-850", "fr")
+        bug_key = _build_dedup_key("BTCAAAAA-100", "FDR-850", "bug")
+        assert fr_key != bug_key
+
+    def test_constant_format(self):
+        key = _build_dedup_key("I-1", "F-2", "fr")
+        assert key == "<!-- dedup:impact-gate:I-1:F-2:fr -->"
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +222,9 @@ class TestProcessIssue:
         )
         monkeypatch.setattr(
             worker_mod, "_create_blocking_issue", lambda fi, fid, d, t: None
+        )
+        monkeypatch.setattr(
+            worker_mod, "_find_existing_blocking_issue", lambda fi, fid, t: None
         )
         monkeypatch.setattr(worker_mod, "_set_blocked_by", lambda i, b: None)
         return posted, transitions
@@ -356,6 +394,169 @@ class TestProcessIssue:
         r = process_issue("fail-uuid-2", dry_run=True)
         assert r["gate_status"] == "FAIL" and r.get("dry_run") is True
         assert len(posted) == 0 and len(transitions) == 0
+
+
+    def test_fail_dedup_skips_duplicate(self, monkeypatch):
+        """When _find_existing_blocking_issue matches, skip _create_blocking_issue."""
+        _FAIL_WITH_MATCHING_FR = {
+            "timestamp": "2026-01-01T00:00:00",
+            "status": "FAIL",
+            "summary": {"total": 1, "passed": 0, "failed": 1, "errors": 0},
+            "fr_results": {
+                "FDR-999": {
+                    "status": "FAIL",
+                    "tests": [{"nodeid": "test::f", "outcome": "failed", "message": "x"}],
+                },
+            },
+            "bug_results": {},
+        }
+        from blast_radius.query import BlastRadiusData, FRImpact
+
+        # Create BR data that includes FDR-999
+        br_data = BlastRadiusData()
+        br_data.fr_impact_set = [FRImpact(fr_identifier="FDR-999", fr_owner_agent_id="", fr_issue_id="")]
+        monkeypatch.setattr(
+            "impact_gate.worker.query_blast_radius", lambda fps: br_data
+        )
+
+        self._mock_fetch(
+            monkeypatch,
+            {**_FIX_IN_REVIEW, "id": "dedup-uuid", "identifier": "BTCAAAAA-700"},
+        )
+        monkeypatch.setattr(
+            "impact_gate.worker.run_impact_gate", lambda f, b: _FAIL_WITH_MATCHING_FR
+        )
+        posted, transitions = self._mock_actions(monkeypatch)
+
+        create_calls = []
+        monkeypatch.setattr(
+            worker_mod,
+            "_create_blocking_issue",
+            lambda fi, fid, d, t: create_calls.append((fi, fid, t)) or {"id": f"b-{fid}"},
+        )
+        # Existing blocking issue found via dedup
+        monkeypatch.setattr(
+            worker_mod,
+            "_find_existing_blocking_issue",
+            lambda fi, fid, t: {"id": "existing-id", "identifier": "BTCAAAAA-999"},
+        )
+
+        r = process_issue("dedup-uuid", dry_run=False)
+        assert r["gate_status"] == "FAIL"
+        assert len(create_calls) == 0, "Should not create new issue when dedup matches"
+        assert any("BTCAAAAA-999" in str(bi) for bi in r.get("blocking_issues", []))
+
+    def test_rate_limiting_applied_between_creates(self, monkeypatch):
+        """Verify time.sleep is called between blocking issue creations."""
+        _FAIL_MULTI = {
+            "timestamp": "2026-01-01T00:00:00",
+            "status": "FAIL",
+            "summary": {"total": 2, "passed": 0, "failed": 2, "errors": 0},
+            "fr_results": {
+                "FDR-800": {
+                    "status": "FAIL",
+                    "tests": [{"nodeid": "test::a", "outcome": "failed", "message": "e"}],
+                },
+                "FDR-801": {
+                    "status": "FAIL",
+                    "tests": [{"nodeid": "test::b", "outcome": "failed", "message": "e"}],
+                },
+            },
+            "bug_results": {},
+        }
+        from blast_radius.query import BlastRadiusData, FRImpact
+
+        br_data = BlastRadiusData()
+        br_data.fr_impact_set = [
+            FRImpact(fr_identifier="FDR-800", fr_owner_agent_id="", fr_issue_id=""),
+            FRImpact(fr_identifier="FDR-801", fr_owner_agent_id="", fr_issue_id=""),
+        ]
+        monkeypatch.setattr(
+            "impact_gate.worker.query_blast_radius", lambda fps: br_data
+        )
+
+        self._mock_fetch(
+            monkeypatch,
+            {**_FIX_IN_REVIEW, "id": "rate-uuid", "identifier": "BTCAAAAA-800"},
+        )
+        monkeypatch.setattr(
+            "impact_gate.worker.run_impact_gate", lambda f, b: _FAIL_MULTI
+        )
+        posted, transitions = self._mock_actions(monkeypatch)
+
+        sleep_calls = []
+        monkeypatch.setattr(worker_mod.time, "sleep", lambda s: sleep_calls.append(s))
+        monkeypatch.setattr(
+            worker_mod,
+            "_create_blocking_issue",
+            lambda fi, fid, d, t: {"id": f"b-{fid}", "identifier": f"BTCAAAAA-{fid[-3:]}"},
+        )
+        # No dedup matches, so all creates go through
+        monkeypatch.setattr(
+            worker_mod,
+            "_find_existing_blocking_issue",
+            lambda fi, fid, t: None,
+        )
+
+        r = process_issue("rate-uuid", dry_run=False)
+        assert r["gate_status"] == "FAIL"
+        # Two FR items both failing → 2 create calls → 2 sleep calls
+        assert len(sleep_calls) == 2, f"Expected 2 sleep calls, got {sleep_calls}"
+        for s in sleep_calls:
+            assert s == BLOCKING_ISSUE_CREATE_INTERVAL
+
+
+# ---------------------------------------------------------------------------
+# _find_existing_blocking_issue
+# ---------------------------------------------------------------------------
+
+
+class TestFindExistingBlockingIssue:
+    def test_returns_none_on_empty_results(self, monkeypatch):
+        monkeypatch.setattr(
+            "impact_gate.worker._paginate",
+            lambda path, params, page_size=50: [],
+        )
+        monkeypatch.setattr("impact_gate.worker._company", lambda: "comp-uuid")
+        result = _find_existing_blocking_issue("BTCAAAAA-100", "FDR-850", "fr")
+        assert result is None
+
+    def test_returns_issue_when_dedup_key_matches(self, monkeypatch):
+        monkeypatch.setattr("impact_gate.worker._company", lambda: "comp-uuid")
+        dedup_key = _build_dedup_key("BTCAAAAA-100", "FDR-850", "fr")
+        issues = [
+            {"id": "other", "body": "no match"},
+            {"id": "match-id", "identifier": "BTCAAAAA-500", "body": f"something {dedup_key} else"},
+        ]
+        monkeypatch.setattr(
+            "impact_gate.worker._paginate",
+            lambda path, params, page_size=50: issues,
+        )
+        result = _find_existing_blocking_issue("BTCAAAAA-100", "FDR-850", "fr")
+        assert result is not None
+        assert result["id"] == "match-id"
+
+    def test_returns_none_when_no_body_match(self, monkeypatch):
+        monkeypatch.setattr("impact_gate.worker._company", lambda: "comp-uuid")
+        issues = [
+            {"id": "i1", "body": "some other content"},
+            {"id": "i2", "body": "<!-- dedup:impact-gate:other:thing:bug -->"},
+        ]
+        monkeypatch.setattr(
+            "impact_gate.worker._paginate",
+            lambda path, params, page_size=50: issues,
+        )
+        result = _find_existing_blocking_issue("BTCAAAAA-100", "FDR-850", "fr")
+        assert result is None
+
+    def test_returns_none_on_api_error(self, monkeypatch):
+        monkeypatch.setattr("impact_gate.worker._company", lambda: "comp-uuid")
+        monkeypatch.setattr(
+            "impact_gate.worker._paginate",
+            lambda path, params, page_size=50: (_ for _ in ()).throw(RuntimeError("API down")),
+        )
+        result = _find_existing_blocking_issue("BTCAAAAA-100", "FDR-850", "fr")
+        assert result is None
 
 
 # ---------------------------------------------------------------------------
