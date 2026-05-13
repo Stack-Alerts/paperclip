@@ -1,21 +1,16 @@
 """
 Regression test for BTCAAAAA-736: Mode 2 (Live Replay) produces 0 trades.
 
-JSON-path only — does not exercise the DB load path. NOT a proxy for UI correctness.
-The UI loads strategy config from the DB (via get_strategy_version → _dict_to_config),
-which resolves signal weights via BlockRegistry base_points. This test loads
-current_strategy.json, which carries explicit weights that may differ from DB values.
-
 This test exercises the full Mode 2 bar-by-bar evaluation path using:
-  - DictWrapper strategy config loaded from current_strategy.json
+  - Inline DictWrapper strategy config (self-contained — no external JSON file)
   - Mocked building blocks that inject known AT_ASIA_50 → BELOW_ASIA_50 + BEARISH_CLIMAX
     sequences (same mocking strategy as test_btcaaaaa_685_timing_chain.py)
   - The COMPLETE evaluator loop from BacktestWorker (not just InstitutionalSignalEvaluator)
 
 Gap covered: test_btcaaaaa_685_timing_chain.py tests the evaluator in isolation.
 This test verifies that the DictWrapper strategy config, the timing chain, and the
-bar-by-bar loop all work end-to-end for the JSON-load path — a regression in
-the Mode 2 code path will fail here, not just in a UI run.
+bar-by-bar loop all work end-to-end — a regression in the Mode 2 code path will
+fail here, not just in a UI run.
 
 Both tests fail on pre-ad3b0b1 code and pass after the fix.
 """
@@ -35,12 +30,109 @@ from src.optimizer_v3.core.institutional_signal_evaluator import InstitutionalSi
 
 
 # ---------------------------------------------------------------------------
+# Inline strategy config — self-contained, no external JSON file dependency.
+# The deleted user_strategies/current_strategy.json contained a phantom signal
+# (liquidity_sweep::BEARISH_SWEEP) that never existed in any DB strategy_version.
+# This inline dict preserves only the fields needed by the test.
+# ---------------------------------------------------------------------------
+
+_INLINE_STRATEGY_DICT: dict = {
+    "name": "50% Asia Rejection (test inline)",
+    "description": "Inline strategy for regression testing",
+    "strategy_type": "Bearish",
+    "confluence_threshold": 40,
+    "blocks": [
+        {
+            "name": "asia_session_50_percent",
+            "logic": "AND",
+            "signals": [
+                {
+                    "name": "AT_ASIA_50",
+                    "logic": "AND",
+                    "weight": 15,
+                    "exit_conditions": [
+                        {
+                            "signal_name": "AT_IHOD",
+                            "percentage": 1.0,
+                            "exit_mode": "ABSOLUTE",
+                            "tp_proximity_threshold": 2.0,
+                            "reversal_trigger": 0.5,
+                            "binding_level": "SIGNAL",
+                        }
+                    ],
+                },
+                {
+                    "name": "BELOW_ASIA_50",
+                    "logic": "AND",
+                    "weight": 15,
+                    "timing_constraint": {
+                        "max_candles": 10,
+                        "reference": "asia_session_50_percent::AT_ASIA_50",
+                    },
+                    "exit_conditions": [
+                        {
+                            "signal_name": "ABOVE_ASIA_50",
+                            "percentage": 1.0,
+                            "exit_mode": "FLEXIBLE",
+                            "tp_proximity_threshold": 0.5,
+                            "reversal_trigger": 0.4,
+                            "binding_level": "SIGNAL",
+                            "recheck_config": {
+                                "enabled": True,
+                                "bar_delay": 2,
+                                "validation_mode": "SIGNAL",
+                                "parent_signal": None,
+                            },
+                        }
+                    ],
+                },
+            ],
+        },
+        {
+            "name": "ema_55_vector",
+            "logic": "AND",
+            "signals": [
+                {
+                    "name": "BEARISH_CLIMAX",
+                    "logic": "AND",
+                    "weight": 20,
+                }
+            ],
+        },
+        {
+            "name": "liquidity_sweep",
+            "logic": "OR",
+            "signals": [
+                {
+                    "name": "BEARISH_SWEEP",
+                    "logic": "OR",
+                    "weight": 10,
+                }
+            ],
+        },
+    ],
+    "exit_conditions": [
+        {
+            "signal_name": "BULLISH_BREAK",
+            "percentage": 0.01,
+            "exit_mode": "ABSOLUTE",
+            "tp_proximity_threshold": 2.0,
+            "reversal_trigger": 0.5,
+            "binding_level": "STRATEGY",
+        }
+    ],
+    "version": "1.1.0",
+    "validation_status": None,
+    "generation_status": None,
+}
+
+
+# ---------------------------------------------------------------------------
 # Shared helpers (mirrored from test_btcaaaaa_685_timing_chain.py)
 # ---------------------------------------------------------------------------
 
 def _load_strategy() -> DictWrapper:
-    with open("user_strategies/current_strategy.json") as f:
-        return DictWrapper(json.load(f))
+    return DictWrapper(_INLINE_STRATEGY_DICT)
 
 
 def _make_bar_type() -> BarType:
