@@ -1,0 +1,685 @@
+{
+  "version": 1,
+  "$schema": "docs/architecture/requirements_registry.schema.md",
+  "description": "Canonical requirements registry mapping requirements to test cases, source modules, and issues. Generated from existing test structure, locked modules, and architecture docs. See ADR-0002 for design rationale.",
+  "generated_at": "2026-05-13T16:30:00Z",
+  "generated_by": "Architect (73eaab54)",
+  "parent_issue": "BTCAAAAA-25639",
+  "requirements": [
+    {
+      "id": "REQ-DATA-001",
+      "type": "AR",
+      "title": "UnifiedDataManager serves as single source of truth for all data access",
+      "description": "The UnifiedDataManager provides a singleton interface for data ingestion, caching, and retrieval across all subsystems (backtesting, live trading, dry-run). Any uncoordinated change risks cascading failures across all pipelines.",
+      "source_issues": [
+        "BTCAAAAA-1479"
+      ],
+      "source_modules": [
+        "src/data_manager/unified_manager.py",
+        "src/data_manager/binance/rest_client.py",
+        "src/data_manager/config.py"
+      ],
+      "test_files": [
+        "tests/unit/test_data_manager_integrity.py",
+        "tests/unit/test_download_with_retry_tz.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "data-manager",
+        "singleton",
+        "caching",
+        "locked-module"
+      ],
+      "owner_agent": "PlatformEngineer"
+    },
+    {
+      "id": "REQ-TRADE-001",
+      "type": "AR",
+      "title": "TradeRegistry maintains central ledger for all optimizer-produced trade records",
+      "description": "TradeRegistry is the single source of truth for trade records produced by the optimizer. Schema or logic changes can silently corrupt trade history and backtest replay. Registry must be scoped to a single backtest run (no global mutable state across runs).",
+      "source_issues": [
+        "BTCAAAAA-1479",
+        "BTCAAAAA-1477",
+        "BTCAAAAA-693"
+      ],
+      "source_modules": [
+        "src/optimizer_v3/core/trade_registry.py"
+      ],
+      "test_files": [
+        "tests/bug_regression/test_canary_trade_execution.py",
+        "tests/integration/test_btcaaaaa_693_registry_clear_regression.py"
+      ],
+      "test_markers": [
+        "@pytest.mark.bug('BTCAAAAA-1476')",
+        "@pytest.mark.smoke"
+      ],
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "trade-registry",
+        "singleton",
+        "backtest",
+        "locked-module"
+      ],
+      "owner_agent": "PlatformEngineer"
+    },
+    {
+      "id": "REQ-SIGNAL-001",
+      "type": "AR",
+      "title": "InstitutionalSignalEvaluator evaluates and ranks institutional-grade signals before optimizer entry",
+      "description": "The InstitutionalSignalEvaluator is the gate that evaluates and ranks all institutional-grade signals before they enter the optimizer. Changes here can alter portfolio allocation logic across all modes. Must include signal health telemetry and canary checks to detect zero-trades scenarios.",
+      "source_issues": [
+        "BTCAAAAA-1479",
+        "BTCAAAAA-1477",
+        "BTCAAAAA-7364"
+      ],
+      "source_modules": [
+        "src/optimizer_v3/core/institutional_signal_evaluator.py"
+      ],
+      "test_files": [
+        "tests/bug_regression/test_btcaaaaa_736_regression.py",
+        "tests/bug_regression/test_canary_trade_execution.py"
+      ],
+      "test_markers": [
+        "@pytest.mark.bug('BTCAAAAA-736')"
+      ],
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "signal-evaluator",
+        "zero-trades",
+        "locked-module",
+        "canary"
+      ],
+      "owner_agent": "NautilusEngineer"
+    },
+    {
+      "id": "REQ-SIGNAL-002",
+      "type": "FR",
+      "title": "Building block registry dynamically discovers and registers all detector building block types",
+      "description": "The BlockRegistry provides dynamic discovery and registration of all detector building block types. Uncoordinated changes can break detector instantiation across the entire pipeline. Must support graceful degradation when individual blocks fail to instantiate.",
+      "source_issues": [
+        "BTCAAAAA-1479",
+        "BTCAAAAA-1477"
+      ],
+      "source_modules": [
+        "src/detectors/building_blocks/registry.py"
+      ],
+      "test_files": [
+        "tests/building_blocks_registry_envoked/test_01_adaptive_momentum_oscillator.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "building-blocks",
+        "registry",
+        "locked-module",
+        "detectors"
+      ],
+      "owner_agent": "NautilusEngineer"
+    },
+    {
+      "id": "REQ-SIGNAL-003",
+      "type": "FR",
+      "title": "All 83 building block indicators must instantiate and produce valid signals",
+      "description": "The system contains 83 building block indicators (adaptive_momentum_oscillator through wyckoff_reaccumulation). Each must instantiate correctly and produce valid signal outputs when provided with market data. Failures in any block can cause silent signal loss and zero-trade scenarios.",
+      "source_issues": [
+        "BTCAAAAA-1477"
+      ],
+      "source_modules": [
+        "src/detectors/building_blocks/registry.py",
+        "src/detectors/building_blocks/patterns/"
+      ],
+      "test_files": [
+        "tests/building_blocks_registry_envoked/test_01_adaptive_momentum_oscillator.py",
+        "tests/building_blocks_registry_envoked/test_02_adr.py",
+        "tests/building_blocks_registry_envoked/test_83_wyckoff_reaccumulation.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "high",
+      "tags": [
+        "building-blocks",
+        "signal-generation",
+        "regression"
+      ],
+      "owner_agent": "NautilusEngineer"
+    },
+    {
+      "id": "REQ-STRAT-001",
+      "type": "FR",
+      "title": "StrategyValidator enforces NautilusTrader-compatible strategy quality standards",
+      "description": "The StrategyValidator is the core validation engine that enforces quality standards for strategies before they are submitted for backtesting or live trading. Uncoordinated changes can silently pass invalid strategies into live trading and optimizer pipelines.",
+      "source_issues": [
+        "BTCAAAAA-1479"
+      ],
+      "source_modules": [
+        "src/strategy_builder/validation/strategy_validator.py"
+      ],
+      "test_files": [
+        "tests/strategy_builder/validation/test_strategy_validator.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "strategy-builder",
+        "validation",
+        "locked-module"
+      ],
+      "owner_agent": "PlatformEngineer"
+    },
+    {
+      "id": "REQ-STRAT-002",
+      "type": "FR",
+      "title": "Auto-Fix Safety Framework applies corrective modifications with rollback capability",
+      "description": "The Auto-Fix Safety Framework is a real-money protection layer that applies corrective modifications to strategies. Includes UndoManager for one-level-deep undo support. All auto-fixes must be safe, reversible, and verified before application.",
+      "source_issues": [
+        "BTCAAAAA-1479",
+        "BTCAAAAA-130"
+      ],
+      "source_modules": [
+        "src/strategy_builder/validation/auto_fix.py",
+        "src/strategy_builder/validation/undo_manager.py"
+      ],
+      "test_files": [
+        "tests/strategy_builder/test_auto_fix_integration.py",
+        "tests/strategy_builder/test_auto_fix_db_persistence.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "strategy-builder",
+        "auto-fix",
+        "locked-module",
+        "undo"
+      ],
+      "owner_agent": "PlatformEngineer"
+    },
+    {
+      "id": "REQ-UI-001",
+      "type": "FR",
+      "title": "ValidationReportWindow displays institutional-grade validation results with auto-fix actions",
+      "description": "The ValidationReportWindow is the 2300-line institutional-grade report UI displaying validation results with auto-fix actions. It is the final gate before strategy submission. Must correctly render all validation issues, auto-fix options, and submission controls.",
+      "source_issues": [
+        "BTCAAAAA-1479"
+      ],
+      "source_modules": [
+        "src/strategy_builder/ui/validation_report_window.py",
+        "src/strategy_builder/ui/validation_panel.py",
+        "src/strategy_builder/ui/validation_dialog.py"
+      ],
+      "test_files": [
+        "tests/strategy_builder/validation/"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "high",
+      "tags": [
+        "strategy-builder",
+        "ui",
+        "validation-report",
+        "locked-module",
+        "qt"
+      ],
+      "owner_agent": "PlatformEngineer"
+    },
+    {
+      "id": "REQ-ITM-001",
+      "type": "FR",
+      "title": "ITM state manager maintains live position persistence for institutional trade management",
+      "description": "The ITM state manager is the persistence layer for live positions. Accidental changes can cause incorrect P&L tracking or position reconciliation failures. Must maintain data integrity across restarts and handle concurrent access.",
+      "source_issues": [
+        "BTCAAAAA-1479"
+      ],
+      "source_modules": [
+        "src/itm/state/manager.py"
+      ],
+      "test_files": [
+        "tests/itm/state/"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "itm",
+        "state-manager",
+        "locked-module",
+        "position-tracking"
+      ],
+      "owner_agent": "PlatformEngineer"
+    },
+    {
+      "id": "REQ-ITM-002",
+      "type": "FR",
+      "title": "PerformanceMonitor auto-pauses strategies when drawdown or daily loss exceeds thresholds",
+      "description": "System MUST auto-pause an ACTIVE strategy when drawdown or daily loss exceeds configured thresholds under performance monitoring. This is a real-money safety requirement (FDR-850).",
+      "source_issues": [
+        "BTCAAAAA-850"
+      ],
+      "source_modules": [
+        "src/itm/orchestrator/performance_monitor.py"
+      ],
+      "test_files": [
+        "tests/fr_acceptance/test_fdr_850.py"
+      ],
+      "test_markers": [
+        "@pytest.mark.fr('FDR-850')",
+        "@pytest.mark.acceptance"
+      ],
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "itm",
+        "performance-monitor",
+        "drawdown",
+        "risk-management",
+        "fr-acceptance"
+      ],
+      "owner_agent": "PlatformEngineer"
+    },
+    {
+      "id": "REQ-CI-001",
+      "type": "AR",
+      "title": "Module lock gate prevents unauthorized changes to critical modules",
+      "description": "The lock gate enforces that changes to locked modules (registered in .module_lock_registry.json) require explicit exception approval via lock_gate_exceptions.json. The gate itself, its registry, and its CI workflow must also be locked to prevent tampering.",
+      "source_issues": [
+        "BTCAAAAA-1479"
+      ],
+      "source_modules": [
+        "scripts/lock_gate.py",
+        ".module_lock_registry.json",
+        "lock_gate_exceptions.json",
+        ".github/workflows/lock-gate.yml"
+      ],
+      "test_files": [
+        "tests/unit/test_lock_gate.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "ci",
+        "lock-gate",
+        "security",
+        "locked-module"
+      ],
+      "owner_agent": "PlatformEngineer"
+    },
+    {
+      "id": "REQ-CI-002",
+      "type": "AR",
+      "title": "Impact Gate validates fix/bug issues before transition to done",
+      "description": "The Impact Gate runs FR acceptance tests and bug regression tests when fix/bug issues transition in_review \u2192 done. Must verify at minimum 10 tests pass before allowing the transition. Issues with impact-gate-bypass label skip the gate.",
+      "source_issues": [
+        "BTCAAAAA-1479"
+      ],
+      "source_modules": [
+        "src/impact_gate/worker.py",
+        "scripts/impact_gate_runner.py",
+        "scripts/impact_gate_worker.py",
+        ".github/workflows/impact-gate-worker.yml"
+      ],
+      "test_files": [
+        "tests/test_impact_gate/test_worker.py",
+        "tests/test_impact_gate/test_runner.py",
+        "tests/test_impact_gate/test_scan_done.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "ci",
+        "impact-gate",
+        "qa-gate",
+        "regression"
+      ],
+      "owner_agent": "AutomationEngineer"
+    },
+    {
+      "id": "REQ-CI-003",
+      "type": "AR",
+      "title": "Blast Radius worker detects impact of code changes and posts reports on issues",
+      "description": "When fix/bug issues transition to in_review, the Blast Radius worker queries the Touch Index to determine which FRs and bugs share overlapping files with the changed code. It posts a structured markdown report on the issue and @-mentions impacted FR owners.",
+      "source_issues": [],
+      "source_modules": [
+        "src/blast_radius/worker.py",
+        "src/blast_radius/generator.py",
+        "src/blast_radius/report.py",
+        "src/blast_radius/query.py",
+        ".github/workflows/blast-radius-worker.yml"
+      ],
+      "test_files": [
+        "tests/test_blast_radius/test_worker.py",
+        "tests/test_blast_radius/test_generator.py",
+        "tests/test_blast_radius/test_report.py",
+        "tests/test_blast_radius/test_query.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "high",
+      "tags": [
+        "ci",
+        "blast-radius",
+        "touch-index",
+        "impact-analysis"
+      ],
+      "owner_agent": "AutomationEngineer"
+    },
+    {
+      "id": "REQ-CI-004",
+      "type": "FR",
+      "title": "Touch Index maintains file-to-issue mapping for FRs and bugs",
+      "description": "The Touch Index system ingests issue data from Paperclip, extracts file paths from comments, git history, and issue descriptions, and maintains PostgreSQL tables (touch_index_fr_files, touch_index_bug_files) as the canonical file-to-issue mapping for blast radius and impact gate queries.",
+      "source_issues": [],
+      "source_modules": [
+        "src/touch_index/db.py",
+        "src/touch_index/fr_worker.py",
+        "src/touch_index/bug_worker.py",
+        "src/touch_index/paperclip_client.py",
+        "src/touch_index/git_extractor.py",
+        "src/touch_index/comment_extractor.py"
+      ],
+      "test_files": [
+        "tests/test_touch_index/test_fr_worker.py",
+        "tests/test_touch_index/test_bug_worker.py",
+        "tests/test_touch_index/test_db.py",
+        "tests/test_touch_index/test_paperclip_client.py",
+        "tests/test_touch_index/test_git_extractor.py",
+        "tests/test_touch_index/test_comment_extractor.py",
+        "tests/test_touch_index/test_validate_fr.py",
+        "tests/test_touch_index/test_validate_bug.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "high",
+      "tags": [
+        "ci",
+        "touch-index",
+        "database",
+        "file-mapping"
+      ],
+      "owner_agent": "AutomationEngineer"
+    },
+    {
+      "id": "REQ-CI-005",
+      "type": "NFR",
+      "title": "Lock gate exception entries must be validated against schema and authority model",
+      "description": "Lock gate exceptions must follow the board-approved authority model: planned changes approved by board (unlimited duration), emergency changes approved by CEO (4-hour max). CTO no longer has unilateral unlock authority. All entries must reference valid approval IDs and authorized approvers.",
+      "source_issues": [
+        "BTCAAAAA-1479"
+      ],
+      "source_modules": [
+        "lock_gate_exceptions.json",
+        "scripts/lock_gate.py",
+        "docs/architecture/lock_gate_exceptions.schema.md"
+      ],
+      "test_files": [
+        "tests/unit/test_lock_gate.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "ci",
+        "lock-gate",
+        "authority-model",
+        "security"
+      ],
+      "owner_agent": "PlatformEngineer"
+    },
+    {
+      "id": "REQ-CI-006",
+      "type": "NFR",
+      "title": "Canary trade execution test must always pass \u2014 detects zero-trades regression",
+      "description": "The canary trade execution test loads real OHLCV data, runs the full signal-evaluator-to-trade-registry chain, and asserts total_trades > 0. This catches the zero-trades failure class within 5 minutes of CI rather than 10 hours after QA sign-off.",
+      "source_issues": [
+        "BTCAAAAA-1476"
+      ],
+      "source_modules": [
+        "src/optimizer_v3/core/institutional_signal_evaluator.py",
+        "src/optimizer_v3/core/trade_registry.py",
+        "src/data_manager/unified_manager.py"
+      ],
+      "test_files": [
+        "tests/bug_regression/test_canary_trade_execution.py"
+      ],
+      "test_markers": [
+        "@pytest.mark.bug('BTCAAAAA-1476')",
+        "@pytest.mark.smoke"
+      ],
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "ci",
+        "canary",
+        "zero-trades",
+        "smoke-test",
+        "locked-module"
+      ],
+      "owner_agent": "QAEngineer"
+    },
+    {
+      "id": "REQ-QA-001",
+      "type": "BR",
+      "title": "QA fact-check pipeline validates strategic claims made by AI consultant",
+      "description": "The QA fact-check pipeline runs automated verification of claims made by the AI Consultant. It validates factual accuracy against data and issue history, producing verdict reports (PASS/FAIL) with evidence.",
+      "source_issues": [
+        "BTCAAAAA-22893"
+      ],
+      "source_modules": [
+        "scripts/qa_fact_check_pipeline.py",
+        "docs/qa/FACT_CHECK_PIPELINE.md"
+      ],
+      "test_files": [
+        "tests/qa/test_fact_check_pipeline.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "medium",
+      "tags": [
+        "qa",
+        "fact-check",
+        "ai-consultant",
+        "verification"
+      ],
+      "owner_agent": "QAEngineer"
+    },
+    {
+      "id": "REQ-DATA-002",
+      "type": "NFR",
+      "title": "Data quality validation gate enforces minimum quality thresholds before pipeline execution",
+      "description": "Before any backtest or live trading pipeline executes, data quality must be validated against minimum thresholds for completeness, accuracy, and freshness. Sub-threshold data blocks pipeline execution until remediated.",
+      "source_issues": [],
+      "source_modules": [
+        "scripts/validate_data_quality.py"
+      ],
+      "test_files": [],
+      "test_markers": [],
+      "status": "active",
+      "priority": "high",
+      "tags": [
+        "data-manager",
+        "quality",
+        "gate",
+        "needs-test"
+      ],
+      "owner_agent": "PlatformEngineer"
+    },
+    {
+      "id": "REQ-CI-007",
+      "type": "FR",
+      "title": "Dependency graph maps file-level imports and is regenerated on schedule",
+      "description": "The dependency graph (dep_graph.json) provides forward and reverse file dependency mappings used by blast radius and impact analysis. Must be regenerated on a schedule to stay current with the codebase.",
+      "source_issues": [],
+      "source_modules": [
+        "scripts/depgraph.py",
+        "scripts/regenerate_dep_graph.py",
+        ".github/workflows/dep-graph-refresh.yml"
+      ],
+      "test_files": [
+        "scripts/validate_dependencies.py",
+        "scripts/verify_dep_graph_refresh.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "medium",
+      "tags": [
+        "ci",
+        "dep-graph",
+        "impact-analysis"
+      ],
+      "owner_agent": "AutomationEngineer"
+    },
+    {
+      "id": "REQ-STRAT-003",
+      "type": "FR",
+      "title": "Backtest configuration panel wiring must produce different results for different parameter values",
+      "description": "All backtest configuration parameters in the UI must be correctly wired to the backtest engine. Changing a parameter value (date range, capital, signal thresholds) must produce measurably different backtest results. Identical results indicate a wiring bug.",
+      "source_issues": [],
+      "source_modules": [
+        "src/strategy_builder/ui/backtest_config_panel.py"
+      ],
+      "test_files": [
+        "tests/integration/test_backtest_configuration_coverage.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "high",
+      "tags": [
+        "strategy-builder",
+        "backtest",
+        "ui-wiring",
+        "integration"
+      ],
+      "owner_agent": "NautilusEngineer"
+    },
+    {
+      "id": "REQ-SIGNAL-004",
+      "type": "FR",
+      "title": "Exit conditions must reference signals that exist in the strategy config",
+      "description": "Exit conditions that reference non-existent signals cause silent failures in the exit evaluation pipeline. The system must validate exit signal references at strategy config time and reject or warn on missing references.",
+      "source_issues": [
+        "BTCAAAAA-736",
+        "BTCAAAAA-778"
+      ],
+      "source_modules": [
+        "src/strategy_builder/core/strategy_config_engine.py"
+      ],
+      "test_files": [
+        "tests/strategy_builder/test_exit_conditions.py",
+        "tests/strategy_builder/test_exit_validation.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "high",
+      "tags": [
+        "strategy-builder",
+        "exit-conditions",
+        "validation"
+      ],
+      "owner_agent": "NautilusEngineer"
+    },
+    {
+      "id": "REQ-QA-002",
+      "type": "BR",
+      "title": "Locked module exception requests must include 4-item QA sign-off checklist",
+      "description": "All locked module exception requests must include a mandatory QA sign-off checklist covering: (1) test coverage verification, (2) regression risk assessment, (3) rollback plan, (4) impacted FR identification. This is enforced via the issue template.",
+      "source_issues": [
+        "BTCAAAAA-1491"
+      ],
+      "source_modules": [
+        ".github/ISSUE_TEMPLATE/qa-locked-module-exception.md"
+      ],
+      "test_files": [
+        "tests/unit/test_lock_gate.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "high",
+      "tags": [
+        "qa",
+        "lock-gate",
+        "exception",
+        "template",
+        "locked-module"
+      ],
+      "owner_agent": "QAEngineer"
+    },
+    {
+      "id": "REQ-CI-008",
+      "type": "NFR",
+      "title": "Nightly test alert notifies on scheduled test failures",
+      "description": "When the nightly test suite fails, a Paperclip alert must be created with the workflow name, run URL, and test output. This ensures test failures are surfaced to the team within the same day.",
+      "source_issues": [],
+      "source_modules": [
+        "scripts/nightly_test_alert.py",
+        ".github/workflows/test.yml"
+      ],
+      "test_files": [],
+      "test_markers": [],
+      "status": "active",
+      "priority": "medium",
+      "tags": [
+        "ci",
+        "alerting",
+        "nightly",
+        "needs-test"
+      ],
+      "owner_agent": "AutomationEngineer"
+    },
+    {
+      "id": "REQ-CI-009",
+      "type": "FR",
+      "title": "scan-done retroactively gates fix/bug issues that bypassed the Impact Gate",
+      "description": "The scan-done worker retroactively validates fix/bug issues already in done status that never passed through the Impact Gate. It backfills coverage for issues completed before the gate existed or that slipped through.",
+      "source_issues": [],
+      "source_modules": [
+        "scripts/scan_fix_issues_done.py",
+        "scripts/scan_done_alert.py",
+        ".github/workflows/impact-gate-scan-done.yml"
+      ],
+      "test_files": [
+        "tests/test_impact_gate/test_scan_done.py",
+        "tests/test_impact_gate/test_scan_done_alert.py"
+      ],
+      "test_markers": [],
+      "status": "active",
+      "priority": "medium",
+      "tags": [
+        "ci",
+        "impact-gate",
+        "scan-done",
+        "backfill"
+      ],
+      "owner_agent": "AutomationEngineer"
+    },
+    {
+      "id": "REQ-DATA-003",
+      "type": "NFR",
+      "title": "Database layer under optimizer_v3/database provides unified ORM access for 9 managers",
+      "description": "The optimizer_v3/database package contains 9 ORM managers providing unified database access for strategy configs, trade results, and calibration state. Uncoordinated schema or connection changes risk data corruption across all tools.",
+      "source_issues": [
+        "BTCAAAAA-1479"
+      ],
+      "source_modules": [
+        "src/optimizer_v3/database/"
+      ],
+      "test_files": [],
+      "test_markers": [],
+      "status": "active",
+      "priority": "critical",
+      "tags": [
+        "database",
+        "orm",
+        "locked-module",
+        "needs-test"
+      ],
+      "owner_agent": "DatabaseAdministrator"
+    }
+  ]
+}

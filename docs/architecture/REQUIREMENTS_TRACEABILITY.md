@@ -192,4 +192,61 @@ Run quarterly (or on every major release):
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-05-13 | Architect | Added §10: Test-Case-to-Requirements Mapping — BTCAAAAA-25644 |
+
 | 2026-05-13 | DocWriter | Initial version — issue BTCAAAAA-25646 |
+
+## 10. Test-Case-to-Requirements Mapping (Code-Level Traceability)
+
+### 10.1 Overview
+
+In addition to process-level issue traceability (§2-§5), the system now includes a code-level traceability layer that maps **source modules → requirements → test cases**. This is implemented via the **Requirements Registry** (`requirements_registry.json`).
+
+### 10.2 Registry Schema
+
+See [requirements_registry.schema.md](requirements_registry.schema.md) and [ADR-0002](adr/ADR-0002-test-to-requirements-traceability.md) for full design rationale.
+
+Each requirement entry links:
+- `source_modules` — which source files implement the requirement
+- `test_files` — which test files verify the requirement
+- `test_markers` — which pytest markers tag the requirement in tests
+- `source_issues` — which Paperclip issues originated the requirement
+
+### 10.3 Traceability Chain (Expanded)
+
+```
+CEO Goal
+  └── Product Requirements (BTCAAAAA-NNN)
+        ├── Implementation Tasks (code changes in src/)
+        │     └── Requirements Registry entry (requirements_registry.json)
+        │           ├── source_modules: which files implement it
+        │           └── test_files: which tests verify it
+        ├── Test Cases (tests/*/test_*.py)
+        │     └── pytest markers: @pytest.mark.fr("FDR-NNN")
+        └── QA Verdict (PASS / FAIL)
+```
+
+### 10.4 CI Integration
+
+| Trigger | Action | Registry Role |
+|---------|--------|---------------|
+| `git push` on locked module | Lock Gate identifies changed module | Loads registry → finds affected requirements → lists required tests |
+| Issue transitions `in_review` | Impact Gate runs verification tests | Cross-references touched files against registry `source_modules` |
+| Nightly scheduled scan | Gap detection | Reports requirements with zero tests, stale references, orphan tests |
+
+### 10.5 Agent Responsibilities
+
+| Agent | Registry Duty |
+|-------|---------------|
+| **Architect** | Owns `requirements_registry.json` schema and ADRs; approves structural changes |
+| **CTO** | Approves new requirements and priority assignments |
+| **Engineering Agents** | Add registry entries when implementing new features; update `source_modules` on refactor |
+| **QAEngineer** | Verifies `test_files` and `test_markers` fields are correct; runs gap detection |
+| **AutomationEngineer** | Integrates registry into CI lock gate, impact gate, and gap scanner |
+| **DocWriter** | Maintains `requirements_registry.schema.md` and this document |
+
+### 10.6 References
+
+- [requirements_registry.json](../../requirements_registry.json) — Canonical registry
+- [ADR-0002](adr/ADR-0002-test-to-requirements-traceability.md) — Architecture decision
+- [requirements_registry.schema.md](requirements_registry.schema.md) — Schema documentation
