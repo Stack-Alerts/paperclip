@@ -154,6 +154,38 @@ class TestUtcTimezonesInGetConfig:
         assert dt.second == 0, f"end_date second must be 0, got {dt.second}"
         assert dt.microsecond == 0, f"end_date microsecond must be 0, got {dt.microsecond}"
 
+    def test_start_date_is_before_end_date(self):
+        """start_date must always be earlier than end_date."""
+        stub = _make_get_config_stub()
+        stub.lookback_spin.value.return_value = 30
+        stub.mode_group.checkedId.return_value = 2
+
+        config = stub.get_config()
+
+        assert config["start_date"] < config["end_date"], (
+            f"start_date {config['start_date']} must be before end_date {config['end_date']}"
+        )
+
+    def test_mode1_includes_split_dates(self):
+        """Mode 1 config must include training_end and testing_start keys."""
+        stub = _make_get_config_stub()
+        stub.lookback_spin.value.return_value = 90
+        stub.training_spin.value.return_value = 30
+        stub.testing_spin.value.return_value = 30
+        stub.mode_group.checkedId.return_value = 1
+
+        config = stub.get_config()
+
+        assert "training_end" in config, "Mode 1 must include training_end"
+        assert "testing_start" in config, "Mode 1 must include testing_start"
+        assert config["training_end"] == config["testing_start"], (
+            "training_end must equal testing_start in Mode 1"
+        )
+        for key in ("training_end", "testing_start"):
+            dt = config[key]
+            assert dt.tzinfo is not None, f"{key} must be timezone-aware"
+            assert dt.utcoffset().total_seconds() == 0, f"{key} must be UTC"
+
 
 class TestUtcFallbackInHandleBacktestFinished:
     """Verifies that _handle_backtest_finished builds a test_data dict whose
