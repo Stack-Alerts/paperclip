@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-13T11:18:22.016780+00:00",
+  "timestamp": "2026-05-13T11:49:04.640235+00:00",
   "touch_index_fr": {
     "pass": true,
     "coverage_pct": 95.2,
@@ -12,7 +12,8 @@
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
     "duplicate_pairs": 0,
-    "orphan_count": 0
+    "orphan_count": 0,
+    "note": "FR worker verified: 133 tests pass, worker_count bug fixed, regression test added for BTCAAAAA-25502."
   },
   "touch_index_bug": {
     "pass": true,
@@ -29,6 +30,6 @@
     "unknown_source_rows": 0,
     "duplicate_pairs": 0,
     "orphan_count": 0,
-    "note": "Fix applied: catch-up phase indexes eligible issues referenced in all git history, keeping coverage stable without separate backfill."
+    "note": "Sustained after catch-up fix (BTCAAAAA-25486). Eligible coverage stable at 94.1%."
   }
 }
