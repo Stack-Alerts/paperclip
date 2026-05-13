@@ -1454,7 +1454,7 @@ class TestMain:
                 main()
 
         assert exc_info.value.code == 1
-        mock_transition.assert_called_once_with(ISSUE_ID, "done")
+        mock_transition.assert_not_called()
 
     def test_main_validate_issue_id_not_found_skips_validation(
         self, monkeypatch, caplog
@@ -2288,7 +2288,7 @@ class TestBugJsonSummary:
 
         assert exc_info.value.code == 1
         mock_fetch.assert_not_called()
-        mock_transition.assert_called_once_with("uuid-1", "done")
+        mock_transition.assert_not_called()
         captured = capsys.readouterr()
         import json
 

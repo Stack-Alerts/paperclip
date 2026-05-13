@@ -122,14 +122,6 @@ def _run_bug_cli() -> None:
                 result.source,
                 result.skipped_no_commits,
             )
-            if not args.dry_run:
-                try:
-                    transition_issue_status_board(result.issue_id, "done")
-                    logger.info("Marked %s as done", result.issue_identifier)
-                except Exception:
-                    logger.exception(
-                        "Failed to mark %s as done", result.issue_identifier
-                    )
             if args.validate:
                 report = run_bug_quality_checks(
                     engine, stale_threshold_days=args.stale_days
@@ -145,6 +137,14 @@ def _run_bug_cli() -> None:
                         )
                     raise SystemExit(1)
                 logger.info("VALIDATION PASSED after single-issue ingestion")
+            if not args.dry_run:
+                try:
+                    transition_issue_status_board(result.issue_id, "done")
+                    logger.info("Marked %s as done", result.issue_identifier)
+                except Exception:
+                    logger.exception(
+                        "Failed to mark %s as done", result.issue_identifier
+                    )
         if args.json_summary:
             _emit_json_summary(
                 args,
