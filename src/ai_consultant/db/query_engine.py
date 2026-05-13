@@ -476,7 +476,7 @@ class QueryEngine:
                     block_id_a=pair[0],
                     block_id_b=pair[1],
                     co_occurrence_count=row["co_count"],
-                    correlation_score=round(row["co_count"] / max(min_fires, 1), 4),
+                    correlation_score=round(row["co_count"] / max(min_fires * 3, 1), 4),
                 )
             )
         return results
