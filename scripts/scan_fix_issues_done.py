@@ -63,15 +63,24 @@ _GATE_HEADER_RE = re.compile(
 
 
 def _check_gate_status(issue_id: str) -> str | None:
-    """Check comments for the most recent Impact Gate result.
+    """Check comments + muted gate state for the most recent Impact Gate result.
 
-    Comments are returned oldest-first by the API, so we iterate in
-    reverse to find the newest gate outcome (handles re-run scenarios
-    where an earlier FAIL is superseded by a later PASS).
+    Comments are returned newest-first by the API (confirmed by
+    observation), so we iterate in original order to find the newest
+    gate outcome (handles re-run scenarios where an earlier FAIL is
+    superseded by a later PASS).
+
+    Also checks the muted-gate state file (produced when force-gating
+    already-done issues in mute mode to avoid reopen loops).
 
     Returns the gate status string (PASS, FAIL, BYPASSED, ERROR, SKIPPED)
-    or None if no Impact Gate comment was found.
+    or None if no Impact Gate comment or muted result was found.
     """
+    # Check muted gate state first (cheaper — no API call)
+    muted_state = _load_muted_state()
+    if issue_id in muted_state:
+        return muted_state[issue_id]
+
     try:
         comments = fetch_issue_comments(issue_id)
     except Exception as exc:
@@ -84,6 +93,27 @@ def _check_gate_status(issue_id: str) -> str | None:
         if m:
             return m.group(1)
     return None
+
+
+_MUTED_STATE_PATH = Path(__file__).resolve().parent.parent / "data" / "impact_gate_muted_state.json"
+
+
+def _load_muted_state() -> dict[str, str]:
+    """Load muted gate state from disk (issue_id -> gate_status)."""
+    try:
+        if _MUTED_STATE_PATH.exists():
+            return json.loads(_MUTED_STATE_PATH.read_text())
+    except Exception:
+        pass
+    return {}
+
+
+def save_muted_gate_result(issue_id: str, gate_status: str) -> None:
+    """Persist a muted gate result so future scans skip this issue."""
+    state = _load_muted_state()
+    state[issue_id] = gate_status
+    _MUTED_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _MUTED_STATE_PATH.write_text(json.dumps(state, indent=2))
 
 
 def scan(

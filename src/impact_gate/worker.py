@@ -368,11 +368,26 @@ def process_issue(
     else:
         log.info("Processing issue %s (status=%s, title=%s)", identifier, status, title)
 
+    # Suppress all mutations (comments, transitions, blocking issues)
+    # when force-gating already-done issues to avoid triggering the
+    # platform's comment-on-done → reopen behaviour (BTCAAAAA-25693).
+    mute = force and not dry_run
+
+    def _save_if_muted(status: str) -> None:
+        """Persist muted gate result so future scans skip this issue."""
+        if mute:
+            try:
+                from scan_fix_issues_done import save_muted_gate_result
+                save_muted_gate_result(issue_id, status)
+            except Exception:
+                pass
+
     # --- Bypass check ---
     if _has_bypass_label(issue):
         log.info("Bypass label detected on %s — skipping gate", identifier)
-        if not dry_run:
+        if not dry_run and not mute:
             _post_comment(issue_id, _build_bypass_comment(identifier))
+        _save_if_muted("BYPASSED")
         return {"issue": identifier, "gate_status": "BYPASSED"}
 
     # --- Only run for in_review issues (or force retroactive) ---
@@ -409,11 +424,12 @@ def process_issue(
 
     if not touched_files:
         log.warning("No touchedFiles found for issue %s", identifier)
-        if not dry_run:
+        if not dry_run and not mute:
             _post_comment(
                 issue_id,
                 f"## Impact Gate: SKIPPED\n\nIssue **{identifier}** has no `touchedFiles` in its description and no git commits referencing it.\n\nGate cannot run without file paths.",
             )
+        _save_if_muted("SKIPPED")
         return {
             "issue": identifier,
             "gate_status": "SKIPPED",
@@ -428,8 +444,9 @@ def process_issue(
     except Exception as exc:
         log.error("Blast Radius query failed for %s: %s", identifier, exc)
         error_msg = f"Blast Radius query error: {exc}"
-        if not dry_run:
+        if not dry_run and not mute:
             _post_comment(issue_id, _build_escalation_comment(identifier, error_msg))
+        _save_if_muted("ERROR")
         return {"issue": identifier, "gate_status": "ERROR", "error": error_msg}
 
     # --- Extract FR IDs and bug IDs ---
@@ -451,7 +468,7 @@ def process_issue(
 
     if not fr_ids and not bug_ids:
         log.info("No FR or bug IDs found for %s — nothing to gate", identifier)
-        if not dry_run:
+        if not dry_run and not mute:
             _post_comment(
                 issue_id,
                 f"## Impact Gate: PASS ✅\n\nIssue **{identifier}** has no FR impact and no regression risk.\n\nGate passed — no tests to run.",
@@ -460,6 +477,7 @@ def process_issue(
                 transition_issue_status_board(issue_id, "done")
             except Exception as exc:
                 log.warning("Failed to transition %s to done: %s", identifier, exc)
+        _save_if_muted("PASS")
         return {"issue": identifier, "gate_status": "PASS", "reason": "no tests needed"}
 
     # --- Run Impact Gate tests (with retry for transient CI failures) ---
@@ -494,8 +512,9 @@ def process_issue(
         log.error("Impact Gate runner exhausted all %d attempts for %s",
                    GATE_RETRY_MAX_ATTEMPTS, identifier)
         error_msg = last_error or "Impact Gate runner: all attempts failed"
-        if not dry_run:
+        if not dry_run and not mute:
             _post_comment(issue_id, _build_escalation_comment(identifier, error_msg))
+        _save_if_muted("ERROR")
         return {"issue": identifier, "gate_status": "ERROR", "error": error_msg}
 
     # Enforce the minimum test bar (10-fix bar)
@@ -533,12 +552,14 @@ def process_issue(
 
     # --- Act on result ---
     if gate_status == "PASS":
-        _post_comment(issue_id, _build_pass_comment(identifier, result))
-        try:
-            transition_issue_status_board(issue_id, "done")
-        except Exception as exc:
-            log.warning("Failed to transition %s to done: %s", identifier, exc)
-        log.info("Gate PASS for %s — transitioned to done", identifier)
+        if not mute:
+            _post_comment(issue_id, _build_pass_comment(identifier, result))
+            try:
+                transition_issue_status_board(issue_id, "done")
+            except Exception as exc:
+                log.warning("Failed to transition %s to done: %s", identifier, exc)
+        _save_if_muted("PASS")
+        log.info("Gate PASS for %s — transitioned to done" if not mute else "Gate PASS for %s — mute (retroactive, no mutation)", identifier)
         return {
             "issue": identifier,
             "gate_status": "PASS",
@@ -547,87 +568,89 @@ def process_issue(
 
     # FAIL or ERROR — revert to in_progress, create blocking sub-issues
     blocking_issues: list[dict] = []
-    _last_create_time: float = 0.0
+    if not mute:
+        _last_create_time: float = 0.0
 
-    def _maybe_throttle() -> None:
-        """Ensure at least BLOCKING_ISSUE_CREATE_INTERVAL between API mutation calls."""
-        nonlocal _last_create_time
-        if _last_create_time > 0:
-            elapsed = time.monotonic() - _last_create_time
-            needed = BLOCKING_ISSUE_CREATE_INTERVAL - elapsed
-            if needed > 0:
-                time.sleep(needed)
-        _last_create_time = time.monotonic()
+        def _maybe_throttle() -> None:
+            """Ensure at least BLOCKING_ISSUE_CREATE_INTERVAL between API mutation calls."""
+            nonlocal _last_create_time
+            if _last_create_time > 0:
+                elapsed = time.monotonic() - _last_create_time
+                needed = BLOCKING_ISSUE_CREATE_INTERVAL - elapsed
+                if needed > 0:
+                    time.sleep(needed)
+            _last_create_time = time.monotonic()
 
-    # Create blocking issues for each failing FR (with dedup and rate limiting)
-    fr_results = result.get("fr_results", {})
-    for fid in fr_ids:
-        fr_entry = fr_results.get(fid, {})
-        if fr_entry.get("status") in ("FAIL", "ERROR", "MISSING"):
-            detail_lines = []
-            for t in fr_entry.get("tests", []):
-                if t.get("outcome") in ("failed", "error"):
-                    detail_lines.append(f"{t['nodeid']}: {t.get('message', '')}")
-            detail = (
-                "\n".join(detail_lines)
-                if detail_lines
-                else f"Status: {fr_entry.get('status')}"
-            )
-            _maybe_throttle()
-            existing = _find_existing_blocking_issue(identifier, fid, "fr")
-            if existing:
-                blocking_issues.append(existing)
-            else:
+        # Create blocking issues for each failing FR (with dedup and rate limiting)
+        fr_results = result.get("fr_results", {})
+        for fid in fr_ids:
+            fr_entry = fr_results.get(fid, {})
+            if fr_entry.get("status") in ("FAIL", "ERROR", "MISSING"):
+                detail_lines = []
+                for t in fr_entry.get("tests", []):
+                    if t.get("outcome") in ("failed", "error"):
+                        detail_lines.append(f"{t['nodeid']}: {t.get('message', '')}")
+                detail = (
+                    "\n".join(detail_lines)
+                    if detail_lines
+                    else f"Status: {fr_entry.get('status')}"
+                )
                 _maybe_throttle()
-                bi = _create_blocking_issue(identifier, fid, detail, "fr")
-                if bi:
-                    _last_create_time = time.monotonic()
-                    blocking_issues.append(bi)
+                existing = _find_existing_blocking_issue(identifier, fid, "fr")
+                if existing:
+                    blocking_issues.append(existing)
+                else:
+                    _maybe_throttle()
+                    bi = _create_blocking_issue(identifier, fid, detail, "fr")
+                    if bi:
+                        _last_create_time = time.monotonic()
+                        blocking_issues.append(bi)
 
-    # Create blocking issues for each failing bug regression (with dedup and rate limiting)
-    bug_results = result.get("bug_results", {})
-    for bid in bug_ids:
-        bug_entry = bug_results.get(bid, {})
-        if bug_entry.get("status") in ("FAIL", "ERROR", "MISSING"):
-            detail_lines = []
-            for t in bug_entry.get("tests", []):
-                if t.get("outcome") in ("failed", "error"):
-                    detail_lines.append(f"{t['nodeid']}: {t.get('message', '')}")
-            detail = (
-                "\n".join(detail_lines)
-                if detail_lines
-                else f"Status: {bug_entry.get('status')}"
-            )
-            _maybe_throttle()
-            existing = _find_existing_blocking_issue(identifier, bid, "bug")
-            if existing:
-                blocking_issues.append(existing)
-            else:
+        # Create blocking issues for each failing bug regression (with dedup and rate limiting)
+        bug_results = result.get("bug_results", {})
+        for bid in bug_ids:
+            bug_entry = bug_results.get(bid, {})
+            if bug_entry.get("status") in ("FAIL", "ERROR", "MISSING"):
+                detail_lines = []
+                for t in bug_entry.get("tests", []):
+                    if t.get("outcome") in ("failed", "error"):
+                        detail_lines.append(f"{t['nodeid']}: {t.get('message', '')}")
+                detail = (
+                    "\n".join(detail_lines)
+                    if detail_lines
+                    else f"Status: {bug_entry.get('status')}"
+                )
                 _maybe_throttle()
-                bi = _create_blocking_issue(identifier, bid, detail, "bug")
-                if bi:
-                    _last_create_time = time.monotonic()
-                    blocking_issues.append(bi)
+                existing = _find_existing_blocking_issue(identifier, bid, "bug")
+                if existing:
+                    blocking_issues.append(existing)
+                else:
+                    _maybe_throttle()
+                    bi = _create_blocking_issue(identifier, bid, detail, "bug")
+                    if bi:
+                        _last_create_time = time.monotonic()
+                        blocking_issues.append(bi)
 
-    # Post failure comment
-    fail_comment = _build_fail_comment(
-        identifier, result, fr_ids, bug_ids, blocking_issues
-    )
-    _post_comment(issue_id, fail_comment)
+        # Post failure comment
+        fail_comment = _build_fail_comment(
+            identifier, result, fr_ids, bug_ids, blocking_issues
+        )
+        _post_comment(issue_id, fail_comment)
 
-    # Revert to in_progress (skip for retroactive — don't undo "done" status)
-    if not force:
-        try:
-            transition_issue_status_board(issue_id, "in_progress")
-        except Exception as exc:
-            log.warning("Failed to revert %s to in_progress: %s", identifier, exc)
+        # Revert to in_progress (skip for retroactive — don't undo "done" status)
+        if not force:
+            try:
+                transition_issue_status_board(issue_id, "in_progress")
+            except Exception as exc:
+                log.warning("Failed to revert %s to in_progress: %s", identifier, exc)
 
-    # Set blockedByIssueIds
-    blocking_ids = [bi.get("id", "") for bi in blocking_issues if bi.get("id")]
-    if blocking_ids:
-        _set_blocked_by(issue_id, blocking_ids)
+        # Set blockedByIssueIds
+        blocking_ids = [bi.get("id", "") for bi in blocking_issues if bi.get("id")]
+        if blocking_ids:
+            _set_blocked_by(issue_id, blocking_ids)
 
-    action = "posted retroactive fail comment (status unchanged)" if force else "reverted to in_progress"
+    action = "mute (retroactive, no mutation)" if mute else ("posted retroactive fail comment (status unchanged)" if force else "reverted to in_progress")
+    _save_if_muted(gate_status)
     log.info(
         "Gate FAIL for %s — %s, %d blocking issues created",
         identifier,

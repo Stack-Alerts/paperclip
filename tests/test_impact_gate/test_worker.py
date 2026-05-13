@@ -249,8 +249,9 @@ class TestProcessIssue:
         posted, transitions = self._mock_actions(monkeypatch)
         r = process_issue("done-uuid", dry_run=False, force=True)
         assert r["gate_status"] == "PASS"
-        assert len(posted) == 1
-        assert transitions == [("done-uuid", "done")]
+        # force=True on done issues now mutes all mutations (BTCAAAAA-25693)
+        assert len(posted) == 0, "No comments posted in mute mode"
+        assert transitions == [], "No transitions in mute mode"
 
     def test_bypasses(self, monkeypatch):
         posted = []
@@ -379,7 +380,8 @@ class TestProcessIssue:
         assert transitions == [], (
             f"Expected no transitions for retroactive FAIL, got {transitions}"
         )
-        assert len(posted) == 1, "Should have posted a fail comment"
+        # force=True on done issues now mutes all mutations (BTCAAAAA-25693)
+        assert len(posted) == 0, "No comments posted in mute mode"
 
     def test_fail_dry_run(self, monkeypatch):
         self._mock_fetch(
