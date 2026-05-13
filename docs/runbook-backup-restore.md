@@ -480,6 +480,51 @@ pytest tests/test_scripts/test_deadman_switch_monitor.py -v
 ```
 
 
+
+#### 6.6.5 Dead-Man Switch Local Backup Monitor (systemd-based fallback)
+
+The local backup monitor runs on the self-hosted machine via systemd timer.
+It checks the dead-man switch state file directly, providing redundancy when
+GitHub Actions API is unavailable.  It complements the GH Actions-based
+deadman-switch-monitor.yml.
+
+- **Timer:** `deploy/systemd/paperclip-deadman-monitor.timer`
+- **Service:** `deploy/systemd/paperclip-deadman-monitor.service`
+- **Interval:** Every 15 min (at :05, :20, :35, :50 — offset from the GH Actions monitor at :15/:45)
+- **Threshold:** 45 min since the dead-man switch last ran (via `last_run_utc` in state file)
+- **Runner:** self-hosted machine (direct filesystem access to state file)
+- **Action:** Creates a critical Paperclip issue if the dead-man's-switch state is stale or missing
+- **State file:** `~/.paperclip/deadman_switch_local_monitor_state.json`
+- **Log file:** `~/.paperclip/deadman_switch_local_monitor.log` (auto-rotated at 1 MB)
+- **Alert query:** "Dead-man's-switch local monitor alert" (distinct from the GH Actions monitor's alerts)
+
+Manual check:
+
+```bash
+python scripts/deadman_switch_local_monitor.py
+python scripts/deadman_switch_local_monitor.py --dry-run
+python scripts/deadman_switch_local_monitor.py --threshold 30
+python scripts/deadman_switch_local_monitor.py --json-summary
+```
+
+Enable the timer:
+
+```bash
+# Install units
+mkdir -p ~/.config/systemd/user/
+cp deploy/systemd/paperclip-deadman-monitor.service ~/.config/systemd/user/
+cp deploy/systemd/paperclip-deadman-monitor.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now paperclip-deadman-monitor.timer
+systemctl --user status paperclip-deadman-monitor.timer
+```
+
+Tests:
+
+```bash
+pytest tests/test_scripts/test_deadman_switch_local_monitor.py -v
+```
+
 ### 6.7 Troubleshooting
 
 | Symptom | Check |
@@ -490,6 +535,7 @@ pytest tests/test_scripts/test_deadman_switch_monitor.py -v
 | Dead-man alert fired | Backup overdue >12h. Run manual backup, then check dead-man log: `~/.paperclip/backup_deadman_switch.log` |
 | Dead-man log rotated unexpectedly | Check `~/.paperclip/backup_deadman_switch.log.1` for the rotated content |
 | Dead-man self-health shows old last_run_utc | The GH Actions workflow may have stopped. Check `~/.paperclip/backup_deadman_switch_state.json` and verify the CI schedule is active |
+| Dead-man switch local monitor alert fired | The dead-man switch state file is stale or missing. Check `~/.paperclip/backup_deadman_switch_state.json` for `last_run_utc`. Check monitor log: `~/.paperclip/deadman_switch_local_monitor.log`. The local monitor runs via systemd: `systemctl --user status paperclip-deadman-monitor.timer` |
 | Dead-man switch monitor alert fired | The dead-man's-switch itself is not running. Check GitHub Actions for `backup-deadman-switch.yml` run history. The self-hosted runner may be down. Check monitor log: `~/.paperclip/deadman_switch_monitor.log` |
 | Service fails with "status=216/GROUP" | Remove any `User=` directive from the service unit — it's redundant in `systemctl --user` and causes GROUP permission errors. Also ensure `WantedBy=default.target` (not `multi-user.target`) for user units. |
 | Timer not firing despite being enabled | Run `loginctl show-user sirrus --property=Linger` — must be `yes`. If `no`: `sudo loginctl enable-linger sirrus`. |

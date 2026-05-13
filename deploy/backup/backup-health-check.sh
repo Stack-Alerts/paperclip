@@ -118,9 +118,17 @@ fi
 MONITOR_STATE="/home/sirrus/.paperclip/deadman_switch_monitor_state.json"
 if [ -f "$MONITOR_STATE" ]; then
     MON_RUNS=$(python3 -c "import json; print(json.load(open('$MONITOR_STATE')).get('total_runs',0))" 2>/dev/null || echo "?")
-    ok "dead-man switch monitor (watchdog): $MON_RUNS runs"
+    ok "dead-man switch monitor (GH Actions): $MON_RUNS runs"
 else
-    warn "dead-man switch monitor state missing"
+    warn "dead-man switch monitor (GH Actions) state missing"
+fi
+
+LOCAL_MONITOR_STATE="/home/sirrus/.paperclip/deadman_switch_local_monitor_state.json"
+if [ -f "$LOCAL_MONITOR_STATE" ]; then
+    LOCAL_RUNS=$(python3 -c "import json; print(json.load(open('$LOCAL_MONITOR_STATE')).get('total_runs',0))" 2>/dev/null || echo "?")
+    ok "dead-man switch monitor (local): $LOCAL_RUNS runs"
+else
+    warn "dead-man switch local monitor state missing (timer may not be enabled)"
 fi
 echo ""
 
