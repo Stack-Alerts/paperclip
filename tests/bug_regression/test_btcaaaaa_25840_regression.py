@@ -39,7 +39,6 @@ from tests.test_impact_gate.test_scan_done import (  # noqa: E402, F401
     TestIsFixIssue,
     TestGateHeaderRegex,
     TestCheckGateStatus,
-
     TestScanFunction,
     TestMain as TestScanDoneMain,
 )
