@@ -172,7 +172,7 @@ def _run_bug_cli() -> None:
                 engine, stale_threshold_days=args.stale_days
             )
             if not report.passed:
-                logger.error("VALIDATION FAILED— investigate existing data")
+                logger.error("VALIDATION FAILED — investigate existing data")
                 if args.json_summary:
                     _emit_json_summary(
                         args,
@@ -181,7 +181,7 @@ def _run_bug_cli() -> None:
                         quality_report=report,
                     )
                 raise SystemExit(1)
-            logger.info("VALIDATION PASSED— existing data clean")
+            logger.info("VALIDATION PASSED — existing data clean")
         if args.json_summary:
             _emit_json_summary(
                 args,
@@ -205,7 +205,7 @@ def _run_bug_cli() -> None:
 
     if args.dry_run:
         logger.info(
-            "DRY RUN -- skipping transition-to-done for %d issue(s)", len(issues)
+            "DRY RUN — skipping transition-to-done for %d issue(s)", len(issues)
         )
     else:
         for r in results:
