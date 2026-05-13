@@ -203,6 +203,7 @@ def run_bug_worker(
                 completed_at=_parse_completed_at(issue),
                 description=issue.get("description", "") or "",
                 dry_run=dry_run,
+                issue_status=issue.get("status"),
             )
             if result.source == "none" and not issue.get("description"):
                 full = get_issue_by_id(issue["id"])

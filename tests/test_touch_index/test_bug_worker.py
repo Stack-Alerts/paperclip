@@ -1818,8 +1818,8 @@ class TestMain:
         mock_quality.assert_not_called()
         mock_transition.assert_called_once_with("id-1", "done")
 
-    def test_main_transitions_all_processed_issues(self, monkeypatch, caplog):
-        """All processed issues are transitioned to done regardless of current status."""
+    def test_main_transitions_done_issues(self, monkeypatch, caplog):
+        """Polling path: only done issues are transitioned; non-done issues are skipped."""
         from touch_index.__main__ import _run_bug_cli as main
         import logging
 
@@ -1845,6 +1845,7 @@ class TestMain:
                 files_indexed=2,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
             BugIngestionResult(
                 issue_id="id-2",
@@ -1852,6 +1853,7 @@ class TestMain:
                 files_indexed=1,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="in_progress",
             ),
         ]
 
@@ -1875,14 +1877,10 @@ class TestMain:
             monkeypatch.setattr("sys.argv", ["touch_index"])
             main()
 
-        # Both issues should be transitioned (status check removed)
-        assert mock_transition.call_count == 2
-        mock_transition.assert_has_calls(
-            [
-                call("id-1", "done"),
-                call("id-2", "done"),
-            ]
-        )
+        # Only the done issue should be transitioned
+        mock_transition.assert_called_once_with("id-1", "done")
+        assert any("skipping transition to done" in r.message for r in caplog.records)
+
 
     def test_main_transition_error_logged_does_not_crash(self, monkeypatch, caplog):
         """A failed transition is logged but does not halt the worker."""

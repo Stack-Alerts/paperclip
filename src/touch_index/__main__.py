@@ -269,8 +269,18 @@ def _run_bug_cli() -> None:
     else:
         for r in results:
             try:
-                transition_issue_status_board(r.issue_id, "done")
-                logger.info("Marked %s as done", r.issue_identifier)
+                if r.issue_status == "done" or r.issue_status is None:
+                    transition_issue_status_board(r.issue_id, "done")
+                    logger.info(
+                        "Marked %s as done", r.issue_identifier
+                    )
+                else:
+                    logger.info(
+                        "Bug %s: ingested but status is '%s' — "
+                        "skipping transition to done",
+                        r.issue_identifier,
+                        r.issue_status,
+                    )
             except Exception:
                 logger.exception("Failed to mark %s as done", r.issue_identifier)
 
@@ -548,8 +558,18 @@ def _run_fr_cli() -> None:
     else:
         for r in results:
             try:
-                transition_issue_status_board(r.issue_id, "done")
-                logger.info("Marked %s as done", r.issue_identifier)
+                if r.issue_status == "done" or r.issue_status is None:
+                    transition_issue_status_board(r.issue_id, "done")
+                    logger.info(
+                        "Marked %s as done", r.issue_identifier
+                    )
+                else:
+                    logger.info(
+                        "FR %s: ingested but status is '%s' — "
+                        "skipping transition to done",
+                        r.issue_identifier,
+                        r.issue_status,
+                    )
             except Exception:
                 logger.exception("Failed to mark %s as done", r.issue_identifier)
     logger.info(
