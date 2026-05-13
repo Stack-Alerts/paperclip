@@ -199,6 +199,57 @@ class TestNautilusCodeGenerator:
         
         assert '"""' in code or "'''" in code
         assert config.description in code
+
+    def test_bullish_strategy_config_dict_includes_strategy_type(self):
+        """Test Bullish config dict includes strategy_type"""
+        generator = NautilusCodeGenerator()
+        config = self._create_test_config("BullishStrategy")
+        config.strategy_type = "Bullish"
+
+        result = generator.generate(config)
+        assert result.config_dict["strategy_type"] == "Bullish"
+
+    def test_bearish_strategy_config_dict_includes_strategy_type(self):
+        """Test Bearish config dict includes strategy_type"""
+        generator = NautilusCodeGenerator()
+        config = self._create_test_config("BearishStrategy")
+        config.strategy_type = "Bearish"
+
+        result = generator.generate(config)
+        assert result.config_dict["strategy_type"] == "Bearish"
+
+    def test_generated_init_stores_strategy_type(self):
+        """Test __init__ stores strategy_type from config"""
+        generator = NautilusCodeGenerator()
+        config = self._create_test_config()
+        config.strategy_type = "Bearish"
+
+        result = generator.generate(config)
+        code = result.strategy_code
+
+        assert 'self.strategy_type = config.get("strategy_type", "Bullish")' in code
+
+    def test_generated_execute_trade_dynamic_order_side(self):
+        """Test _execute_trade uses dynamic order side, not hardcoded"""
+        generator = NautilusCodeGenerator()
+        config = self._create_test_config()
+
+        result = generator.generate(config)
+        code = result.strategy_code
+
+        assert 'order_side = OrderSide.BUY if self.strategy_type == "Bullish" else OrderSide.SELL' in code
+        assert 'OrderSide.BUY  # TODO: Determine from signals' not in code
+
+    def test_generated_execute_trade_dynamic_order_side_bearish(self):
+        """Test Bearish strategy also generates dynamic order side"""
+        generator = NautilusCodeGenerator()
+        config = self._create_test_config("BearishStrategy")
+        config.strategy_type = "Bearish"
+
+        result = generator.generate(config)
+        code = result.strategy_code
+
+        assert 'order_side = OrderSide.BUY if self.strategy_type == "Bullish" else OrderSide.SELL' in code
         
     # Helper method
     def _create_test_config(self, name="TestStrategy"):
