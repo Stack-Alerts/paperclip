@@ -52,6 +52,7 @@ class BugIngestionResult:
     files_indexed: int
     source: str  # "git" | "comments" | "description" | "none"
     skipped_no_commits: bool
+    issue_status: str | None = None  # Paperclip status at time of ingestion
 
 
 def ingest_bug_issue(
@@ -62,6 +63,7 @@ def ingest_bug_issue(
     description: str = "",
     *,
     dry_run: bool = False,
+    issue_status: str | None = None,
 ) -> BugIngestionResult:
     """Process a single closed bug issue and upsert its touched files."""
     files = get_files_for_issue(issue_identifier)
@@ -85,6 +87,7 @@ def ingest_bug_issue(
             files_indexed=0,
             source="none",
             skipped_no_commits=True,
+            issue_status=issue_status,
         )
 
     rows = [
@@ -121,6 +124,7 @@ def ingest_bug_issue(
         files_indexed=len(rows),
         source=source,
         skipped_no_commits=False,
+        issue_status=issue_status,
     )
 
 
@@ -172,6 +176,7 @@ def process_bug_issue(
         completed_at=_parse_completed_at(issue),
         description=issue.get("description", "") or "",
         dry_run=dry_run,
+        issue_status=issue.get("status"),
     )
 
 
@@ -209,6 +214,7 @@ def run_bug_worker(
                         completed_at=_parse_completed_at(full),
                         description=full.get("description", "") or "",
                         dry_run=dry_run,
+                        issue_status=full.get("status"),
                     )
             results.append(result)
         except Exception:
@@ -268,6 +274,7 @@ def catch_up_eligible_bug_issues(
                 completed_at=_parse_completed_at(issue),
                 description=issue.get("description", "") or "",
                 dry_run=dry_run,
+                issue_status=issue.get("status"),
             )
             results.append(result)
         except Exception:

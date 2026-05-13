@@ -143,8 +143,21 @@ def _run_bug_cli() -> None:
                 logger.info("VALIDATION PASSED after single-issue ingestion")
             if not args.dry_run:
                 try:
-                    transition_issue_status_board(result.issue_id, "done")
-                    logger.info("Marked %s as done", result.issue_identifier)
+                    # Only transition to done for issues already in done status.
+                    # Webhook events (issue_created, issue_updated) may deliver
+                    # non-done issues — we must not close them prematurely.
+                    if result.issue_status == "done" or result.issue_status is None:
+                        transition_issue_status_board(result.issue_id, "done")
+                        logger.info(
+                            "Marked %s as done", result.issue_identifier
+                        )
+                    else:
+                        logger.info(
+                            "Bug %s: ingested but status is '%s' — "
+                            "skipping transition to done",
+                            result.issue_identifier,
+                            result.issue_status,
+                        )
                 except Exception:
                     logger.exception(
                         "Failed to mark %s as done", result.issue_identifier
