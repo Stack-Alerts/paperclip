@@ -60,14 +60,19 @@ def _get_issue(issue_id: str) -> dict:
     return resp.json()
 
 
-def _post_comment(issue_id: str, body: str) -> None:
-    sess = _board_session()
-    resp = sess.post(
-        f"{_base()}/api/issues/{issue_id}/comments",
-        json={"body": body},
-        timeout=30,
-    )
-    resp.raise_for_status()
+def _post_comment(issue_id: str, body: str) -> bool:
+    try:
+        sess = _board_session()
+        resp = sess.post(
+            f"{_base()}/api/issues/{issue_id}/comments",
+            json={"body": body},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return True
+    except Exception as exc:
+        log.warning("Failed to post comment on %s: %s", issue_id, exc)
+        return False
 
 
 def _create_blocking_issue(
@@ -400,7 +405,10 @@ def process_issue(
                 issue_id,
                 f"## Impact Gate: PASS ✅\n\nIssue **{identifier}** has no FR impact and no regression risk.\n\nGate passed — no tests to run.",
             )
-            transition_issue_status_board(issue_id, "done")
+            try:
+                transition_issue_status_board(issue_id, "done")
+            except Exception as exc:
+                log.warning("Failed to transition %s to done: %s", identifier, exc)
         return {"issue": identifier, "gate_status": "PASS", "reason": "no tests needed"}
 
     # --- Run Impact Gate tests ---
@@ -449,7 +457,10 @@ def process_issue(
     # --- Act on result ---
     if gate_status == "PASS":
         _post_comment(issue_id, _build_pass_comment(identifier, result))
-        transition_issue_status_board(issue_id, "done")
+        try:
+            transition_issue_status_board(issue_id, "done")
+        except Exception as exc:
+            log.warning("Failed to transition %s to done: %s", identifier, exc)
         log.info("Gate PASS for %s — transitioned to done", identifier)
         return {
             "issue": identifier,
@@ -504,7 +515,10 @@ def process_issue(
 
     # Revert to in_progress (skip for retroactive — don't undo "done" status)
     if not force:
-        transition_issue_status_board(issue_id, "in_progress")
+        try:
+            transition_issue_status_board(issue_id, "in_progress")
+        except Exception as exc:
+            log.warning("Failed to revert %s to in_progress: %s", identifier, exc)
 
     # Set blockedByIssueIds
     blocking_ids = [bi.get("id", "") for bi in blocking_issues if bi.get("id")]

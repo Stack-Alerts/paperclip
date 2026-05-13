@@ -239,7 +239,11 @@ def scan(
                 logger.error(
                     "Retroactive gate failed for %s: %s", entry["identifier"], exc
                 )
-                retro_results.append({"issue": entry["identifier"], "error": str(exc)})
+                retro_results.append({
+                    "issue": entry["identifier"],
+                    "gate_status": "ERROR",
+                    "error": str(exc),
+                })
         result["retroactive_results"] = retro_results
 
         # Update counts from retroactive results (avoids redundant comment-fetch API calls)
