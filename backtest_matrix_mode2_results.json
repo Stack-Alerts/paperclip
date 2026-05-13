@@ -1,0 +1,119 @@
+{
+  "mode": "2 (Live Replay Sequential)",
+  "bars": 2000,
+  "date": "2026-03",
+  "results": [
+    {
+      "name": "50% Asia Rejection Simple",
+      "src": "user_strategies",
+      "status": "OK",
+      "trades": 43,
+      "signals_eval": 2000,
+      "elapsed": 15.0
+    },
+    {
+      "name": "HOD Rejection",
+      "src": "user_strategies",
+      "status": "NO_TRADES",
+      "trades": 0,
+      "signals_eval": 2000,
+      "elapsed": 8.2
+    },
+    {
+      "name": "HOD Rejection",
+      "src": "user_strategies",
+      "status": "OK",
+      "trades": 3,
+      "signals_eval": 2000,
+      "elapsed": 10.1
+    },
+    {
+      "name": "RSI Vwap 50% Asia Rejection",
+      "src": "user_strategies",
+      "status": "NO_TRADES",
+      "trades": 0,
+      "signals_eval": 2000,
+      "elapsed": 6.6
+    },
+    {
+      "name": "Breakout Retest",
+      "src": "tests/strategies",
+      "status": "NO_TRADES",
+      "trades": 0,
+      "signals_eval": 2000,
+      "elapsed": 3.9
+    },
+    {
+      "name": "Divergence Strategy",
+      "src": "tests/strategies",
+      "status": "NO_TRADES",
+      "trades": 0,
+      "signals_eval": 2000,
+      "elapsed": 5.6
+    },
+    {
+      "name": "Fibonacci Zones",
+      "src": "tests/strategies",
+      "status": "NO_TRADES",
+      "trades": 0,
+      "signals_eval": 2000,
+      "elapsed": 3.1
+    },
+    {
+      "name": "HOD Rejection",
+      "src": "tests/strategies",
+      "status": "NO_TRADES",
+      "trades": 0,
+      "signals_eval": 2000,
+      "elapsed": 8.2
+    },
+    {
+      "name": "Liquidity Sweep",
+      "src": "tests/strategies",
+      "status": "NO_TRADES",
+      "trades": 0,
+      "signals_eval": 2000,
+      "elapsed": 21.1
+    },
+    {
+      "name": "LOD Rejection",
+      "src": "tests/strategies",
+      "status": "NO_TRADES",
+      "trades": 0,
+      "signals_eval": 2000,
+      "elapsed": 8.2
+    },
+    {
+      "name": "Market Structure",
+      "src": "tests/strategies",
+      "status": "NO_TRADES",
+      "trades": 0,
+      "signals_eval": 2000,
+      "elapsed": 20.7
+    },
+    {
+      "name": "Reversal M Pattern",
+      "src": "tests/strategies",
+      "status": "NO_TRADES",
+      "trades": 0,
+      "signals_eval": 2000,
+      "elapsed": 6.7
+    },
+    {
+      "name": "RSI Vwap 50% Asia Rejection",
+      "src": "tests/strategies",
+      "status": "NO_TRADES",
+      "trades": 0,
+      "signals_eval": 2000,
+      "elapsed": 6.7
+    },
+    {
+      "name": "Wyckoff Spring",
+      "src": "tests/strategies",
+      "status": "NO_TRADES",
+      "trades": 0,
+      "signals_eval": 2000,
+      "elapsed": 5.4
+    }
+  ]
+}

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Generator
 
 import pytest
@@ -88,7 +88,7 @@ def seed_ids() -> dict:
 def seed_database(admin_session: Session, seed_ids: dict):
     """Insert all test data once per module; roll back / delete on teardown."""
     ids = seed_ids
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     past_30 = now - timedelta(days=30)
     past_60 = now - timedelta(days=60)
 

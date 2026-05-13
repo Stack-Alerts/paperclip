@@ -24,7 +24,8 @@ HEADLESS SERVER OAuth — you have two options:
 
 --- Option A: rclone authorize (recommended) ---
 On a machine WITH a browser, run:
-    rclone authorize "drive" "drive.file" --auth-no-open-browser
+    RCLONE_SCOPE_BLOB=$(echo -n '{"scope":"'"${SCOPE}"'"}' | base64 -w0 | sed 's/=//g')
+    rclone authorize "drive" "${RCLONE_SCOPE_BLOB}" --auth-no-open-browser
 
 This prints a URL. Open it, authorize with Google, paste the code
 back on that machine. You'll receive a JSON token block.
