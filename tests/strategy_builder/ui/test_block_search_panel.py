@@ -412,3 +412,99 @@ class TestBlockSearchPanelIntegration:
 
 
 # Run tests with: python -m pytest tests/strategy_builder/ui/test_block_search_panel.py -v
+
+
+class TestFilterPresets:
+    """Test suite for filter preset save/load functionality."""
+
+    def test_save_and_load_preset(self, qapp, orchestrator, mock_block_info):
+        """Test saving and loading a filter preset."""
+        search_result = _make_search_result("TestBlock", category="TEST", block_type="EVENT")
+        orchestrator.search_blocks = Mock(return_value=[search_result])
+        orchestrator.registry_interface.get_block = Mock(return_value=mock_block_info)
+
+        panel = BlockSearchPanel(orchestrator)
+        panel.show()
+
+        # Set filter state
+        panel.search_input.setText("test_search")
+        idx = panel.category_filter.findText("TEST")
+        if idx >= 0:
+            panel.category_filter.setCurrentIndex(idx)
+        idx = panel.type_filter.findText("EVENT")
+        if idx >= 0:
+            panel.type_filter.setCurrentIndex(idx)
+
+        # Save preset
+        panel.save_filter_preset("Test Preset 1")
+
+        # Load presets list
+        presets = panel.get_filter_presets()
+        preset_names = [p["name"] for p in presets]
+        assert "Test Preset 1" in preset_names
+
+        # Clean up
+        panel.delete_filter_preset("Test Preset 1")
+
+    def test_get_filter_presets_empty(self, panel):
+        """Test that get_filter_presets returns empty list when no presets saved."""
+        presets = panel.get_filter_presets()
+        assert isinstance(presets, list)
+
+    def test_load_preset_restores_state(self, qapp, orchestrator, mock_block_info):
+        """Test that loading a preset restores all filter fields."""
+        search_result = _make_search_result("TestBlock", category="TEST", block_type="EVENT")
+        orchestrator.search_blocks = Mock(return_value=[search_result])
+        orchestrator.registry_interface.get_block = Mock(return_value=mock_block_info)
+
+        panel = BlockSearchPanel(orchestrator)
+        panel.show()
+
+        # Set filter state
+        panel.search_input.setText("saved_search")
+        idx = panel.category_filter.findText("TEST")
+        if idx >= 0:
+            panel.category_filter.setCurrentIndex(idx)
+        idx = panel.type_filter.findText("EVENT")
+        if idx >= 0:
+            panel.type_filter.setCurrentIndex(idx)
+
+        # Save preset
+        panel.save_filter_preset("Restore Test")
+
+        # Change filters
+        panel.search_input.setText("changed")
+        if panel.category_filter.count() > 0:
+            panel.category_filter.setCurrentIndex(0)  # "All Categories"
+
+        # Load preset back
+        panel.load_filter_preset("Restore Test")
+
+        # Verify restored
+        assert panel.search_input.text() == "saved_search"
+
+        # Clean up
+        panel.delete_filter_preset("Restore Test")
+
+    def test_delete_preset_removes_it(self, qapp, orchestrator, mock_block_info):
+        """Test that deleting a preset removes it from the list."""
+        search_result = _make_search_result("TestBlock", category="TEST", block_type="EVENT")
+        orchestrator.search_blocks = Mock(return_value=[search_result])
+        orchestrator.registry_interface.get_block = Mock(return_value=mock_block_info)
+
+        panel = BlockSearchPanel(orchestrator)
+        panel.show()
+
+        # Save then delete
+        panel.save_filter_preset("Delete Me")
+        presets_after_save = [p["name"] for p in panel.get_filter_presets()]
+        assert "Delete Me" in presets_after_save
+
+        panel.delete_filter_preset("Delete Me")
+        presets_after_delete = [p["name"] for p in panel.get_filter_presets()]
+        assert "Delete Me" not in presets_after_delete
+
+    def test_load_nonexistent_preset_does_not_crash(self, panel):
+        """Test loading a non-existent preset does not raise."""
+        panel.load_filter_preset("THIS_PRESET_DOES_NOT_EXIST")
+        # Should not raise

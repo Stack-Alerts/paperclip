@@ -56,6 +56,67 @@ from src.strategy_builder.utils.signal_statistics_loader import (
 )
 # Import universal combo box fix
 from src.strategy_builder.ui.combobox_fix import fix_combobox_white_bars
+import json
+import os
+from dataclasses import dataclass, asdict, field
+
+
+@dataclass
+class FilterPreset:
+    """Stores a saved filter preset for the block search panel."""
+    name: str
+    search_text: str = ""
+    category: str = "All Categories"
+    block_type: str = "All Types"
+
+
+PRESETS_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+    "data",
+    "filter_presets"
+)
+
+
+def _ensure_presets_dir():
+    """Create the filter presets directory if it doesn't exist."""
+    os.makedirs(PRESETS_DIR, exist_ok=True)
+
+
+def _preset_path(name: str) -> str:
+    """Get the file path for a preset by name."""
+    safe_name = name.replace(" ", "_").replace("/", "_")
+    return os.path.join(PRESETS_DIR, f"{safe_name}.json")
+
+
+def load_all_presets() -> List[FilterPreset]:
+    """Load all saved filter presets from disk."""
+    _ensure_presets_dir()
+    presets = []
+    for fname in sorted(os.listdir(PRESETS_DIR)):
+        if fname.endswith(".json"):
+            try:
+                with open(os.path.join(PRESETS_DIR, fname), "r") as f:
+                    data = json.load(f)
+                    presets.append(FilterPreset(**data))
+            except (json.JSONDecodeError, IOError, TypeError):
+                continue
+    return presets
+
+
+def save_preset_to_disk(preset: FilterPreset):
+    """Save a filter preset to disk."""
+    _ensure_presets_dir()
+    with open(_preset_path(preset.name), "w") as f:
+        json.dump(asdict(preset), f, indent=2)
+
+
+def delete_preset_from_disk(name: str):
+    """Delete a filter preset from disk."""
+    path = _preset_path(name)
+    if os.path.exists(path):
+        os.remove(path)
+
+
 class BlockListItem(QWidget):
     """
     Custom widget for displaying a block with expandable signal details and selection.
@@ -656,6 +717,68 @@ class BlockSearchPanel(QWidget):
         self.type_filter.currentTextChanged.connect(self._on_filter_changed)
         filters_layout.addWidget(self.type_filter)
         
+
+        # Filter preset buttons
+        self.save_preset_btn = QPushButton("💾 Save Preset")
+        self.save_preset_btn.setFont(self.content_font)
+        self.save_preset_btn.setMinimumHeight(28)
+        self.save_preset_btn.setToolTip("Save current search/filter settings as a named preset")
+        self.save_preset_btn.setStyleSheet(""
+            "QPushButton {"
+            "  background-color: #2D3748;"
+            "  color: #A0AEC0;"
+            "  border: 1px solid #374151;"
+            "  border-radius: 4px;"
+            "  padding: 4px 12px;"
+            "}"
+            "QPushButton:hover {"
+            "  background-color: #374151;"
+            "  border-color: #00D9FF;"
+            "}"
+        "")
+        self.save_preset_btn.clicked.connect(lambda: self._show_save_preset_dialog())
+        filters_layout.addWidget(self.save_preset_btn)
+
+        self.load_preset_btn = QPushButton("📂 Load Preset")
+        self.load_preset_btn.setFont(self.content_font)
+        self.load_preset_btn.setMinimumHeight(28)
+        self.load_preset_btn.setToolTip("Load a previously saved filter preset")
+        self.load_preset_btn.setStyleSheet(""
+            "QPushButton {"
+            "  background-color: #2D3748;"
+            "  color: #A0AEC0;"
+            "  border: 1px solid #374151;"
+            "  border-radius: 4px;"
+            "  padding: 4px 12px;"
+            "}"
+            "QPushButton:hover {"
+            "  background-color: #374151;"
+            "  border-color: #00D9FF;"
+            "}"
+        "")
+        self.load_preset_btn.clicked.connect(lambda: self._show_load_preset_menu(self.load_preset_btn))
+        filters_layout.addWidget(self.load_preset_btn)
+
+        self.delete_preset_btn = QPushButton("🗑 Delete Preset")
+        self.delete_preset_btn.setFont(self.content_font)
+        self.delete_preset_btn.setMinimumHeight(28)
+        self.delete_preset_btn.setToolTip("Delete a saved filter preset")
+        self.delete_preset_btn.setStyleSheet(""
+            "QPushButton {"
+            "  background-color: #2D3748;"
+            "  color: #A0AEC0;"
+            "  border: 1px solid #374151;"
+            "  border-radius: 4px;"
+            "  padding: 4px 12px;"
+            "}"
+            "QPushButton:hover {"
+            "  background-color: #374151;"
+            "  border-color: #e53e3e;"
+            "}"
+        "")
+        self.delete_preset_btn.clicked.connect(lambda: self._show_delete_preset_menu(self.delete_preset_btn))
+        filters_layout.addWidget(self.delete_preset_btn)
+
         filters_layout.addStretch()
         controls_layout.addLayout(filters_layout)
         
@@ -1192,3 +1315,143 @@ class BlockSearchPanel(QWidget):
         
         # Update button states to match new reality
         self.update_all_button_states()
+
+    def get_filter_presets(self) -> List[Dict[str, str]]:
+        """Get all saved filter presets."""
+        presets = load_all_presets()
+        return [
+            {
+                "name": p.name,
+                "search_text": p.search_text,
+                "category": p.category,
+                "type": p.block_type,
+            }
+            for p in presets
+        ]
+
+    def save_filter_preset(self, name: str):
+        """Save current search/filter state as a named preset."""
+        preset = FilterPreset(
+            name=name,
+            search_text=self.search_input.text(),
+            category=self.category_filter.currentText(),
+            block_type=self.type_filter.currentText(),
+        )
+        save_preset_to_disk(preset)
+        if LOGGER_AVAILABLE and logger:
+            logger.info(LogComponent.SEARCH_PANEL,
+                       f"Filter preset saved: {name}",
+                       {"preset": asdict(preset)})
+
+    def load_filter_preset(self, name: str):
+        """Load a saved filter preset and apply to the search panel."""
+        presets = load_all_presets()
+        for p in presets:
+            if p.name == name:
+                self.search_input.setText(p.search_text)
+                # Set combos — use blockSignals to avoid recursive filter re-apply
+                idx = self.category_filter.findText(p.category)
+                if idx >= 0:
+                    self.category_filter.blockSignals(True)
+                    self.category_filter.setCurrentIndex(idx)
+                    self.category_filter.blockSignals(False)
+
+                idx = self.type_filter.findText(p.block_type)
+                if idx >= 0:
+                    self.type_filter.blockSignals(True)
+                    self.type_filter.setCurrentIndex(idx)
+                    self.type_filter.blockSignals(False)
+
+                self._apply_filters()
+                if LOGGER_AVAILABLE and logger:
+                    logger.info(LogComponent.SEARCH_PANEL,
+                               f"Filter preset loaded: {name}",
+                               {"preset": asdict(p)})
+                return
+
+        if LOGGER_AVAILABLE and logger:
+            logger.warning(LogComponent.SEARCH_PANEL,
+                          f"Filter preset not found: {name}")
+
+    def delete_filter_preset(self, name: str):
+        """Delete a saved filter preset."""
+        delete_preset_from_disk(name)
+        if LOGGER_AVAILABLE and logger:
+            logger.info(LogComponent.SEARCH_PANEL,
+                       f"Filter preset deleted: {name}")
+
+    def _show_save_preset_dialog(self):
+        """Show dialog to save current filters as a preset."""
+        name, ok = QInputDialog.getText(
+            self,
+            "Save Filter Preset",
+            "Preset name:",
+            QLineEdit.Normal,
+            ""
+        )
+        if ok and name.strip():
+            self.save_filter_preset(name.strip())
+            return name.strip()
+        return None
+
+    def _show_load_preset_menu(self, button: QPushButton):
+        """Show a popup menu of available presets to load."""
+        presets = load_all_presets()
+        if not presets:
+            msg = QMessageBox()
+            msg.setWindowTitle("Load Filter Preset")
+            msg.setText("No saved presets found.")
+            msg.setInformativeText("Use 'Save Preset' to create one first.")
+            msg.setStandardButtons(QMessageBox.Ok)
+            msg.exec_()
+            return
+
+        menu = QMenu(self)
+        for preset in presets:
+            label = '{0}  ("{1}" | {2} | {3})'.format(
+                preset.name,
+                preset.search_text or "any",
+                preset.category,
+                preset.block_type
+            )
+            action = menu.addAction(label)
+            action.setData(preset.name)
+
+        # Show menu below the button
+        menu.triggered.connect(
+            lambda action: self.load_filter_preset(action.data())
+        )
+        menu.exec_(button.mapToGlobal(QPoint(0, button.height())))
+
+    def _show_delete_preset_menu(self, button: QPushButton):
+        """Show a popup menu of available presets to delete."""
+        presets = load_all_presets()
+        if not presets:
+            msg = QMessageBox()
+            msg.setWindowTitle("Delete Filter Preset")
+            msg.setText("No saved presets found.")
+            msg.setStandardButtons(QMessageBox.Ok)
+            msg.exec_()
+            return
+
+        menu = QMenu(self)
+        for preset in presets:
+            action = menu.addAction(preset.name)
+            action.setData(preset.name)
+
+        menu.triggered.connect(
+            lambda action: self._confirm_delete_preset(action.data())
+        )
+        menu.exec_(button.mapToGlobal(QPoint(0, button.height())))
+
+    def _confirm_delete_preset(self, name: str):
+        """Confirm and delete a filter preset."""
+        reply = QMessageBox.question(
+            self,
+            "Delete Filter Preset",
+            "Delete preset \"" + name + "\"?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.delete_filter_preset(name)
