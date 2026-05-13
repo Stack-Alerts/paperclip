@@ -93,6 +93,7 @@ class StrategyConfig:
     name: str = ""
     description: str = ""
     strategy_type: str = "Bullish"  # "Bullish" or "Bearish"
+    side: str = ""  # "LONG" or "SHORT" — set by auto_fix
     exit_conditions: List[ExitCondition] = field(default_factory=list)
     
     def get_block(self, name: str) -> Optional[BlockConfig]:
