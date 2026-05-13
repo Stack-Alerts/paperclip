@@ -569,11 +569,11 @@ class TestStartupCheck:
     # Previously this test wrote data anchored at `now - 6 days` ending at
     # approximately `now - 1 day`, which caused the AC5 trailing-edge check
     # inside detect_gaps_in_binance_files() to detect a gap from the last
-    # stored bar to datetime.utcnow().  Fix: anchor the data to now so the
+    # stored bar to datetime.now(timezone.utc).  Fix: anchor the data to now so the
     # last bar on disk is within the trailing-edge slop window.
     #
     # Strategy (Option 2 from BTCAAAAA-378):
-    #   - Floor datetime.utcnow() to the currently-forming bar boundary.
+    #   - Floor datetime.now(timezone.utc) to the currently-forming bar boundary.
     #   - Generate lookback_days * 96 + 1 bars *backward* from there.
     #   - Write them; the last bar is always at or after `last_closed` as
     #     computed by the trailing-edge detector, so no trailing gap fires.
@@ -589,7 +589,7 @@ class TestStartupCheck:
         # (slop = 13.5 min).  By writing the last bar AT floor(now, 15m) we
         # ensure last_closed <= last_bar for any end_date < next bar open, so
         # the trailing-edge check never fires for the entire 15-minute window.
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         last_bar = now - timedelta(
             minutes=now.minute % freq_minutes,
             seconds=now.second,
@@ -602,7 +602,7 @@ class TestStartupCheck:
         df = _make_ohlcv(start, n=n, freq_minutes=freq_minutes, timeframe="15m")
 
         # Snap the last bar to exactly `last_bar` to guarantee no clock-skew
-        df.iloc[-1, df.columns.get_loc("timestamp")] = pd.Timestamp(last_bar).tz_localize('UTC')
+        df.iloc[-1, df.columns.get_loc("timestamp")] = last_bar
 
         # Write to the correct month file(s).  The data may span two calendar
         # months, so group by month and write each group separately.
@@ -1464,7 +1464,7 @@ class TestGetBarsBinanceTzAwareRegression:
     # --------------------------------------------------------------------- #
     def test_get_bars_binance_naive_start_still_works(self, manager):
         """Naive start_date (legacy caller) must also work after the fix."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         start_date = now - timedelta(hours=12)
         end_date = now
 

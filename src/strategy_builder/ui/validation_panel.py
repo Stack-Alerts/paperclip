@@ -328,8 +328,8 @@ class ValidationPanel(QWidget):
             self._save_validation_status(result)
             
             # Update timestamp
-            from datetime import datetime
-            now = datetime.now().strftime("%H:%M:%S")
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc).strftime("%H:%M:%S")
             self.last_validated_label.setText(f"Last validated: {now}")
             
             # Re-enable button

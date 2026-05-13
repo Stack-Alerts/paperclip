@@ -18,7 +18,7 @@ Task:   BTCAAAAA-468
 
 import sys
 import types
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict
 from unittest.mock import MagicMock, patch, PropertyMock
 
@@ -516,7 +516,7 @@ class TestMixedGapSecondaryRow:
 
     def _make_mixed_report(self):
         from datetime import timedelta
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         old = now - timedelta(days=_BINANCE_HORIZON_DAYS + 10)
         recent = now - timedelta(days=5)
 

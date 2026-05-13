@@ -307,7 +307,7 @@ class BinanceRestClient:
             if end_time is not None:
                 params['endTime'] = end_time
         elif hours:
-            end_time_calc = datetime.now()
+            end_time_calc = datetime.now(timezone.utc)
             start_time_calc = end_time_calc - timedelta(hours=hours)
             params['startTime'] = int(start_time_calc.timestamp() * 1000)
             params['endTime'] = int(end_time_calc.timestamp() * 1000)
@@ -461,7 +461,7 @@ class BinanceRestClient:
         Returns:
             DataFrame with funding rate history
         """
-        start_time = datetime.now() - timedelta(hours=hours)
+        start_time = datetime.now(timezone.utc) - timedelta(hours=hours)
         
         response = self._request(
             '/fapi/v1/fundingRate',
@@ -521,7 +521,7 @@ class BinanceRestClient:
         
         return {
             'symbol': symbol,
-            'timestamp': datetime.now(),
+            'timestamp': datetime.now(timezone.utc),
             'bids': bids_df,
             'asks': asks_df,
             'best_bid': float(response['bids'][0][0]),

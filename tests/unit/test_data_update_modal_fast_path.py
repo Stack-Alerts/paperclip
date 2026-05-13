@@ -22,7 +22,7 @@ The unit/conftest.py installs PyQt5 stubs automatically.
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import ModuleType
 from unittest.mock import MagicMock, patch
 
@@ -97,7 +97,7 @@ class _DataUpdateModalFastPathStub:
         if not self.auto_mode:
             return False
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         last_15m = self._get_last_bar('15m', now)
         last_1h = self._get_last_bar('1h', now)
 

@@ -25,7 +25,7 @@ import logging
 import types as _types
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Union, get_args, get_origin
 
@@ -54,7 +54,7 @@ _DEFAULT_TOKEN_LIMIT = 100_000
 class Session:
     session_id: str
     messages: list[dict[str, Any]] = field(default_factory=list)
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     total_cost: float = 0.0
     turn_count: int = 0
 

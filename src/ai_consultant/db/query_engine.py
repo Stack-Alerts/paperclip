@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Sequence
 
 from dotenv import load_dotenv
@@ -214,7 +214,7 @@ class QueryEngine:
         lookback_days: int,
     ) -> SignalStats:
         """Fire rate, win rate, and avg return for a signal over the last N days."""
-        cutoff = datetime.utcnow() - timedelta(days=lookback_days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
         sql = text("""
             SELECT
                 sm.signal_name,
@@ -290,7 +290,7 @@ class QueryEngine:
             base_sql += " AND str.test_type = 'backtest'"
         elif period.endswith("d") and period[:-1].isdigit():
             days = int(period[:-1])
-            cutoff = datetime.utcnow() - timedelta(days=days)
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
             base_sql += " AND str.end_date >= :cutoff"
             params["cutoff"] = cutoff
 
@@ -496,7 +496,7 @@ class QueryEngine:
         - otherwise                                  → SIDEWAYS
         """
         days = int(period.rstrip("d")) if period.endswith("d") and period[:-1].isdigit() else 90
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
         sql = text("""
             SELECT
@@ -622,7 +622,7 @@ class QueryEngine:
     def get_portfolio_stats(self, period: str = "90d") -> PortfolioStats:
         """Portfolio-level aggregates across all strategies in the given period."""
         days = int(period.rstrip("d")) if period.endswith("d") and period[:-1].isdigit() else 90
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
         sql = text("""
             SELECT

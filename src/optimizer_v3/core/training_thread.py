@@ -9,7 +9,7 @@ CRITICAL: All signals use proper types for institutional safety.
 """
 
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from decimal import Decimal
 import os
@@ -219,7 +219,7 @@ class TrainingThread(QThread):
         Computes training period from period_days, builds InstrumentId for BTC,
         and delegates to the full NautilusTrainingSystem analysis stack.
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         end_date = now.replace(hour=0, minute=0, second=0, microsecond=0)  # UTC midnight — stable cache key
         start_date = end_date - timedelta(days=self.period_days)
         period = (start_date, end_date)

@@ -2077,7 +2077,7 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
         """
         logger.info(f"[RuntimeUpdate] {'OK' if success else 'FAIL'}: {message}")
         if success:
-            self.last_update_time = datetime.now()
+            self.last_update_time = datetime.now(timezone.utc)
             self._in_quick_retry = False
             self._update_status(
                 f"[RuntimeUpdate] OK: {message[:120]}"
@@ -2133,7 +2133,7 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
                 self.candle_check_timer.setSingleShot(True)
                 self.candle_check_timer.timeout.connect(self._check_and_update_data)
                 self.candle_check_timer.start(_FALLBACK_MS)
-                self.next_check_time = datetime.now() + timedelta(milliseconds=_FALLBACK_MS)
+                self.next_check_time = datetime.now(timezone.utc) + timedelta(milliseconds=_FALLBACK_MS)
                 logger.info(f"[RuntimeSchedule] Fallback: Next check in {_FALLBACK_MS/1000:.1f}s (at {self.next_check_time.strftime('%H:%M:%S')})")
             except Exception as inner_e:
                 # Last resort: bare singleShot — cannot die here
@@ -2157,7 +2157,7 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
             
             # Show countdown if next check is scheduled
             if self.next_check_time:
-                now = datetime.now()
+                now = datetime.now(timezone.utc)
                 seconds_until = (self.next_check_time - now).total_seconds()
                 
                 if seconds_until > 0:

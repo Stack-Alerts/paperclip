@@ -161,7 +161,7 @@ class TestGetBarsBinanceTzAware:
         assert len(result) >= 50
 
     def test_naive_start_still_works(self, manager):
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         klines_df = self._make_naive_klines_df(
             start=now - timedelta(hours=13), n=100,
         )
