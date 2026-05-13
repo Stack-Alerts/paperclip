@@ -85,6 +85,7 @@ jobs:
             tests/optimizer_v3/test_error_recovery.py \
             tests/itm/state/ \
             tests/bug_regression/test_btcaaaaa_99_regression.py \
+            tests/bug_regression/test_btcaaaaa_1477_regression.py \
             tests/bug_regression/test_btcaaaaa_995_regression.py \
             --cov=src \
             --cov-config=.coveragerc \
