@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-13T06:42:20.229208+00:00",
+  "timestamp": "2026-05-13T06:21:15.417191+00:00",
   "touch_index_fr": {
     "pass": true,
     "coverage_pct": 95.2,
@@ -7,7 +7,7 @@
     "total": 42,
     "total_rows": 150,
     "stale_rows": 0,
-    "max_age_hours": 16.0,
+    "max_age_hours": 17.7,
     "null_owner_rows": 0,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
@@ -15,20 +15,19 @@
     "orphan_count": 0
   },
   "touch_index_bug": {
-    "pass": true,
-    "coverage_pct": 20.4,
+    "pass": false,
+    "coverage_pct": 20.0,
     "indexed": 494,
-    "total": 2420,
-    "coverage_eligible_pct": 93.4,
-    "eligible_total": 529,
+    "total": 2470,
+    "coverage_eligible_pct": 89.9,
+    "eligible_total": 543,
     "total_rows": 1695,
     "stale_rows": 0,
-    "max_age_hours": 2.4,
+    "max_age_hours": 4.0,
     "null_closed_at_rows": 0,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
     "duplicate_pairs": 0,
-    "orphan_count": 0,
-    "note": "Backfill run after fix(BTCAAAAA-24641): full commit body scanning now detects body-referenced issues. Eligible coverage restored to 93.4% (494/529)."
+    "orphan_count": 0
   }
 }
