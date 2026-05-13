@@ -641,7 +641,8 @@ class BacktestWorker(QThread):
                     'total_candles': total_candles,
                     'trades': trade_count,
                     'trades_list': trades_list,  # PHASE 1.1: Full per-trade data for discovery metrics
-                    'tp_adjustments': mc_results.get('tp_adjustments', {'TP1': 0, 'TP2': 0, 'TP3': 0, 'SL': 0})  # From multicore engine
+                    'tp_adjustments': mc_results.get('tp_adjustments', {'TP1': 0, 'TP2': 0, 'TP3': 0, 'SL': 0}),  # From multicore engine
+                    'sl_adjustments': mc_results.get('sl_adjustments', 0)
                 }
                 
                 self.live_message.emit(

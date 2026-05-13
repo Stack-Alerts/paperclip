@@ -303,15 +303,18 @@ class BacktestCoverageTest:
             pass
         
         # Check SL adjustments (only for Adaptive mode)
+        # Uses actual sl_adjustments field (real-time price adaptation count),
+        # NOT tp_adjustments['SL'] (which is exit count).
         if expected.get('sl_adjustments') is not None:
-            has_adjustments = sl_count > 0
+            actual_adj = results.get('sl_adjustments', 0)
+            has_adjustments = actual_adj > 0
             if expected['sl_adjustments'] and not has_adjustments:
                 failures.append(
                     "Expected SL adjustments but found none (Adaptive SL not working?)"
                 )
             elif not expected['sl_adjustments'] and has_adjustments:
                 failures.append(
-                    "Found SL adjustments but expected none (Static SL selected)"
+                    f"Found {actual_adj} SL adjustments but expected none (Static SL selected)"
                 )
         
         # Check time limit exits

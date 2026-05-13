@@ -779,6 +779,7 @@ def merge_chunk_results(
     tp1_count = sum(1 for t in unique_trades if t.get('exit_condition_name') == 'TP1')
     tp2_count = sum(1 for t in unique_trades if t.get('exit_condition_name') == 'TP2')
     tp3_count = sum(1 for t in unique_trades if t.get('exit_condition_name') == 'TP3')
+    sl_exit_count = sum(1 for t in unique_trades if t.get('exit_condition_name') == 'SL')
 
     return {
         'trades': unique_trades,
@@ -787,7 +788,8 @@ def merge_chunk_results(
         'errors': all_errors,
         'messages': all_messages,
         'duplicates_rejected': duplicates_rejected,
-        'tp_adjustments': {'TP1': tp1_count, 'TP2': tp2_count, 'TP3': tp3_count, 'SL': total_sl_adjustments}  # FIX: Real counts!
+        'tp_adjustments': {'TP1': tp1_count, 'TP2': tp2_count, 'TP3': tp3_count, 'SL': sl_exit_count},
+        'sl_adjustments': total_sl_adjustments
     }
 
 
