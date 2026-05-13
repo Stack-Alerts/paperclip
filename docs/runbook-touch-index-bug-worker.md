@@ -37,6 +37,26 @@ This data powers:
     5. Run data quality validation (optional)
 ```
 
+### Scheduled backfill
+
+The polling worker uses a 30-minute lookback window (configurable via
+`--lookback-minutes`), which means it only processes issues closed in that
+window. Eligible issues can also increase when new git commits reference
+previously closed issues (e.g., ``fix(BTCAAAAA-NNN)`` in a new PR).
+
+A **[daily backfill workflow](../.github/workflows/touch-index-backfill.yml)**
+runs ``scripts/backfill_touch_index.py --days 7`` at 06:00 UTC to catch any
+issues that were missed or became newly eligible since the last backfill.
+The backfill scans the last 7 days of git commits for issue references,
+looks up each referenced issue in Paperclip, and upserts any done non-FDR
+issues that are not yet indexed.
+
+Trigger manually:
+
+```bash
+gh workflow run touch-index-backfill.yml --ref main -f days=30
+```
+
 ### File extraction strategy
 
 | Priority | Source | Signal | How it works |
@@ -294,3 +314,6 @@ Key log lines at `INFO` level:
 - `scripts/validate_touch_index_bug.py` — Validation script
 - `scripts/backfill_touch_index.py` — 90-day backfill script
 - `docs/runbook-touch-index-fr-worker.md` — FR worker runbook (sibling)
+- `.github/workflows/touch-index-backfill.yml` — Daily scheduled backfill workflow
+- `scripts/backfill_touch_index_source.py` — One-time source column backfill
+
