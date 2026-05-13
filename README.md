@@ -102,16 +102,16 @@ Legacy 14-day implementation plan (archived).
 
 **Implementation Guides:**
 - `docs/archive/v3-legacy/V3_IMPLEMENTATION_MASTER_GUIDE.md` - Legacy 14-day implementation plan (archived)
-- `docs/DAY8_PATH_B_PLAN.md` - Sophisticated V2 implementation plan (Days 8-13)
+- `docs/archive/v3-legacy/DAY8_PATH_B_PLAN.md` - Sophisticated V2 implementation plan (Days 8-13)
 
 **Specifications:**
-- `docs/v3/Patterns/SOPHISTICATED_M_PATTERN_DETECTOR_SPEC.md` - V2 detector architecture
-- `docs/NAUTILUS_TRADER_ANALYSIS.md` - Framework analysis
+- `docs/building-blocks/patterns-research/SOPHISTICATED_M_PATTERN_DETECTOR_SPEC.md` - V2 detector architecture
+- `docs/archive/v3-legacy/NAUTILUS_TRADER_ANALYSIS.md` - Framework analysis
 
 **Code:**
 - `src/strategies/strategy_01_reversal_m_pattern.py` - M-pattern strategy (baseline)
 - `src/indicators/pattern_adapter.py` - Pattern detection adapter
-- `scripts/run_backtest.py` - Backtest execution script
+- `scripts/run_backtest_matrix.py` - Backtest execution script
 
 **Data:**
 - `data/raw/BTC_USDT_PERP_30m.pkl` - 109,949 bars (2024-2025)
@@ -128,7 +128,7 @@ Legacy 14-day implementation plan (archived).
 - **15min Walk-Forward:** 67.7% win rate (1,316 trades)
 - **Status:** Timeframe-robust, no lookahead bias
 - **Scripts:** `scripts/archived/walkforward_validation.py`, `scripts/archived/walkforward_15min.py`
-- **Docs:** `docs/EXPERT_MODE_MW_FIX_COMPLETE.md`
+- **Docs:** `docs/archive/v3-legacy/EXPERT_MODE_MW_FIX_COMPLETE.md`
 
 ### ⚠️ Statistical System (SHELVED)
 - **Status:** Lookahead bias identified, not viable for walk-forward
