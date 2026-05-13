@@ -198,21 +198,26 @@ jobs:
         id: diff
         run: |
           SNAPSHOT=$(ls data_quality_impact_gate_*.json 2>/dev/null | sort | tail -1)
-          if [ -z "$SNAPSHOT" ]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          elif ! git diff --quiet "$SNAPSHOT"; then
+          if [ -n "$SNAPSHOT" ] && ! git diff --quiet "$SNAPSHOT"; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "snapshot_file=$SNAPSHOT" >> "$GITHUB_OUTPUT"
+          elif [ -f .impact_gate_muted_state.json ] && ! git diff --quiet .impact_gate_muted_state.json 2>/dev/null; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif [ -f .impact_gate_muted_state.json ] && ! git ls-files --error-unmatch .impact_gate_muted_state.json 2>/dev/null; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Commit updated data quality snapshot
+      - name: Commit updated data quality snapshot and muted state
         if: steps.diff.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           SNAPSHOT="${{ steps.diff.outputs.snapshot_file }}"
-          git add "$SNAPSHOT"
-          git commit -m "chore(impact-gate): update scan-done data quality snapshot"
+          if [ -n "$SNAPSHOT" ]; then
+            git add "$SNAPSHOT"
+          fi
+          git add .impact_gate_muted_state.json
+          git commit --allow-empty -m "chore(impact-gate): update scan-done data quality snapshot"
           git push

@@ -95,7 +95,7 @@ def _check_gate_status(issue_id: str) -> str | None:
     return None
 
 
-_MUTED_STATE_PATH = Path(__file__).resolve().parent.parent / "data" / "impact_gate_muted_state.json"
+_MUTED_STATE_PATH = Path(__file__).resolve().parent.parent / ".impact_gate_muted_state.json"
 
 
 def _load_muted_state() -> dict[str, str]:
