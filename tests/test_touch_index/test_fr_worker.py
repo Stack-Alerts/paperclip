@@ -405,6 +405,7 @@ class TestRunFrWorker:
             run_fr_worker(engine, [{"id": "id-x", "identifier": "BTCAAAAA-X"}])
         # Should complete without error; git fallback used
 
+    
 
     def test_fetches_description_when_list_endpoint_omits_it(self):
         """When list endpoint omits description, run_fr_worker fetches full issue and retries."""
@@ -606,6 +607,66 @@ class TestRunFrWorker:
 # ---------------------------------------------------------------------------
 # main() — CLI entry point
 # ---------------------------------------------------------------------------
+
+
+    def test_propagates_issue_status_from_issue_dict(self):
+        """run_fr_worker captures issue_status from the issue dict in each result."""
+        engine, _ = _mock_engine()
+        issues = [
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "status": "done",
+                "assigneeAgentId": OWNER_AGENT_ID,
+                "description": "",
+            },
+            {
+                "id": "id-2",
+                "identifier": "BTCAAAAA-102",
+                "status": "in_progress",
+                "assigneeAgentId": OWNER_AGENT_ID,
+                "description": "",
+            },
+        ]
+
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=["src/a.py"]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+        ):
+            results = run_fr_worker(engine, issues)
+
+        assert len(results) == 2
+        assert results[0].issue_status == "done"
+        assert results[1].issue_status == "in_progress"
+
+    def test_propagates_issue_status_on_description_retry(self):
+        """run_fr_worker captures issue_status from the full issue on retry."""
+        engine, conn = _mock_engine()
+        full_issue = {
+            "id": "id-1",
+            "identifier": "BTCAAAAA-101",
+            "status": "in_review",
+            "assigneeAgentId": OWNER_AGENT_ID,
+            "description": "Changed `src/foo.py`",
+        }
+
+        with (
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.fr_worker.get_issue_by_id", return_value=full_issue),
+            patch(
+                "touch_index.fr_worker.extract_files_from_text",
+                return_value=["src/foo.py"],
+            ),
+        ):
+            results = run_fr_worker(
+                engine,
+                [{"id": "id-1", "identifier": "BTCAAAAA-101"}],
+            )
+
+        assert len(results) == 1
+        assert results[0].issue_status == "in_review"
+
 
 
 class TestProcessFrIssue:
@@ -2096,6 +2157,7 @@ class TestMainProcessFrIssueError:
 
 
 class TestCatchUpEligibleFrIssues:
+
     def _connect_engine(self):
         """Return an engine mock with both .begin() and .connect() mocked."""
         engine, conn = _mock_engine()
@@ -2345,3 +2407,4 @@ class TestEmitJsonSummaryRequiresWorker:
 
         data = json.loads(captured.out.strip())
         assert data["worker"] == "fr"
+

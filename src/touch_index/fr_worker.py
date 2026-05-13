@@ -90,6 +90,7 @@ def ingest_fr_issue(
     description: str = "",
     *,
     dry_run: bool = False,
+    issue_status: str | None = None,
 ) -> FRIngestionResult:
     """Process a single FDR issue — extract files and upsert."""
     # 1. Comments (highest signal — implementing agent's done-comment)
@@ -116,6 +117,7 @@ def ingest_fr_issue(
             files_indexed=0,
             source="none",
             skipped_no_commits=True,
+            issue_status=issue_status,
         )
 
     owner = owner_agent_id or "00000000-0000-0000-0000-000000000000"
@@ -155,6 +157,7 @@ def ingest_fr_issue(
         files_indexed=len(rows),
         source=source,
         skipped_no_commits=False,
+        issue_status=issue_status,
     )
 
 
@@ -181,6 +184,7 @@ def run_fr_worker(
                 owner_agent_id=issue.get("assigneeAgentId"),
                 description=issue.get("description", "") or "",
                 dry_run=dry_run,
+                issue_status=issue.get("status"),
             )
             if result.source == "none" and not issue.get("description"):
                 full = get_issue_by_id(issue["id"])
@@ -192,6 +196,7 @@ def run_fr_worker(
                         owner_agent_id=full.get("assigneeAgentId"),
                         description=full.get("description", "") or "",
                         dry_run=dry_run,
+                        issue_status=full.get("status"),
                     )
             results.append(result)
         except Exception:
@@ -235,6 +240,7 @@ def catch_up_eligible_fr_issues(
                 owner_agent_id=issue.get("assigneeAgentId"),
                 description=issue.get("description", "") or "",
                 dry_run=dry_run,
+                issue_status=issue.get("status"),
             )
             results.append(result)
         except Exception:
