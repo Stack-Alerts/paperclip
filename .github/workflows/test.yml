@@ -58,6 +58,7 @@ jobs:
             pytest pytest-cov pytest-qt pytest-mock pytest-postgresql \
             PyQt5 PyQt5-Qt5 PyQt5-sip \
             SQLAlchemy alembic psycopg2-binary \
+            numpy pandas pyarrow \
             pydantic
 
       - name: Delete stale .coverage database
@@ -105,6 +106,7 @@ jobs:
             tests/bug_regression/test_btcaaaaa_1796_regression.py \
             tests/bug_regression/test_btcaaaaa_198_regression.py \
             tests/bug_regression/test_btcaaaaa_206_regression.py \
+            tests/bug_regression/test_btcaaaaa_2093_regression.py \
             tests/bug_regression/test_btcaaaaa_20263_regression.py \
             tests/bug_regression/test_btcaaaaa_647_regression.py \
             tests/bug_regression/test_btcaaaaa_664_regression.py \
