@@ -1,30 +1,75 @@
 {
-  "timestamp": "2026-05-13T13:37:17.815376+00:00",
+  "timestamp": "2026-05-13T21:38:47.726104+00:00",
   "touch_index_fr": {
     "pass": true,
     "coverage_pct": 95.2,
     "indexed": 40,
     "total": 42,
-    "total_rows": 150,
-    "max_age_hours": 24.9,
-    "stale_rows": 0,
     "missing_issue_identifiers": [
       "BTCAAAAA-1191",
       "BTCAAAAA-851"
     ],
-    "note": "FR worker catch-up complete. Coverage 95.2% (40/42). 401 tests pass across test_touch_index/."
+    "total_rows": 150,
+    "stale_rows": 0,
+    "max_age_hours": 33.0,
+    "null_owner_rows": 0,
+    "null_updated_at_rows": 0,
+    "unknown_source_rows": 0,
+    "duplicate_pairs": 0,
+    "orphan_count": 0,
+    "source_distribution": {
+      "comments": 150
+    }
   },
   "touch_index_bug": {
     "pass": true,
-    "coverage_pct": 24.2,
-    "indexed": 654,
-    "total": 2700,
-    "eligible_coverage_pct": 97.9,
-    "eligible_total": 661,
-    "missing_eligible": 14,
-    "total_rows": 1945,
-    "max_age_hours": 11.2,
+    "coverage_pct": 25.9,
+    "indexed": 811,
+    "total": 3134,
+    "coverage_eligible_pct": 96.9,
+    "eligible_total": 832,
+    "missing_eligible_count": 26,
+    "missing_eligible_identifiers": [
+      "BTCAAAAA-1166",
+      "BTCAAAAA-1171",
+      "BTCAAAAA-151",
+      "BTCAAAAA-1547",
+      "BTCAAAAA-17618",
+      "BTCAAAAA-199",
+      "BTCAAAAA-2083",
+      "BTCAAAAA-25175",
+      "BTCAAAAA-25176",
+      "BTCAAAAA-25252",
+      "BTCAAAAA-25253",
+      "BTCAAAAA-25254",
+      "BTCAAAAA-25260",
+      "BTCAAAAA-25262",
+      "BTCAAAAA-25263",
+      "BTCAAAAA-25264",
+      "BTCAAAAA-25464",
+      "BTCAAAAA-25646",
+      "BTCAAAAA-25656",
+      "BTCAAAAA-25880",
+      "BTCAAAAA-442",
+      "BTCAAAAA-4895",
+      "BTCAAAAA-700",
+      "BTCAAAAA-717",
+      "BTCAAAAA-7381",
+      "BTCAAAAA-907"
+    ],
+    "missing_total_count": 2328,
+    "total_rows": 2157,
     "stale_rows": 0,
-    "note": "Bug catch-up complete. Eligible coverage: 97.9% (647/661)."
+    "max_age_hours": 19.3,
+    "null_closed_at_rows": 0,
+    "null_updated_at_rows": 0,
+    "unknown_source_rows": 0,
+    "duplicate_pairs": 0,
+    "orphan_count": 0,
+    "source_distribution": {
+      "description": 30,
+      "comments": 96,
+      "git": 2031
+    }
   }
 }

@@ -148,9 +148,7 @@ def _run_bug_cli() -> None:
                     # non-done issues — we must not close them prematurely.
                     if result.issue_status == "done" or result.issue_status is None:
                         transition_issue_status_board(result.issue_id, "done")
-                        logger.info(
-                            "Marked %s as done", result.issue_identifier
-                        )
+                        logger.info("Marked %s as done", result.issue_identifier)
                     else:
                         logger.info(
                             "Bug %s: ingested but status is '%s' — "
@@ -271,9 +269,7 @@ def _run_bug_cli() -> None:
             try:
                 if r.issue_status == "done" or r.issue_status is None:
                     transition_issue_status_board(r.issue_id, "done")
-                    logger.info(
-                        "Marked %s as done", r.issue_identifier
-                    )
+                    logger.info("Marked %s as done", r.issue_identifier)
                 else:
                     logger.info(
                         "Bug %s: ingested but status is '%s' — "
@@ -445,9 +441,7 @@ def _run_fr_cli() -> None:
                     # non-done issues — we must not close them prematurely.
                     if result.issue_status == "done" or result.issue_status is None:
                         transition_issue_status_board(result.issue_id, "done")
-                        logger.info(
-                            "Marked %s as done", result.issue_identifier
-                        )
+                        logger.info("Marked %s as done", result.issue_identifier)
                     else:
                         logger.info(
                             "FR %s: ingested but status is '%s' — "
@@ -561,9 +555,7 @@ def _run_fr_cli() -> None:
             try:
                 if r.issue_status == "done" or r.issue_status is None:
                     transition_issue_status_board(r.issue_id, "done")
-                    logger.info(
-                        "Marked %s as done", r.issue_identifier
-                    )
+                    logger.info("Marked %s as done", r.issue_identifier)
                 else:
                     logger.info(
                         "FR %s: ingested but status is '%s' — "

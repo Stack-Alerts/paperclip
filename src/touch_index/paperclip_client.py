@@ -353,7 +353,8 @@ def transition_issue_status_board(issue_id: str, status: str) -> None:
         logger.warning(
             "transition_issue_status_board: refusing to transition done "
             "issue %s to %r — done-guard active (BTCAAAAA-25832)",
-            issue_id, status,
+            issue_id,
+            status,
         )
         return
 
