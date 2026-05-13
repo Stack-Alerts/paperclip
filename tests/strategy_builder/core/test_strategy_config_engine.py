@@ -168,6 +168,7 @@ class TestStrategyConfigEngine:
     def test_validate_valid_strategy_passes(self):
         """Test validation passes for properly configured strategy"""
         engine = StrategyConfigEngine(registry=None)
+        engine.config.strategy_type = "Bearish"
         
         # Add valid configuration
         engine.add_block("Double_Top", logic="AND")
@@ -337,6 +338,7 @@ class TestStrategyConfigEngineIntegration:
     def test_complete_strategy_creation_workflow(self):
         """Test complete workflow of creating a strategy"""
         engine = StrategyConfigEngine(registry=None)
+        engine.config.strategy_type = "Bearish"
         
         # Add first block with signals
         engine.add_block("Double_Top", logic="AND")

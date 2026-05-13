@@ -534,9 +534,9 @@ class StrategyConfigEngine:
         if self.validators.has_circular_dependencies(self.config):
             errors.append("Circular dependencies detected in block structure")
         
-        # Direction consistency warnings
-        direction_warnings = self.validators.validate_direction_consistency(self.config)
-        warnings.extend(direction_warnings)
+        # Direction consistency errors (reject mismatches)
+        direction_errors = self.validators.validate_direction_consistency(self.config)
+        errors.extend(direction_errors)
 
         # Warnings for best practices
         if self.config.required_signals == 0:
