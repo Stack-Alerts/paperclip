@@ -58,8 +58,7 @@ class SignalConfiguration(BaseModel):
     required: bool = True
     min_confidence: float = Field(default=0.0, ge=0.0, le=100.0)
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class BlockSelection(BaseModel):
@@ -230,8 +229,7 @@ class BlockInfo(BaseModel):
     signals: List[str]
     description: str = ""
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class SignalInfo(BaseModel):
@@ -256,8 +254,7 @@ class StrategyMetadata(BaseModel):
     status: str = "DRAFT"  # DRAFT, VALIDATED, OPTIMIZED, LIVE
     description: str = ""
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class QuickTestResult(BaseModel):

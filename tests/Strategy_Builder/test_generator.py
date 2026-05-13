@@ -362,7 +362,7 @@ class TestOptimizerConfigGeneration:
             data = yaml.safe_load(f)
         
         assert 'strategy' in data
-        assert data['strategy']['name'] == "test_strategy"
+        assert data['strategy']['name'] == "strategy_01_test_strategy"
         assert data['strategy']['number'] == 1
     
     def test_config_has_parameters(self, generator, sample_config, temp_dir):
