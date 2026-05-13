@@ -182,7 +182,7 @@ class TestProcessIssue:
         posted, transitions = [], []
         monkeypatch.setattr(worker_mod, "_post_comment", lambda i, b: posted.append(i))
         monkeypatch.setattr(
-            "impact_gate.worker.transition_issue_status",
+            "impact_gate.worker.transition_issue_status_board",
             lambda i, s: transitions.append((i, s)),
         )
         monkeypatch.setattr(
@@ -415,7 +415,7 @@ class TestMinimumTestBar:
         posted, transitions = [], []
         monkeypatch.setattr(wmod, "_post_comment", lambda i, b: posted.append(i))
         monkeypatch.setattr(
-            "impact_gate.worker.transition_issue_status",
+            "impact_gate.worker.transition_issue_status_board",
             lambda i, s: transitions.append((i, s)),
         )
         monkeypatch.setattr(
@@ -444,7 +444,7 @@ class TestMinimumTestBar:
         posted, transitions = [], []
         monkeypatch.setattr(wmod, "_post_comment", lambda i, b: posted.append(i))
         monkeypatch.setattr(
-            "impact_gate.worker.transition_issue_status",
+            "impact_gate.worker.transition_issue_status_board",
             lambda i, s: transitions.append((i, s)),
         )
         r = process_issue("fix-uuid", dry_run=False)
