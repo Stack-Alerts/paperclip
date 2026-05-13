@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -105,6 +105,4 @@ class TestValidateBug:
         monkeypatch.setattr(_runner, "health_check", MagicMock(return_value=True))
         mock_quality = MagicMock(return_value=_make_bug_quality_report(passed=True))
         monkeypatch.setattr(_runner, "run_bug_quality_checks", mock_quality)
-        from validate_touch_index_bug import main
-
-        main()
+        _runner.main()
