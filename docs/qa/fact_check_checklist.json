@@ -1,0 +1,112 @@
+{
+  "description": "Factual accuracy checklist — derived from DocWriter audit BTCAAAAA-22893, updated 2026-05-13",
+  "created": "2026-05-13",
+  "scope": ["README.md", "docs/training-manual.md"],
+  "checks": [
+    {
+      "id": "readme-l24",
+      "document": "README.md",
+      "type": "file_exists",
+      "description": "docs/V3_IMPLEMENTATION_MASTER_GUIDE.md exists",
+      "params": {"path": "docs/V3_IMPLEMENTATION_MASTER_GUIDE.md", "expected": false}
+    },
+    {
+      "id": "readme-l80-oscillators",
+      "document": "README.md",
+      "type": "line_count_tolerance",
+      "description": "README claims oscillators.py ~500 lines — actual is 478",
+      "params": {"path": "src/detectors/utilities/oscillators.py", "claimed": 500, "tolerance_pct": 10}
+    },
+    {
+      "id": "readme-l82-zigzag",
+      "document": "README.md",
+      "type": "line_count_tolerance",
+      "description": "README claims ZigzagDetector ~650 lines — actual is 581",
+      "params": {"path": "src/detectors/utilities/zigzag_detector.py", "claimed": 650, "tolerance_pct": 15}
+    },
+    {
+      "id": "readme-l81-divergence",
+      "document": "README.md",
+      "type": "line_count_tolerance",
+      "description": "README claims DivergenceDetector ~450 lines — actual is 492",
+      "params": {"path": "src/detectors/utilities/divergence_detector.py", "claimed": 450, "tolerance_pct": 15}
+    },
+    {
+      "id": "readme-l33-version",
+      "document": "README.md",
+      "type": "version_min",
+      "description": "NautilusTrader version is at least 1.221.0",
+      "params": {"package": "nautilus_trader", "min_version": "1.221.0"}
+    },
+    {
+      "id": "readme-l120-308gb",
+      "document": "README.md",
+      "type": "text_not_in_file",
+      "description": "README should not claim 308GB historical data (actual is ~47GB)",
+      "params": {"path": "README.md", "text": "308GB"}
+    },
+    {
+      "id": "readme-l132-walkforward",
+      "document": "README.md",
+      "type": "file_exists",
+      "description": "scripts/walkforward_validation.py is a broken ref (moved to archived/)",
+      "params": {"path": "scripts/walkforward_validation.py", "expected": false}
+    },
+    {
+      "id": "readme-l132-walkforward15",
+      "document": "README.md",
+      "type": "file_exists",
+      "description": "scripts/walkforward_15min.py is a broken ref (moved to archived/)",
+      "params": {"path": "scripts/walkforward_15min.py", "expected": false}
+    },
+    {
+      "id": "readme-l137",
+      "document": "README.md",
+      "type": "file_exists",
+      "description": "docs/STATISTICAL_SYSTEM_STATUS.md is a broken ref (moved to archive/)",
+      "params": {"path": "docs/STATISTICAL_SYSTEM_STATUS.md", "expected": false}
+    },
+    {
+      "id": "readme-l29-data-size",
+      "document": "README.md",
+      "type": "dir_size_tolerance",
+      "description": "README claims 45GB historical BTC data — verify data/ actual size",
+      "params": {"path": "data", "claimed_gb": 45, "tolerance_pct": 30}
+    },
+    {
+      "id": "readme-l61-coverage",
+      "document": "README.md",
+      "type": "file_exists",
+      "description": "README claims 100% type coverage — coverage tool (.coveragerc) is configured",
+      "params": {"path": ".coveragerc", "expected": true}
+    },
+    {
+      "id": "training-manual-l717",
+      "document": "docs/training-manual.md",
+      "type": "env_key_exists",
+      "description": "EARLY_STOP_PATIENCE is configurable in .env (added by d1d1e66a)",
+      "params": {"key": "EARLY_STOP_PATIENCE", "expected": true}
+    },
+    {
+      "id": "training-manual-l778",
+      "document": "docs/training-manual.md",
+      "type": "env_key_value",
+      "description": "PERF_HISTORY_LENGTH default is 100 (training manual is wrong, actual is 300)",
+      "params": {"key": "PERF_HISTORY_LENGTH", "expected": "100"}
+    },
+    {
+      "id": "training-manual-l784",
+      "document": "docs/training-manual.md",
+      "type": "env_key_exists",
+      "description": "EARLY_STOP_MIN_DELTA is configurable in .env (added by d1d1e66a)",
+      "params": {"key": "EARLY_STOP_MIN_DELTA", "expected": true}
+    },
+    {
+      "id": "readme-l60-scope",
+      "document": "README.md",
+      "type": "text_not_in_file",
+      "description": "README claims 2,500+ lines of institutional-grade code — actual src/ is ~168k",
+      "params": {"path": "README.md", "text": "2,500+"}
+    }
+  ]
+}

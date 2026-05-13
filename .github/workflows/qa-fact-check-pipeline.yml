@@ -83,3 +83,72 @@ jobs:
                   print(f'| {item.get("id", "N/A")} | {item.get("title", "N/A")[:60]} | {reviewer_name} |')
           PYEOF
           fi
+
+  check:
+    name: Automated fact-check (document audit)
+    runs-on: ubuntu-latest
+    needs: []
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install packaging
+
+      - name: Run automated fact-check
+        id: check
+        run: |
+          python scripts/qa_fact_check_pipeline.py check docs/qa/fact_check_checklist.json > /tmp/fact-check-results.json
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          PASS=$(python3 -c "import json; d=json.load(open('/tmp/fact-check-results.json')); print(d.get('pass', 0))")
+          FAIL=$(python3 -c "import json; d=json.load(open('/tmp/fact-check-results.json')); print(d.get('fail', 0))")
+          echo "pass_count=$PASS" >> "$GITHUB_OUTPUT"
+          echo "fail_count=$FAIL" >> "$GITHUB_OUTPUT"
+          cat /tmp/fact-check-results.json
+
+      - name: Upload check output artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fact-check-results
+          path: /tmp/fact-check-results.json
+          retention-days: 7
+
+      - name: Write check step summary
+        if: always()
+        run: |
+          if [ -f /tmp/fact-check-results.json ]; then
+            python3 >> "$GITHUB_STEP_SUMMARY" << 'PYEOF'
+          import json
+          with open('/tmp/fact-check-results.json') as f:
+              data = json.load(f)
+          total = data.get('total', 0)
+          passed = data.get('pass', 0)
+          failed = data.get('fail', 0)
+          errors = data.get('error', 0)
+          print('## Automated Fact-Check Results')
+          print('')
+          print(f'- **Total checks:** {total}')
+          print(f'- **Passed:** {passed}')
+          print(f'- **Failed:** {failed}')
+          print(f'- **Errors:** {errors}')
+          print('')
+          if failed > 0 or errors > 0:
+              print(':warning: Factual accuracy issues detected — see artifact for details.')
+          else:
+              print(':white_check_mark: All fact-checks passed.')
+          print('')
+          results = data.get('results', [])
+          failed_items = [r for r in results if r.get('verdict') in ('FAIL', 'ERROR')]
+          if failed_items:
+              print('| Check ID | Document | Verdict | Detail |')
+              print('|---|---|---|---|')
+              for item in failed_items:
+                  detail = item.get('result', {}).get('detail', item.get('error', 'N/A'))
+                  print(f'| {item.get("id", "N/A")} | {item.get("document", "N/A")} | {item.get("verdict", "N/A")} | {detail[:80]} |')
+          PYEOF
+          fi

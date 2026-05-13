@@ -30,7 +30,7 @@ Legacy 14-day implementation plan (archived).
 - [x] Pattern detectors: Copied & ready ✅
 - [x] **Day 1 COMPLETE:** Environment setup ✅
   - [x] Virtual environment created
-  - [x] NautilusTrader v1.221.0 installed
+  - [x] NautilusTrader v1.226.0 installed
   - [x] Installation verified
   - [x] Data catalog configured
 - [x] **Day 2 COMPLETE:** Data validation ✅
