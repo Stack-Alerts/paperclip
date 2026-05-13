@@ -140,6 +140,7 @@ jobs:
             tests/bug_regression/test_btcaaaaa_348_regression.py \
             tests/bug_regression/test_btcaaaaa_356_regression.py \
             tests/bug_regression/test_btcaaaaa_391_regression.py \
+            tests/bug_regression/test_btcaaaaa_417_regression.py \
             tests/bug_regression/test_btcaaaaa_423_regression.py \
             tests/bug_regression/test_btcaaaaa_550_regression.py \
             tests/bug_regression/test_btcaaaaa_566_regression.py \
