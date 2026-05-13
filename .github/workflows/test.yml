@@ -121,6 +121,8 @@ jobs:
             tests/bug_regression/test_btcaaaaa_327_regression.py  \
             tests/bug_regression/test_btcaaaaa_33_regression.py \
             tests/bug_regression/test_btcaaaaa_348_regression.py \
+            tests/bug_regression/test_btcaaaaa_356_regression.py \
+            tests/bug_regression/test_btcaaaaa_391_regression.py \
             tests/bug_regression/test_btcaaaaa_2186_regression.py \
             --cov=src \
             --cov-config=.coveragerc \
