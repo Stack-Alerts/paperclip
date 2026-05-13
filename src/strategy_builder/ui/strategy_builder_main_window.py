@@ -2149,7 +2149,8 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
             # Check if we should show countdown (not during active operations)
             if current_status and any(keyword in current_status for keyword in [
                 'Added block', 'Strategy updated', 'Saved', 'Loaded', 'Checking',
-                'Updating', 'Validat', 'Generated', 'cleared', 'created'
+                'Updating', 'Validat', 'Generated', 'cleared', 'created',
+                'Data updated', 'Update failed', 'Auto-update'
             ]):
                 # Don't override active status messages
                 return
