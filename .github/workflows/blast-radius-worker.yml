@@ -48,7 +48,6 @@ jobs:
       POSTGRES_DB: ${{ secrets.POSTGRES_DB || 'optimizer_v3' }}
       POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'optimizer_admin' }}
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-      PYTHONPATH: src
 
     steps:
       - uses: actions/checkout@v4
@@ -99,13 +98,13 @@ jobs:
           ISSUE_ID="${{ steps.resolve-issue.outputs.issue_id }}"
           OLD_STATUS="${{ steps.resolve-issue.outputs.old_status }}"
           if [ -n "$ISSUE_ID" ]; then
-            python -m blast_radius --issue-id "$ISSUE_ID" \
+            python scripts/run_blast_radius_worker.py --issue-id "$ISSUE_ID" \
               ${OLD_STATUS:+--old-status "$OLD_STATUS"} \
               $FLAGS > /tmp/br-output.json
           elif [ "${{ github.event.inputs.loop_seconds }}" != "0" ] && [ -n "${{ github.event.inputs.loop_seconds }}" ]; then
-            python -m blast_radius --loop ${{ github.event.inputs.loop_seconds }} $FLAGS > /tmp/br-output.json
+            python scripts/run_blast_radius_worker.py --loop ${{ github.event.inputs.loop_seconds }} $FLAGS > /tmp/br-output.json
           else
-            python -m blast_radius $FLAGS > /tmp/br-output.json
+            python scripts/run_blast_radius_worker.py $FLAGS > /tmp/br-output.json
           fi
 
       - name: Upload worker output artifact
