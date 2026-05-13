@@ -46,6 +46,13 @@ class TestParseCompletedAt:
         )
         assert result is None
 
+    def test_non_string_value(self):
+        """Non-string completedAt (e.g. int, list) returns None instead of crashing."""
+        result = _parse_completed_at(
+            {"completedAt": 12345, "identifier": "BTCAAAAA-888"}
+        )
+        assert result is None
+
 
 # ---------------------------------------------------------------------------
 # Helpers

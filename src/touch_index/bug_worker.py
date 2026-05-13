@@ -126,7 +126,13 @@ def ingest_bug_issue(
 
 def _parse_completed_at(issue: dict) -> datetime | None:
     raw = issue.get("completedAt")
-    if not raw:
+    if raw is None or raw == "":
+        return None
+    if not isinstance(raw, str):
+        logger.warning(
+            "Bug issue %s: unexpected completedAt type %s (value=%r)",
+            issue.get("identifier"), type(raw).__name__, raw,
+        )
         return None
     try:
         return datetime.fromisoformat(raw.replace("Z", "+00:00"))

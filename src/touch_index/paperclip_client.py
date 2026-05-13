@@ -35,7 +35,9 @@ _BUG_TITLE_PREFIXES = ("bug:", "bug ")
 
 def _parse_iso_ts(raw: str | None) -> datetime | None:
     """Parse an ISO timestamp string, returning None on malformed input."""
-    if not raw:
+    if raw is None or raw == "":
+        return None
+    if not isinstance(raw, str):
         return None
     try:
         return datetime.fromisoformat(raw.replace("Z", "+00:00"))
