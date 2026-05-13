@@ -56,6 +56,9 @@ Pre-migration historical docs are preserved under [`archive/`](archive/).
 | [`runbook-database-migration.md`](runbook-database-migration.md) | Alembic migration lifecycle — create, apply, rollback, recovery |
 | [`runbook-incident-response.md`](runbook-incident-response.md) | Sev1–3 incident response flow, escalation matrix |
 | [`runbook-backup-restore.md`](runbook-backup-restore.md) | Database backup and restore procedures |
+| [`runbook-deployment.md`](runbook-deployment.md) | Deployment flow — pre-deployment checklist, standard/migration/hotfix deploy, rollback, post-deploy verification |
+| [`runbook-dep-graph.md`](runbook-dep-graph.md) | Dependency graph — refresh cadence, manual trigger, JSON interpretation, troubleshooting |
+| [`runbook-opencode-watchdog.md`](runbook-opencode-watchdog.md) | OpenCode watchdog — scheduled monitoring, systemd service/timer, log inspection, threshold config |
 | [`runbook-module-lock.md`](runbook-module-lock.md) | Lock gate operations and exception process |
 | [`runbook-blast-radius-worker.md`](runbook-blast-radius-worker.md) | Blast Radius worker operations |
 | [`runbook-touch-index-bug-worker.md`](runbook-touch-index-bug-worker.md) | Touch Index Bug worker operations |
