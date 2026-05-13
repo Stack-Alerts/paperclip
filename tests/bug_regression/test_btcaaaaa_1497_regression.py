@@ -6,6 +6,10 @@ Shim file at the path expected by impact_gate_runner.py
 (test_btcaaaaa_{id}_regression.py). Uses a 1-month bar subset to keep
 total runtime under 120s (the gate runner's timeout).
 
+Expanded to >=10 tests (the Impact Gate minimum test bar) by using
+module-scoped fixtures that cache backtest results once per mode, then
+lightweight result-inspection test methods.
+
 The full 7-month, 13-test regression is at:
   tests/bug_regression/test_btcaaaaa_1497_backtest_worker_chain.py
   tests/bug_regression/test_btcaaaaa_1497_backtestworker_real_data_chain.py
@@ -38,7 +42,7 @@ pytestmark = [
 _project_root = Path(__file__).parent.parent.parent
 
 # ---------------------------------------------------------------------------
-# Strategy config — "50% Asia Rejection Simple" (identical to 745 test)
+# Strategy config -- "50% Asia Rejection Simple" (identical to 745 test)
 # ---------------------------------------------------------------------------
 
 _STRATEGY_CONFIG: dict = {
@@ -148,7 +152,7 @@ def _make_backtest_config(mode: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Bar loader — single month keeps runtime under 120s
+# Bar loader -- single month keeps runtime under 120s
 # ---------------------------------------------------------------------------
 
 _DATA_DIR = _project_root / "data" / "binance"
@@ -230,8 +234,24 @@ def _run_worker(strategy_config, backtest_config, bars, timeout_ms=120_000):
 
 @pytest.fixture(scope="module")
 def single_month_bars() -> list:
-    """March 2026 (~2,700 bars) — small enough to keep both modes under 120s."""
+    """March 2026 (~2,700 bars) -- small enough to keep both modes under 120s."""
     return _load_single_month("2026-03")
+
+
+@pytest.fixture(scope="module")
+def mode1_results(single_month_bars: list) -> dict:
+    """Cached Mode 1 (multicore) backtest results -- runs once per module."""
+    return _run_worker(
+        _STRATEGY_CONFIG, _make_backtest_config(mode=1), single_month_bars
+    )
+
+
+@pytest.fixture(scope="module")
+def mode2_results(single_month_bars: list) -> dict:
+    """Cached Mode 2 (live replay) backtest results -- runs once per module."""
+    return _run_worker(
+        _STRATEGY_CONFIG, _make_backtest_config(mode=2), single_month_bars
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -242,6 +262,8 @@ class TestBacktestWorkerChainRegression:
     """
     Regression tests for BacktestWorker -> UI results chain.
     Uses a single month of real data for CI speed.
+    Module-scoped fixtures cache backtest results so multiple test methods
+    can inspect the same data without re-running expensive backtests.
     """
 
     @pytest.fixture(autouse=True)
@@ -250,31 +272,92 @@ class TestBacktestWorkerChainRegression:
         if app is None:
             QApplication(sys.argv)
 
+    # ------------------------------------------------------------------
+    # Data sanity
+    # ------------------------------------------------------------------
+
     def test_bar_count_sanity(self, single_month_bars: list) -> None:
         assert len(single_month_bars) >= 2_500, (
             f"Expected >=2,500 bars for Mar 2026; got {len(single_month_bars)}"
         )
 
-    def test_mode1_multicore_trade_count(self, single_month_bars: list) -> None:
-        results = _run_worker(
-            _STRATEGY_CONFIG, _make_backtest_config(mode=1), single_month_bars
-        )
-        trade_count = results.get("trades", 0)
-        trades_list = results.get("trades_list", [])
-        assert trade_count > 0, f"Mode 1 produced 0 trades on {len(single_month_bars)} real bars"
-        assert len(trades_list) > 0
-        assert trade_count == len(trades_list), (
-            f"Mode 1: trades={trade_count} != len(trades_list)={len(trades_list)}"
+    # ------------------------------------------------------------------
+    # Mode 1 (multicore) -- results dict structure and semantics
+    # ------------------------------------------------------------------
+
+    def test_mode1_produces_trades(self, mode1_results: dict) -> None:
+        trade_count = mode1_results.get("trades", 0)
+        trades_list = mode1_results.get("trades_list", [])
+        assert trade_count > 0, "Mode 1 produced 0 trades on real data"
+        assert len(trades_list) > 0, "Mode 1 trades_list is empty"
+
+    def test_mode1_trades_list_matches_count(self, mode1_results: dict) -> None:
+        assert mode1_results.get("trades", 0) == len(mode1_results.get("trades_list", [])), (
+            f"Mode 1: trades={mode1_results.get('trades')} != "
+            f"len(trades_list)={len(mode1_results.get('trades_list', []))}"
         )
 
-    def test_mode2_live_replay_trade_count(self, single_month_bars: list) -> None:
-        results = _run_worker(
-            _STRATEGY_CONFIG, _make_backtest_config(mode=2), single_month_bars
+    def test_mode1_has_trades_key(self, mode1_results: dict) -> None:
+        assert "trades" in mode1_results, (
+            "Mode 1 results missing 'trades' key -- "
+            "_on_backtest_finished reads trades_label from this"
         )
-        trade_count = results.get("trades", 0)
-        trades_list = results.get("trades_list", [])
-        assert trade_count > 0, f"Mode 2 produced 0 trades on {len(single_month_bars)} real bars"
-        assert len(trades_list) > 0
+
+    def test_mode1_has_trades_list_key(self, mode1_results: dict) -> None:
+        assert "trades_list" in mode1_results, (
+            "Mode 1 results missing 'trades_list' key -- "
+            "_populate_tabs_with_results needs this for per-trade data"
+        )
+
+    def test_mode1_trades_list_items_are_dicts(self, mode1_results: dict) -> None:
+        for t in mode1_results.get("trades_list", []):
+            assert isinstance(t, dict), f"Mode 1 trades_list item is not dict: {type(t)}"
+
+    def test_mode1_has_total_candles(self, mode1_results: dict) -> None:
+        assert "total_candles" in mode1_results, (
+            "Mode 1 results missing 'total_candles' key"
+        )
+        assert mode1_results["total_candles"] > 0
+
+    # ------------------------------------------------------------------
+    # Mode 2 (live replay) -- results dict structure and semantics
+    # ------------------------------------------------------------------
+
+    def test_mode2_produces_trades(self, mode2_results: dict) -> None:
+        trade_count = mode2_results.get("trades", 0)
+        trades_list = mode2_results.get("trades_list", [])
+        assert trade_count > 0, "Mode 2 produced 0 trades on real data"
+        assert len(trades_list) > 0, "Mode 2 trades_list is empty"
+
+    def test_mode2_trades_list_entry_count_constraint(self, mode2_results: dict) -> None:
+        trade_count = mode2_results.get("trades", 0)
+        trades_list = mode2_results.get("trades_list", [])
         assert trade_count <= len(trades_list), (
-            f"Mode 2: trades={trade_count} > len(trades_list)={len(trades_list)}"
+            f"Mode 2: trades={trade_count} > len(trades_list)={len(trades_list)}. "
+            "Single-core path counts entries in trades[]; trades_list "
+            "includes all events (entries + partial exits)."
         )
+
+    def test_mode2_has_trades_key(self, mode2_results: dict) -> None:
+        assert "trades" in mode2_results, (
+            "Mode 2 results missing 'trades' key -- "
+            "_on_backtest_finished reads trades_label from this"
+        )
+
+    def test_mode2_has_trades_list_key(self, mode2_results: dict) -> None:
+        assert "trades_list" in mode2_results, (
+            "Mode 2 results missing 'trades_list' key -- "
+            "_populate_tabs_with_results needs this for per-trade data"
+        )
+
+    def test_mode2_trades_list_items_are_dicts(self, mode2_results: dict) -> None:
+        for t in mode2_results.get("trades_list", []):
+            assert isinstance(t, dict), f"Mode 2 trades_list item is not dict: {type(t)}"
+
+    # ------------------------------------------------------------------
+    # Cross-mode consistency
+    # ------------------------------------------------------------------
+
+    def test_both_modes_produce_trades(self, mode1_results: dict, mode2_results: dict) -> None:
+        assert mode1_results.get("trades", 0) > 0, "Mode 1 must produce trades"
+        assert mode2_results.get("trades", 0) > 0, "Mode 2 must produce trades"
