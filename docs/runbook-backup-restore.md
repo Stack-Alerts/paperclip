@@ -292,6 +292,9 @@ python scripts/manage_migrations.py history
 | Stats | `python scripts/manage_backups.py stats` |
 | Apply migrations | `python scripts/manage_migrations.py upgrade` |
 | Re-apply AI grants | `python -c "from src.optimizer_v3.database.backup import get_backup_manager; get_backup_manager().reapply_ai_grants()"` |
+| Check rclone auth | `~/.paperclip/scripts/rclone-headless-auth.sh --check` |
+| Apply rclone token (headless) | `~/.paperclip/scripts/rclone-headless-auth.sh --apply-token` |
+| Full backup pipeline health | `~/.paperclip/scripts/backup-health-check.sh` |
 
 ---
 
@@ -480,7 +483,7 @@ pytest tests/test_scripts/test_deadman_switch_monitor.py -v
 
 | Symptom | Check |
 |---------|-------|
-| Backup fails at rclone step | `rclone lsd gdrive:` — token may be expired. Run `rclone-headless-auth.sh --apply-token` |
+| Backup fails at rclone step | 1. Check auth: `~/.paperclip/scripts/rclone-headless-auth.sh --check`<br>2. If unauthenticated: `~/.paperclip/scripts/rclone-headless-auth.sh --apply-token` (paste token from `rclone authorize` on browser machine)<br>3. If "empty token found": the OAuth token was cleared — same fix as above<br>4. Comprehensive pipeline health: `~/.paperclip/scripts/backup-health-check.sh` |
 | No DB dumps found | `ls ~/.paperclip/instances/default/data/backups/` — Paperclip embedded PG may not be producing dumps |
 | Timer not firing | `systemctl --user status paperclip-backup.timer` — check linger: `loginctl show-user sirrus --property=Linger` |
 | Dead-man alert fired | Backup overdue >12h. Run manual backup, then check dead-man log: `~/.paperclip/backup_deadman_switch.log` |
