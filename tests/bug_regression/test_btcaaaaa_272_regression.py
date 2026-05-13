@@ -30,7 +30,7 @@ pytestmark = [
 
 
 @pytest.fixture
-def panel():
+def panel(qapp):
     """Return a TrainingPanelUI instance with mocked orchestrator."""
     with (
         patch("src.optimizer_v3.ui.training_panel.calibration_cache") as mock_cache,
