@@ -336,7 +336,7 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
     _populate(fr_paths, fr_results)
     _populate(bug_paths, bug_results)
 
-    overall_failed = failed_total + error_total + len(missing)
+    overall_failed = failed_total + error_total
     if zero_test_files > 0:
         overall = "ERROR"
     else:

@@ -307,7 +307,7 @@ class EMA200Trend:
         # Check minimum data
         min_required = self.period + 20
         if len(df) < min_required:
-            granular_signal, simple_signal = self._determine_dual_signals('INSUFFICIENT_DATA')
+            granular_signal, simple_signal = self._determine_dual_signals(False, False, 'NEUTRAL', 'INSUFFICIENT_DATA')
             return {
                 'signal': granular_signal,
                 'signal_simple': simple_signal,
