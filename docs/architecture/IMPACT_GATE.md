@@ -161,3 +161,24 @@ Issues with label `impact-gate-bypass` (CEO-authorized) skip the gate entirely. 
 - [BLAST_RADIUS_WORKER.md](BLAST_RADIUS_WORKER.md) — Blast Radius touch index
 - [DATABASE_GUIDE.md](DATABASE_GUIDE.md) — touch_index schema
 - [src/impact_gate/worker.py](../../src/impact_gate/worker.py)
+
+## 8. Done-Guard (BTCAAAAA-25832)
+
+To prevent agent-comment-triggered reopen loops on done issues, the Impact Gate
+includes a belt-and-suspenders done-guard at three layers:
+
+1. **Client layer** (`paperclip_client.py`): `transition_issue_status_board()`
+   refuses to transition a done issue to a non-done status. Transitioning TO done
+   is always allowed.
+
+2. **Worker layer** (`impact_gate/worker.py`): `_post_comment()` calls
+   `is_issue_done()` before posting. `process_issue()` sets `mute=True` when the
+   issue status is done (suppressing all comments, transitions, and blocking
+   issue creation). Muted gate results are persisted via
+   `save_muted_gate_result()`.
+
+3. **Blast Radius layer** (`blast_radius/generator.py`): `_post_comment()` skips
+   when the issue is done.
+
+All guards are fail-safe: if the status check itself fails (network error), the
+operation proceeds rather than being silently suppressed.

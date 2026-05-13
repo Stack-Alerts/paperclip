@@ -289,3 +289,35 @@ curl -X DELETE "$PAPERCLIP_API_URL/api/companies/$COMPANY_ID/issues/$ISSUE_ID" \
 - `tests/test_impact_gate/test_scan_done_alert.py` — Unit tests for alert script
 - `.github/workflows/impact-gate-scan-done.yml` — CI/CD workflow
 - `docs/runbook-blast-radius-worker.md` — Related Blast Radius worker runbook
+
+## Done-Guard (BTCAAAAA-25832)
+
+The Impact Gate and Blast Radius workers include a **done-guard** to prevent
+agent-comment-triggered reopen loops. The Paperclip platform reopens a `done`
+issue when a comment is posted on it, which creates an infinite wake loop if an
+agent's heartbeat logic posts comments unconditionally.
+
+### Guard layers
+
+| Layer | Location | Behavior |
+|---|---|---|
+| Client | `transition_issue_status_board()` in `paperclip_client.py` | Refuses to transition a `done` issue to a non-`done` status |
+| Impact Gate | `_post_comment()` and `process_issue()` in `worker.py` | Skips comment posting when `is_issue_done()` returns True; mutes all mutations (comments, transitions, blocking issues) when scanning already-done issues |
+| Blast Radius | `_post_comment()` in `generator.py` | Skips comment posting when `is_issue_done()` returns True |
+
+### Fail-safe behavior
+
+When the guard check itself fails (network error, API timeout), the guard
+silently passes through — comments are still posted rather than being silently
+dropped. This prevents false-negative suppression during API outages.
+
+### Mute persistence
+
+Retroactive gating on done issues persists a muted gate result via
+`save_muted_gate_result()` so future scans skip the issue entirely. This
+avoids repeated API calls to already-gated done issues.
+
+### Verification
+
+See `tests/bug_regression/test_btcaaaaa_25832_regression.py` for the full
+regression suite covering all three guard layers.

@@ -328,3 +328,17 @@ filtering.
 - `.github/workflows/blast-radius-monitor.yml` — Monitoring & alerting workflow
 - `scripts/blast_radius_monitor.py` — Worker health monitoring script
 - `data/blast_radius_worker_state.json` — Persisted worker state
+
+## Done-Guard (BTCAAAAA-25832)
+
+The `_post_comment()` function in `generator.py` includes a done-guard that
+checks `is_issue_done()` before posting a Blast Radius report. If the issue is
+already in `done` status, the comment is silently skipped to prevent the
+Paperclip platform from reopening the issue on comment (which would create an
+infinite wake loop).
+
+The guard is fail-safe: if the status check itself fails (network error, etc.),
+the comment is still posted rather than being silently dropped.
+
+See `docs/runbook-impact-gate-scan-done.md#done-guard-btcaaaaa-25832` for the
+full multi-layer guard architecture.
