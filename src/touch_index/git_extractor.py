@@ -69,7 +69,7 @@ def get_all_referenced_issue_ids(repo: Path = _REPO_ROOT) -> set[str]:
     cannot be indexed by the bug worker and should be excluded from the
     coverage denominator.
     """
-    out = _run(["git", "log", "--all", "--format=%s"], repo)
+    out = _run(["git", "log", "--all", "--format=%B"], repo)
     ids: set[str] = set()
     for line in out.splitlines():
         for match in _RE_ISSUE_ID.finditer(line):

@@ -251,13 +251,28 @@ class TestGetFilesForIssue:
 
 class TestGetAllReferencedIssueIds:
     def test_returns_set_of_issue_ids(self):
-        """Parses BTCAAAAA-NNN from commit subjects."""
+        """Parses BTCAAAAA-NNN from commit full bodies (--format=%B)."""
         with patch(
             "touch_index.git_extractor._run",
             return_value="fix(BTCAAAAA-100): fix foo\nfeat(BTCAAAAA-101): add bar\nfix(BTCAAAAA-100): second fix for 100",
         ):
             ids = get_all_referenced_issue_ids()
         assert ids == {"BTCAAAAA-100", "BTCAAAAA-101"}
+
+    def test_extracts_ids_from_commit_body(self):
+        """Issue IDs in the body (not just subject) are found with --format=%B."""
+        with patch(
+            "touch_index.git_extractor._run",
+            return_value=(
+                "feat: implement feature\n\n"
+                "This commit addresses BTCAAAAA-300 which reported the bug\n"
+                "and is related to BTCAAAAA-301 for the follow-up.\n"
+            ),
+        ):
+            ids = get_all_referenced_issue_ids()
+        assert "BTCAAAAA-300" in ids
+        assert "BTCAAAAA-301" in ids
+
 
     def test_empty_when_no_refs(self):
         with patch(

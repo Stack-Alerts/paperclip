@@ -70,7 +70,7 @@ def _report(msg: str = "") -> None:
 
 
 def _git_commits_in_window(days: int) -> list[tuple[str, str, datetime]]:
-    """Return (sha, subject, commit_dt) for commits in the last `days` days."""
+    """Return (sha, body, commit_dt) for commits in the last `days` days. Uses %B (full body) to catch issue IDs in commit bodies."""
     since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
     out = subprocess.run(
         [
@@ -80,7 +80,7 @@ def _git_commits_in_window(days: int) -> list[tuple[str, str, datetime]]:
             "log",
             "--all",
             f"--since={since}",
-            "--format=%H\x1f%s\x1f%aI",
+            "--format=%H\x1f%B\x1f%aI",
         ],
         capture_output=True,
         text=True,
@@ -91,17 +91,17 @@ def _git_commits_in_window(days: int) -> list[tuple[str, str, datetime]]:
     for line in out.splitlines():
         parts = line.split("\x1f", 2)
         if len(parts) == 3:
-            sha, subject, ts_str = parts
+            sha, body, ts_str = parts
             try:
                 dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
             except ValueError:
                 continue
-            results.append((sha.strip(), subject.strip(), dt))
+            results.append((sha.strip(), body.strip(), dt))
     return results
 
 
-def _extract_issue_ids(subject: str) -> list[str]:
-    return list(set(_RE_ISSUE_ID.findall(subject)))
+def _extract_issue_ids(text: str) -> list[str]:
+    return list(set(_RE_ISSUE_ID.findall(text)))
 
 
 def main() -> None:
@@ -152,10 +152,10 @@ def main() -> None:
     commits = _git_commits_in_window(args.days)
     logger.info("Found %d commits in window", len(commits))
 
-    # Collect unique issue IDs from commit subjects
+    # Collect unique issue IDs from commit full bodies (subject + body text)
     issue_ids_in_commits: set[str] = set()
-    for _, subject, _ in commits:
-        issue_ids_in_commits.update(_extract_issue_ids(subject))
+    for _, body, _ in commits:
+        issue_ids_in_commits.update(_extract_issue_ids(body))
 
     logger.info("Unique issue IDs referenced in commits: %d", len(issue_ids_in_commits))
 
