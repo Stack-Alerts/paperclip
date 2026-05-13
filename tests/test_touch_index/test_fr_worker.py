@@ -859,7 +859,7 @@ class TestMain:
         assert any("VALIDATION PASSED" in r.message for r in caplog.records)
 
     def test_main_validate_polling_failed(self, monkeypatch):
-        """--validate with issues: validation failure exits non-zero."""
+        """--validate with issues: validation failure exits non-zero, no transition."""
         engine = MagicMock()
         issues = [{"id": "id-1", "identifier": "BTCAAAAA-100", "description": ""}]
         worker_results = [
@@ -888,7 +888,7 @@ class TestMain:
                 main()
 
         assert exc_info.value.code == 1
-        mock_transition.assert_called_once_with("id-1", "done")
+        mock_transition.assert_not_called()
 
     def test_main_validate_no_issues_passed(self, monkeypatch, caplog):
         """--validate with no issues: validation runs on existing data."""

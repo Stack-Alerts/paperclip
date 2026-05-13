@@ -366,14 +366,6 @@ def _run_fr_cli() -> None:
                 result.source,
                 result.skipped_no_commits,
             )
-            if not args.dry_run:
-                try:
-                    transition_issue_status_board(result.issue_id, "done")
-                    logger.info("Marked %s as done", result.issue_identifier)
-                except Exception:
-                    logger.exception(
-                        "Failed to mark %s as done", result.issue_identifier
-                    )
             if args.validate:
                 report = run_quality_checks(
                     engine, stale_threshold_hours=args.stale_hours
@@ -386,6 +378,14 @@ def _run_fr_cli() -> None:
                         )
                     raise SystemExit(1)
                 logger.info("VALIDATION PASSED after single-issue ingestion")
+            if not args.dry_run:
+                try:
+                    transition_issue_status_board(result.issue_id, "done")
+                    logger.info("Marked %s as done", result.issue_identifier)
+                except Exception:
+                    logger.exception(
+                        "Failed to mark %s as done", result.issue_identifier
+                    )
         if args.json_summary:
             _emit_json_summary(args, worker="fr", result=result, quality_report=report)
         return
@@ -429,18 +429,6 @@ def _run_fr_cli() -> None:
     total_files = sum(r.files_indexed for r in results)
     skipped = sum(1 for r in results if r.skipped_no_commits)
 
-    if args.dry_run:
-        logger.info(
-            "DRY RUN \u2014 skipping transition-to-done for %d issue(s)", len(issues)
-        )
-    else:
-        for r in results:
-            try:
-                transition_issue_status_board(r.issue_id, "done")
-                logger.info("Marked %s as done", r.issue_identifier)
-            except Exception:
-                logger.exception("Failed to mark %s as done", r.issue_identifier)
-
     logger.info(
         "FR worker done \u2014 %d issues processed, %d files indexed, %d skipped (no commits), %d errors",
         len(results),
@@ -465,6 +453,18 @@ def _run_fr_cli() -> None:
                 )
             raise SystemExit(1)
         logger.info("VALIDATION PASSED: all quality checks clean")
+
+    if args.dry_run:
+        logger.info(
+            "DRY RUN \u2014 skipping transition-to-done for %d issue(s)", len(issues)
+        )
+    else:
+        for r in results:
+            try:
+                transition_issue_status_board(r.issue_id, "done")
+                logger.info("Marked %s as done", r.issue_identifier)
+            except Exception:
+                logger.exception("Failed to mark %s as done", r.issue_identifier)
 
     if args.json_summary:
         _emit_json_summary(
