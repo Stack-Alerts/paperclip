@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-13T06:21:15.417191+00:00",
+  "timestamp": "2026-05-13T11:18:22.016780+00:00",
   "touch_index_fr": {
     "pass": true,
     "coverage_pct": 95.2,
@@ -15,19 +15,20 @@
     "orphan_count": 0
   },
   "touch_index_bug": {
-    "pass": false,
-    "coverage_pct": 20.0,
-    "indexed": 494,
-    "total": 2470,
-    "coverage_eligible_pct": 89.9,
-    "eligible_total": 543,
-    "total_rows": 1695,
+    "pass": true,
+    "coverage_pct": 22.6,
+    "indexed": 594,
+    "total": 2631,
+    "coverage_eligible_pct": 94.1,
+    "eligible_total": 625,
+    "total_rows": 1832,
     "stale_rows": 0,
-    "max_age_hours": 4.0,
+    "max_age_hours": 9.0,
     "null_closed_at_rows": 0,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
     "duplicate_pairs": 0,
-    "orphan_count": 0
+    "orphan_count": 0,
+    "note": "Fix applied: catch-up phase indexes eligible issues referenced in all git history, keeping coverage stable without separate backfill."
   }
 }

@@ -45,7 +45,11 @@ def _run_bug_cli() -> None:
     """Bug worker CLI entry point (from python -m touch_index bug ...)."""
     import argparse
 
-    from touch_index.bug_worker import process_bug_issue, run_bug_worker
+    from touch_index.bug_worker import (
+        catch_up_eligible_bug_issues,
+        process_bug_issue,
+        run_bug_worker,
+    )
     from touch_index.db import get_engine, health_check
     from touch_index.paperclip_client import (
         get_closed_non_fdr_issues,
@@ -167,6 +171,15 @@ def _run_bug_cli() -> None:
 
     if not issues:
         logger.info("Nothing to do")
+        catchup_results = catch_up_eligible_bug_issues(
+            engine, dry_run=args.dry_run
+        )
+        if catchup_results:
+            logger.info(
+                "Catch-up indexed %d file(s) across %d issue(s)",
+                sum(r.files_indexed for r in catchup_results),
+                len(catchup_results),
+            )
         if args.validate:
             report = run_bug_quality_checks(
                 engine, stale_threshold_days=args.stale_days
@@ -192,6 +205,17 @@ def _run_bug_cli() -> None:
         return
 
     results = run_bug_worker(engine, issues, dry_run=args.dry_run)
+
+    catchup_results = catch_up_eligible_bug_issues(
+        engine, dry_run=args.dry_run
+    )
+    if catchup_results:
+        logger.info(
+            "Catch-up indexed %d file(s) across %d issue(s)",
+            sum(r.files_indexed for r in catchup_results),
+            len(catchup_results),
+        )
+    results.extend(catchup_results)
 
     errors = len(issues) - len(results)
     if errors:
