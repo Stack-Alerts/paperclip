@@ -38,7 +38,6 @@ from src.strategy_builder.ui.strategy_info_panel import StrategyInfoPanel
 from src.strategy_builder.ui.block_search_panel import BlockSearchPanel
 from src.strategy_builder.ui.strategy_blocks_panel import StrategyBlocksPanel
 from src.strategy_builder.ui.validation_report_window import ValidationReportWindow
-from src.strategy_builder.ui.validation_dialog import ValidationDialog
 from src.strategy_builder.ui.backtest_config_dialog import BacktestConfigDialog
 from src.optimizer_v3.validation.institutional_validator import InstitutionalValidator
 from src.strategy_builder.ui.data_update_modal import DataUpdateModal
@@ -345,12 +344,14 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
         self.validation_passed = False
         self.test_completed = False
         
+        # Track validation report for stepper updates from ValidationReportWindow
+        self._last_validation_report = None
+        
         # Flag to prevent validation reset during strategy load
         self.loading_strategy = False
         
         # Track open windows (singleton pattern)
         self.validation_window: Optional[ValidationReportWindow] = None
-        self.validation_dialog: Optional[ValidationDialog] = None
         self.browser_window: Optional[StrategyBrowserDialog] = None
         self.backtest_window: Optional[BacktestConfigDialog] = None
         self.log_viewer_window: Optional['LogViewerWindow'] = None
@@ -1561,23 +1562,34 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
 
             self.stepper.set_current_step(1)
 
-            if self.validation_dialog and self.validation_dialog.isVisible():
-                self.validation_dialog.raise_()
-                self.validation_dialog.activateWindow()
+            # Singleton pattern: reuse existing ValidationReportWindow
+            if self.validation_window and self.validation_window.isVisible():
+                self.validation_window.raise_()
+                self.validation_window.activateWindow()
                 return
 
-            dialog = ValidationDialog(self.orchestrator, self)
-            self.validation_dialog = dialog
-            dialog.destroyed.connect(lambda: setattr(self, 'validation_dialog', None))
-
-            dialog.validation_panel.save_requested.connect(self._on_save_strategy)
-            dialog.validation_panel.run_test_requested.connect(self._on_run_backtest)
-
-            dialog.exec_()
-
+            # Run institutional validation before opening window
             try:
-                panel = dialog.validation_panel
-                if panel.last_validation_result and panel.last_validation_result.success:
+                config = self.orchestrator.get_current_config()
+                validator = InstitutionalValidator()
+                report = validator.validate(config)
+            except Exception as e:
+                QMessageBox.critical(self, "Validation Error", f"Error validating strategy:\n\n{str(e)}")
+                self._update_status("Strategy validation failed")
+                return
+
+            # Track report for stepper update when window closes
+            self._last_validation_report = report
+
+            def _on_validation_fix_applied_from_window(fix_type: str, fix_data: dict):
+                """Update cached report and delegate to existing fix handler."""
+                if self.validation_window:
+                    self._last_validation_report = self.validation_window.report
+                self._on_validation_fix_applied(fix_type, fix_data)
+
+            def _on_validation_window_destroyed():
+                """Update stepper based on final report when window closes."""
+                if self._last_validation_report and self._last_validation_report.is_valid:
                     self.validation_passed = True
                     self.orchestrator.config_engine.config.validation_status = 'passed'
                     self.stepper.mark_step_complete(1)
@@ -1590,11 +1602,14 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
                     self.stepper.mark_step_error(1)
                     self._update_status('Strategy validation failed')
                     self._save_validation_status_to_db('Fail')
-            except Exception as e:
-                self.validation_passed = False
-                self.stepper.mark_step_error(1)
-                self._update_status('Validation error occurred')
-                logger.error(f'Error updating stepper after validation dialog: {e}')
+                self.validation_window = None
+
+            window = ValidationReportWindow(report, config, self)
+            self.validation_window = window
+            window.destroyed.connect(_on_validation_window_destroyed)
+            window.fix_applied.connect(_on_validation_fix_applied_from_window)
+            window.generate_code_requested.connect(self._on_generate_code_from_report)
+            window.show()
         elif step == 2:
             # Test / Optimize step - CHECK PREREQUISITES  
             if not self._check_test_prerequisites():
@@ -2284,6 +2299,30 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
         else:
             logger.error(f"❌ Failed to save configuration to database")
             self._update_status(f"Auto-fix applied but save failed")
+    
+    def _on_generate_code_from_report(self) -> None:
+        """Handle Generate Code request from ValidationReportWindow."""
+        try:
+            result = self.orchestrator.generate_code()
+            if result.success:
+                QMessageBox.information(
+                    self,
+                    "Code Generated",
+                    f"Strategy code written to:\n{result.message}",
+                )
+                self._update_status("Strategy code generated")
+            else:
+                QMessageBox.critical(
+                    self,
+                    "Code Generation Failed",
+                    "Failed to generate strategy code:\n\n" + "\n".join(result.errors),
+                )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Code Generation Error",
+                f"Error generating code:\n\n{str(e)}"
+            )
     
     def _reload_current_version(self):
         """

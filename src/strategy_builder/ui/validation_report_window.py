@@ -69,6 +69,7 @@ class ValidationReportWindow(WindowGeometryMixin, QMainWindow):
     
     # Signals
     fix_applied = pyqtSignal(str, dict)  # fix_type, fix_data
+    generate_code_requested = pyqtSignal()
 
     GEOMETRY_SETTINGS_KEY = "validationReportWindow"
     GEOMETRY_DEFAULT_SIZE = (1000, 700)
@@ -847,6 +848,16 @@ class ValidationReportWindow(WindowGeometryMixin, QMainWindow):
         self.undo_btn.clicked.connect(self._handle_undo_click)
         layout.addWidget(self.undo_btn)
         
+        # Generate Code button (primary action)
+        self.generate_btn = QPushButton("📝 Generate Code")
+        set_hand_cursor(self.generate_btn)
+        self.generate_btn.setFont(create_font(11))
+        self.generate_btn.setMinimumWidth(170)
+        self.generate_btn.setStyleSheet(get_primary_button_stylesheet())
+        self.generate_btn.setToolTip("Generate NautilusTrader Python strategy code from this configuration")
+        self.generate_btn.clicked.connect(self._on_generate_code)
+        layout.addWidget(self.generate_btn)
+        
         # Close button
         close_btn = QPushButton("Close")
         set_hand_cursor(close_btn)
@@ -857,6 +868,10 @@ class ValidationReportWindow(WindowGeometryMixin, QMainWindow):
         
         return widget
     
+    def _on_generate_code(self) -> None:
+        """Emit generate_code_requested signal for main window to handle."""
+        self.generate_code_requested.emit()
+
     def _get_institutional_description(self, issue: any) -> str:
         """
         Get institutional-grade description with clear explanation and guidance
