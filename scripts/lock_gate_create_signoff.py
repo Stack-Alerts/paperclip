@@ -109,7 +109,7 @@ def create_signoff_issue(
 
     payload = {
         "title": title,
-        "body": body,
+        "description": body,
         "labels": [SIGNOFF_LABEL],
         "assigneeAgentId": CTO_AGENT_ID,
         "priority": "high",

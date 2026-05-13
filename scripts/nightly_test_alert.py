@@ -58,14 +58,14 @@ def create_alert(base_url: str, company_id: str, sess,
 
     if dry_run:
         logger.info("DRY RUN: would create alert issue '%s'", title)
-        print(json.dumps({"title": title, "body": body, "labels": [ALERT_LABEL],
+        print(json.dumps({"title": title, "description": body, "labels": [ALERT_LABEL],
                           "assigneeAgentId": CTO_AGENT_ID, "priority": "critical"},
                          indent=2))
         return True
 
     payload = {
         "title": title,
-        "body": body,
+        "description": body,
         "labels": [ALERT_LABEL],
         "assigneeAgentId": CTO_AGENT_ID,
         "priority": "critical",

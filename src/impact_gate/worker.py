@@ -153,7 +153,7 @@ def _create_blocking_issue(
             f"{_base()}/api/companies/{_company()}/issues",
             json={
                 "title": title,
-                "body": body,
+                "description": body,
                 "labels": ["impact-gate-failure"],
                 "status": "todo",
             },

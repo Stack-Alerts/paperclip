@@ -124,7 +124,7 @@ def create_alert(
             json.dumps(
                 {
                     "title": title,
-                    "body": body,
+                    "description": body,
                     "labels": [ALERT_LABEL],
                     "assigneeAgentId": CTO_AGENT_ID,
                     "priority": "medium",
@@ -136,7 +136,7 @@ def create_alert(
 
     payload = {
         "title": title,
-        "body": body,
+        "description": body,
         "labels": [ALERT_LABEL],
         "assigneeAgentId": CTO_AGENT_ID,
         "priority": "medium",

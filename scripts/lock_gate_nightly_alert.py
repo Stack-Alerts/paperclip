@@ -170,7 +170,7 @@ def create_paperclip_alert(title: str, body: str, dry_run: bool) -> bool:
             f"{_base()}/api/companies/{_company()}/issues",
             json={
                 "title": title,
-                "body": body,
+                "description": body,
                 "labels": ["lock-gate", "nightly-alert"],
                 "status": "todo",
             },
