@@ -1,0 +1,13 @@
+[Unit]
+Description=Touch Index bug-close ingestion worker — upsert bug issue file references
+Documentation=https://github.com/anomalyco/opencode
+Wants=touch-index-bug-worker.timer
+
+[Service]
+Type=oneshot
+ExecStart=%h/projects/BTC-Trade-Engine-PaperClip/venv/bin/python %h/projects/BTC-Trade-Engine-PaperClip/scripts/run_touch_index_bug_worker.py --lookback-minutes 30 --validate
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
