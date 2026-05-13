@@ -179,7 +179,7 @@ when coverage drops below 90%.
 
 ### Bug Freshness
 
-Reports row age statistics using `closed_at` and flags stale rows (closed_at
+Reports row age statistics using `updated_at` and flags stale rows (updated_at
 older than the threshold, default 30 days).
 
 ### Bug Consistency
