@@ -112,3 +112,27 @@ class TestCalibrationProgressBarStructural:
         assert count >= 3, (
             f"Expected at least 3 progress bar reset sites, found {count}"
         )
+
+    def test_empty_blocks_early_return(self):
+        """_run_auto_calibration must return early when blocks list is empty."""
+        from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
+
+        src = inspect.getsource(BacktestConfigPanel._run_auto_calibration)
+        assert "if not blocks:" in src, (
+            "Must guard against empty blocks"
+        )
+        assert "return" in src.split("if not blocks:")[1].split(chr(92)+"n")[0], (
+            "Must return early when no blocks"
+        )
+
+    def test_fingerprint_computation_call(self):
+        """_run_auto_calibration must compute a fingerprint via calibration_cache."""
+        from src.strategy_builder.ui.backtest_config_panel import BacktestConfigPanel
+
+        src = inspect.getsource(BacktestConfigPanel._run_auto_calibration)
+        assert "calibration_cache.compute_fingerprint" in src, (
+            "Must compute calibration fingerprint for cache-key comparison"
+        )
+        assert "block_names=block_names" in src, (
+            "Fingerprint must include block_names parameter"
+        )
