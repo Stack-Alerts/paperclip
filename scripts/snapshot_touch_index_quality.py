@@ -44,6 +44,7 @@ def _build_fr_report(fr_report) -> dict:
         "coverage_pct": fr_report.coverage.coverage_pct,
         "indexed": fr_report.coverage.indexed_fdr_issues,
         "total": fr_report.coverage.total_fdr_issues,
+        "missing_issue_identifiers": fr_report.coverage.missing_issue_identifiers,
     }
     if fr_report.freshness is not None:
         d["total_rows"] = fr_report.freshness.total_rows

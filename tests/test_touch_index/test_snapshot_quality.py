@@ -38,6 +38,7 @@ def _make_fr_report():
             coverage_pct = 95.2
             indexed_fdr_issues = 40
             total_fdr_issues = 42
+            missing_issue_identifiers = []
 
         class freshness:
             total_rows = 150
@@ -149,6 +150,7 @@ class TestBuildFrReport:
                 coverage_pct = 95.0
                 indexed_fdr_issues = 38
                 total_fdr_issues = 40
+                missing_issue_identifiers = []
 
             freshness = None
             consistency = None
@@ -180,6 +182,7 @@ class TestBuildFrReport:
                 coverage_pct = 100.0
                 indexed_fdr_issues = 5
                 total_fdr_issues = 5
+                missing_issue_identifiers = []
 
             class freshness:
                 total_rows = 20
