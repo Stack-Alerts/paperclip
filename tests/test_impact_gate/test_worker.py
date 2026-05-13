@@ -375,7 +375,7 @@ class TestCreateBlockingIssue:
 class TestSetBlockedBy:
     def test_patches_correctly(self, monkeypatch):
         mock_sess = MagicMock()
-        monkeypatch.setattr("impact_gate.worker._session", lambda: mock_sess)
+        monkeypatch.setattr("impact_gate.worker._board_session", lambda: mock_sess)
         worker_mod._set_blocked_by("uuid", ["b1", "b2"])
         _, kw = mock_sess.patch.call_args
         assert kw["json"]["blockedByIssueIds"] == ["b1", "b2"]
@@ -383,7 +383,7 @@ class TestSetBlockedBy:
     def test_logs_error(self, monkeypatch, caplog):
         mock_sess = MagicMock()
         mock_sess.patch.side_effect = RuntimeError("fail")
-        monkeypatch.setattr("impact_gate.worker._session", lambda: mock_sess)
+        monkeypatch.setattr("impact_gate.worker._board_session", lambda: mock_sess)
         with caplog.at_level(logging.ERROR):
             worker_mod._set_blocked_by("uuid", ["b1"])
         assert any(
@@ -463,7 +463,7 @@ class TestMinimumTestBar:
 class TestPostComment:
     def test_posts_to_correct_endpoint(self, monkeypatch):
         mock_sess = MagicMock()
-        monkeypatch.setattr("impact_gate.worker._session", lambda: mock_sess)
+        monkeypatch.setattr("impact_gate.worker._board_session", lambda: mock_sess)
         worker_mod._post_comment("uuid", "body")
         args, kw = mock_sess.post.call_args
         assert "uuid/comments" in args[0]
@@ -478,13 +478,13 @@ class TestPostComment:
 class TestGetIssue:
     def test_fetches_issue(self, monkeypatch):
         mock_sess = MagicMock()
-        monkeypatch.setattr("impact_gate.worker._session", lambda: mock_sess)
+        monkeypatch.setattr("impact_gate.worker._board_session", lambda: mock_sess)
         mock_sess.get.return_value.json.return_value = {"id": "i1"}
         assert worker_mod._get_issue("i1") == {"id": "i1"}
 
     def test_raises_on_http_error(self, monkeypatch):
         mock_sess = MagicMock()
-        monkeypatch.setattr("impact_gate.worker._session", lambda: mock_sess)
+        monkeypatch.setattr("impact_gate.worker._board_session", lambda: mock_sess)
         mock_sess.get.return_value.raise_for_status.side_effect = RuntimeError("404")
         with pytest.raises(RuntimeError, match="404"):
             worker_mod._get_issue("bad")
