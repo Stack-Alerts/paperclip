@@ -84,6 +84,7 @@ jobs:
             tests/strategy_builder/core/test_strategy_config_engine.py \
             tests/optimizer_v3/test_error_recovery.py \
             tests/itm/state/ \
+            tests/bug_regression/test_btcaaaaa_20_regression.py \
             tests/bug_regression/test_btcaaaaa_79_regression.py \
             tests/bug_regression/test_btcaaaaa_87_regression.py \
             tests/bug_regression/test_btcaaaaa_92_regression.py \
