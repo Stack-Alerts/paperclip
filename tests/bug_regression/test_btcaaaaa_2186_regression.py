@@ -138,22 +138,21 @@ class TestUtcTimezonesInGetConfig:
         except TypeError:
             pytest.fail("end_date is a naive datetime (missing tzinfo)")
 
-    def test_get_config_uses_utc_now_not_local_now(self):
-        """The end_date should be approximately 'now' in UTC.
-        If get_config() used local time, the offset would differ for
-        non-UTC timezones."""
+    def test_end_date_is_midnight_utc(self):
+        """The end_date must be floored to midnight UTC (00:00:00.000000).
+        Verifies BTCAAAAA-25396: floor end_date to midnight UTC."""
         stub = _make_get_config_stub()
         stub.lookback_spin.value.return_value = 30
         stub.mode_group.checkedId.return_value = 2
 
         config = stub.get_config()
 
-        now_utc = datetime.now(timezone.utc)
-        diff_seconds = abs((config["end_date"] - now_utc).total_seconds())
-        assert diff_seconds < 60, (
-            f"end_date {config['end_date']} differs from UTC now "
-            f"{now_utc} by {diff_seconds:.0f}s - likely using local time"
-        )
+        dt = config["end_date"]
+        assert dt.tzinfo is not None, "end_date must be timezone-aware"
+        assert dt.hour == 0, f"end_date hour must be 0, got {dt.hour}"
+        assert dt.minute == 0, f"end_date minute must be 0, got {dt.minute}"
+        assert dt.second == 0, f"end_date second must be 0, got {dt.second}"
+        assert dt.microsecond == 0, f"end_date microsecond must be 0, got {dt.microsecond}"
 
 
 class TestUtcFallbackInHandleBacktestFinished:
