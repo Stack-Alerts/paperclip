@@ -14,10 +14,17 @@ Bugs (fix-type issues):
   This captures issues closed under titles like "Fix BacktestDataProvider
   cache key" that don't carry a "Bug:" prefix.
 
+After the window-based pass, a catch-up step scans ALL git history
+(via ``get_all_referenced_issue_ids``) and indexes any eligible done non-FDR
+issues not yet in the DB. This ensures the backfill catches body-referenced
+issue IDs from old commits that the window-based scan misses, keeping bug
+coverage in sync with ``compute_bug_coverage()`` which uses the same
+all-history scan.
+
 Coverage denominator:
   FRs  — all FDR-labelled issues updated in the window.
-  Bugs — all done non-FDR issues that appear in git commit messages in the
-         window (the set of indexable bugs).
+  Bugs — all done non-FDR issues that appear in git commit messages (window)
+         plus any eligible issues not yet indexed (catch-up).
 
 Usage:
     python scripts/backfill_touch_index.py [--days N]
@@ -37,6 +44,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from dotenv import load_dotenv
+from sqlalchemy import text
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -53,7 +61,11 @@ from touch_index.bug_worker import (
     ingest_bug_issue,
     _parse_completed_at,
 )
-from touch_index.git_extractor import get_files_for_issue, _REPO_ROOT
+from touch_index.git_extractor import (
+    get_all_referenced_issue_ids,
+    get_files_for_issue,
+    _REPO_ROOT,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -196,6 +208,66 @@ def main() -> None:
         except Exception:
             logger.exception("Bug ingestion error for %s", identifier)
 
+    # ── Step 3: Catch-up on eligible issues not yet indexed ────────────────
+    # The quality check (compute_bug_coverage) uses get_all_referenced_issue_ids()
+    # which scans ALL git history. Issues referenced in old commit bodies are
+    # invisible to the window-based scan. Catch them here by scanning all git
+    # history and processing any eligible done non-FDR issues not yet indexed.
+    logger.info("Scanning all git history for eligible issues not yet indexed …")
+    all_git_ids = get_all_referenced_issue_ids()
+    logger.info("Found %d unique issue IDs in all git history", len(all_git_ids))
+
+    # Determine what's already in the DB index
+    with engine.connect() as conn:
+        indexed_rows = conn.execute(
+            text("SELECT DISTINCT bug_identifier FROM touch_index_bug_files")
+        ).fetchall()
+    indexed_in_db: set[str] = {r[0] for r in indexed_rows}
+    logger.info("Already in DB index: %d bug identifiers", len(indexed_in_db))
+
+    catchup_eligible = 0
+    catchup_results: list[BugIngestionResult] = []
+    for identifier in sorted(all_git_ids):
+        if identifier in indexed_in_db:
+            continue
+        if identifier in fdr_identifiers:
+            continue
+
+        issue = get_issue_by_identifier(identifier)
+        if issue is None:
+            logger.debug("Catch-up: issue %s not found in Paperclip", identifier)
+            continue
+        if issue["status"] != "done":
+            logger.debug(
+                "Catch-up: issue %s is %s (not done)", identifier, issue["status"]
+            )
+            continue
+        if FDR_LABEL_ID in (issue.get("labelIds") or []):
+            continue
+
+        catchup_eligible += 1
+        try:
+            result = ingest_bug_issue(
+                engine,
+                issue_id=issue["id"],
+                issue_identifier=identifier,
+                completed_at=_parse_completed_at(issue),
+            )
+            catchup_results.append(result)
+        except Exception:
+            logger.exception("Catch-up ingestion error for %s", identifier)
+
+    logger.info(
+        "Catch-up complete: %d eligible, %d indexed, %d skipped",
+        catchup_eligible,
+        sum(1 for r in catchup_results if r.files_indexed > 0),
+        sum(1 for r in catchup_results if r.files_indexed == 0),
+    )
+
+    # Merge catch-up results into totals
+    bug_results.extend(catchup_results)
+    bug_total_eligible += catchup_eligible
+
     bug_indexed = sum(1 for r in bug_results if r.files_indexed > 0)
     bug_files_total = sum(r.files_indexed for r in bug_results)
     bug_skipped = sum(1 for r in bug_results if r.files_indexed == 0)
@@ -221,7 +293,9 @@ def main() -> None:
     _report()
     _report("Bugs (done issues referenced by fix commits):")
     _report(f"  Unique issue IDs in git log       : {len(issue_ids_in_commits)}")
-    _report(f"  Eligible done non-FDR issues      : {bug_total_eligible}")
+    _report(f"  Window eligible done non-FDR      : {bug_total_eligible - catchup_eligible}")
+    _report(f"  Catch-up eligible (from all git)  : {catchup_eligible}")
+    _report(f"  Total eligible done non-FDR       : {bug_total_eligible}")
     _report(f"  Bugs indexed (≥1 file)            : {bug_indexed}")
     _report(f"  Bugs with no git files found      : {bug_skipped}")
     _report(f"  Total file rows upserted          : {bug_files_total}")
@@ -261,6 +335,8 @@ def main() -> None:
         },
         "bug": {
             "unique_commit_ids": len(issue_ids_in_commits),
+            "window_eligible": bug_total_eligible - catchup_eligible,
+            "catchup_eligible": catchup_eligible,
             "eligible_done": bug_total_eligible,
             "indexed": bug_indexed,
             "no_files": bug_skipped,
