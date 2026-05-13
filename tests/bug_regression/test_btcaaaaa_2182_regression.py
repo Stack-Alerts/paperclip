@@ -20,6 +20,7 @@ preventing accidental removal or misconfiguration.
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,6 +34,8 @@ pytestmark = [
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LOCK_GATE_EXCEPTIONS_PATH = REPO_ROOT / "lock_gate_exceptions.json"
 
+VALID_APPROVED_BY = {"board", "ceo-emergency"}
+
 
 def _load_exceptions() -> list[dict]:
     with open(LOCK_GATE_EXCEPTIONS_PATH) as f:
@@ -45,6 +48,10 @@ def _find_data_manager_exception(exceptions: list[dict]) -> dict | None:
         if exc.get("module") == "src/data_manager":
             return exc
     return None
+
+
+def _count_data_manager_exceptions(exceptions: list[dict]) -> int:
+    return sum(1 for exc in exceptions if exc.get("module") == "src/data_manager")
 
 
 class TestLockGateExceptionDataManager:
@@ -86,6 +93,16 @@ class TestLockGateExceptionDataManager:
         approval = exc.get("approval_id", "")
         assert approval, "approval_id must not be empty"
 
+    def test_exception_approved_by_is_valid(self):
+        """The exception's approved_by must be one of the valid enum values."""
+        exc = _find_data_manager_exception(_load_exceptions())
+        assert exc is not None
+        approved_by = exc.get("approved_by", "")
+        assert approved_by in VALID_APPROVED_BY, (
+            f"approved_by must be one of {sorted(VALID_APPROVED_BY)}, "
+            f"got '{approved_by}'"
+        )
+
     def test_exception_approved_by_board(self):
         """The exception must be board-approved."""
         exc = _find_data_manager_exception(_load_exceptions())
@@ -113,4 +130,31 @@ class TestLockGateExceptionDataManager:
             expiry_dt = expiry_dt.replace(tzinfo=timezone.utc)
         assert expiry_dt > datetime.now(timezone.utc), (
             f"Exception for src/data_manager expired on {expires}"
+        )
+
+    def test_exception_approval_id_is_valid_uuid(self):
+        """The approval_id must be a valid UUID."""
+        exc = _find_data_manager_exception(_load_exceptions())
+        assert exc is not None
+        approval = exc.get("approval_id", "")
+        assert approval, "approval_id must not be empty"
+        parsed = uuid.UUID(approval)
+        assert str(parsed) == approval, (
+            f"approval_id must be a valid UUID, got '{approval}'"
+        )
+
+    def test_exception_module_is_src_data_manager(self):
+        """The exception module must be exactly src/data_manager."""
+        exc = _find_data_manager_exception(_load_exceptions())
+        assert exc is not None
+        assert exc.get("module") == "src/data_manager", (
+            f"module must be 'src/data_manager', got '{exc.get('module')}'"
+        )
+
+    def test_no_duplicate_data_manager_exception(self):
+        """There must be exactly one exception entry for src/data_manager."""
+        exceptions = _load_exceptions()
+        count = _count_data_manager_exceptions(exceptions)
+        assert count == 1, (
+            f"Expected exactly 1 exception for src/data_manager, found {count}"
         )
