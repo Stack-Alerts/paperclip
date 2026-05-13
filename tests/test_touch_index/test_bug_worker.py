@@ -3066,3 +3066,117 @@ class TestCatchUpEligibleBugIssues:
         assert len(results) == 1
         assert results[0].issue_identifier == other_id
         assert results[0].files_indexed == 1
+
+    def test_catch_up_fetches_description_when_list_endpoint_omits_it(self):
+        """When list endpoint omits description, catch-up fetches full issue and retries."""
+        engine, conn = _mock_engine()
+        done_issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
+            "completedAt": "2026-05-11T12:00:00Z",
+        }
+        full_issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
+            "completedAt": "2026-05-11T12:00:00Z",
+            "description": "Fixed bug in `src/touch_index/bug_worker.py`",
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+                return_value=done_issue,
+            ),
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+            patch(
+                "touch_index.bug_worker.get_issue_by_id", return_value=full_issue
+            ),
+            patch(
+                "touch_index.bug_worker.extract_files_from_text",
+                return_value=["src/touch_index/bug_worker.py"],
+            ),
+        ):
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = []
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert len(results) == 1
+        r = results[0]
+        assert r.source == "description"
+        assert r.files_indexed == 1
+        assert r.skipped_no_commits is False
+        assert r.issue_identifier == ISSUE_IDENTIFIER
+
+    def test_catch_up_skips_description_retry_when_git_found_files(self):
+        """When git already found files, the description retry is skipped."""
+        engine, conn = _mock_engine()
+        done_issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+                return_value=done_issue,
+            ),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/git_found.py"],
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.bug_worker.get_issue_by_id") as mock_fetch,
+        ):
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = []
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert len(results) == 1
+        assert results[0].source == "git"
+        mock_fetch.assert_not_called()
+
+    def test_catch_up_skips_description_retry_when_full_issue_still_no_description(self):
+        """When full issue also lacks description, original 'none' result is preserved."""
+        engine, conn = _mock_engine()
+        done_issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+                return_value=done_issue,
+            ),
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+            patch(
+                "touch_index.bug_worker.get_issue_by_id",
+                return_value={"id": ISSUE_ID, "identifier": ISSUE_IDENTIFIER},
+            ),
+        ):
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = []
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert len(results) == 1
+        assert results[0].source == "none"
+        assert results[0].skipped_no_commits is True
+

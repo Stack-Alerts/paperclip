@@ -277,6 +277,18 @@ def catch_up_eligible_bug_issues(
                 dry_run=dry_run,
                 issue_status=issue.get("status"),
             )
+            if result.source == "none" and not issue.get("description"):
+                full = get_issue_by_id(issue["id"])
+                if full and full.get("description"):
+                    result = ingest_bug_issue(
+                        engine,
+                        issue_id=full["id"],
+                        issue_identifier=identifier,
+                        completed_at=_parse_completed_at(full),
+                        description=full.get("description", "") or "",
+                        dry_run=dry_run,
+                        issue_status=full.get("status"),
+                    )
             results.append(result)
         except Exception:
             logger.exception("Catch-up ingestion error for %s", identifier)
