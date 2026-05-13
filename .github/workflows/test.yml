@@ -98,6 +98,8 @@ jobs:
             tests/bug_regression/test_btcaaaaa_20263_regression.py \
             tests/bug_regression/test_btcaaaaa_687_regression.py \
             tests/bug_regression/test_btcaaaaa_6873_regression.py \
+            tests/bug_regression/test_btcaaaaa_729_regression.py \
+            tests/bug_regression/test_btcaaaaa_747_regression.py \
             tests/bug_regression/test_btcaaaaa_7299_regression.py \
             tests/bug_regression/test_btcaaaaa_778_regression.py \
             tests/bug_regression/test_btcaaaaa_795_regression.py \
