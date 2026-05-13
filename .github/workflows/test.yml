@@ -102,6 +102,7 @@ jobs:
             tests/bug_regression/test_btcaaaaa_197_regression.py \
             tests/bug_regression/test_btcaaaaa_1477_regression.py \
             tests/bug_regression/test_btcaaaaa_1576_regression.py \
+            tests/bug_regression/test_btcaaaaa_1796_regression.py \
             tests/bug_regression/test_btcaaaaa_198_regression.py \
             tests/bug_regression/test_btcaaaaa_206_regression.py \
             tests/bug_regression/test_btcaaaaa_20263_regression.py \
@@ -173,13 +174,15 @@ jobs:
             tests/bug_regression/test_btcaaaaa_25528_regression.py \
             tests/bug_regression/test_btcaaaaa_25532_regression.py \
             tests/bug_regression/test_btcaaaaa_25533_regression.py \
-            tests/bug_regression/test_btcaaaaa_25574_regression.py 
+            tests/bug_regression/test_btcaaaaa_25574_regression.py \
+            tests/bug_regression/test_btcaaaaa_25579_regression.py \
             tests/bug_regression/test_btcaaaaa_25392_regression.py \
             tests/bug_regression/test_btcaaaaa_25393_regression.py \
             tests/bug_regression/test_btcaaaaa_234_regression.py \
             tests/bug_regression/test_btcaaaaa_163_regression.py \
             tests/bug_regression/test_btcaaaaa_167_regression.py \
             tests/bug_regression/test_btcaaaaa_170_regression.py \
+            tests/bug_regression/test_btcaaaaa_1701_regression.py \
             tests/bug_regression/test_btcaaaaa_240_regression.py \
             tests/bug_regression/test_btcaaaaa_241_regression.py \
             tests/bug_regression/test_btcaaaaa_24_regression.py \
