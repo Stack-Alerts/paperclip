@@ -16,6 +16,7 @@ This regression test suite enforces:
 from __future__ import annotations
 
 import ast
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -144,8 +145,11 @@ class TestRuffT201Gate:
         )
 
     def test_ruff_rule_t201_is_recognized(self) -> None:
+        ruff_path = shutil.which("ruff")
+        if ruff_path is None:
+            pytest.skip("ruff not installed — cannot verify T201 rule recognition")
         result = subprocess.run(
-            [sys.executable, "-m", "ruff", "rule", "T201"],
+            [ruff_path, "rule", "T201"],
             capture_output=True,
             text=True,
             timeout=30,
