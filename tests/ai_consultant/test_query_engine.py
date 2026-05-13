@@ -91,7 +91,53 @@ def seed_database(admin_session: Session, seed_ids: dict):
     now = datetime.now(timezone.utc)
     past_30 = now - timedelta(days=30)
     past_60 = now - timedelta(days=60)
-    # ── Ensure ORM-managed tables exist (not managed by Alembic) ───────────
+    # ── Ensure all required tables exist (Alembic migrations may not be applied) ─
+    admin_session.execute(text("""
+        CREATE TABLE IF NOT EXISTS strategies (
+            strategy_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+    """))
+    admin_session.execute(text("""
+        CREATE TABLE IF NOT EXISTS strategy_versions (
+            version_id UUID PRIMARY KEY,
+            strategy_id TEXT NOT NULL,
+            version_number INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            blocks JSONB NOT NULL,
+            signals JSONB NOT NULL,
+            parameters JSONB NOT NULL,
+            entry_conditions JSONB NOT NULL,
+            exit_conditions JSONB NOT NULL,
+            risk_management JSONB NOT NULL,
+            backtest_config JSONB NOT NULL,
+            timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+    """))
+    admin_session.execute(text("""
+        CREATE TABLE IF NOT EXISTS strategy_test_results (
+            result_id UUID PRIMARY KEY,
+            strategy_id TEXT NOT NULL,
+            version_id UUID NOT NULL,
+            test_type TEXT NOT NULL,
+            test_config JSONB,
+            start_date TIMESTAMP,
+            end_date TIMESTAMP,
+            total_return_pct DOUBLE PRECISION,
+            sharpe_ratio DOUBLE PRECISION,
+            max_drawdown_pct DOUBLE PRECISION,
+            win_rate DOUBLE PRECISION,
+            profit_factor DOUBLE PRECISION,
+            total_trades INTEGER,
+            metrics JSONB NOT NULL,
+            trades JSONB,
+            timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+    """))
     admin_session.execute(text("""
         CREATE TABLE IF NOT EXISTS signal_metrics (
             metric_id UUID PRIMARY KEY,
