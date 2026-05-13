@@ -831,6 +831,10 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -872,6 +876,10 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -1215,6 +1223,10 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
             caplog.at_level(logging.INFO),
         ):
             monkeypatch.setattr(
@@ -1278,6 +1290,10 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
             caplog.at_level(logging.INFO),
         ):
             mock_quality.return_value.passed = True
@@ -1324,6 +1340,10 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             mock_quality.return_value.passed = False
             monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
@@ -1349,6 +1369,10 @@ class TestMain:
             ),
             patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
             caplog.at_level(logging.INFO),
         ):
             mock_quality.return_value.passed = True
@@ -1374,6 +1398,10 @@ class TestMain:
             ),
             patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             mock_quality.return_value.passed = False
             monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
@@ -1465,6 +1493,10 @@ class TestMain:
             ),
             patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
             patch("touch_index.quality.run_bug_quality_checks", return_value=report),
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             monkeypatch.setattr(
                 "sys.argv", ["touch_index", "--validate", "--json-summary"]
@@ -1517,6 +1549,10 @@ class TestMain:
             patch("touch_index.bug_worker.run_bug_worker", return_value=results),
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
             patch("touch_index.paperclip_client.transition_issue_status_board"),
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             mock_quality.return_value.passed = True
             monkeypatch.setattr(
@@ -1541,6 +1577,10 @@ class TestMain:
             ),
             patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
             patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             mock_quality.return_value.passed = True
             monkeypatch.setattr(
@@ -1727,6 +1767,10 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             monkeypatch.setattr("sys.argv", ["touch_index"])
             main()
@@ -1782,6 +1826,10 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board"
             ) as mock_transition,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
             caplog.at_level(logging.INFO),
         ):
             monkeypatch.setattr("sys.argv", ["touch_index"])
@@ -1831,6 +1879,10 @@ class TestMain:
                 "touch_index.paperclip_client.transition_issue_status_board",
                 side_effect=RuntimeError("API timeout"),
             ) as mock_transition,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
             caplog.at_level(logging.ERROR),
         ):
             monkeypatch.setattr("sys.argv", ["touch_index"])
@@ -2105,6 +2157,10 @@ class TestBugJsonSummary:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -2173,6 +2229,10 @@ class TestBugJsonSummary:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -2222,6 +2282,10 @@ class TestBugJsonSummary:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ),
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -2250,6 +2314,10 @@ class TestBugJsonSummary:
                 return_value=[],
             ),
             patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -2303,6 +2371,10 @@ class TestBugJsonSummary:
             patch("touch_index.bug_worker.run_bug_worker", return_value=results),
             patch("touch_index.quality.run_bug_quality_checks", return_value=qc),
             patch("touch_index.paperclip_client.transition_issue_status_board"),
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -2338,6 +2410,10 @@ class TestBugJsonSummary:
             ),
             patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
             patch("touch_index.quality.run_bug_quality_checks", return_value=qc),
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             monkeypatch.setattr(
                 "sys.argv",
@@ -2391,6 +2467,10 @@ class TestBugJsonSummary:
             patch("touch_index.bug_worker.run_bug_worker", return_value=results),
             patch("touch_index.quality.run_bug_quality_checks", return_value=qc),
             patch("touch_index.paperclip_client.transition_issue_status_board"),
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ),
         ):
             monkeypatch.setattr(
                 "sys.argv",
