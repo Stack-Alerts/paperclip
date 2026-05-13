@@ -448,6 +448,7 @@ class TestProcessIssue:
 
     def test_rate_limiting_applied_between_creates(self, monkeypatch):
         """Verify time.sleep is called between blocking issue creations."""
+        monkeypatch.setattr(worker_mod, "GATE_RETRY_MAX_ATTEMPTS", 1)
         _FAIL_MULTI = {
             "timestamp": "2026-01-01T00:00:00",
             "status": "FAIL",
@@ -510,6 +511,7 @@ class TestProcessIssue:
 
     def test_rate_limiting_across_fr_and_bug_loops(self, monkeypatch):
         """Rate limiting must apply between FR and bug loops too."""
+        monkeypatch.setattr(worker_mod, "GATE_RETRY_MAX_ATTEMPTS", 1)
         _FAIL_MIXED = {
             "timestamp": "2026-01-01T00:00:00",
             "status": "FAIL",
@@ -573,6 +575,7 @@ class TestProcessIssue:
 
     def test_rate_limiting_dedup_hit_skips_create(self, monkeypatch):
         """When dedup finds existing, no create call is made and only search throttles apply."""
+        monkeypatch.setattr(worker_mod, "GATE_RETRY_MAX_ATTEMPTS", 1)
         _FAIL_ONE = {
             "timestamp": "2026-01-01T00:00:00",
             "status": "FAIL",
