@@ -1,35 +1,31 @@
 {
-  "timestamp": "2026-05-13T11:49:04.640235+00:00",
+  "timestamp": "2026-05-13T13:24:19.673278+00:00",
   "touch_index_fr": {
     "pass": true,
     "coverage_pct": 95.2,
     "indexed": 40,
     "total": 42,
     "total_rows": 150,
-    "stale_rows": 0,
     "max_age_hours": 17.7,
-    "null_owner_rows": 0,
-    "null_updated_at_rows": 0,
-    "unknown_source_rows": 0,
-    "duplicate_pairs": 0,
-    "orphan_count": 0,
+    "stale_rows": 0,
     "note": "FR worker verified: 133 tests pass, worker_count bug fixed, regression test added for BTCAAAAA-25502."
   },
   "touch_index_bug": {
     "pass": true,
-    "coverage_pct": 22.6,
-    "indexed": 594,
-    "total": 2631,
-    "coverage_eligible_pct": 94.1,
-    "eligible_total": 625,
-    "total_rows": 1832,
+    "coverage_pct": 24.2,
+    "indexed": 652,
+    "total": 2698,
+    "eligible_coverage_pct": 97.7,
+    "eligible_total": 660,
+    "missing_eligible": 15,
+    "total_rows": 1943,
+    "max_age_hours": 11.1,
     "stale_rows": 0,
-    "max_age_hours": 9.0,
     "null_closed_at_rows": 0,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
     "duplicate_pairs": 0,
     "orphan_count": 0,
-    "note": "Sustained after catch-up fix (BTCAAAAA-25486). Eligible coverage stable at 94.1%."
+    "note": "Catch-up ran (BTCAAAAA-25551): eligible coverage 89.1% -> 97.7% (645/660). 111 files indexed across 72 issues."
   }
 }
