@@ -68,6 +68,9 @@ def _build_bug_report(bug_report) -> dict:
         "total": bug_report.coverage.total_bug_issues,
         "coverage_eligible_pct": bug_report.coverage.eligible_coverage_pct,
         "eligible_total": bug_report.coverage.eligible_bug_issues,
+        "missing_eligible_count": len(bug_report.coverage.missing_eligible_identifiers),
+        "missing_eligible_identifiers": bug_report.coverage.missing_eligible_identifiers,
+        "missing_total_count": len(bug_report.coverage.missing_issue_identifiers),
     }
     if bug_report.freshness is not None:
         d["total_rows"] = bug_report.freshness.total_rows

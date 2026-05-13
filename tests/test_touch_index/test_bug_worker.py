@@ -950,6 +950,10 @@ class TestMain:
                 return_value=[],
             ),
             patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ) as mock_catchup,
             caplog.at_level(logging.INFO),
         ):
             monkeypatch.setattr(
@@ -959,7 +963,211 @@ class TestMain:
             main()
 
         mock_worker.assert_not_called()
+        mock_catchup.assert_called_once()
         assert any("Nothing to do" in r.message for r in caplog.records)
+
+    def test_main_no_issues_calls_catch_up(self, monkeypatch, caplog):
+        """When no issues, catch_up_eligible_bug_issues is called."""
+        import logging
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+        catchup_result = BugIngestionResult(
+            issue_id="catchup-id",
+            issue_identifier="BTCAAAAA-300",
+            files_indexed=2,
+            source="git",
+            skipped_no_commits=False,
+        )
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=[],
+            ),
+            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[catchup_result],
+            ) as mock_catchup,
+            caplog.at_level(logging.INFO),
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            main()
+
+        mock_worker.assert_not_called()
+        mock_catchup.assert_called_once()
+        assert any("Catch-up indexed" in r.message for r in caplog.records)
+
+    def test_main_polling_calls_catch_up_after_worker(self, monkeypatch):
+        """When issues exist, catch-up is called after run_bug_worker."""
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+        issues = [
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch(
+                "touch_index.bug_worker.run_bug_worker",
+                return_value=[
+                    BugIngestionResult(
+                        issue_id="id-1",
+                        issue_identifier="BTCAAAAA-101",
+                        files_indexed=2,
+                        source="git",
+                        skipped_no_commits=False,
+                    )
+                ],
+            ) as mock_worker,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ) as mock_catchup,
+            patch(
+                "touch_index.paperclip_client.transition_issue_status_board",
+            ) as mock_transition,
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            main()
+
+        mock_worker.assert_called_once()
+        mock_catchup.assert_called_once()
+        mock_transition.assert_called_once_with("id-1", "done")
+
+    def test_main_catch_up_results_extended(self, monkeypatch, caplog):
+        """Catch-up results are included in total files and skipped counts."""
+        import logging
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+        results = [
+            BugIngestionResult(
+                issue_id="id-1",
+                issue_identifier="BTCAAAAA-101",
+                files_indexed=3,
+                source="git",
+                skipped_no_commits=False,
+            ),
+        ]
+        catchup_results = [
+            BugIngestionResult(
+                issue_id="id-cu",
+                issue_identifier="BTCAAAAA-201",
+                files_indexed=1,
+                source="git",
+                skipped_no_commits=False,
+            ),
+            BugIngestionResult(
+                issue_id="id-cu2",
+                issue_identifier="BTCAAAAA-202",
+                files_indexed=0,
+                source="none",
+                skipped_no_commits=True,
+            ),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=[
+                    {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+                ],
+            ),
+            patch("touch_index.bug_worker.run_bug_worker", return_value=results),
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=catchup_results,
+            ),
+            patch("touch_index.paperclip_client.transition_issue_status_board"),
+            caplog.at_level(logging.INFO),
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            main()
+
+        # 3 from worker + 1 from catch-up = 4 total files (the 0-file catch-up doesn't add)
+        # 3 results total: 1 worker + 2 catch-up
+        summary_logs = [r for r in caplog.records if "issues processed" in r.message]
+        assert len(summary_logs) == 1
+        msg = summary_logs[0].message
+        assert "3 issues" in msg
+        assert "4 files" in msg
+        assert "1 skipped" in msg
+
+    def test_main_catch_up_dry_run(self, monkeypatch):
+        """--dry-run is passed through to catch_up_eligible_bug_issues."""
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=[],
+            ),
+            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ) as mock_catchup,
+        ):
+            monkeypatch.setattr(
+                "sys.argv", ["touch_index", "--dry-run"]
+            )
+            main()
+
+        mock_worker.assert_not_called()
+        mock_catchup.assert_called_once()
+        _, kwargs = mock_catchup.call_args
+        assert kwargs.get("dry_run") is True
+
+    def test_main_catch_up_no_issues_with_validate_passed(self, monkeypatch, caplog):
+        """--validate with no issues runs quality checks after catch-up."""
+        import logging
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=[],
+            ),
+            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                return_value=[],
+            ) as mock_catchup,
+            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
+            caplog.at_level(logging.INFO),
+        ):
+            mock_quality.return_value.passed = True
+            monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
+            main()
+
+        mock_worker.assert_not_called()
+        mock_catchup.assert_called_once()
+        mock_quality.assert_called_once()
+        assert any("VALIDATION PASSED" in r.message for r in caplog.records)
 
     def test_main_summary_counts_files_and_skipped(self, monkeypatch, caplog):
         """Log summary reflects total files indexed and skipped count."""

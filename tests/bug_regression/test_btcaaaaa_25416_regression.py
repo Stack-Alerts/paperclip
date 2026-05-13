@@ -128,10 +128,11 @@ class TestGetBarsBinanceNatGuard:
         # Should have caught the error and not be empty
         assert mock_client.get_klines.call_count == 2
 
-    def test_api_error_on_first_page_returns_empty(self, manager):
+    def test_api_error_on_first_page_triggers_fallback(self, manager):
         """
-        If the very first get_klines call fails (no data yet), must return
-        empty DataFrame without raising.
+        When the very first get_klines call fails (no data yet), must
+        re-raise so the outer try/except triggers the LakeAPI fallback
+        instead of silently returning empty.
         """
         start_date = datetime.now(timezone.utc) - timedelta(days=1)
         end_date = datetime.now(timezone.utc)
@@ -139,11 +140,19 @@ class TestGetBarsBinanceNatGuard:
         mock_client = MagicMock()
         mock_client.get_klines.side_effect = TimeoutError("API timeout")
 
-        with patch.object(manager, "_get_binance_client", return_value=mock_client):
+        lakeapi_df = pd.DataFrame({
+            "timestamp": pd.to_datetime([start_date], utc=True),
+            "open": [60000.0], "high": [61000.0], "low": [59000.0],
+            "close": [60500.0], "volume": [10.0], "volume_usd": [600000.0],
+            "trade_count": [100], "symbol": ["BTCUSDT"], "timeframe": ["15m"],
+        })
+
+        with patch.object(manager, "_get_binance_client", return_value=mock_client),              patch.object(manager, "_get_bars_lakeapi", return_value=lakeapi_df) as mock_lakeapi:
             result = manager._get_bars_binance("15m", start_date, end_date)
 
+        mock_lakeapi.assert_called_once()
         assert isinstance(result, pd.DataFrame)
-        assert len(result) == 0
+        assert len(result) == 1
 
 
 # ------------------------------------------------------------------ #

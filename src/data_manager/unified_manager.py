@@ -542,6 +542,8 @@ class UnifiedDataManager:
                         "Binance API error at page boundary current_start=%d: %s",
                         current_start, api_exc,
                     )
+                    if len(all_chunks) == 0:
+                        raise
                     break
 
                 if len(chunk) == 0:
@@ -579,6 +581,11 @@ class UnifiedDataManager:
             # tz-aware start_date_floored (set by BTCAAAAA-795) doesn't raise TypeError.
             # rest_client strips UTC with .dt.tz_localize(None); re-localize here.
             bars['timestamp'] = pd.to_datetime(bars['timestamp'], utc=True)
+
+            # BTCAAAAA-25498: drop any NaT timestamps that may have leaked
+            # through despite the per-page cursor guard (e.g. a corrupt
+            # middle row in a chunk whose last_ts is valid).
+            bars = bars[bars['timestamp'].notna()].copy()
 
             # INSTITUTIONAL: Don't filter by end_date too strictly!
             # Binance returns ALL available candles including current forming one

@@ -195,6 +195,58 @@ def run_fr_worker(
     return results
 
 
+def catch_up_eligible_fr_issues(
+    engine: Engine,
+    *,
+    dry_run: bool = False,
+) -> list[FRIngestionResult]:
+    """Scan all FDR issues from Paperclip and index those not yet in touch_index_fr_files.
+
+    New FDR issues can be created at any time. The worker's lookback window only
+    catches issues updated within the last N minutes. This catch-up ensures all
+    FDR issues are eventually indexed, keeping coverage above the quality
+    threshold without requiring a separate backfill run.
+    """
+    from .paperclip_client import get_fdr_issues
+
+    all_fdr = get_fdr_issues()
+    if not all_fdr:
+        return []
+
+    with engine.connect() as conn:
+        indexed_rows = conn.execute(
+            text("SELECT DISTINCT fr_identifier FROM touch_index_fr_files")
+        ).fetchall()
+    indexed_in_db: set[str] = {str(r[0]) for r in indexed_rows}
+
+    results: list[FRIngestionResult] = []
+    for issue in all_fdr:
+        if issue.get("identifier") in indexed_in_db:
+            continue
+        try:
+            result = ingest_fr_issue(
+                engine,
+                issue_id=issue["id"],
+                issue_identifier=issue["identifier"],
+                owner_agent_id=issue.get("assigneeAgentId"),
+                description=issue.get("description", "") or "",
+                dry_run=dry_run,
+            )
+            results.append(result)
+        except Exception:
+            logger.exception(
+                "Catch-up ingestion error for %s", issue.get("identifier")
+            )
+    if results:
+        logger.info(
+            "Catch-up complete: %d FDR issues processed, %d files indexed, %d skipped",
+            len(results),
+            sum(r.files_indexed for r in results),
+            sum(1 for r in results if r.skipped_no_commits),
+        )
+    return results
+
+
 def main() -> None:
     """CLI entry point: dispatch to __main__._run_fr_cli() (unified CLI)."""
     from .__main__ import _run_fr_cli

@@ -61,8 +61,12 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+SRC_DIR = REPO_ROOT / "src"
 FR_ACCEPTANCE_DIR = REPO_ROOT / "tests" / "fr_acceptance"
 BUG_REGRESSION_DIR = REPO_ROOT / "tests" / "bug_regression"
+
+# PYTHONPATH for subprocess — ensures src/ is resolvable in any environment
+_DEFAULT_PYTHONPATH = str(SRC_DIR)
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +240,7 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
     with tempfile.NamedTemporaryFile(suffix=".xml", delete=False) as tmp:
         junit_path = tmp.name
 
+    proc = None
     try:
         cmd = [
             sys.executable,
@@ -250,12 +255,16 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
             "--no-cov",  # skip coverage for speed; the gate only cares about pass/fail
         ] + [str(p) for p in existing_paths]
 
-        subprocess.run(
+        proc = subprocess.run(
             cmd,
             cwd=str(REPO_ROOT),
             capture_output=True,
             text=True,
             timeout=120,
+            env={
+                **os.environ,
+                "PYTHONPATH": _DEFAULT_PYTHONPATH,
+            },
         )
 
         file_results = _parse_junit(junit_path, existing_paths)
@@ -274,8 +283,11 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
             "fr_results": fr_results,
             "bug_results": bug_results,
             "error": "pytest timed out after 120s",
+            "pytest_stderr": proc.stderr[-2000:] if proc and proc.stderr else "",
         }
     except ET.ParseError as exc:
+        _stderr_snip = proc.stderr[-2000:] if proc and proc.stderr else ""
+        _stdout_snip = proc.stdout[-1000:] if proc and proc.stdout else ""
         return {
             "timestamp": timestamp,
             "status": "ERROR",
@@ -289,6 +301,9 @@ def run(fr_ids: list[str], bug_ids: list[str]) -> dict:
             "fr_results": fr_results,
             "bug_results": bug_results,
             "error": f"Failed to parse JUnit XML: {exc}",
+            "pytest_returncode": proc.returncode if proc else None,
+            "pytest_stderr": _stderr_snip,
+            "pytest_stdout": _stdout_snip,
         }
     finally:
         try:

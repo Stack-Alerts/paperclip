@@ -205,6 +205,7 @@ def _run_bug_cli() -> None:
         return
 
     results = run_bug_worker(engine, issues, dry_run=args.dry_run)
+    worker_count = len(results)
 
     catchup_results = catch_up_eligible_bug_issues(
         engine, dry_run=args.dry_run
@@ -217,7 +218,7 @@ def _run_bug_cli() -> None:
         )
     results.extend(catchup_results)
 
-    errors = len(issues) - len(results)
+    errors = len(issues) - worker_count
     if errors:
         logger.warning(
             "%d issue(s) had processing errors \u2014 check logs above for details",
@@ -317,7 +318,11 @@ def _run_fr_cli() -> None:
     import argparse
 
     from touch_index.db import get_engine, health_check
-    from touch_index.fr_worker import process_fr_issue, run_fr_worker
+    from touch_index.fr_worker import (
+        catch_up_eligible_fr_issues,
+        process_fr_issue,
+        run_fr_worker,
+    )
     from touch_index.paperclip_client import get_fdr_issues, transition_issue_status_board
     from touch_index.quality import run_quality_checks
 
@@ -427,6 +432,15 @@ def _run_fr_cli() -> None:
 
     if not issues:
         logger.info("Nothing to do")
+        catchup_results = catch_up_eligible_fr_issues(
+            engine, dry_run=args.dry_run
+        )
+        if catchup_results:
+            logger.info(
+                "Catch-up indexed %d file(s) across %d issue(s)",
+                sum(r.files_indexed for r in catchup_results),
+                len(catchup_results),
+            )
         if args.validate:
             report = run_quality_checks(engine, stale_threshold_hours=args.stale_hours)
             if not report.passed:
@@ -443,7 +457,18 @@ def _run_fr_cli() -> None:
 
     results = run_fr_worker(engine, issues, dry_run=args.dry_run)
 
-    errors = len(issues) - len(results)
+    catchup_results = catch_up_eligible_fr_issues(
+        engine, dry_run=args.dry_run
+    )
+    if catchup_results:
+        logger.info(
+            "Catch-up indexed %d file(s) across %d issue(s)",
+            sum(r.files_indexed for r in catchup_results),
+            len(catchup_results),
+        )
+    results.extend(catchup_results)
+
+    errors = len(issues) - worker_count
     if errors:
         logger.warning(
             "%d issue(s) had processing errors \u2014 check logs above for details",

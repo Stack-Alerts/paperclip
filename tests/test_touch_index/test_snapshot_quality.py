@@ -66,6 +66,8 @@ def _make_bug_report():
             total_bug_issues = 2326
             eligible_coverage_pct = 74.0
             eligible_bug_issues = 438
+            missing_eligible_identifiers = ['BTCAAAAA-999', 'BTCAAAAA-1000']
+            missing_issue_identifiers = ['BTCAAAAA-1', 'BTCAAAAA-2', 'BTCAAAAA-999', 'BTCAAAAA-1000']
 
         class freshness:
             total_rows = 938
@@ -209,6 +211,9 @@ class TestBuildBugReport:
         assert d["total"] == 2326
         assert d["coverage_eligible_pct"] == 74.0
         assert d["eligible_total"] == 438
+        assert d["missing_eligible_count"] == 2
+        assert d["missing_eligible_identifiers"] == ["BTCAAAAA-999", "BTCAAAAA-1000"]
+        assert d["missing_total_count"] == 4
         assert d["total_rows"] == 938
         assert d["stale_rows"] == 0
 
@@ -236,6 +241,8 @@ class TestBuildBugReport:
                 total_bug_issues = 10
                 eligible_coverage_pct = 100.0
                 eligible_bug_issues = 5
+                missing_eligible_identifiers = []
+                missing_issue_identifiers = []
 
             class freshness:
                 total_rows = 20
@@ -263,6 +270,8 @@ class TestBuildBugReport:
                 total_bug_issues = 10
                 eligible_coverage_pct = 100.0
                 eligible_bug_issues = 10
+                missing_eligible_identifiers = []
+                missing_issue_identifiers = []
 
             class freshness:
                 total_rows = 50
