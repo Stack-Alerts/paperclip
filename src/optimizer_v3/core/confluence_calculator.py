@@ -165,40 +165,47 @@ class ConfluenceCalculator:
         fired_signals: List[str]
     ) -> bool:
         """
-        Check if all required (AND) signals fired
+        Check if all required (AND) signals in AND blocks fired
         
-        Before calculating confluence, verify all AND-logic
-        signals are present. If any AND signal missing, entry
-        should be rejected regardless of total points.
+        Per AND/OR logic design (docs/strategy-builder/06_AND_OR_LOGIC_SYSTEM.md):
+        - AND blocks: All AND-logic signals in the block must fire
+        - OR blocks: No signals required (optional boosters)
+        
+        Only signals in AND-logic blocks with AND-logic are required.
+        Signals in OR blocks are optional regardless of signal-level logic.
+        
+        BTCAAAAA-24644: Fixed to respect block-level logic — previously
+        required ALL AND signals across ALL blocks including OR blocks.
         
         Args:
             strategy_config: Strategy configuration
             fired_signals: List of fired signals
         
         Returns:
-            True if all AND signals present, False otherwise
+            True if all required signals present, False otherwise
         
         Example:
             required_ok = calculator.check_required_signals(
                 strategy_config,
                 ['hod::HOD_REJECTION', 'hod::BEARISH']
             )
-            # Returns: False (missing hod::BELOW_HOD which is AND)
+            # Returns: False (missing hod::BELOW_HOD which is AND in AND block)
         """
         for block in strategy_config.blocks:
+            block_logic = getattr(block, 'logic', 'AND')
+            # Skip OR blocks — their signals are optional per AND/OR architecture
+            if block_logic == 'OR':
+                continue
+            
             for signal in block.signals:
-                # Check for AND logic
-                logic = getattr(signal, 'logic', 'OR')
-                
-                if logic == 'AND':
+                signal_logic = getattr(signal, 'logic', 'OR')
+                if signal_logic == 'AND':
                     signal_id = f"{block.name}::{signal.name}"
-                    
                     if signal_id not in fired_signals:
-                        # Required signal missing!
                         return False
         
         return True  # All required signals present
-    
+        
     def get_signal_breakdown(
         self,
         strategy_config: Any,

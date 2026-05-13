@@ -514,8 +514,12 @@ class InstitutionalSignalEvaluator:
         
         # STEP 7: Check entry decision
         # BTCAAAAA-7364: Verify all required (AND) signals are present before allowing entry
+        # BTCAAAAA-24644: R5 — make AND-gate configurable (default False = confluence-only gating)
+        # When require_all_and_signals is False, skip the strict all-AND check
+        # to avoid zero-trades vectors from timing/recheck chains filtering required signals.
+        require_all = getattr(self.strategy_config, 'require_all_and_signals', False)
         required_ok = True
-        if self.confluence_calc:
+        if require_all and self.confluence_calc:
             required_ok = self.confluence_calc.check_required_signals(
                 self.strategy_config,
                 all_signals
