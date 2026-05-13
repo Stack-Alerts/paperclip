@@ -173,6 +173,67 @@ class TestAdminPinDialogMinimumDimensions:
         )
 
 
+class TestSettingsDialogTitle:
+    """SettingsDialog must show correct title 'Settings'."""
+
+    def test_settings_dialog_title(self, qapp):
+        from src.strategy_builder.ui.settings_dialog import SettingsDialog
+        from src.strategy_builder.ui.settings_service import SettingsService
+
+        svc = _make_service_mock()
+        with patch(
+            "src.strategy_builder.ui.settings_dialog.SettingsService",
+            return_value=svc,
+        ), patch.object(
+            SettingsService, "_enforce_env_permissions", staticmethod(lambda: None)
+        ):
+            dialog = SettingsDialog()
+            title = dialog.windowTitle()
+            dialog.close()
+
+        assert title == "Settings", (
+            f"SettingsDialog windowTitle() is '{title}' -- "
+            "expected 'Settings'."
+        )
+
+
+class TestSecretFieldWidgetButtons:
+    """SecretFieldWidget buttons must use setMinimumWidth, not setFixedWidth."""
+
+    def test_no_setfixedwidth_in_secretfieldwidget_class(self):
+        source = SOURCE_PATH.read_text()
+        tree = ast.parse(source)
+
+        secret_class_body = None
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.ClassDef)
+                and node.name == "SecretFieldWidget"
+            ):
+                secret_class_body = node.body
+                break
+
+        assert secret_class_body is not None, (
+            "Could not find SecretFieldWidget class in source."
+        )
+
+        violations = []
+        for node in ast.walk(
+            ast.Module(body=secret_class_body, type_ignores=[])
+        ):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "setFixedWidth"
+            ):
+                violations.append(node.lineno)
+
+        assert not violations, (
+            f"SecretFieldWidget still calls setFixedWidth() at lines "
+            f"{violations}. BTCAAAAA-87 requires setMinimumWidth() instead."
+        )
+
+
 class TestAdminPinDialogTitles:
     """AdminPinDialog must show correct titles (not truncated)."""
 
