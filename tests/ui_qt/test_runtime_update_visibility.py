@@ -116,8 +116,8 @@ def test_on_runtime_update_finished_success_sets_status_bar(qtbot):
     QApplication.processEvents()
 
     msg = status_bar.currentMessage()
-    assert "Data updated at" in msg, (
-        f"Status bar should show 'Data updated at' after success, got: {msg}"
+    assert "[RuntimeUpdate] OK:" in msg, (
+        f"Status bar should show .RuntimeUpdate. OK: after success, got: {msg}"
     )
 
 
@@ -135,8 +135,8 @@ def test_on_runtime_update_finished_failure_sets_status_bar(qtbot):
     QApplication.processEvents()
 
     msg = status_bar.currentMessage()
-    assert "Update failed" in msg, (
-        f"Status bar should show 'Update failed' after failure, got: {msg}"
+    assert "[RuntimeUpdate] FAIL:" in msg, (
+        f"Status bar should show .RuntimeUpdate. FAIL: after failure, got: {msg}"
     )
 
 
@@ -173,7 +173,7 @@ def test_countdown_shows_when_no_active_message(qtbot):
 
     # Set next check time
     from datetime import datetime, timedelta, timezone
-    win.next_check_time = datetime.now() + timedelta(minutes=4, seconds=30)
+    win.next_check_time = datetime.now(timezone.utc) + timedelta(minutes=4, seconds=30)
 
     win._update_countdown_status()
     QApplication.processEvents()

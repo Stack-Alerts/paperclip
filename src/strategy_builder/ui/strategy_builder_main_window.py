@@ -2151,7 +2151,7 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
             if current_status and any(keyword in current_status for keyword in [
                 'Added block', 'Strategy updated', 'Saved', 'Loaded', 'Checking',
                 'Updating', 'Validat', 'Generated', 'cleared', 'created',
-                'Data updated', 'Update failed', 'Auto-update'
+                'Data updated', 'Update failed', 'Auto-update', '[RuntimeUpdate]'
             ]):
                 # Don't override active status messages
                 return
