@@ -2341,3 +2341,193 @@ class TestEmitJsonSummaryRequiresWorker:
 
         data = json.loads(captured.out.strip())
         assert data["worker"] == "fr"
+
+    def test_polls_issue_description_when_missing_from_list(self):
+        """When git/comments fail and list issue lacks description, full issue is fetched."""
+        engine, conn = _mock_engine()
+        desc = "Fixed bug in `src/touch_index/bug_worker.py`"
+        full_issue = {
+            "id": "id-1",
+            "identifier": "BTCAAAAA-200",
+            "description": desc,
+            "completedAt": "2026-05-11T12:00:00Z",
+        }
+
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+            patch(
+                "touch_index.bug_worker.get_issue_by_id", return_value=full_issue
+            ) as mock_get,
+            patch(
+                "touch_index.bug_worker.extract_files_from_text",
+                return_value=["src/touch_index/bug_worker.py"],
+            ),
+        ):
+            results = run_bug_worker(
+                engine,
+                [{"id": "id-1", "identifier": "BTCAAAAA-200", "completedAt": "2026-05-11T12:00:00Z"}],
+            )
+
+        assert len(results) == 1
+        assert results[0].source == "description"
+        assert results[0].files_indexed == 1
+        assert results[0].skipped_no_commits is False
+        mock_get.assert_called_once_with("id-1")
+        conn.execute.assert_called_once()
+
+    def test_description_fallback_not_called_when_git_succeeds(self):
+        """When git has files, no API call for description is made."""
+        engine, _ = _mock_engine()
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/ok.py"],
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract"),
+            patch("touch_index.bug_worker.get_issue_by_id") as mock_get,
+        ):
+            results = run_bug_worker(
+                engine,
+                [{"id": "id-1", "identifier": "BTCAAAAA-200"}],
+            )
+
+        assert len(results) == 1
+        assert results[0].source == "git"
+        mock_get.assert_not_called()
+
+    def test_description_fallback_not_called_when_comments_succeed(self):
+        """When comments have files, no API call for description is made."""
+        engine, _ = _mock_engine()
+
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch(
+                "touch_index.bug_worker.fetch_and_extract",
+                return_value=["src/comment.py"],
+            ),
+            patch("touch_index.bug_worker.get_issue_by_id") as mock_get,
+        ):
+            results = run_bug_worker(
+                engine,
+                [{"id": "id-1", "identifier": "BTCAAAAA-200"}],
+            )
+
+        assert len(results) == 1
+        assert results[0].source == "comments"
+        mock_get.assert_not_called()
+
+    def test_no_fallback_when_list_has_description(self):
+        """When list endpoint already has description, no extra API call."""
+        engine, conn = _mock_engine()
+        desc = "Fix in `src/foo.py`"
+
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.bug_worker.get_issue_by_id") as mock_get,
+            patch(
+                "touch_index.bug_worker.extract_files_from_text",
+                return_value=["src/foo.py"],
+            ),
+        ):
+            results = run_bug_worker(
+                engine,
+                [{"id": "id-1", "identifier": "BTCAAAAA-200", "description": desc}],
+            )
+
+        assert len(results) == 1
+        assert results[0].source == "description"
+        assert results[0].files_indexed == 1
+        mock_get.assert_not_called()
+        conn.execute.assert_called_once()
+
+    def test_no_fallback_when_full_issue_lacks_description(self):
+        """When full issue has no description either, result stays 'none'."""
+        engine, _ = _mock_engine()
+        full_issue = {
+            "id": "id-1",
+            "identifier": "BTCAAAAA-200",
+            "completedAt": "2026-05-11T12:00:00Z",
+        }
+
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+            patch(
+                "touch_index.bug_worker.get_issue_by_id", return_value=full_issue
+            ) as mock_get,
+        ):
+            results = run_bug_worker(
+                engine,
+                [{"id": "id-1", "identifier": "BTCAAAAA-200"}],
+            )
+
+        assert len(results) == 1
+        assert results[0].source == "none"
+        assert results[0].skipped_no_commits is True
+        mock_get.assert_called_once()
+
+    def test_fallback_not_called_when_full_issue_not_found(self):
+        """When get_issue_by_id returns None, result stays 'none'."""
+        engine, _ = _mock_engine()
+
+        with (
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+            patch("touch_index.bug_worker.get_issue_by_id", return_value=None) as mock_get,
+        ):
+            results = run_bug_worker(
+                engine,
+                [{"id": "id-1", "identifier": "BTCAAAAA-200"}],
+            )
+
+        assert len(results) == 1
+        assert results[0].source == "none"
+        assert results[0].skipped_no_commits is True
+        mock_get.assert_called_once()
+
+    def test_mixed_fallback_and_git(self):
+        """Mixed batch: one issue with git files, one requiring description fallback."""
+        engine, conn = _mock_engine()
+        full_issue = {
+            "id": "id-2",
+            "identifier": "BTCAAAAA-201",
+            "description": "Fixed in `src/bar.py`",
+            "completedAt": "2026-05-11T12:00:00Z",
+        }
+
+        def git_side_effect(identifier):
+            if identifier == "BTCAAAAA-200":
+                return ["src/foo.py"]
+            return []
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                side_effect=git_side_effect,
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+            patch(
+                "touch_index.bug_worker.get_issue_by_id", return_value=full_issue
+            ) as mock_get,
+            patch(
+                "touch_index.bug_worker.extract_files_from_text",
+                return_value=["src/bar.py"],
+            ),
+        ):
+            results = run_bug_worker(
+                engine,
+                [
+                    {"id": "id-1", "identifier": "BTCAAAAA-200"},
+                    {"id": "id-2", "identifier": "BTCAAAAA-201"},
+                ],
+            )
+
+        assert len(results) == 2
+        assert results[0].source == "git"
+        assert results[0].files_indexed == 1
+        assert results[1].source == "description"
+        assert results[1].files_indexed == 1
+        mock_get.assert_called_once_with("id-2")
