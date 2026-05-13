@@ -176,5 +176,10 @@
   "c685afee-a40f-4fd6-b13c-bd9be906d58b": "ERROR",
   "97460549-2f58-4220-a22a-5104f8533c24": "FAIL",
   "9b20ec34-77b7-4dbc-820c-9ca4c8ab98ac": "PASS",
-  "3c6f67b6-e8d3-4867-8bda-16bd0d5c64c4": "PASS"
+  "3c6f67b6-e8d3-4867-8bda-16bd0d5c64c4": "PASS",
+  "685e7e00-021c-4d12-8936-f4de8df002f3": "PASS",
+  "b5749eb5-d179-449e-812a-26b54e8e0c22": "SKIPPED",
+  "dec277bb-2524-483c-938b-2b4fa3fb9504": "SKIPPED",
+  "cb8efc05-95e9-4d35-8917-1cabd9a27084": "SKIPPED",
+  "79ebea0e-c0d9-4686-9849-1ba259f6897a": "SKIPPED"
 }

@@ -101,6 +101,9 @@ def seed_database(admin_session: Session, seed_ids: dict):
     """), {"a_id": ids["strategy_a"], "b_id": ids["strategy_b"], "now": now})
 
     # ── Strategy versions ─────────────────────────────────────────────────
+    params_alpha = '{"rsi_period":14,"macd_fast":12,"macd_slow":26}'
+    params_beta = '{"rsi_period":21,"bb_period":20}'
+
     admin_session.execute(text("""
         INSERT INTO strategy_versions (
             version_id, strategy_id, version_number, name,
@@ -110,14 +113,14 @@ def seed_database(admin_session: Session, seed_ids: dict):
             :vid_a, :sid_a, 1, 'Alpha v1',
             '[{"name":"MACD","category":"MOMENTUM"},{"name":"RSI","category":"OSCILLATOR"}]'::jsonb,
             '{"entry_signal":"MACD_CROSS","exit_signal":"RSI_OVERBOUGHT"}'::jsonb,
-            '{"rsi_period":14,"macd_fast":12,"macd_slow":26}'::jsonb,
+            CAST(:params_alpha AS jsonb),
             '{}'::jsonb, '[]'::jsonb, '{}'::jsonb, '{}'::jsonb,
             :now, :now
         ), (
             :vid_b, :sid_b, 1, 'Beta v1',
             '[{"name":"RSI","category":"OSCILLATOR"},{"name":"BOLLINGER","category":"VOLATILITY"}]'::jsonb,
             '{"entry_signal":"RSI_OVERSOLD","exit_signal":"BOLLINGER_UPPER"}'::jsonb,
-            '{"rsi_period":21,"bb_period":20}'::jsonb,
+            CAST(:params_beta AS jsonb),
             '{}'::jsonb, '[]'::jsonb, '{}'::jsonb, '{}'::jsonb,
             :now, :now
         )
@@ -125,6 +128,8 @@ def seed_database(admin_session: Session, seed_ids: dict):
     """), {
         "vid_a": ids["version_a_id"], "sid_a": ids["strategy_a"],
         "vid_b": ids["version_b_id"], "sid_b": ids["strategy_b"],
+        "params_alpha": params_alpha,
+        "params_beta": params_beta,
         "now": now,
     })
 
@@ -150,12 +155,12 @@ def seed_database(admin_session: Session, seed_ids: dict):
             :rid_a, :sid_a, :vid_a, 'backtest',
             '{}'::jsonb, :start, :end,
             12.5, 1.8, 8.3, 0.62, 2.1, 50,
-            '{}'::jsonb, :trades::jsonb, :now, :now
+            '{}'::jsonb, CAST(:trades AS jsonb), :now, :now
         ), (
             :rid_b, :sid_b, :vid_b, 'backtest',
             '{}'::jsonb, :start, :end,
             -2.0, -0.3, 15.0, 0.38, 0.7, 30,
-            '{}'::jsonb, :trades::jsonb, :now, :now
+            '{}'::jsonb, CAST(:trades AS jsonb), :now, :now
         )
         ON CONFLICT DO NOTHING
     """), {
@@ -213,16 +218,16 @@ def seed_database(admin_session: Session, seed_ids: dict):
             timestamp, signal_name, signal_type, signal_direction,
             instrument_id, price, bar_number
         )
-        SELECT unnest(:eids::uuid[]),
-               unnest(:rids::uuid[]),
-               unnest(:vids::uuid[]),
-               unnest(:tss::timestamp[]),
-               unnest(:snames::text[]),
-               unnest(:stypes::text[]),
-               unnest(:sdirs::text[]),
-               unnest(:iids::text[]),
-               unnest(:prices::text[]),
-               unnest(:bars::int[])
+        SELECT unnest(CAST(:eids AS uuid[])),
+               unnest(CAST(:rids AS uuid[])),
+               unnest(CAST(:vids AS uuid[])),
+               unnest(CAST(:tss AS timestamp[])),
+               unnest(CAST(:snames AS text[])),
+               unnest(CAST(:stypes AS text[])),
+               unnest(CAST(:sdirs AS text[])),
+               unnest(CAST(:iids AS text[])),
+               unnest(CAST(:prices AS text[])),
+               unnest(CAST(:bars AS int[]))
         ON CONFLICT DO NOTHING
     """), {
         "eids": [r["eid"] for r in event_rows],
