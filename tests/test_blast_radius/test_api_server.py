@@ -372,12 +372,14 @@ class _MockResult:
         source,
         skipped_no_commits,
         issue_id="00000000-0000-0000-0000-000000000000",
+        issue_status="done",
     ):
         self.issue_identifier = identifier
         self.issue_id = issue_id
         self.files_indexed = files_indexed
         self.source = source
         self.skipped_no_commits = skipped_no_commits
+        self.issue_status = issue_status
 
 
 class TestHandlerFrWebhook:
