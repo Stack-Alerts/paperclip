@@ -1,0 +1,15 @@
+{
+  "issueId": "BTCAAAAA-26053",
+  "runTimestamp": "2026-05-14T02:48:00Z",
+  "worker": "fr",
+  "status": "done",
+  "coverage_pct": 95.2,
+  "indexed": 40,
+  "total": 42,
+  "missing": ["BTCAAAAA-1191", "BTCAAAAA-851"],
+  "total_rows": 150,
+  "stale_rows": 0,
+  "pass": true,
+  "tests_pass": 477,
+  "tests_total": 477
+}
