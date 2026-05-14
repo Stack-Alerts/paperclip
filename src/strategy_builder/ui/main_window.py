@@ -26,6 +26,7 @@ class MainWindow(WindowGeometryMixin, QMainWindow):
     def setup_menu(self):
         """Setup main menu bar"""
         menubar = QMenuBar()
+        menubar.setNativeMenuBar(False)
         menubar.setStyleSheet(MENU_STYLE)
         menubar.setFont(create_font())
         

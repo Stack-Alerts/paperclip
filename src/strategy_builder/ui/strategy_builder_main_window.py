@@ -520,6 +520,7 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
     def _create_menu_bar(self):
         """Create the menu bar with professional icons."""
         menu_bar = self.menuBar()
+        menu_bar.setNativeMenuBar(False)
         style = self.style()
         
         # File Menu
