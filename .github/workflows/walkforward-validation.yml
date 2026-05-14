@@ -67,15 +67,15 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install pytest pandas numpy pyarrow
+          pip install pytest pandas numpy pyarrow nautilus-trader
 
       - name: Verify BTC data availability
         run: |
-          if [ ! -f data/raw/BTC_USDT_PERP_15m.csv ]; then
-            echo "BTC data file not found — skipping real-data walkforward"
+          if [ ! -f data/raw/BTC_USDT_PERP_30m.pkl ]; then
+            echo "30m BTC data file not found — skipping real-data walkforward"
             exit 0
           fi
-          echo "BTC data file found ($(wc -c < data/raw/BTC_USDT_PERP_15m.csv) bytes)"
+          echo "30m BTC data file found ($(wc -c < data/raw/BTC_USDT_PERP_30m.pkl) bytes)"
 
       - name: Download previous walkforward registry
         id: download-registry
@@ -106,9 +106,10 @@ jobs:
               echo "--- Running CI walkforward: $strategy_path ---"
               python scripts/run_walkforward_ci.py \
                 --strategy "$strategy_path" \
-                --data data/raw/BTC_USDT_PERP_15m.csv \
-                --days 180 \
+                --data data/raw/BTC_USDT_PERP_30m.pkl \
+                --days 60 \
                 --timeout 600 \
+                --strict \
                 || echo "WARNING: CI walkforward failed for $strategy_path (non-fatal)"
             fi
           done

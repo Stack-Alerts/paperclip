@@ -69,7 +69,7 @@ def load_30m_data(data_path: str):
     print(f"  Range: {df['timestamp'].min()} → {df['timestamp'].max()}")
     return df
 
-def run_walkforward(strategy, df, strategy_name: str) -> dict:
+def run_walkforward(strategy, df, strategy_name: str, args=None) -> dict:
     """Run walkforward simulation returning metrics dict."""
     import pandas as pd
     import numpy as np
@@ -96,6 +96,7 @@ def run_walkforward(strategy, df, strategy_name: str) -> dict:
 
     signals_checked = 0
     signals_taken = 0
+    _loop_errors = {}
 
     for i in range(min_bars, len(df)):
         current_bar = df.iloc[i]
@@ -147,8 +148,10 @@ def run_walkforward(strategy, df, strategy_name: str) -> dict:
                         if success:
                             signals_taken += 1
             except Exception as e:
-                if signals_checked <= 3 or signals_checked % 5000 == 0:
-                    print(f"  [WARN] bar {i}: {type(e).__name__}: {e}", file=sys.stderr)
+                err_type = type(e).__name__
+                if err_type not in _loop_errors:
+                    _loop_errors[err_type] = {"count": 0, "first_bar": i, "sample": str(e)[:120]}
+                _loop_errors[err_type]["count"] += 1
                 continue
 
     if simulator.open_trade is not None:
@@ -157,6 +160,15 @@ def run_walkforward(strategy, df, strategy_name: str) -> dict:
         )
 
     print(f"  Signals checked: {signals_checked}  taken: {signals_taken}")
+    if _loop_errors:
+        total_errs = sum(v["count"] for v in _loop_errors.values())
+        err_pct = (total_errs / max(signals_checked, 1)) * 100
+        print(f"  Loop errors: {total_errs} total ({err_pct:.1f}% of bars) — {len(_loop_errors)} types:", file=sys.stderr)
+        for err_type, info in sorted(_loop_errors.items(), key=lambda x: -x[1]["count"]):
+            print(f"    {err_type}: {info['count']}x (first at bar {info['first_bar']}): {info['sample']}", file=sys.stderr)
+        if args.strict and err_pct > 10:
+            print(f"FATAL: strict mode — {err_pct:.1f}% error rate exceeds 10% threshold", file=sys.stderr)
+            sys.exit(2)
     return simulator.get_performance_metrics()
 
 def check_thresholds(metrics: dict) -> tuple[bool, list[str]]:
@@ -216,6 +228,7 @@ def main():
     parser.add_argument("--timeout", type=int, default=TIMEOUT_SEC, help="Timeout in seconds")
     parser.add_argument("--days", type=int, default=180, help="Days of recent data to use")
     parser.add_argument("--output", default=None, help="Path to write JSON results")
+    parser.add_argument("--strict", action="store_true", help="Fail if >10%% of bars produce errors")
     args = parser.parse_args()
 
     start = time.time()
@@ -389,7 +402,7 @@ def main():
         sys.exit(2)
 
     try:
-        metrics = run_walkforward(strategy, df, strategy_name)
+        metrics = run_walkforward(strategy, df, strategy_name, args)
     except Exception as e:
         print(f"FATAL: walkforward run failed: {e}", file=sys.stderr)
         traceback.print_exc()
