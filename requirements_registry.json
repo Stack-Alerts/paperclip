@@ -222,15 +222,16 @@
         "scripts/nightly_test_alert.py",
         ".github/workflows/test.yml"
       ],
-      "test_files": [],
+      "test_files": [
+        "tests/test_scripts/test_nightly_test_alert.py"
+      ],
       "test_markers": [],
       "status": "active",
       "priority": "medium",
       "tags": [
         "ci",
         "alerting",
-        "nightly",
-        "needs-test"
+        "nightly"
       ],
       "owner_agent": "AutomationEngineer"
     },
