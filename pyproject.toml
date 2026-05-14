@@ -12,6 +12,7 @@ touch-index-bug = "touch_index.bug_worker:main"
 impact-gate-worker = "impact_gate_worker:main"
 scan-fix-issues-done = "scan_fix_issues_done:main"
 scan-done-alert = "scan_done_alert:main"
+work-registry = "work_registry:main"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"
