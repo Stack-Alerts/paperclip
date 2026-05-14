@@ -2,8 +2,16 @@
 """Provider usage monitor and agent model switching automation.
 
 Polls DeepSeek, OpenRouter, and Claude Code Max usage/billing APIs,
-evaluates switching triggers, and patches agent adapter config models
-via the Paperclip API. Implements hysteresis to prevent thrashing.
+company budget data from Paperclip dashboard, evaluates switching triggers,
+and patches agent adapter config models via the Paperclip API. Implements
+hysteresis to prevent thrashing.
+
+Switching triggers (priority order):
+  1. Claude rate-limit exhaust (4hr >=95%, 7day >=95%) — MUST switch
+  2. Budget critical (>=95% monthly budget spent) — degrade all to cheapest
+  3. Budget warning (>=90% monthly budget spent) — degrade standard tier
+  4. Budget caution (>=80% monthly budget spent) — alert only
+  5. Claude recovery — restore normal models
 
 Usage:
     python scripts/provider_monitor.py                # live run
@@ -55,6 +63,14 @@ CTO_AGENT_ID = "41b5ede6-e209-40ba-b923-dc969c722e6d"
 
 DEGRADE_COOLDOWN_MIN = 30
 UPGRADE_COOLDOWN_MIN = 15
+
+# Budget-driven switching thresholds (% of monthly budget spent)
+BUDGET_ALERT_PCT = 80
+BUDGET_DEGRADE_STANDARD_PCT = 90
+BUDGET_DEGRADE_ALL_PCT = 95
+BUDGET_RECOVER_PCT = 70
+BUDGET_DEGRADE_COOLDOWN_MIN = 60
+BUDGET_UPGRADE_COOLDOWN_MIN = 30
 
 MONITOR_LOG.parent.mkdir(parents=True, exist_ok=True)
 
@@ -117,6 +133,10 @@ class UsageSnapshot:
     claude_error: str | None = None
     deepseek_error: str | None = None
     openrouter_error: str | None = None
+    month_spend_cents: int | None = None
+    month_budget_cents: int | None = None
+    budget_pct: float | None = None
+    dashboard_error: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -132,6 +152,27 @@ class UsageSnapshot:
             "claude_error": self.claude_error,
             "deepseek_error": self.deepseek_error,
             "openrouter_error": self.openrouter_error,
+            "month_spend_cents": self.month_spend_cents,
+            "month_budget_cents": self.month_budget_cents,
+            "budget_pct": self.budget_pct,
+            "dashboard_error": self.dashboard_error,
+        }
+
+
+
+@dataclass
+class BudgetSnapshot:
+    month_spend_cents: int | None = None
+    month_budget_cents: int | None = None
+    budget_pct: float | None = None
+    dashboard_error: str | None = None
+
+    def to_dict(self) -> dict:
+        return {
+            "month_spend_cents": self.month_spend_cents,
+            "month_budget_cents": self.month_budget_cents,
+            "budget_pct": self.budget_pct,
+            "dashboard_error": self.dashboard_error,
         }
 
 
@@ -143,6 +184,9 @@ class MonitorState:
     pro_model: str | None = None
     standard_model: str | None = None
     alert_sent_d2: bool = False
+    budget_degraded_level: str | None = None
+    last_budget_switch_at: str | None = None
+    budget_alert_sent: bool = False
     checks: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -153,6 +197,9 @@ class MonitorState:
             "pro_model": self.pro_model,
             "standard_model": self.standard_model,
             "alert_sent_d2": self.alert_sent_d2,
+            "budget_degraded_level": self.budget_degraded_level,
+            "last_budget_switch_at": self.last_budget_switch_at,
+            "budget_alert_sent": self.budget_alert_sent,
             "checks": self.checks[-50:],
         }
 
@@ -165,6 +212,9 @@ class MonitorState:
             pro_model=d.get("pro_model"),
             standard_model=d.get("standard_model"),
             alert_sent_d2=d.get("alert_sent_d2", False),
+            budget_degraded_level=d.get("budget_degraded_level"),
+            last_budget_switch_at=d.get("last_budget_switch_at"),
+            budget_alert_sent=d.get("budget_alert_sent", False),
             checks=d.get("checks", []),
         )
 
@@ -316,6 +366,32 @@ def fetch_claude_usage() -> tuple[float | None, float | None, bool, str | None]:
         return None, None, False, f"Anthropic usage API parse error: {e}"
 
 
+def fetch_budget_data() -> tuple[int | None, int | None, float | None, str | None]:
+    """Poll Paperclip company dashboard for monthly spend and budget."""
+    try:
+        with _paperclip_session() as sess:
+            resp = sess.get(
+                f"{_pc_base()}/api/companies/{_pc_company()}/dashboard",
+                timeout=API_TIMEOUT,
+            )
+            if resp.status_code != 200:
+                return None, None, None, f"Dashboard API returned {resp.status_code}"
+            data = resp.json()
+            costs = data.get("costs", {})
+            month_spend = costs.get("monthSpendCents")
+            month_budget = costs.get("monthBudgetCents")
+            if month_spend is None:
+                return None, None, None, "Dashboard response missing monthSpendCents"
+            pct = None
+            if month_budget and month_budget > 0:
+                pct = round((month_spend / month_budget) * 100.0, 1)
+            return month_spend, month_budget, pct, None
+    except requests.RequestException as e:
+        return None, None, None, f"Dashboard API request failed: {e}"
+    except (ValueError, KeyError, TypeError) as e:
+        return None, None, None, f"Dashboard API parse error: {e}"
+
+
 def poll_all_providers() -> UsageSnapshot:
     snap = UsageSnapshot()
 
@@ -350,6 +426,18 @@ def poll_all_providers() -> UsageSnapshot:
     else:
         logger.info("Claude: 4hr=%.1f%% 7day=%.1f%% available=%s", c4, c7, c_avail)
 
+    spend, budget, pct, b_err = fetch_budget_data()
+    snap.month_spend_cents = spend
+    snap.month_budget_cents = budget
+    snap.budget_pct = pct
+    snap.dashboard_error = b_err
+    if b_err:
+        logger.warning("Budget: %s", b_err)
+    else:
+        budget_dollars = budget / 100 if budget else 0
+        spend_dollars = spend / 100 if spend else 0
+        logger.info("Budget: $%.2f / $%.0f (%.1f%%)", spend_dollars, budget_dollars, pct or 0)
+
     return snap
 
 
@@ -357,10 +445,22 @@ def poll_all_providers() -> UsageSnapshot:
 
 
 def _cooldown_remaining(state: MonitorState, direction: str, cooldown_min: int) -> float:
-    if not state.last_switch_at or state.last_switch_direction != direction:
+    """Return minutes remaining in cooldown for a given switch direction.
+
+    For budget-driven directions (budget_degrade / budget_upgrade), reads from
+    last_budget_switch_at. For Claude-driven directions (degrade / upgrade),
+    reads from last_switch_at.
+    """
+    ts = None
+    if direction in ("budget_degrade", "budget_upgrade"):
+        ts = state.last_budget_switch_at
+    else:
+        ts = state.last_switch_at
+
+    if not ts or state.last_switch_direction != direction:
         return 0.0
     try:
-        last = datetime.fromisoformat(state.last_switch_at)
+        last = datetime.fromisoformat(ts)
     except (ValueError, TypeError):
         return 0.0
     elapsed = (datetime.now(timezone.utc) - last).total_seconds() / 60.0
@@ -378,18 +478,24 @@ class SwitchingDecision:
 
 
 def evaluate_triggers(snap: UsageSnapshot, state: MonitorState) -> SwitchingDecision:
-    degrade_cooldown = _cooldown_remaining(state, "degrade", DEGRADE_COOLDOWN_MIN)
-    upgrade_cooldown = _cooldown_remaining(state, "upgrade", UPGRADE_COOLDOWN_MIN)
+    claude_degrade_cooldown = _cooldown_remaining(state, "degrade", DEGRADE_COOLDOWN_MIN)
+    claude_upgrade_cooldown = _cooldown_remaining(state, "upgrade", UPGRADE_COOLDOWN_MIN)
+    budget_degrade_cooldown = _cooldown_remaining(state, "budget_degrade", BUDGET_DEGRADE_COOLDOWN_MIN)
+    budget_upgrade_cooldown = _cooldown_remaining(state, "budget_upgrade", BUDGET_UPGRADE_COOLDOWN_MIN)
 
     c1_active = snap.claude_4hr_pct is not None and snap.claude_4hr_pct >= 95.0
     c2_active = snap.claude_7day_pct is not None and snap.claude_7day_pct >= 95.0
+    claude_degraded = state.current_provider_state == "claude_degraded"
+    budget_degraded = state.budget_degraded_level is not None
+
+    bp = snap.budget_pct
 
     # OpenRouter credit alert flag management
     or_low = (
         snap.openrouter_remaining is not None
         and (snap.openrouter_remaining <= 5.0
              or (snap.openrouter_pct_remaining is not None
-                 and snap.openrouter_pct_remaining <= 10.0))
+                  and snap.openrouter_pct_remaining <= 10.0))
     )
     or_ok = (
         snap.openrouter_remaining is not None
@@ -400,7 +506,56 @@ def evaluate_triggers(snap: UsageSnapshot, state: MonitorState) -> SwitchingDeci
         logger.info("OpenRouter recovered, clearing alert flag")
         state.alert_sent_d2 = False
 
-    # OpenRouter credit low — alert only, not a switching trigger
+    # Priority 1: Claude rate-limit exhaust (MUST switch)
+    if c1_active and c2_active:
+        if claude_degraded:
+            return SwitchingDecision(action="noop", reason="Already degraded (C1+C2 active)")
+        if claude_degrade_cooldown > 0:
+            return SwitchingDecision(
+                action="noop",
+                reason=f"C1+C2 degrade blocked by hysteresis ({claude_degrade_cooldown:.0f}m remaining)",
+                blocked_by_hysteresis=True,
+            )
+        return SwitchingDecision(
+            action="degrade_c1c2",
+            pro_model=STANDARD_MODEL_DEGRADED,
+            standard_model=STANDARD_MODEL_DEGRADED,
+            reason=f"Claude 4hr={snap.claude_4hr_pct:.1f}% 7day={snap.claude_7day_pct:.1f}% -- both >=95%, both tiers -> OR V4 Flash",
+        )
+
+    if c1_active:
+        if claude_degraded:
+            return SwitchingDecision(action="noop", reason="Already degraded (C1 active)")
+        if claude_degrade_cooldown > 0:
+            return SwitchingDecision(
+                action="noop",
+                reason=f"C1 degrade blocked by hysteresis ({claude_degrade_cooldown:.0f}m remaining)",
+                blocked_by_hysteresis=True,
+            )
+        return SwitchingDecision(
+            action="degrade_c1",
+            pro_model=PRO_MODEL_DEGRADED,
+            standard_model=STANDARD_MODEL_NORMAL,
+            reason=f"Claude 4hr={snap.claude_4hr_pct:.1f}% >= 95% -- degrading pro tier to OR V4 Pro",
+        )
+
+    if c2_active:
+        if claude_degraded:
+            return SwitchingDecision(action="noop", reason="Already degraded (C2 active)")
+        if claude_degrade_cooldown > 0:
+            return SwitchingDecision(
+                action="noop",
+                reason=f"C2 degrade blocked by hysteresis ({claude_degrade_cooldown:.0f}m remaining)",
+                blocked_by_hysteresis=True,
+            )
+        return SwitchingDecision(
+            action="degrade_c2",
+            pro_model=PRO_MODEL_NORMAL,
+            standard_model=STANDARD_MODEL_DEGRADED,
+            reason=f"Claude 7day={snap.claude_7day_pct:.1f}% >= 95% -- degrading standard tier to OR V4 Flash",
+        )
+
+    # Priority 2: OpenRouter credit alert
     if or_low and not state.alert_sent_d2:
         return SwitchingDecision(
             action="alert_or",
@@ -408,86 +563,100 @@ def evaluate_triggers(snap: UsageSnapshot, state: MonitorState) -> SwitchingDeci
             alert_only=True,
         )
 
-    current_state = state.current_provider_state
-
-    # ── Degrade triggers ──────────────────────────────────────────────────
-
-    if c1_active and c2_active:
-        # Both 4hr and 7day >= 95% — both tiers → OR V4 Flash
-        if current_state == "claude_degraded":
-            return SwitchingDecision(action="noop", reason="Already degraded (C1+C2 active)")
-        if degrade_cooldown > 0:
+    # Priority 3: Budget thresholds (only when Claude is available)
+    # B3: >=95% budget spent -- degrade all tiers to cheapest (OR V4 Flash)
+    if bp is not None and bp >= BUDGET_DEGRADE_ALL_PCT:
+        if claude_degraded:
+            return SwitchingDecision(action="noop", reason="Claude already degraded, budget B3 not applicable")
+        if budget_degraded and state.budget_degraded_level in ("b3", "b2", "b1"):
+            return SwitchingDecision(action="noop", reason=f"Already at budget level {state.budget_degraded_level} (B3={bp:.1f}%)")
+        if budget_degrade_cooldown > 0:
             return SwitchingDecision(
                 action="noop",
-                reason=f"C1+C2 degrade blocked by hysteresis ({degrade_cooldown:.0f}m remaining)",
+                reason=f"Budget B3 degrade blocked by hysteresis ({budget_degrade_cooldown:.0f}m remaining)",
                 blocked_by_hysteresis=True,
             )
         return SwitchingDecision(
-            action="degrade_c1c2",
+            action="degrade_budget_b3",
             pro_model=STANDARD_MODEL_DEGRADED,
             standard_model=STANDARD_MODEL_DEGRADED,
-            reason=f"Claude 4hr={snap.claude_4hr_pct:.1f}% 7day={snap.claude_7day_pct:.1f}% — both >=95%, both tiers → OR V4 Flash",
+            reason=f"Budget {bp:.1f}% >= {BUDGET_DEGRADE_ALL_PCT}% spent -- all tiers -> OR V4 Flash to conserve budget",
         )
 
-    if c1_active:
-        # C1: 4hr >= 95% — pro tier → OR V4 Pro
-        if current_state == "claude_degraded":
-            return SwitchingDecision(action="noop", reason="Already degraded (C1 active)")
-        if degrade_cooldown > 0:
+    # B2: >=90% budget spent -- degrade standard tier to OR V4 Flash
+    if bp is not None and bp >= BUDGET_DEGRADE_STANDARD_PCT:
+        if claude_degraded:
+            return SwitchingDecision(action="noop", reason="Claude already degraded, budget B2 not applicable")
+        if budget_degraded and state.budget_degraded_level in ("b3", "b2"):
+            return SwitchingDecision(action="noop", reason=f"Already at budget level {state.budget_degraded_level} (B2={bp:.1f}%)")
+        if budget_degrade_cooldown > 0:
             return SwitchingDecision(
                 action="noop",
-                reason=f"C1 degrade blocked by hysteresis ({degrade_cooldown:.0f}m remaining)",
+                reason=f"Budget B2 degrade blocked by hysteresis ({budget_degrade_cooldown:.0f}m remaining)",
                 blocked_by_hysteresis=True,
             )
         return SwitchingDecision(
-            action="degrade_c1",
-            pro_model=PRO_MODEL_DEGRADED,
-            standard_model=STANDARD_MODEL_NORMAL,
-            reason=f"Claude 4hr={snap.claude_4hr_pct:.1f}% >= 95% — degrading pro tier to OR V4 Pro",
-        )
-
-    if c2_active:
-        # C2: 7day >= 95% — agents on OR V4 Pro → OR V4 Flash
-        if current_state == "claude_degraded":
-            return SwitchingDecision(action="noop", reason="Already degraded (C2 active)")
-        if degrade_cooldown > 0:
-            return SwitchingDecision(
-                action="noop",
-                reason=f"C2 degrade blocked by hysteresis ({degrade_cooldown:.0f}m remaining)",
-                blocked_by_hysteresis=True,
-            )
-        return SwitchingDecision(
-            action="degrade_c2",
+            action="degrade_budget_b2",
             pro_model=PRO_MODEL_NORMAL,
             standard_model=STANDARD_MODEL_DEGRADED,
-            reason=f"Claude 7day={snap.claude_7day_pct:.1f}% >= 95% — degrading standard tier to OR V4 Flash",
+            reason=f"Budget {bp:.1f}% >= {BUDGET_DEGRADE_STANDARD_PCT}% spent -- standard tier -> OR V4 Flash",
         )
 
-    # ── Recovery trigger (U1) ─────────────────────────────────────────────
-    # Rev 3 AND gate: BOTH 4hr AND 7day must be < 95% before upgrading.
-    # Prevents thrashing where 4hr resets while 7day remains exhausted.
+    # B1: >=80% budget spent -- alert only (no model changes).
+    # Skip if already budget-degraded (b2/b3 already triggered above).
+    if bp is not None and bp >= BUDGET_ALERT_PCT:
+        if budget_degraded:
+            return SwitchingDecision(action="noop", reason=f"Budget at {bp:.1f}%, already budget-degraded ({state.budget_degraded_level})")
+        if not state.budget_alert_sent:
+            state.budget_alert_sent = True
+            return SwitchingDecision(
+                action="alert_budget",
+                reason=f"Budget {bp:.1f}% >= {BUDGET_ALERT_PCT}% spent -- monitor for potential provider switch",
+                alert_only=True,
+            )
+        return SwitchingDecision(action="noop", reason=f"Budget at {bp:.1f}% (alert already sent)")
 
-    if current_state == "claude_degraded":
+    # Budget recovery: spend drops below BUDGET_RECOVER_PCT
+    if budget_degraded and bp is not None and bp <= BUDGET_RECOVER_PCT:
+        if budget_upgrade_cooldown > 0:
+            return SwitchingDecision(
+                action="noop",
+                reason=f"Budget upgrade blocked by hysteresis ({budget_upgrade_cooldown:.0f}m remaining)",
+                blocked_by_hysteresis=True,
+            )
+        return SwitchingDecision(
+            action="upgrade_budget",
+            pro_model=PRO_MODEL_NORMAL,
+            standard_model=STANDARD_MODEL_NORMAL,
+            reason=f"Budget recovered to {bp:.1f}% (threshold: {BUDGET_RECOVER_PCT}%) -- restoring normal models",
+        )
+
+    # Clear budget alert flag when below threshold
+    if bp is not None and bp < BUDGET_ALERT_PCT and state.budget_alert_sent:
+        logger.info("Budget below alert threshold, clearing budget_alert_sent flag")
+        state.budget_alert_sent = False
+
+    # Priority 4: Claude recovery (U1) -- AND gate
+    if claude_degraded:
         if not snap.claude_available:
             return SwitchingDecision(
                 action="noop",
                 reason=f"U1 upgrade blocked: claude_available=False (4hr={snap.claude_4hr_pct}% 7day={snap.claude_7day_pct}%)",
             )
-        if upgrade_cooldown > 0:
+        if claude_upgrade_cooldown > 0:
             return SwitchingDecision(
                 action="noop",
-                reason=f"U1 upgrade blocked by hysteresis ({upgrade_cooldown:.0f}m remaining)",
+                reason=f"U1 upgrade blocked by hysteresis ({claude_upgrade_cooldown:.0f}m remaining)",
                 blocked_by_hysteresis=True,
             )
         return SwitchingDecision(
             action="upgrade_u1",
             pro_model=PRO_MODEL_NORMAL,
             standard_model=STANDARD_MODEL_NORMAL,
-            reason=f"Claude recovered (4hr={snap.claude_4hr_pct:.1f}%, 7day={snap.claude_7day_pct:.1f}%) — restoring normal models",
+            reason=f"Claude recovered (4hr={snap.claude_4hr_pct:.1f}%, 7day={snap.claude_7day_pct:.1f}%) -- restoring normal models",
         )
 
     return SwitchingDecision(action="noop", reason="All conditions nominal")
-
 
 # ── Agent switching ──────────────────────────────────────────────────────────
 
@@ -540,12 +709,29 @@ def apply_switch(decision: SwitchingDecision, state: MonitorState, dry_run: bool
                 any_failed = True
 
     if not dry_run:
-        direction = "degrade" if decision.action.startswith("degrade") else "upgrade"
-        state.last_switch_at = datetime.now(timezone.utc).isoformat()
-        state.last_switch_direction = direction
-        state.current_provider_state = "claude_degraded" if direction == "degrade" else "normal"
-        state.pro_model = pro_model
-        state.standard_model = std_model
+        now_ts = datetime.now(timezone.utc).isoformat()
+        if decision.action.startswith("degrade_budget"):
+            state.last_budget_switch_at = now_ts
+            state.last_switch_direction = "budget_degrade"
+            if decision.action == "degrade_budget_b3":
+                state.budget_degraded_level = "b3"
+            elif decision.action == "degrade_budget_b2":
+                state.budget_degraded_level = "b2"
+            state.pro_model = pro_model
+            state.standard_model = std_model
+        elif decision.action == "upgrade_budget":
+            state.last_budget_switch_at = now_ts
+            state.last_switch_direction = "budget_upgrade"
+            state.budget_degraded_level = None
+            state.pro_model = pro_model
+            state.standard_model = std_model
+        else:
+            direction = "degrade" if decision.action.startswith("degrade") else "upgrade"
+            state.last_switch_at = now_ts
+            state.last_switch_direction = direction
+            state.current_provider_state = "claude_degraded" if direction == "degrade" else "normal"
+            state.pro_model = pro_model
+            state.standard_model = std_model
         save_state(state)
 
     logger.info("Switch applied: %s (pro=%s, std=%s, failed=%s)",
@@ -613,6 +799,13 @@ def main() -> None:
                 "alert_only": decision.alert_only,
                 "blocked_by_hysteresis": decision.blocked_by_hysteresis,
             },
+            "budget": {
+                "month_spend_cents": snap.month_spend_cents,
+                "month_budget_cents": snap.month_budget_cents,
+                "budget_pct": snap.budget_pct,
+                "degraded_level": state.budget_degraded_level,
+                "alert_sent": state.budget_alert_sent,
+            },
         }
         print(json.dumps(summary, indent=2))
         return
@@ -634,6 +827,12 @@ def main() -> None:
         state.alert_sent_d2 = True
         save_state(state)
         logger.info("OR credit alert sent, alert_sent_d2 flag set")
+        return
+
+    if decision.alert_only and decision.action == "alert_budget":
+        post_board_alert(decision.reason, args.dry_run)
+        save_state(state)
+        logger.info("Budget alert sent, budget_alert_sent flag set")
         return
 
     if args.no_switch:

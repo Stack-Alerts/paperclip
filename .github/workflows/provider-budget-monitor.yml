@@ -1,0 +1,76 @@
+name: Provider Budget Monitor
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (log only, do not patch agents)"
+        required: false
+        default: "true"
+      no_switch:
+        description: "Skip agent model patches (poll and alert only)"
+        required: false
+        default: "false"
+
+jobs:
+  budget-monitor:
+    name: Provider budget threshold check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests python-dotenv urllib3
+
+      - name: Run budget monitor
+        env:
+          PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+          PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+          PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          FLAGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            FLAGS="$FLAGS --dry-run"
+          fi
+          if [ "${{ github.event.inputs.no_switch }}" = "true" ]; then
+            FLAGS="$FLAGS --no-switch"
+          fi
+          python scripts/provider_monitor.py $FLAGS --json-summary > budget_summary.json
+          cat budget_summary.json | python -m json.tool
+
+      - name: Check budget thresholds
+        id: budget
+        run: |
+          if [ -f budget_summary.json ]; then
+            BUDGET_PCT=$(python -c "import json; d=json.load(open('budget_summary.json')); print(d.get('budget',{}).get('budget_pct', 0) or 0)")
+            ALERT_LEVEL=$(python -c "import json; d=json.load(open('budget_summary.json')); print(d.get('budget',{}).get('degraded_level', 'none'))")
+            echo "budget_pct=$BUDGET_PCT" >> "$GITHUB_OUTPUT"
+            echo "alert_level=$ALERT_LEVEL" >> "$GITHUB_OUTPUT"
+            echo "Budget: ${BUDGET_PCT}% used, alert level: ${ALERT_LEVEL}"
+            if [ "$(echo "$BUDGET_PCT >= 90" | bc 2>/dev/null || echo 0)" = "1" ]; then
+              echo "::warning::Budget ${BUDGET_PCT}% spent - near or at provider switch threshold"
+            fi
+          fi
+
+      - name: Upload monitor logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: budget-monitor-logs
+          path: |
+            budget_summary.json
+            ~/.paperclip/provider_monitor*.log
+          retention-days: 7
