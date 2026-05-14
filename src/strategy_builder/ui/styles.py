@@ -1304,7 +1304,7 @@ def apply_hand_cursor_to_buttons(parent_widget):
         if _sip.isdeleted(parent_widget):
             return
     except (ImportError, AttributeError):
-        pass
+        _sip = None
 
     from PyQt5.QtWidgets import (
         QToolButton, QPushButton, QRadioButton, 
@@ -1312,30 +1312,39 @@ def apply_hand_cursor_to_buttons(parent_widget):
     )
     from PyQt5.QtCore import Qt
     
-    # Apply hand cursor to widgets
+    _is_alive = (lambda w: not _sip.isdeleted(w)) if _sip is not None else (lambda w: True)
+    
     for tool_btn in parent_widget.findChildren(QToolButton):
-        tool_btn.setCursor(Qt.PointingHandCursor)
+        if _is_alive(tool_btn):
+            tool_btn.setCursor(Qt.PointingHandCursor)
     
     for push_btn in parent_widget.findChildren(QPushButton):
-        push_btn.setCursor(Qt.PointingHandCursor)
+        if _is_alive(push_btn):
+            push_btn.setCursor(Qt.PointingHandCursor)
     
     for radio in parent_widget.findChildren(QRadioButton):
-        radio.setCursor(Qt.PointingHandCursor)
+        if _is_alive(radio):
+            radio.setCursor(Qt.PointingHandCursor)
     
     for checkbox in parent_widget.findChildren(QCheckBox):
-        checkbox.setCursor(Qt.PointingHandCursor)
+        if _is_alive(checkbox):
+            checkbox.setCursor(Qt.PointingHandCursor)
     
     for combo in parent_widget.findChildren(QComboBox):
-        combo.setCursor(Qt.PointingHandCursor)
+        if _is_alive(combo):
+            combo.setCursor(Qt.PointingHandCursor)
     
     for tab in parent_widget.findChildren(QTabBar):
-        tab.setCursor(Qt.PointingHandCursor)
+        if _is_alive(tab):
+            tab.setCursor(Qt.PointingHandCursor)
     
     for spinbox in parent_widget.findChildren(QSpinBox):
-        spinbox.setCursor(Qt.PointingHandCursor)
+        if _is_alive(spinbox):
+            spinbox.setCursor(Qt.PointingHandCursor)
     
     for doublespinbox in parent_widget.findChildren(QDoubleSpinBox):
-        doublespinbox.setCursor(Qt.PointingHandCursor)
+        if _is_alive(doublespinbox):
+            doublespinbox.setCursor(Qt.PointingHandCursor)
 
 
 # =============================================================================
@@ -2064,6 +2073,25 @@ class WindowGeometryMixin:
                     key, frame_top_left, self.size(),
                 )
 
+            # BTCAAAAA-26162: Detect maximize from normal (user clicked the OS
+            # maximize button). Update QSettings immediately so the saved
+            # maximized flag never desyncs from the actual window state.
+            if not (old_state & _Qt.WindowMaximized) and (new_state & _Qt.WindowMaximized):
+                settings = _QSettings("BTC_Engine", "StrategyBuilder")
+                key = self.GEOMETRY_SETTINGS_KEY
+                settings.setValue(f"{key}/maximized", True)
+                maximized_center = self.frameGeometry().center()
+                maximized_screen = _QGuiApplication.screenAt(maximized_center)
+                if maximized_screen is not None:
+                    settings.setValue(f"{key}/maximized_screen_name", maximized_screen.name())
+                self._geometry_restored = True
+
+                import logging as _logging
+                _logging.getLogger("WindowGeometry").debug(
+                    "[CHANGEEVENT MAXIMIZE] %s: maximized on screen=%s",
+                    key, maximized_screen.name() if maximized_screen else "unknown",
+                )
+
             # Detect minimize: when minimized, the oldState was maximized so
             # we must not treat the restore-from-minimize as a user-initiated
             # de-maximize. The guard above correctly ignores old states that
@@ -2072,16 +2100,21 @@ class WindowGeometryMixin:
         super().changeEvent(event)
 
     def showEvent(self, event):
-        """Apply maximized state BEFORE the WM maps the window.
+        """Position window before mapping; apply maximized state AFTER the WM maps.
 
-        Some Linux window managers reject maximize requests that arrive
-        after the window is already mapped. By reading the saved maximized
-        flag and calling setWindowState() before delegating to
-        super().showEvent(), the WM sees the maximize request during the
-        initial map cycle rather than after the window is on screen.
+        The pre-show window positioning (move / center) is safe and correct.
+        However, calling setWindowState(WindowMaximized) *before* the window is
+        mapped causes Qt to set its internal state to maximized without actually
+        instructing the Window Manager to fill the screen.  The OS title bar
+        then shows the restore icon but clicking maximise does nothing — Qt
+        already believes it is maximised (BTCAAAAA-26202).
 
-        The non-maximized geometry restore (position/size) continues to
-        be handled by _restore_window_geometry() in the subclass showEvent.
+        Fix: call setWindowState() *after* super().showEvent() so the WM
+        receives the maximise request on an already-mapped window, keeping
+        Qt and WM state in perfect sync.
+
+        Non-maximized geometry restore continues to be handled by
+        _restore_window_geometry() in the subclass showEvent.
         """
         if not getattr(self, "_geometry_restored", False):
             settings = _QSettings("BTC_Engine", "StrategyBuilder")
@@ -2125,17 +2158,17 @@ class WindowGeometryMixin:
                     )
                     self._center_on_primary(default_w, default_h)
 
-                _wg_log.debug("[MIXIN MAXIMIZE] %s: setting WindowMaximized before show", key)
-                self.setWindowState(self.windowState() | _Qt.WindowMaximized)
+                # Defer setWindowState to after super().showEvent() so the WM
+                # receives the request on a mapped window (BTCAAAAA-26202).
+                self._maximize_requested = True
                 self._geometry_restored = True
 
         super().showEvent(event)
 
-        if getattr(self, "_geometry_restored", False) and not self.isMaximized():
+        if getattr(self, "_maximize_requested", False):
             import logging as _logging
-            _logging.getLogger("WindowGeometry").warning(
-                "[MIXIN MAX FALLBACK] %s: isMaximized=False after showEvent, calling showMaximized()",
-                self.GEOMETRY_SETTINGS_KEY,
-            )
-            self.showMaximized()
+            _wg_log = _logging.getLogger("WindowGeometry")
+            _wg_log.debug("[MIXIN MAXIMIZE] %s: setting WindowMaximized after show", key)
+            self.setWindowState(self.windowState() | _Qt.WindowMaximized)
+            self._maximize_requested = False
 

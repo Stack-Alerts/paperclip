@@ -152,7 +152,7 @@ class TestChangeEventFallback:
         """changeEvent must call super().changeEvent(event)."""
         src = _src("styles.py")
         change_start = src.index("def changeEvent(self, event):")
-        change_body = src[change_start:change_start + 3000]
+        change_body = src[change_start:change_start + 4000]
         assert "super().changeEvent(event)" in change_body, (
             "changeEvent must call super().changeEvent(event)"
         )
