@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-14T06:34:21.779653+00:00",
+  "timestamp": "2026-05-14T10:03:33.167667+00:00",
   "touch_index_fr": {
     "pass": true,
     "coverage_pct": 95.2,
@@ -11,7 +11,7 @@
     ],
     "total_rows": 150,
     "stale_rows": 0,
-    "max_age_hours": 41.9,
+    "max_age_hours": 45.4,
     "null_owner_rows": 0,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
@@ -23,11 +23,11 @@
   },
   "touch_index_bug": {
     "pass": true,
-    "coverage_pct": 29.4,
-    "indexed": 1029,
-    "total": 3496,
+    "coverage_pct": 38.3,
+    "indexed": 1397,
+    "total": 3651,
     "coverage_eligible_pct": 96.9,
-    "eligible_total": 1019,
+    "eligible_total": 1040,
     "missing_eligible_count": 32,
     "missing_eligible_identifiers": [
       "BTCAAAAA-1166",
@@ -63,10 +63,10 @@
       "BTCAAAAA-7381",
       "BTCAAAAA-907"
     ],
-    "missing_total_count": 2472,
-    "total_rows": 2533,
+    "missing_total_count": 2242,
+    "total_rows": 3240,
     "stale_rows": 0,
-    "max_age_hours": 28.2,
+    "max_age_hours": 31.8,
     "null_closed_at_rows": 4,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
