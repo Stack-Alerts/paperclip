@@ -1,0 +1,24 @@
+[Unit]
+Description=ITM Binance Testnet Paper Trading Dry Run (Section H.2)
+Documentation=https://github.com/anomalyco/BTC-Trade-Engine-PaperClip
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/sirrus/projects/BTC-Trade-Engine-PaperClip/venv/bin/python \
+    /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/run_testnet_dry_run.py \
+    --min-hours 72 \
+    --status-interval 900
+WorkingDirectory=/home/sirrus/projects/BTC-Trade-Engine-PaperClip
+Restart=on-failure
+RestartSec=30
+StandardOutput=append:/home/sirrus/projects/BTC-Trade-Engine-PaperClip/logs/dry_run/systemd-stdout.log
+StandardError=append:/home/sirrus/projects/BTC-Trade-Engine-PaperClip/logs/dry_run/systemd-stderr.log
+Environment=PYTHONPATH=/home/sirrus/projects/BTC-Trade-Engine-PaperClip
+Environment=HOME=/home/sirrus
+Environment=PATH=/home/sirrus/projects/BTC-Trade-Engine-PaperClip/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=ITM_PAPER_TRADING=true
+
+[Install]
+WantedBy=default.target

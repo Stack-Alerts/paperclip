@@ -1,0 +1,28 @@
+# ITM Configuration — Binance Testnet Paper Trading Deployment
+# =============================================================
+# Layer: base_config (merged with env defaults + env vars + runtime overrides)
+# Environment: test (ITMConfigLoader.load(env=Environment.TEST))
+# 
+# Usage:
+#   from src.itm.domain.config import ITMConfigLoader, Environment
+#   loader = ITMConfigLoader()
+#   config = loader.load_from_yaml("deploy/itm_testnet_config.yaml", Environment.TEST)
+
+exchange: "binance"
+symbol: "BTC/USDT"
+capital_base: "1000.00"
+paper_trading: true
+
+risk:
+  max_drawdown_pct: "0.05"
+  max_position_qty: "0.01"
+  heat_limit: "2.0"
+  max_daily_loss: "50.00"
+  max_leverage: "1.0"
+
+execution:
+  max_submit_retries: 1
+  retry_delay_ms: 100
+  order_timeout_ms: 2000
+  post_only: false
+  slippage_tolerance_bps: 50

@@ -12,4 +12,5 @@ __all__ = [
     'strategy_08_micro_trend_scalping',
     'strategy_09_order_flow_scalping',
     'strategy_15_bollinger_mean_reversion',
+    'paper_trading_strategy',
 ]
