@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-14T11:09:56.144301+00:00",
+  "timestamp": "2026-05-14T13:53:00.833103+00:00",
   "touch_index_fr": {
     "pass": true,
     "coverage_pct": 95.2,
@@ -23,11 +23,11 @@
   },
   "touch_index_bug": {
     "pass": true,
-    "coverage_pct": 38.7,
-    "indexed": 1435,
-    "total": 3705,
+    "coverage_pct": 38.9,
+    "indexed": 1452,
+    "total": 3728,
     "coverage_eligible_pct": 97.0,
-    "eligible_total": 1050,
+    "eligible_total": 1056,
     "missing_eligible_count": 32,
     "missing_eligible_identifiers": [
       "BTCAAAAA-1166",
@@ -63,19 +63,19 @@
       "BTCAAAAA-7381",
       "BTCAAAAA-907"
     ],
-    "missing_total_count": 2274,
-    "total_rows": 3295,
+    "missing_total_count": 2276,
+    "total_rows": 3322,
     "stale_rows": 0,
-    "max_age_hours": 33.0,
+    "max_age_hours": 33.5,
     "null_closed_at_rows": 4,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
     "duplicate_pairs": 0,
     "orphan_count": 0,
     "source_distribution": {
-      "comments": 620,
-      "description": 342,
-      "git": 2333
+      "comments": 629,
+      "description": 352,
+      "git": 2341
     }
   }
 }
