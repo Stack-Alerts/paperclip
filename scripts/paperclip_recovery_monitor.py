@@ -33,7 +33,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from touch_index.paperclip_client import _session as api_session, _base, _company
+from touch_index.paperclip_client import _base, _company
 
 MONITOR_LOG = Path.home() / ".paperclip" / "recovery_monitor.log"
 RECOVERY_STATE_FILE = Path.home() / ".paperclip" / "recovery_monitor_state.json"
