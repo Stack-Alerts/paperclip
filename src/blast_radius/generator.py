@@ -14,7 +14,7 @@ import logging
 import os
 from typing import Sequence
 
-from touch_index.paperclip_client import _session, _base, get_issue_by_id
+from touch_index.paperclip_client import _session, _board_session, _base, get_issue_by_id
 
 from .query import query_blast_radius, to_json_dict
 from .report import render_report, extract_touched_files
@@ -64,7 +64,7 @@ def _post_comment(issue_id: str, body: str) -> None:
     except Exception:
         pass
 
-    with _session() as sess:
+    with _board_session() as sess:
         sess.headers.update(_run_headers())
         resp = sess.post(
             f"{_base()}/api/issues/{issue_id}/comments",
