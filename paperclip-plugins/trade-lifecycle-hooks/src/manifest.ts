@@ -1,11 +1,12 @@
 // src/manifest.ts
 // Plugin manifest for @frenocorp/trade-lifecycle-hooks
 // See ADR-0005 for full architecture.
+// Phase 2: real exchange health probe (multi-exchange) and risk limit query.
 
 const manifest = {
   id: "paperclip-plugin-trade-lifecycle",
   apiVersion: 1 as const,
-  version: "0.1.0",
+  version: "0.2.0",
   displayName: "Trade Lifecycle Hooks",
   author: "FrenoCorp",
   description:
@@ -19,6 +20,7 @@ const manifest = {
     "plugin.state.write",
     "http.outbound",
     "secrets.read-ref",
+    "database.namespace.default",
     "issues.read",
     "issues.create",
     "issues.update",
@@ -27,6 +29,11 @@ const manifest = {
   ],
   entrypoints: {
     worker: "./dist/worker.js",
+  },
+  database: {
+    namespaceSlug: "trade_lifecycle",
+    migrationsDir: "migrations",
+    coreReadTables: ["heartbeat_runs", "issues"],
   },
   instanceConfigSchema: {
     type: "object",
@@ -46,16 +53,70 @@ const manifest = {
         enum: ["basic", "strict"],
         default: "basic",
       },
+      exchanges: {
+        type: "array",
+        title: "Exchange Endpoints",
+        description:
+          "Exchange configuration for health probes. Each entry defines a connectivity check target.",
+        default: [
+          {
+            name: "binance-testnet",
+            healthEndpoint: "https://testnet.binancefuture.com/fapi/v1/ping",
+            timeoutMs: 5000,
+          },
+        ],
+        items: {
+          type: "object",
+          required: ["name", "healthEndpoint"],
+          properties: {
+            name: {
+              type: "string",
+              title: "Exchange Name",
+              description: "Identifier for this exchange (e.g. binance-mainnet).",
+            },
+            healthEndpoint: {
+              type: "string",
+              title: "Health Check Endpoint",
+              description: "HTTP endpoint to verify exchange connectivity.",
+            },
+            timeoutMs: {
+              type: "number",
+              title: "Timeout (ms)",
+              description: "Request timeout in milliseconds.",
+              default: 5000,
+            },
+            expectedStatus: {
+              type: "number",
+              title: "Expected HTTP Status",
+              description: "Expected HTTP status code for a healthy exchange.",
+              default: 200,
+            },
+          },
+        },
+      },
       exchangeHealthEndpoint: {
         type: "string",
-        title: "Exchange Health Endpoint",
-        description: "HTTP endpoint to verify exchange connectivity.",
-        default: "https://testnet.binancefuture.com/fapi/v1/ping",
+        title: "Exchange Health Endpoint (deprecated)",
+        description:
+          "Use `exchanges` array instead. This single-field form is kept for backward compatibility.",
+        default: "",
       },
       exchangeHealthTimeoutMs: {
         type: "number",
-        title: "Exchange Health Check Timeout (ms)",
+        title: "Exchange Health Check Timeout (ms) (deprecated)",
+        description: "Use `exchanges[].timeoutMs` instead. Per-exchange timeouts take precedence.",
         default: 5000,
+      },
+      riskDataEndpoint: {
+        type: "string",
+        title: "Risk Data API Endpoint (optional)",
+        description:
+          "HTTP endpoint for live risk data queries. When configured, risk snapshots will be fetched from this endpoint in addition to plugin state. Format: GET {endpoint} returns { heatRatio, dailyPnl, positionSizeBtc, ... }.",
+      },
+      riskDataEndpointTimeoutMs: {
+        type: "number",
+        title: "Risk Data Endpoint Timeout (ms)",
+        default: 3000,
       },
       riskLimits: {
         type: "object",
@@ -115,13 +176,13 @@ const manifest = {
       name: "trade_check_exchange",
       displayName: "Check Exchange Connectivity",
       description:
-        "Verify that the configured exchange is reachable and responding.",
+        "Verify that the configured exchange(s) are reachable and responding. Returns health status for all exchanges, or a specific one by name.",
       parametersSchema: {
         type: "object",
         properties: {
           exchange: {
             type: "string",
-            description: "Exchange name (defaults to configured primary)",
+            description: "Exchange name to check (defaults to all configured exchanges)",
           },
         },
       },
@@ -130,7 +191,7 @@ const manifest = {
       name: "trade_check_risk_limits",
       displayName: "Check Risk Limits",
       description:
-        "Check current risk metrics: account heat ratio, daily PnL, position size against configured limits.",
+        "Check current risk metrics: account heat ratio, daily PnL, position size against configured limits. Identifies breaches by severity (WARNING / CRITICAL).",
       parametersSchema: {
         type: "object",
         properties: {},
