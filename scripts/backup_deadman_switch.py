@@ -5,7 +5,7 @@ Reads ``last-success.json`` from the PaperClip instance backup-state directory
 and fires a Paperclip alert issue if the last successful backup exceeds the
 threshold (interval + grace period).
 
-Expected to run every 30 minutes via GitHub Actions or systemd timer.
+Expected to run every 30 minutes via systemd timer (deploy/systemd/paperclip-backup-deadman-switch.{service,timer}).
 
 Usage:
     python scripts/backup_deadman_switch.py              # normal run

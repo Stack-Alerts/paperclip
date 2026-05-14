@@ -302,7 +302,7 @@ python scripts/manage_migrations.py history
 
 **Owner:** AutomationEngineer
 **Scripts:** `~/.paperclip/scripts/backup-to-drive.sh` (main)
-**Monitor:** `.github/workflows/backup-deadman-switch.yml` (runs every 30 min)
+**Monitor:** `deploy/systemd/paperclip-backup-deadman-switch.{service,timer}` (systemd timer, every 30 min)
 **State file:** `~/.paperclip/instances/default/backup-state/last-success.json`
 
 ### 6.1 Overview
@@ -407,14 +407,16 @@ rclone config reconnect gdrive:
 
 The dead-man switch monitors backup liveness:
 
-- **Workflow:** `.github/workflows/backup-deadman-switch.yml`
+- **Systemd service:** `deploy/systemd/paperclip-backup-deadman-switch.service`
+- **Systemd timer:** `deploy/systemd/paperclip-backup-deadman-switch.timer`
 - **Interval:** Every 30 min
 - **Threshold:** 4h (backup interval) + 8h (grace) = 12h since last success
 - **Action:** Creates a critical Paperclip issue assigned to CTO if backup is overdue
 - **State file:** `~/.paperclip/instances/default/backup-state/last-success.json`
 - **Self-health state:** `~/.paperclip/backup_deadman_switch_state.json` (tracks total runs, last run, last alert)
 - **Log file:** `~/.paperclip/backup_deadman_switch.log` (auto-rotated at 1 MB)
-- **CI step summary:** Workflow writes a step summary with backup age, threshold, and self-health metrics
+- **Install:** `deploy/systemd/install-backup-deadman-switch.sh`
+- **Journal:** `journalctl --user -u paperclip-backup-deadman-switch.service -n 20`
 
 Manual dead-man check:
 
@@ -456,7 +458,8 @@ The dead-man switch monitor watches the backup dead-man's-switch itself.
 It runs on GitHub-hosted runners (`ubuntu-latest`) to avoid being affected
 by the same self-hosted runner failures it monitors.
 
-- **Workflow:** `.github/workflows/deadman-switch-monitor.yml`
+- **Systemd service:** `deploy/systemd/paperclip-backup-deadman-monitor.service`
+- **Systemd timer:** `deploy/systemd/paperclip-backup-deadman-monitor.timer`
 - **Interval:** Every 30 min (at :15 and :45, offset from the dead-man switch)
 - **Threshold:** 45 min since last successful dead-man-switch run
 - **Runner:** `ubuntu-latest` (GitHub-hosted, **not** self-hosted)
@@ -534,9 +537,9 @@ pytest tests/test_scripts/test_deadman_switch_local_monitor.py -v
 | Timer not firing | `systemctl --user status paperclip-backup.timer` — check linger: `loginctl show-user sirrus --property=Linger` |
 | Dead-man alert fired | Backup overdue >12h. Run manual backup, then check dead-man log: `~/.paperclip/backup_deadman_switch.log` |
 | Dead-man log rotated unexpectedly | Check `~/.paperclip/backup_deadman_switch.log.1` for the rotated content |
-| Dead-man self-health shows old last_run_utc | The GH Actions workflow may have stopped. Check `~/.paperclip/backup_deadman_switch_state.json` and verify the CI schedule is active |
+| Dead-man self-health shows old last_run_utc | The systemd timer may have stopped. Check `systemctl --user status paperclip-backup-deadman-switch.timer`. Verify `~/.paperclip/backup_deadman_switch_state.json` has recent `last_run_utc`. Check linger: `loginctl show-user sirrus --property=Linger` |
 | Dead-man switch local monitor alert fired | The dead-man switch state file is stale or missing. Check `~/.paperclip/backup_deadman_switch_state.json` for `last_run_utc`. Check monitor log: `~/.paperclip/deadman_switch_local_monitor.log`. The local monitor runs via systemd: `systemctl --user status paperclip-deadman-monitor.timer` |
-| Dead-man switch monitor alert fired | The dead-man's-switch itself is not running. Check GitHub Actions for `backup-deadman-switch.yml` run history. The self-hosted runner may be down. Check monitor log: `~/.paperclip/deadman_switch_monitor.log` |
+| Dead-man switch monitor alert fired | The dead-man's-switch itself is not running. Check systemd timer: `systemctl --user status paperclip-backup-deadman-switch.timer`. Check journal: `journalctl --user -u paperclip-backup-deadman-switch.service -n 20`. The systemd user session may have stopped. Verify linger: `loginctl show-user sirrus --property=Linger`. Check monitor log: `~/.paperclip/deadman_switch_monitor.log` |
 | Service fails with "status=216/GROUP" | Remove any `User=` directive from the service unit — it's redundant in `systemctl --user` and causes GROUP permission errors. Also ensure `WantedBy=default.target` (not `multi-user.target`) for user units. |
 | Timer not firing despite being enabled | Run `loginctl show-user sirrus --property=Linger` — must be `yes`. If `no`: `sudo loginctl enable-linger sirrus`. |
 | | Lock held (flock) | Stale lock file: `rm /tmp/paperclip-backup.lock` |

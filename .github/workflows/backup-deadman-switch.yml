@@ -1,8 +1,11 @@
+# REPLACED by systemd timer (deploy/systemd/paperclip-backup-deadman-switch.{service,timer}).
+# Schedule removed to eliminate GH Actions self-hosted runner dependency.
+# Manual dispatch retained for on-demand runs.
+# See docs/runbook-backup-restore.md for systemd timer ops.
+
 name: Backup Dead-Man's-Switch
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:
