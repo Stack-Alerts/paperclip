@@ -6,14 +6,19 @@ tests run offline without a PostgreSQL instance or network.
 
 from __future__ import annotations
 
+import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
 import pytest
 
 from touch_index.bug_worker import (
     BugIngestionResult,
+    _load_unindexable_ids,
+    _save_unindexable_ids,
     _parse_completed_at,
+    _set_catchup_tracker_path,
     catch_up_eligible_bug_issues,
     ingest_bug_issue,
     process_bug_issue,
@@ -1030,9 +1035,7 @@ class TestMain:
                 "touch_index.paperclip_client.get_closed_non_fdr_issues"
             ) as mock_fetch,
         ):
-            monkeypatch.setattr(
-                "sys.argv", ["touch_index", "--json-summary"]
-            )
+            monkeypatch.setattr("sys.argv", ["touch_index", "--json-summary"])
             with pytest.raises(SystemExit) as exc_info:
                 main()
 
@@ -1281,7 +1284,6 @@ class TestMain:
         # Only the worker result should be transitioned, not the catch-up result
         mock_transition.assert_called_once_with("id-1", "done")
 
-
     def test_main_no_issues_catch_up_error_logged(self, monkeypatch, caplog):
         """When catch_up_eligible_bug_issues raises, error is logged and worker continues."""
         import logging
@@ -1307,8 +1309,9 @@ class TestMain:
             main()
 
         mock_worker.assert_not_called()
-        assert any("Catch-up eligible bug issues failed" in r.message for r in caplog.records)
-
+        assert any(
+            "Catch-up eligible bug issues failed" in r.message for r in caplog.records
+        )
 
     def test_main_polling_catch_up_error_logged(self, monkeypatch, caplog):
         """Polling path: catch_up_eligible_bug_issues raises, error logged, worker continues."""
@@ -1357,7 +1360,9 @@ class TestMain:
             monkeypatch.setattr("sys.argv", ["touch_index"])
             main()
 
-        assert any("Catch-up eligible bug issues failed" in r.message for r in caplog.records)
+        assert any(
+            "Catch-up eligible bug issues failed" in r.message for r in caplog.records
+        )
         mock_transition.assert_called_once_with("id-1", "done")
 
     def test_main_catch_up_dry_run(self, monkeypatch):
@@ -3093,6 +3098,18 @@ class TestEmitJsonSummaryRequiresWorker:
 class TestCatchUpEligibleBugIssues:
     """Tests for catch_up_eligible_bug_issues()."""
 
+    def setup_method(self) -> None:
+        """Create an empty unindexable tracker file to isolate from test artifacts on disk."""
+        self._tmp_unindexable = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        )
+        self._tmp_unindexable.write("[]\n")
+        self._tmp_unindexable.close()
+        _set_catchup_tracker_path(Path(self._tmp_unindexable.name))
+
+    def teardown_method(self) -> None:
+        Path(self._tmp_unindexable.name).unlink(missing_ok=True)
+
     def test_catch_up_indexes_missing_eligible_issues(self):
         """Issues referenced in git but not in DB are indexed."""
         engine, conn = _mock_engine()
@@ -3333,8 +3350,6 @@ class TestCatchUpEligibleBugIssues:
         assert len(results) == 1
         assert results[0].issue_identifier == other_id
 
-
-
     def test_catch_up_fetches_description_when_list_endpoint_omits_it(self):
         """When list endpoint omits description, catch-up fetches full issue and retries."""
         engine, conn = _mock_engine()
@@ -3447,3 +3462,243 @@ class TestCatchUpEligibleBugIssues:
         assert len(results) == 1
         assert results[0].source == "none"
         assert results[0].skipped_no_commits is True
+
+
+# ---------------------------------------------------------------------------
+# _load_unindexable_ids / _save_unindexable_ids — tracker file I/O
+# ---------------------------------------------------------------------------
+
+
+class TestUnindexableTrackerIO:
+    def test_save_and_load_roundtrip(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            tmp = Path(f.name)
+        try:
+            _set_catchup_tracker_path(tmp)
+            _save_unindexable_ids({"BTCAAAAA-1", "BTCAAAAA-2"})
+            loaded = _load_unindexable_ids()
+            assert loaded == {"BTCAAAAA-1", "BTCAAAAA-2"}
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def test_load_empty_set_from_empty_file(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            f.write("[]\n")
+            tmp = Path(f.name)
+        try:
+            _set_catchup_tracker_path(tmp)
+            loaded = _load_unindexable_ids()
+            assert loaded == set()
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def test_load_returns_empty_for_nonexistent_file(self):
+        tmp = Path("/tmp/nonexistent_unindexable_test.json")
+        tmp.unlink(missing_ok=True)
+        _set_catchup_tracker_path(tmp)
+        loaded = _load_unindexable_ids()
+        assert loaded == set()
+
+    def test_load_returns_empty_for_empty_file(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            tmp = Path(f.name)
+        try:
+            _set_catchup_tracker_path(tmp)
+            loaded = _load_unindexable_ids()
+            assert loaded == set()
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def test_load_handles_corrupt_json_gracefully(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            f.write("{not-json")
+            tmp = Path(f.name)
+        try:
+            _set_catchup_tracker_path(tmp)
+            loaded = _load_unindexable_ids()
+            assert loaded == set()
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def test_save_empty_set_writes_empty_list(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            tmp = Path(f.name)
+        try:
+            _set_catchup_tracker_path(tmp)
+            _save_unindexable_ids(set())
+            raw = tmp.read_text().strip()
+            assert raw == "[]"
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def test_save_replaces_previous_content(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            f.write('["old-id"]\n')
+            tmp = Path(f.name)
+        try:
+            _set_catchup_tracker_path(tmp)
+            _save_unindexable_ids({"BTCAAAAA-99"})
+            loaded = _load_unindexable_ids()
+            assert loaded == {"BTCAAAAA-99"}
+        finally:
+            tmp.unlink(missing_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# catch_up_eligible_bug_issues — unindexable tracking
+# ---------------------------------------------------------------------------
+
+
+class TestCatchUpUnindexableTracking:
+    def setup_method(self) -> None:
+        self._tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+        self._tmp.write("[]\n")
+        self._tmp.close()
+        _set_catchup_tracker_path(Path(self._tmp.name))
+
+    def teardown_method(self) -> None:
+        Path(self._tmp.name).unlink(missing_ok=True)
+
+    def test_skips_previously_unindexable_issues(self):
+        engine, conn = _mock_engine()
+        done_issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
+        }
+        _save_unindexable_ids({ISSUE_IDENTIFIER})
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+                return_value=done_issue,
+            ) as mock_get,
+            patch("touch_index.bug_worker.get_files_for_issue") as mock_git,
+        ):
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = []
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert len(results) == 0
+        mock_get.assert_not_called()
+        mock_git.assert_not_called()
+
+    def test_records_newly_unindexable_issues(self):
+        engine, conn = _mock_engine()
+        done_issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+                return_value=done_issue,
+            ),
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = []
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert len(results) == 1
+        assert results[0].source == "none"
+        assert results[0].skipped_no_commits is True
+        loaded = _load_unindexable_ids()
+        assert ISSUE_IDENTIFIER in loaded
+
+    def test_does_not_record_indexable_as_unindexable(self):
+        engine, conn = _mock_engine()
+        done_issue = {
+            "id": ISSUE_ID,
+            "identifier": ISSUE_IDENTIFIER,
+            "status": "done",
+            "completedAt": "2026-05-11T12:00:00Z",
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+                return_value=done_issue,
+            ),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/ok.py"],
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = []
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert len(results) == 1
+        assert results[0].source == "git"
+        loaded = _load_unindexable_ids()
+        assert ISSUE_IDENTIFIER not in loaded
+
+    def test_accumulates_over_multiple_catch_up_runs(self):
+        engine, conn = _mock_engine()
+        other_id = "BTCAAAAA-999"
+        other_issue = {
+            "id": "cccccccc-0000-0000-0000-999999999999",
+            "identifier": other_id,
+            "status": "done",
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER, other_id},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+                side_effect=lambda i: (
+                    {"id": ISSUE_ID, "identifier": ISSUE_IDENTIFIER, "status": "done"}
+                    if i == ISSUE_IDENTIFIER
+                    else other_issue
+                ),
+            ),
+            patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = []
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert len(results) == 2
+        loaded = _load_unindexable_ids()
+        assert ISSUE_IDENTIFIER in loaded
+        assert other_id in loaded
+
+        # Second run: both are now in tracker, so nothing to process
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER, other_id},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+            ) as mock_get,
+            patch("touch_index.bug_worker.get_files_for_issue") as mock_git,
+        ):
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = []
+            results2 = catch_up_eligible_bug_issues(engine)
+
+        assert len(results2) == 0
+        mock_get.assert_not_called()
+        mock_git.assert_not_called()
