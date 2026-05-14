@@ -2641,32 +2641,15 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
                 )
                 return
             
-            # Find all log files
-            log_files = list(logs_dir.rglob('*.log'))
-            
-            if not log_files:
-                QMessageBox.information(
-                    self,
-                    "No Logs Found",
-                    "No log files found in logs directory."
-                )
-                return
-            
-            # Sort by modification time (newest first)
-            log_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
-            
-            # Get the newest log file
-            newest_log = log_files[0]
-            
-            # Create and show log viewer window
-            self.log_viewer_window = LogViewerWindow(newest_log, self)
+            # Create and show log viewer window (background worker handles scanning + content loading)
+            self.log_viewer_window = LogViewerWindow(parent=self)
             
             # Clear reference when window is destroyed
             self.log_viewer_window.destroyed.connect(lambda: setattr(self, 'log_viewer_window', None))
             
             self.log_viewer_window.show()
             
-            self._update_status(f"Opened log viewer: {newest_log.name}")
+            self._update_status("Opened log viewer")
             
         except Exception as e:
             QMessageBox.critical(

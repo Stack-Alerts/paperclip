@@ -418,6 +418,8 @@ class LogLoadRunnable(QRunnable):
             tabs.append(TabMetadata("🤖 AI Recommendations", [ai_log]))
 
         focused_tab = 0
+        if self.current_log_file is None and capped_all:
+            self.current_log_file = capped_all[0]
         if self.current_log_file is not None and self.current_log_file.exists():
             cname = self.current_log_file.name
             if cname in ("ai_recommendations.log", "test_ai_recommendations.log"):
@@ -729,7 +731,8 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
             if focused_tab < self.tabs.count():
                 self.tabs.setCurrentIndex(focused_tab)
 
-            self._activate_tab(focused_tab)
+            # _activate_tab not called explicitly — setCurrentIndex above triggers
+            # _on_tab_changed which dispatches background loading via _activate_tab.
             self._restore_last_tab()
         except RuntimeError:
             pass
