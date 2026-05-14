@@ -28,6 +28,7 @@ Usage
 
 from __future__ import annotations
 
+import atexit
 import json
 import logging
 import sys
@@ -103,6 +104,7 @@ def _run_bug_cli() -> None:
     report: Any | None = None
 
     engine = get_engine()
+    atexit.register(engine.dispose)
     if not health_check(engine):
         logger.error("DB health check failed \u2014 aborting")
         if args.json_summary:
@@ -416,6 +418,7 @@ def _run_fr_cli() -> None:
     report: Any | None = None
 
     engine = get_engine()
+    atexit.register(engine.dispose)
     if not health_check(engine):
         logger.error("DB health check failed \u2014 aborting")
         if args.json_summary:
