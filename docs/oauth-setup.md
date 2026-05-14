@@ -10,14 +10,17 @@ This document describes how to obtain, configure, and rotate credentials for all
 
 ### Service Credential Map
 
-| Service | Purpose | Env Variables | Security Level |
-|---------|---------|---------------|----------------|
+| Service | Purpose | Env Variables / File | Security Level |
+|---------|---------|---------------------|----------------|
 | LakeAPI | BTC/USDT market data via S3 | `LAKEAPI_KEY`, `LAKEAPI_SECRET`, `LAKEAPI_REGION` | Confidential |
 | Binance Testnet | Paper trading / integration tests | `BINANCE_TESTNET_API_KEY`, `BINANCE_TESTNET_API_SECRET` | Internal |
 | Binance Mainnet | Live production trading | `BINANCE_MAINNET_API_KEY`, `BINANCE_MAINNET_API_SECRET` | **Critical** |
 | OpenRouter | AI-enhanced recommendations | `OPENROUTER_API_KEY` | Confidential |
 | Paperclip API | Touch Index, Blast Radius, Impact Gate workers | `PAPERCLIP_API_KEY`, `PAPERCLIP_COMPANY_ID` | Confidential |
 | PostgreSQL | Strategy database | `POSTGRES_USER`, `POSTGRES_PASSWORD` | Confidential |
+| rclone GDrive | Backup uploads to Google Drive | `~/.config/rclone/rclone.conf` | Confidential |
+
+**Note:** rclone OAuth tokens are stored in `~/.config/rclone/rclone.conf` (not in `.env`). See [rclone OAuth Setup](../OAUTH_SETUP.md) for setup details.
 
 ---
 
@@ -240,9 +243,92 @@ AI_READONLY_PASSWORD=change_me_ai_readonly
 
 ---
 
-## 6. Security Best Practices
+## 6. rclone Google Drive OAuth
 
-### 6.1 .env File Security
+**Required for:** Backup uploads to Google Drive via `backup-to-drive.sh`.
+
+The rclone OAuth token enables the PaperClip server to upload backups to a dedicated Google Drive folder (`Paperclip-Backups/`). It uses least-privilege `drive.file` scope.
+
+### 6.1 Token Storage
+
+Unlike other credentials stored in `.env`, the rclone OAuth token is stored in `~/.config/rclone/rclone.conf`:
+
+```ini
+[gdrive]
+type = drive
+scope = drive.file
+token = {"access_token":"...","refresh_token":"...","expiry":"..."}
+```
+
+The token file must be protected:
+```bash
+chmod 600 ~/.config/rclone/rclone.conf
+```
+
+### 6.2 Token Lifecycle
+
+| Token Component | Lifetime | Auto-Renewal |
+|----------------|----------|--------------|
+| Access token | ~1 hour | Auto-refreshed by rclone via refresh token |
+| Refresh token | Indefinite (unless revoked) | Only regenerated via OAuth re-auth |
+| OAuth app consent | Until revoked by user | Manual re-auth if revoked at https://myaccount.google.com/permissions |
+
+### 6.3 Initial Setup
+
+Follow the step-by-step guide in `docs/OAUTH_SETUP.md`:
+
+```bash
+# Run the bootstrap script (interactive — requires browser)
+/home/sirrus/.paperclip/scripts/rclone-bootstrap.sh
+```
+
+### 6.4 Rotation
+
+Scheduled rotation (every 180 days):
+```bash
+# 1. Check current auth status
+~/.paperclip/scripts/rclone-headless-auth.sh --check
+
+# 2. If token is missing or expired, re-run bootstrap
+/home/sirrus/.paperclip/scripts/rclone-bootstrap.sh
+
+# 3. Verify connectivity
+rclone lsd gdrive:Paperclip-Backups/
+
+# 4. Run a manual backup to confirm
+/home/sirrus/.paperclip/scripts/backup-to-drive.sh
+```
+
+Incident response (compromised token):
+1. Revoke "rclone" app access at https://myaccount.google.com/permissions
+2. Clear the existing remote: `rclone config delete gdrive`
+3. Re-run bootstrap: `/home/sirrus/.paperclip/scripts/rclone-bootstrap.sh`
+4. Verify connectivity
+
+### 6.5 Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| `Token expired` | Re-run `rclone-bootstrap.sh` and re-authorize |
+| `Failed to create file system` | Check `~/.config/rclone/rclone.conf` exists and is readable |
+| `Remote 'gdrive' already configured` | Say `y` to reconfigure, or run `rclone config delete gdrive` first |
+| `rclone: not found` | `sudo apt install rclone` |
+| Quota exceeded | Clean up old backups or upgrade Google Drive storage |
+
+### 6.6 References
+
+- `docs/OAUTH_SETUP.md` — Board one-pager for initial OAuth setup
+- `docs/runbook-backup-restore.md` — Full backup/restore procedures
+- `docs/runbooks/key-rotation.md` — Credential rotation schedule and runbook
+- `~/.paperclip/scripts/rclone-bootstrap.sh` — Interactive OAuth setup script
+- `~/.paperclip/scripts/rclone-headless-auth.sh` — Headless token check/apply
+
+
+---
+
+## 7. Security Best Practices
+
+### 7.1 .env File Security
 
 ```bash
 # .env is already in .gitignore — verify
@@ -255,7 +341,7 @@ chmod 600 .env
 # Never paste .env contents into issues or chat
 ```
 
-### 6.2 Credential Rotation Schedule
+### 7.2 Credential Rotation Schedule
 
 | Credential | Rotation Frequency | Trigger |
 |------------|-------------------|---------|
@@ -265,8 +351,9 @@ chmod 600 .env
 | OpenRouter API key | Every 180 days | Calendar reminder |
 | Paperclip API key | Every 180 days | Calendar reminder |
 | PostgreSQL passwords | Every 180 days | Calendar reminder |
+| rclone GDrive OAuth token | Every 180 days | Calendar reminder — re-run `rclone-bootstrap.sh` |
 
-### 6.3 Incident Response: Leaked Credentials
+### 7.3 Incident Response: Leaked Credentials
 
 If credentials are accidentally exposed (e.g., committed to git, posted in chat):
 
@@ -281,7 +368,7 @@ If credentials are accidentally exposed (e.g., committed to git, posted in chat)
    ```
 4. **Notify** the CTO and Security Officer
 
-### 6.4 Environment Separation
+### 7.4 Environment Separation
 
 | Environment | Binance | Data Source | Risk Level |
 |-------------|---------|-------------|------------|
@@ -308,12 +395,15 @@ checks = {
     'OpenRouter': bool(os.getenv('OPENROUTER_API_KEY')),
     'Paperclip': all([os.getenv('PAPERCLIP_API_KEY'), os.getenv('PAPERCLIP_COMPANY_ID')]),
     'PostgreSQL': all([os.getenv('POSTGRES_USER'), os.getenv('POSTGRES_PASSWORD')]),
+    'rclone GDrive': os.path.isfile(os.path.expanduser('~/.config/rclone/rclone.conf')),
 }
 for name, ok in checks.items():
     status = '\033[92mOK\033[0m' if ok else '\033[91mMISSING\033[0m'
     print(f'  {status} {name}')
 "
 ```
+
+**Note:** The rclone GDrive check verifies that `~/.config/rclone/rclone.conf` exists. For a deeper check (token validity), run `~/.paperclip/scripts/rclone-headless-auth.sh --check`.
 
 ## Appendix B: .env Template Reference
 

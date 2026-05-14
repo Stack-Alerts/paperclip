@@ -26,16 +26,17 @@ Rotate credentials immediately when:
 
 ## Credential Inventory
 
-| Credential | Env Var(s) | Provider | Scope | Rotation Window |
-|------------|-----------|----------|-------|-----------------|
+| Credential | Env Var(s) / File | Provider | Scope | Rotation Window |
+|------------|-------------------|----------|-------|-----------------|
 | LakeAPI S3 (Crypto Lake) | `LAKEAPI_KEY`, `LAKEAPI_SECRET` | AWS IAM | S3 read for market data | 90 days |
 | Binance Testnet | `BINANCE_TESTNET_API_KEY`, `BINANCE_TESTNET_API_SECRET` | Binance | Futures testnet paper trading | 180 days |
 | Binance Mainnet | `BINANCE_MAINNET_API_KEY`, `BINANCE_MAINNET_API_SECRET` | Binance | Futures mainnet (CTO-gated) | 90 days |
 | PostgreSQL | `POSTGRES_PASSWORD`, `AI_READONLY_PASSWORD` | Local DB | Optimizer v3 database, AI read-only queries | 90 days |
 | Paperclip API | `PAPERCLIP_API_KEY` | Paperclip | Issue/board API automation | 90 days |
 | OpenRouter AI | `OPENROUTER_API_KEY` | OpenRouter | AI-enhanced recommendations | 90 days |
+| rclone GDrive OAuth | `~/.config/rclone/rclone.conf` | Google OAuth | Drive backup upload (`drive.file` scope) | 180 days (re-auth) |
 
-**Storage:** All credentials reside in `.env` at the project root. `.env` is in `.gitignore`. The file permissions MUST be `600` (`-rw-------`).
+**Storage:** All credentials reside in `.env` at the project root (or `~/.config/rclone/rclone.conf` for rclone OAuth). `.env` is in `.gitignore`. Both files MUST have permissions `600` (`-rw-------`).
 
 **Source code check:** No hardcoded credentials. All keys loaded via `os.environ.get()` or `os.getenv()`. Verified by `scripts/audit/secrets_audit.py`.
 
@@ -48,7 +49,7 @@ Rotate credentials immediately when:
 | Calendar Event | Credential | Action |
 |---------------|-----------|--------|
 | Every 90 days | LakeAPI, Binance Mainnet, PostgreSQL, Paperclip, OpenRouter | Standard rotation |
-| Every 180 days | Binance Testnet | Standard rotation |
+| Every 180 days | Binance Testnet, rclone GDrive OAuth | Standard rotation (re-run bootstrap) |
 | Team member departure | All credentials that member had access to | Immediate rotation |
 | Post-incident | Compromised credential only | Immediate rotation |
 
@@ -75,6 +76,7 @@ Before any scheduled rotation:
 | `AI_READONLY_PASSWORD` | `src/ai_consultant/` (read-only role for AI queries) |
 | `PAPERCLIP_API_KEY` | `src/touch_index/paperclip_client.py`, `scripts/run_touch_index_*_worker.py`, `scripts/lock_gate*.py` |
 | `OPENROUTER_API_KEY` | `src/optimizer_v3/core/ai_recommendation_enhancer.py`, `src/optimizer_v3/ui/ai_recommendations_panel.py` |
+| `~/.config/rclone/rclone.conf` | `~/.paperclip/scripts/backup-to-drive.sh`, `~/.paperclip/scripts/rclone-headless-auth.sh` |
 
 ---
 
@@ -382,6 +384,76 @@ The OpenRouter API key enables AI-enhanced strategy recommendations. If the key 
 
 ---
 
+
+---
+
+## rclone Google Drive OAuth Rotation
+
+The rclone OAuth token is used for uploading backups to Google Drive. The token is stored in `~/.config/rclone/rclone.conf` (NOT in `.env`).
+
+**Token lifecycle:**
+- Access token expires ~1 hour after issuance, but is auto-refreshed via the refresh token
+- The refresh token does not expire unless manually revoked at https://myaccount.google.com/permissions
+- Rotation is required when: the refresh token is revoked, a team member with Google Drive access leaves, or as a scheduled precaution
+
+### Scheduled Re-auth (180-day cycle)
+
+```bash
+# 1. Check current auth status
+~/.paperclip/scripts/rclone-headless-auth.sh --check
+
+# 2. If the token is missing or expired, re-run the bootstrap script
+/home/sirrus/.paperclip/scripts/rclone-bootstrap.sh
+
+# The bootstrap script will prompt for browser-based OAuth authorization.
+# On a headless server, copy the URL, open in a browser, authorize,
+# and paste the verification code back.
+
+# 3. Verify the remote is functional
+rclone listremotes
+# Expected: gdrive:
+
+rclone lsd gdrive:Paperclip-Backups/
+# Expected: empty or listing backup subdirectories
+
+# 4. Run a manual backup to confirm
+/home/sirrus/.paperclip/scripts/backup-to-drive.sh
+```
+
+### Incident Response: Compromised Token
+
+1. Revoke the rclone app access at https://myaccount.google.com/permissions
+2. Clear the existing token:
+   ```bash
+   rclone config delete gdrive
+   ```
+3. Re-run bootstrap:
+   ```bash
+   /home/sirrus/.paperclip/scripts/rclone-bootstrap.sh
+   ```
+4. Verify as above
+
+### File Protection
+
+```bash
+# rclone.conf contains OAuth tokens — protect it
+chmod 600 ~/.config/rclone/rclone.conf
+
+# Verify ownership
+ls -la ~/.config/rclone/rclone.conf
+# Expected: -rw------- 1 <user> <group> ...
+```
+
+### OAuth Credential Inventory
+
+| Item | Location | Notes |
+|------|----------|-------|
+| OAuth token (access + refresh) | `~/.config/rclone/rclone.conf` | Auto-refreshed; only manual action needed if revoked |
+| Bootstrap script | `~/.paperclip/scripts/rclone-bootstrap.sh` | Interactive — requires browser for OAuth |
+| Headless auth script | `~/.paperclip/scripts/rclone-headless-auth.sh` | For headless token check/apply |
+| Google Account permissions | https://myaccount.google.com/permissions | Revoke "rclone" app access here |
+
+
 ## Post-Rotation Verification (All Credentials)
 
 ### Automated Audit
@@ -414,6 +486,7 @@ After any credential rotation:
 | PostgreSQL | `python3 -c "from src.optimizer_v3.database.database_manager import DatabaseManager; print(DatabaseManager().test_connection())"` |
 | Paperclip | Touch index worker heartbeat check (verify it posts a comment) |
 | OpenRouter | Strategy Builder -> check AI recommendations panel loads without error |
+| rclone GDrive | `rclone lsd gdrive:Paperclip-Backups/` (lists backup directories) |
 
 ---
 
@@ -437,6 +510,7 @@ cp .env.bak.YYYYMMDD .env
 - **PostgreSQL:** `ALTER USER optimizer_admin WITH PASSWORD '<old_password>';`
 - **Paperclip:** Revoke new key, keep old key active
 - **OpenRouter:** Delete new key, keep old key active
+- **rclone GDrive:** `rclone config delete gdrive` then re-run `rclone-bootstrap.sh` with old token
 
 ### Step 3: Verify Rollback
 
@@ -470,3 +544,7 @@ After any credential rotation:
 - `scripts/audit/secrets_audit.py`: Automated credential scanner
 - `.github/workflows/lint.yml`: CI pipeline with secrets-audit gate
 - `.env.example`: Environment variable template (no real keys)
+- `docs/OAUTH_SETUP.md`: rclone Google Drive OAuth setup guide (board one-pager)
+- `docs/runbook-backup-restore.md`: Backup/restore runbook with rclone operations
+- `~/.paperclip/scripts/rclone-bootstrap.sh`: Interactive OAuth bootstrap script
+- `~/.paperclip/scripts/rclone-headless-auth.sh`: Headless token check/apply script
