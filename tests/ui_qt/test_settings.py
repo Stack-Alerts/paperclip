@@ -9,7 +9,7 @@ Run:
 """
 
 import pytest
-from PyQt5.QtWidgets import QTabWidget, QPushButton, QLineEdit
+from PyQt5.QtWidgets import QComboBox, QTabWidget, QPushButton, QLineEdit
 
 from src.strategy_builder.ui.settings_dialog import SettingsDialog
 from src.strategy_builder.ui.settings_service import USER_DEFAULTS
@@ -118,24 +118,24 @@ def test_settings_minimum_size(qtbot):
 
 @pytest.mark.qt_real
 def test_settings_ai_model_field_is_editable(qtbot):
-    """Happy path: AI_MODEL QLineEdit accepts typed input."""
+    """Happy path: AI_MODEL editable QComboBox accepts typed input."""
     dlg = SettingsDialog()
     qtbot.addWidget(dlg)
 
-    ai_field = dlg._plain_fields.get("AI_MODEL")
-    assert ai_field is not None, "_plain_fields['AI_MODEL'] QLineEdit not found"
+    ai_combo = dlg._combo_fields.get("AI_MODEL")
+    assert ai_combo is not None, "_combo_fields['AI_MODEL'] not found"
+    assert ai_combo.isEditable(), "AI_MODEL combo must be editable"
 
-    ai_field.clear()
-    qtbot.keyClicks(ai_field, "anthropic/claude-opus-4")
-
-    assert ai_field.text() == "anthropic/claude-opus-4"
+    ai_combo.setEditText("anthropic/claude-opus-4")
+    assert ai_combo.currentText() == "anthropic/claude-opus-4"
     qtbot.wait(200)
 
 
 @pytest.mark.qt_real
 def test_settings_save_persists_changed_value_via_stub(qtbot):
     """
-    Happy path: Changing AI_MODEL then saving stores the new value in the service.
+    Happy path: Changing AI_MODEL in the editable combo then saving stores
+    the new value in the service.
 
     The real SettingsService is replaced with a stub *before* _on_save() so
     no keyring or .env I/O occurs.  The test verifies the round-trip through
@@ -147,9 +147,8 @@ def test_settings_save_persists_changed_value_via_stub(qtbot):
     stub = _StubSettingsService()
     dlg._service = stub
 
-    ai_field = dlg._plain_fields["AI_MODEL"]
-    ai_field.clear()
-    ai_field.setText("anthropic/claude-test-model")
+    ai_combo = dlg._combo_fields["AI_MODEL"]
+    ai_combo.setEditText("anthropic/claude-test-model")
 
     dlg._on_save()
 
@@ -160,20 +159,20 @@ def test_settings_save_persists_changed_value_via_stub(qtbot):
 @pytest.mark.qt_real
 def test_settings_save_ignores_bullet_sentinel(qtbot):
     """
-    Error path: A field left as all-bullet mask (unchanged secret) must NOT
-    overwrite the stored value.
+    Error path: A plain-text field left as all-bullet mask (unchanged sentinel)
+    must NOT overwrite the stored value.
     """
     dlg = SettingsDialog()
     qtbot.addWidget(dlg)
 
-    stub = _StubSettingsService(initial={"AI_MODEL": "original-model"})
+    stub = _StubSettingsService(initial={"ALERT_EMAIL": "admin@example.com"})
     dlg._service = stub
 
-    ai_field = dlg._plain_fields["AI_MODEL"]
-    ai_field.setText("••••••••")  # simulate "unchanged" sentinel
+    alert_field = dlg._plain_fields["ALERT_EMAIL"]
+    alert_field.setText("••••••••")  # simulate "unchanged" sentinel
 
     dlg._on_save()
 
     # Bullet-only string must not overwrite the original
-    assert stub._store.get("AI_MODEL") == "original-model"
+    assert stub._store.get("ALERT_EMAIL") == "admin@example.com"
     qtbot.wait(200)

@@ -829,6 +829,7 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
             self._provider_combo.setCurrentIndex(idx)
         self._provider_combo.setFont(create_font(10))
         form.addRow(self._make_label("AI Provider:"), self._provider_combo)
+        self._combo_fields["AI_PROVIDER"] = self._provider_combo
 
         # Provider-specific fields stacked by index matching combo order
         self._provider_stack = QStackedWidget()
@@ -1595,6 +1596,7 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
 
         for key, field in self._plain_fields.items():
             user_values[key] = field.text().strip()
+
         for key, combo in self._combo_fields.items():
             user_values[key] = combo.currentText().strip()
 
