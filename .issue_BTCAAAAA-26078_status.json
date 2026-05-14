@@ -1,0 +1,11 @@
+{
+  "issue": "BTCAAAAA-26078",
+  "status": "done",
+  "summary": "Blast Radius worker — detect fix→in_review and post report: VERIFIED",
+  "tests": "204/204 PASS",
+  "lint": "ruff clean",
+  "dry_run": "verified — fetches 1 in_review issue, detects 0 fix transitions (correct, no fix issues currently in_review)",
+  "coverage": "src/blast_radius/worker.py 95%, generator.py 96%, query.py 100%, report.py 100%",
+  "changes_needed": "none — worker is feature-complete and CI/CD pipelines are healthy",
+  "completed_at": "2026-05-14T05:31:35Z"
+}
