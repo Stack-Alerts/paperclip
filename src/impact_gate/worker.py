@@ -693,10 +693,18 @@ def scan_done_issues(
     days_back: int | None = None,
     dry_run: bool = False,
     retroactive: bool = False,
+    retry_errors: bool = False,
+    retry_fails: bool = False,
 ) -> dict:
     from scan_fix_issues_done import scan as _scan_impl
 
-    return _scan_impl(days_back=days_back, dry_run=dry_run, retroactive=retroactive)
+    return _scan_impl(
+        days_back=days_back,
+        dry_run=dry_run,
+        retroactive=retroactive,
+        retry_errors=retry_errors,
+        retry_fails=retry_fails,
+    )
 
 
 if __name__ == "__main__":
@@ -748,6 +756,16 @@ if __name__ == "__main__":
         help="Only scan issues completed within the last N days (default: all, used with --poll)",
     )
     parser.add_argument(
+        "--retry-errors",
+        action="store_true",
+        help="Purge muted ERROR entries for fresh retroactive gate (used with --poll)",
+    )
+    parser.add_argument(
+        "--retry-fails",
+        action="store_true",
+        help="Purge muted FAIL entries for fresh retroactive gate (used with --poll)",
+    )
+    parser.add_argument(
         "--json-summary",
         action="store_true",
         help="Output structured JSON summary to stdout (used with --poll, one-shot mode)",
@@ -760,11 +778,13 @@ if __name__ == "__main__":
             sys.exit(2)
 
         log.info(
-            "Starting Impact Gate scan-done poll (interval=%ds, retroactive=%s, dry_run=%s, days_back=%s)",
+            "Starting Impact Gate scan-done poll (interval=%ds, retroactive=%s, dry_run=%s, days_back=%s, retry_errors=%s, retry_fails=%s)",
             args.poll_interval,
             args.retroactive,
             args.dry_run,
             args.days_back,
+            args.retry_errors,
+            args.retry_fails,
         )
 
         _shutdown = [False]
@@ -787,12 +807,16 @@ if __name__ == "__main__":
                     days_back=args.days_back,
                     dry_run=args.dry_run,
                     retroactive=args.retroactive,
+                    retry_errors=args.retry_errors,
+                    retry_fails=args.retry_fails,
                 )
                 if args.json_summary:
                     summary = {
                         "worker": "impact-gate-scan-done",
                         "dry_run": args.dry_run,
                         "retroactive": args.retroactive,
+                        "retry_errors": args.retry_errors,
+                        "retry_fails": args.retry_fails,
                         "days_back": args.days_back,
                         "timestamp": result.get("timestamp"),
                         "total_done_fix_issues": result.get("total_done_fix_issues"),
