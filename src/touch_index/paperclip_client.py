@@ -405,6 +405,15 @@ def transition_issue_status_board(issue_id: str, status: str) -> None:
             json={"status": status},
             timeout=30,
         )
+        if resp.status_code == 403:
+            logger.warning(
+                "transition_issue_status_board: board-level transition not "
+                "available for issue %s (status=%r) — insufficient permissions. "
+                "Data ingestion already complete.",
+                issue_id,
+                status,
+            )
+            return
         resp.raise_for_status()
 
 
