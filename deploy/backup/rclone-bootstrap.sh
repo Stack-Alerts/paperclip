@@ -6,7 +6,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 source "${SCRIPT_DIR}/_rclone_pass.sh"
 RCLONE_REMOTE="gdrive"
-RCLONE_DRIVE_SCOPE="drive.file"
+RCLONE_DRIVE_SCOPE="drive"
 RCLONE_CONFIG_FILE="${RCLONE_CONFIG:-$HOME/.config/rclone/rclone.conf}"
 PAPERCLIP_HOME="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -97,7 +97,7 @@ echo "Step 2: Verifying remote..."
 if rclone about "$RCLONE_REMOTE": --config "$RCLONE_CONFIG_FILE" 2>/dev/null; then
     echo "Remote '${RCLONE_REMOTE}' is working."
 else
-    echo "(about check skipped -- expected for drive.file scope)"
+    echo "(about check skipped -- expected for drive scope)"
     rclone lsd "$RCLONE_REMOTE": --config "$RCLONE_CONFIG_FILE" 2>&1 || echo "(empty root is normal)"
 fi
 

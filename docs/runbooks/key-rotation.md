@@ -34,7 +34,7 @@ Rotate credentials immediately when:
 | PostgreSQL | `POSTGRES_PASSWORD`, `AI_READONLY_PASSWORD` | Local DB | Optimizer v3 database, AI read-only queries | 90 days |
 | Paperclip API | `PAPERCLIP_API_KEY` | Paperclip | Issue/board API automation | 90 days |
 | OpenRouter AI | `OPENROUTER_API_KEY` | OpenRouter | AI-enhanced recommendations | 90 days |
-| rclone GDrive OAuth | `~/.config/rclone/rclone.conf` | Google OAuth | Drive backup upload (`drive.file` scope) | 180 days (re-auth) |
+| rclone GDrive OAuth | `~/.config/rclone/rclone.conf` | Google OAuth | Drive backup upload (`drive` scope) | 180 days (re-auth) |
 
 **Storage:** All credentials reside in `.env` at the project root (or `~/.config/rclone/rclone.conf` for rclone OAuth). `.env` is in `.gitignore`. Both files MUST have permissions `600` (`-rw-------`).
 

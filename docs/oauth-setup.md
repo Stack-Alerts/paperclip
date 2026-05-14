@@ -247,7 +247,7 @@ AI_READONLY_PASSWORD=change_me_ai_readonly
 
 **Required for:** Backup uploads to Google Drive via `backup-to-drive.sh`.
 
-The rclone OAuth token enables the PaperClip server to upload backups to a dedicated Google Drive folder (`Paperclip-Backups/`). It uses least-privilege `drive.file` scope.
+The rclone OAuth token enables the PaperClip server to upload backups to a dedicated Google Drive folder (`Paperclip-Backups/`). It uses `drive` scope for full Drive file access, which is needed to see historical backups created with previous tokens.
 
 ### 6.1 Token Storage
 
@@ -256,7 +256,7 @@ Unlike other credentials stored in `.env`, the rclone OAuth token is stored in `
 ```ini
 [gdrive]
 type = drive
-scope = drive.file
+scope = drive
 token = {"access_token":"...","refresh_token":"...","expiry":"..."}
 ```
 

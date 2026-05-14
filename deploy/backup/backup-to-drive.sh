@@ -133,9 +133,9 @@ if echo "$OAUTH_RESULT" | grep -q "^FATAL="; then
     exit 1
 fi
 
-OK_VAL=$(echo "$OAUTH_RESULT" | grep -oP '(?<=^| )OK=\K\S+')
-EXP_SECS=$(echo "$OAUTH_RESULT" | grep -oP '(?<=^| )EXPIRY_SECS=\K-?\d+')
-IS_ENCRYPTED=$(echo "$OAUTH_RESULT" | grep -oP 'ENCRYPTED=\K\S+')
+OK_VAL=$(echo "$OAUTH_RESULT" | grep -oP '(?<=^| )OK=\K\S+' || true)
+EXP_SECS=$(echo "$OAUTH_RESULT" | grep -oP '(?<=^| )EXPIRY_SECS=\K-?\d+' || true)
+IS_ENCRYPTED=$(echo "$OAUTH_RESULT" | grep -oP 'ENCRYPTED=\K\S+' || true)
 
 case "${OK_VAL:-}" in
     encrypted_config)
@@ -234,7 +234,7 @@ if $CONN_FAILED; then
     echo ""
     echo "To fix (headless server):"
     echo "  1. On a machine WITH a browser, run:"
-    echo '     SCOPE_BLOB=$(echo -n '"'"'{"scope":"drive.file"}'"'"' | base64 -w0 | sed '"'"'s/=//g'"'"')'
+    echo '     SCOPE_BLOB=$(echo -n '"'"'{"scope":"drive"}'"'"' | base64 -w0 | sed '"'"'s/=//g'"'"')'
     echo '     rclone authorize "drive" "${SCOPE_BLOB}" --auth-no-open-browser'
     echo "  2. Copy the JSON token block output"
     echo "  3. On this server, run:"

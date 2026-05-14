@@ -271,7 +271,7 @@ def _create_alert(
         + "\n".join(token_lines)
         + f"\n\n**Fix procedure:**\n"
         f"1. On a machine WITH a browser, run:\n"
-        f"   `SCOPE_BLOB=$(echo -n '{{\"scope\":\"drive.file\"}}' | base64 -w0 | sed 's/=//g')`\n"
+        f"   `SCOPE_BLOB=$(echo -n '{{\"scope\":\"drive\"}}' | base64 -w0 | sed 's/=//g')`\n"
         f"   `rclone authorize \"drive\" \"$SCOPE_BLOB\" --auth-no-open-browser`\n"
         f"2. Copy the JSON token block output\n"
         f"3. On this server, run:\n"

@@ -9,10 +9,10 @@
 ## What This Does
 
 This authorises the PaperClip server to upload backups to a dedicated Google Drive
-folder (`Paperclip-Backups/`). It uses **least-privilege access** (`drive.file` scope):
+folder (`Paperclip-Backups/`). It uses `drive` scope to access all files in its
+folder, including historical backups created with previous tokens:
 
-> ✅ rclone can only see and modify files it creates itself inside its folder
-> ❌ rclone cannot see your personal documents, photos, or other Drive files
+> ✅ rclone can see and manage files in its Drive folder (including historical backups)
 > ❌ rclone cannot access any Google services other than Drive
 
 ---
@@ -50,7 +50,7 @@ You will see:
   Paperclip -- rclone GDrive Bootstrap
 ========================================
 
-Step 1: Creating rclone remote 'gdrive' (scope: drive.file)
+Step 1: Creating rclone remote 'gdrive' (scope: drive)
 
 A browser URL will be printed. On a headless server:
   1. Copy the URL
@@ -69,8 +69,8 @@ A browser URL will be printed. On a headless server:
 3. **Log in** with your Google account
 4. **Review the consent screen:**
    - **App name:** rclone
-   - **Permission requested:** *See and download files it creates*
-   - This is the `drive.file` scope — it cannot browse your other Drive files
+   - **Permission requested:** *See, edit, create, and delete all of your Google Drive files*
+   - This is the `drive` scope — needed to access historical backups from prior tokens
 5. Click **Allow**
 6. **Copy the verification code** that appears
 
@@ -116,8 +116,8 @@ rclone lsd gdrive:Paperclip-Backups/
 
 | Scope | What It Allows |
 |-------|----------------|
-| `drive.file` | Files created by this app only (ours) |
-| `drive` (full) | Everything (NOT used — too permissive) |
+| `drive` | Full Drive file access (used — needed for cross-token backup visibility) |
+| `drive.file` | Per-file access only (NOT used — prevents seeing historical backups) |
 
 ---
 

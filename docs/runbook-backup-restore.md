@@ -357,7 +357,7 @@ This server has no display. Use the headless auth helper:
 
 ```bash
 # On a machine WITH a browser (your laptop):
-SCOPE_BLOB=$(echo -n '{"scope":"drive.file"}' | base64 -w0 | sed 's/=//g')
+SCOPE_BLOB=$(echo -n '{"scope":"drive"}' | base64 -w0 | sed 's/=//g')
 rclone authorize "drive" "${SCOPE_BLOB}" --auth-no-open-browser
 # → Open URL → authorize Google → paste verification code → copy JSON token block
 

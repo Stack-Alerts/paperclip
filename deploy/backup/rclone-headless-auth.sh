@@ -3,7 +3,7 @@ set -euo pipefail
 
 CONFIG_FILE="${RCLONE_CONFIG:-$HOME/.config/rclone/rclone.conf}"
 REMOTE="gdrive"
-SCOPE="drive.file"
+SCOPE="drive"
 ACTION=""
 
 print_header() {

@@ -29,7 +29,7 @@ class TestParseRcloneConfigSection:
 
         raw = """[gdrive]
 type = drive
-scope = drive.file
+scope = drive
 token = {"access_token":"abc","refresh_token":"xyz"}"""
         result = _parse_rclone_config_section(raw)
         assert result is not None
