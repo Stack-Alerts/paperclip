@@ -234,7 +234,7 @@ if $CONN_FAILED; then
     echo ""
     echo "To fix (headless server):"
     echo "  1. On a machine WITH a browser, run:"
-    echo '     SCOPE_BLOB=$(echo -n '"'"'{"scope":"drive"}'"'"' | base64 -w0 | sed '"'"'s/=//g'"'"')'
+    echo '     SCOPE_BLOB=$(echo -n '"'"'{"scope":"drive.file"}'"'"' | base64 -w0 | sed '"'"'s/=//g'"'"')'
     echo '     rclone authorize "drive" "${SCOPE_BLOB}" --auth-no-open-browser'
     echo "  2. Copy the JSON token block output"
     echo "  3. On this server, run:"

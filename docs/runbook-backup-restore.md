@@ -355,6 +355,37 @@ rclone lsd gdrive:Paperclip-Backups
 
 This server has no display. Use the headless auth helper:
 
+#### 6.3.1a Scope Expansion (`drive.file` → `drive`)
+
+The default `drive.file` scope means rclone can only see files it created
+itself. Historical backups created under a previous OAuth grant (or with a
+wider scope) are invisible with `drive.file`. To restore historical backup
+visibility, expand to `drive` (or `drive.readonly`) scope:
+
+```bash
+# 1. On a machine WITH a browser, generate a token with wider scope:
+rclone authorize "drive" "drive" --auth-no-open-browser
+# → Copy the JSON token block
+
+# 2. On this server, apply with --scope flag:
+~/.paperclip/scripts/rclone-headless-auth.sh --apply-token --scope=drive
+# → Paste the JSON token block, press Ctrl+D
+
+# 3. Verify expanded scope:
+~/.paperclip/scripts/rclone-headless-auth.sh --scope-from
+# Should show: drive
+
+# 4. Verify historical backups are now visible:
+rclone lsd gdrive:Paperclip-Backups
+```
+
+**Security note:** `drive` scope grants read/write access to all Google Drive
+files associated with the authorized account. Review with
+[@SecurityAnalyst](/BTCAAAAA/issues?assignee=840eb9ff-f746-47da-9fdc-f0ec9d071155)
+before applying to production if sensitive files exist on the same Google account.
+
+
+
 ```bash
 # On a machine WITH a browser (your laptop):
 SCOPE_BLOB=$(echo -n '{"scope":"drive"}' | base64 -w0 | sed 's/=//g')
