@@ -105,7 +105,12 @@ case "${ACTION}" in
         ;;
     check)
         echo "Checking remote '${REMOTE}'..."
-        if rclone lsd "${REMOTE}:Paperclip-Backups" &>/dev/null; then
+        if [ -z "${RCLONE_CONFIG_PASS:-}" ] && [ -f "$SCRIPT_DIR/_rclone_pass.sh" ]; then
+            echo "Config appears encrypted but RCLONE_CONFIG_PASS not set."
+            echo "Sourcing _rclone_pass.sh..."
+            source "$SCRIPT_DIR/_rclone_pass.sh"
+        fi
+        if rclone lsd "${REMOTE}:Paperclip-Backups" --config "$CONFIG_FILE" --ask-password=false &>/dev/null; then
             echo "Remote '${REMOTE}' is authenticated and working."
             exit 0
         else
@@ -118,9 +123,12 @@ case "${ACTION}" in
         ;;
     verify)
         echo "Verifying remote '${REMOTE}'..."
-        if rclone lsd "${REMOTE}:Paperclip-Backups" &>/dev/null; then
+        if [ -z "${RCLONE_CONFIG_PASS:-}" ] && [ -f "$SCRIPT_DIR/_rclone_pass.sh" ]; then
+            source "$SCRIPT_DIR/_rclone_pass.sh"
+        fi
+        if rclone lsd "${REMOTE}:Paperclip-Backups" --config "$CONFIG_FILE" --ask-password=false &>/dev/null; then
             echo "Remote '${REMOTE}' is authenticated and working."
-            rclone mkdir "${REMOTE}:Paperclip-Backups" &>/dev/null || true
+            rclone mkdir "${REMOTE}:Paperclip-Backups" --config "$CONFIG_FILE" --ask-password=false &>/dev/null || true
             exit 0
         else
             echo "ERROR: Remote verification failed."
@@ -131,7 +139,7 @@ case "${ACTION}" in
         ;;
     scope-from)
         echo "Reading current scope from rclone config..."
-        CURRENT=$(rclone config show "${REMOTE}:" 2>/dev/null | grep -E '^scope' | sed 's/^scope *= *//' || echo "unknown")
+        CURRENT=$(rclone config show "${REMOTE}:" --config "$CONFIG_FILE" 2>/dev/null | grep -E '^scope' | sed 's/^scope *= *//' || echo "unknown")
         echo "Current scope: ${CURRENT}"
         exit 0
         ;;
@@ -169,7 +177,7 @@ print(result.stderr.strip() or "(no output)")
 PYEOF
         if [ $? -eq 0 ]; then
             echo "Verifying remote with new scope..."
-            rclone lsd "${REMOTE}:Paperclip-Backups" 2>&1 | head -5
+            rclone lsd "${REMOTE}:Paperclip-Backups" --config "$CONFIG_FILE" --ask-password=false 2>&1 | head -5
         fi
         ;;
     apply-token)
@@ -275,9 +283,9 @@ PYEOF
 
         echo ""
         echo "Verifying remote..."
-        if rclone lsd "${REMOTE}:Paperclip-Backups" &>/dev/null; then
+        if rclone lsd "${REMOTE}:Paperclip-Backups" --config "$CONFIG_FILE" --ask-password=false &>/dev/null; then
             echo "Remote '${REMOTE}' is working and authenticated."
-            rclone mkdir "${REMOTE}:Paperclip-Backups" &>/dev/null || true
+            rclone mkdir "${REMOTE}:Paperclip-Backups" --config "$CONFIG_FILE" --ask-password=false &>/dev/null || true
             echo ""
             echo "Backup pipeline is now operational."
             echo "To run a backup immediately: ~/.paperclip/scripts/backup-to-drive.sh"
