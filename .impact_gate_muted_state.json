@@ -225,5 +225,7 @@
   "68e597e9-602d-4e03-96bb-9e0bcc15dd46": "FAIL",
   "adb2dfc8-1392-4801-b372-13a6162e1c76": "FAIL",
   "c88a3d47-e31c-441b-865a-264519e2c2b5": "PASS",
-  "f9750609-b5a1-4cfb-85d5-7e89f995e272": "ERROR"
+  "f9750609-b5a1-4cfb-85d5-7e89f995e272": "ERROR",
+  "5703d9a5-dc6d-44ae-9ae7-c548decc57b6": "SKIPPED",
+  "860caf5a-aafd-49fd-bd98-7e29fba5634b": "PASS"
 }
