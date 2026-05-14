@@ -2569,7 +2569,7 @@ class TestCatchUpEligibleFrIssues:
         ):
             catch_up_eligible_fr_issues(engine)
 
-        assert any("Catch-up complete" in r.message for r in caplog.records)
+        assert any("Catch-up FR complete" in r.message for r in caplog.records)
 
     def test_skip_does_not_log_catch_up_complete(self, caplog):
         """When no new issues found, the catch-up summary is not logged."""
@@ -2587,7 +2587,7 @@ class TestCatchUpEligibleFrIssues:
         ):
             catch_up_eligible_fr_issues(engine)
 
-        assert not any("Catch-up complete" in r.message for r in caplog.records)
+        assert not any("Catch-up FR complete" in r.message for r in caplog.records)
 
     # ---------------------------------------------------------------------------
     # _emit_json_summary — required worker param (regression for BTCAAAAA-4892)
@@ -2715,6 +2715,9 @@ class TestCatchUpEligibleFrIssues:
             patch(
                 "touch_index.fr_worker.get_issue_by_id",
                 return_value={"id": "fdr-uuid-no-desc", "identifier": "BTCAAAAA-902"},
+            ),
+            patch(
+                "touch_index.fr_worker._load_unindexable_ids", return_value=set()
             ),
         ):
             results = catch_up_eligible_fr_issues(engine)

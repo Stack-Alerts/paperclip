@@ -12,10 +12,12 @@ File extraction strategy (in priority order):
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Sequence
 
 from sqlalchemy import text
@@ -26,6 +28,40 @@ from .git_extractor import get_files_for_issue
 from .paperclip_client import FDR_LABEL_ID, get_issue_by_id
 
 logger = logging.getLogger(__name__)
+
+
+# Tracker for FDR issues attempted by catch-up that yielded no source files,
+# preventing infinite re-processing every polling cycle.
+_CATCHUP_UNINDEXABLE_PATH: Path = (
+    Path(__file__).parents[2] / "data" / "touch_index_fr_catchup_unindexable.json"
+)
+
+
+def _set_catchup_tracker_path(path: Path) -> None:
+    global _CATCHUP_UNINDEXABLE_PATH
+    _CATCHUP_UNINDEXABLE_PATH = path
+
+
+def _load_unindexable_ids() -> set[str]:
+    if not _CATCHUP_UNINDEXABLE_PATH.exists():
+        return set()
+    try:
+        raw = _CATCHUP_UNINDEXABLE_PATH.read_text().strip()
+        if not raw:
+            return set()
+        return set(json.loads(raw))
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Could not load FR catch-up unindexable tracker: %s", exc)
+        return set()
+
+
+def _save_unindexable_ids(ids: set[str]) -> None:
+    try:
+        _CATCHUP_UNINDEXABLE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _CATCHUP_UNINDEXABLE_PATH.write_text(json.dumps(sorted(ids), indent=2) + "\n")
+    except OSError as exc:
+        logger.warning("Could not save FR catch-up unindexable tracker: %s", exc)
+
 
 _UPSERT_SQL = text("""
     INSERT INTO touch_index_fr_files
@@ -215,6 +251,10 @@ def catch_up_eligible_fr_issues(
     catches issues updated within the last N minutes. This catch-up ensures all
     FDR issues are eventually indexed, keeping coverage above the quality
     threshold without requiring a separate backfill run.
+
+    Issues that were previously attempted but yielded no source files (e.g.
+    commits touching only docs/, .md, .sh, .json) are tracked and skipped on
+    subsequent runs to avoid infinite re-processing every cycle.
     """
     from .paperclip_client import get_fdr_issues
 
@@ -228,15 +268,24 @@ def catch_up_eligible_fr_issues(
         ).fetchall()
     indexed_in_db: set[str] = {str(r[0]) for r in indexed_rows}
 
+    unindexable = _load_unindexable_ids()
+    newly_unindexable: set[str] = set()
+
     results: list[FRIngestionResult] = []
     for issue in all_fdr:
-        if issue.get("identifier") in indexed_in_db:
+        identifier = issue.get("identifier")
+        if identifier in indexed_in_db:
+            continue
+        if identifier in unindexable:
+            logger.debug(
+                "Catch-up FR: %s previously unindexable -- skipping", identifier
+            )
             continue
         try:
             result = ingest_fr_issue(
                 engine,
                 issue_id=issue["id"],
-                issue_identifier=issue["identifier"],
+                issue_identifier=identifier,
                 owner_agent_id=issue.get("assigneeAgentId"),
                 description=issue.get("description", "") or "",
                 dry_run=dry_run,
@@ -254,12 +303,30 @@ def catch_up_eligible_fr_issues(
                         dry_run=dry_run,
                         issue_status=full.get("status"),
                     )
+            if result.source == "none":
+                newly_unindexable.add(identifier)
+                logger.info(
+                    "Catch-up FR: %s yielded no source files -- "
+                    "recording as unindexable to skip future cycles",
+                    identifier,
+                )
             results.append(result)
         except Exception:
-            logger.exception("Catch-up ingestion error for %s", issue.get("identifier"))
+            logger.exception("Catch-up ingestion error for %s", identifier)
+
+    if newly_unindexable:
+        all_unindexable = unindexable | newly_unindexable
+        _save_unindexable_ids(all_unindexable)
+        logger.info(
+            "Catch-up FR: recorded %d newly unindexable issue(s) "
+            "(%d total tracked)",
+            len(newly_unindexable),
+            len(all_unindexable),
+        )
+
     if results:
         logger.info(
-            "Catch-up complete: %d FDR issues processed, %d files indexed, %d skipped",
+            "Catch-up FR complete: %d FDR issues processed, %d files indexed, %d skipped",
             len(results),
             sum(r.files_indexed for r in results),
             sum(1 for r in results if r.skipped_no_commits),
