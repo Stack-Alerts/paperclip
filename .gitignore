@@ -121,3 +121,10 @@ rclone-pass
 
 # QA verdict artifacts (local audit trail, not for version control)
 tests/qa/QA_VERDICT_*
+
+# Stale-code archival paths — these were moved or replaced and MUST NOT be
+# re-created on disk. See AGENTS.md for the full archival policy.
+src/utils/Strategy_Builder/
+src/strategies/strategy_02_reversal_w_pattern.py
+src/strategy_builder/core/nautilus_code_generator.py
+src/strategy_builder/examples/complete_workflow_example.py
