@@ -23,12 +23,12 @@
   },
   "touch_index_bug": {
     "pass": true,
-    "coverage_pct": 38.5,
-    "indexed": 1423,
-    "total": 3694,
-    "coverage_eligible_pct": 96.8,
-    "eligible_total": 1047,
-    "missing_eligible_count": 34,
+    "coverage_pct": 38.7,
+    "indexed": 1435,
+    "total": 3705,
+    "coverage_eligible_pct": 97.0,
+    "eligible_total": 1050,
+    "missing_eligible_count": 32,
     "missing_eligible_identifiers": [
       "BTCAAAAA-1166",
       "BTCAAAAA-1171",
@@ -56,8 +56,6 @@
       "BTCAAAAA-26010",
       "BTCAAAAA-26100",
       "BTCAAAAA-26183",
-      "BTCAAAAA-26393",
-      "BTCAAAAA-26443",
       "BTCAAAAA-442",
       "BTCAAAAA-4895",
       "BTCAAAAA-700",
@@ -65,19 +63,19 @@
       "BTCAAAAA-7381",
       "BTCAAAAA-907"
     ],
-    "missing_total_count": 2275,
-    "total_rows": 3279,
+    "missing_total_count": 2274,
+    "total_rows": 3295,
     "stale_rows": 0,
-    "max_age_hours": 32.8,
+    "max_age_hours": 33.0,
     "null_closed_at_rows": 4,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
     "duplicate_pairs": 0,
     "orphan_count": 0,
     "source_distribution": {
-      "comments": 617,
-      "description": 332,
-      "git": 2330
+      "comments": 620,
+      "description": 342,
+      "git": 2333
     }
   }
 }
