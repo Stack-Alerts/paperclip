@@ -15,6 +15,7 @@ Pre-migration historical docs are preserved under [`archive/`](archive/).
 | [`strategies/`](strategies/) | Strategy development, universal optimizer guide, trade manager |
 | [`strategy-builder/`](strategy-builder/) | Strategy Builder UI — architecture, component specs, NautilusTrader integration |
 | [`ui/`](ui/) | UI/UX design specs, color palette, stylesheet guides |
+| [`requirements/`](requirements/) | Requirements documentation — traceability process, registry, ADRs, CI integration |
 | [`archive/`](archive/) | Completed session notes, sprint handoffs, legacy docs, test results |
 
 ## Key Reference Documents
@@ -37,6 +38,7 @@ Pre-migration historical docs are preserved under [`archive/`](archive/).
 - **Impact Gate Worker**: [`../.github/workflows/impact-gate-worker.yml`](../.github/workflows/impact-gate-worker.yml) — gates in_review fixes through Impact Gate validation ([`src/impact_gate/`](../src/impact_gate/))
 - **Expert Reviews**: [`building-blocks/expert-reviews/`](building-blocks/expert-reviews/) — 80 signal expert analysis docs
 - **LakeAPI Integration**: [`integrations/`](integrations/)
+- **Requirements Documentation (Central Index)**: [`requirements/`](requirements/) — centralized TOC for all requirements docs: traceability process, registry, ADRs, CI integration
 - **Requirements Traceability**: [`architecture/REQUIREMENTS_TRACEABILITY.md`](architecture/REQUIREMENTS_TRACEABILITY.md) — end-to-end traceability from CEO goals through implementation, QA, and deployment; status lifecycle, field requirements, auditing procedures
 
 ## Archive Structure
