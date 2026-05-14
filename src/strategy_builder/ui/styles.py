@@ -1759,7 +1759,7 @@ def format_block_name(block_name: str) -> str:
 #       super().closeEvent(event)
 # ---------------------------------------------------------------------------
 
-from PyQt5.QtCore import Qt as _Qt, QSettings as _QSettings, QPoint as _QPoint, QSize as _QSize, QRect as _QRect
+from PyQt5.QtCore import Qt as _Qt, QEvent as _QEvent, QSettings as _QSettings, QPoint as _QPoint, QSize as _QSize, QRect as _QRect
 from PyQt5.QtWidgets import QApplication as _QApplication
 from PyQt5.QtGui import QGuiApplication as _QGuiApplication
 
@@ -2025,6 +2025,51 @@ class WindowGeometryMixin:
             screen_rect.center().x() - default_w // 2,
             screen_rect.center().y() - default_h // 2,
         )
+
+    def changeEvent(self, event):
+        """Track window state transitions to keep QSettings in sync.
+
+        BTCAAAAA-26161: Without this handler, when a user restores a maximized
+        window via the OS title bar button, QSettings still has maximized=True.
+        On the next window open (or if the window is never closed before the
+        next maximize click), the persisted flag causes the mixin to re-maximize
+        a window the user expects to stay normal \u2014 the "second-click re-maximize"
+        bug.
+
+        This handler detects WindowStateChange events and immediately updates
+        QSettings to reflect the real window state, eliminating the desync
+        between what Qt/WM thinks and what the saved settings think.
+        """
+        if event.type() == _QEvent.WindowStateChange:
+            old_state = event.oldState()
+            new_state = self.windowState()
+
+            # Detect restore from maximized to normal (user clicked restore button
+            # on the OS title bar). Update QSettings immediately so the saved
+            # maximized flag never desyncs from the actual window state.
+            if (old_state & _Qt.WindowMaximized) and not (new_state & _Qt.WindowMaximized):
+                settings = _QSettings("BTC_Engine", "StrategyBuilder")
+                key = self.GEOMETRY_SETTINGS_KEY
+                settings.setValue(f"{key}/maximized", False)
+                frame_top_left = self.frameGeometry().topLeft()
+                settings.setValue(f"{key}/pos", frame_top_left)
+                settings.setValue(f"{key}/size", self.size())
+                # Reset so _restore_window_geometry can run again if the window
+                # is hidden and re-shown in this session.
+                self._geometry_restored = False
+
+                import logging as _logging
+                _logging.getLogger("WindowGeometry").debug(
+                    "[CHANGEEVENT RESTORE] %s: saved normal geometry pos=%s size=%s",
+                    key, frame_top_left, self.size(),
+                )
+
+            # Detect minimize: when minimized, the oldState was maximized so
+            # we must not treat the restore-from-minimize as a user-initiated
+            # de-maximize. The guard above correctly ignores old states that
+            # don't have WindowMaximized.
+
+        super().changeEvent(event)
 
     def showEvent(self, event):
         """Apply maximized state BEFORE the WM maps the window.
