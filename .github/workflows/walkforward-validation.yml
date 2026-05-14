@@ -77,6 +77,14 @@ jobs:
           fi
           echo "BTC data file found ($(wc -c < data/raw/BTC_USDT_PERP_15m.csv) bytes)"
 
+      - name: Download previous walkforward registry
+        id: download-registry
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: walkforward-registry
+          path: .
+
       - name: Run walkforward strategy validation
         run: |
           python -m pytest \
@@ -86,6 +94,24 @@ jobs:
             tests/strategies/walkforward_test.py \
             -v --tb=short --timeout=900 -p no:cacheprovider \
             2>&1 | tee /tmp/walkforward-output.txt
+
+      - name: Run CI walkforward registry update
+        env:
+          PYTHONPATH: src
+        run: |
+          for strategy_path in \
+            src/strategies/strategy_01_reversal_m_pattern.py \
+            src/strategies/strategy_02_reversal_w_pattern.py; do
+            if [ -f "$strategy_path" ]; then
+              echo "--- Running CI walkforward: $strategy_path ---"
+              python scripts/run_walkforward_ci.py \
+                --strategy "$strategy_path" \
+                --data data/raw/BTC_USDT_PERP_15m.csv \
+                --days 180 \
+                --timeout 600 \
+                || echo "WARNING: CI walkforward failed for $strategy_path (non-fatal)"
+            fi
+          done
 
       - name: Alert on nightly walkforward failure
         if: failure() && github.event_name == 'schedule'
@@ -106,4 +132,13 @@ jobs:
           path: |
             data/reports/walkforward_tests/
             /tmp/walkforward-output.txt
-          retention-days: 14
+          retention-days: 90
+
+      - name: Upload walkforward registry
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: walkforward-registry
+          path: walkforward_results_registry.json
+          retention-days: 90
+          overwrite: true

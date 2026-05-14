@@ -146,7 +146,9 @@ def run_walkforward(strategy, df, strategy_name: str) -> dict:
                         )
                         if success:
                             signals_taken += 1
-            except Exception:
+            except Exception as e:
+                if signals_checked <= 3 or signals_checked % 5000 == 0:
+                    print(f"  [WARN] bar {i}: {type(e).__name__}: {e}", file=sys.stderr)
                 continue
 
     if simulator.open_trade is not None:
@@ -309,8 +311,8 @@ def main():
             _key = _match.group(1)
             _weight = int(_match.group(2))
             strategy.blocks[_key] = {'name': _key.replace('_', ' ').title(), 'weight': _weight, 'enabled': True}
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"  [WARN] block source parse failed: {type(e).__name__}: {e}", file=sys.stderr)
 
     if not strategy.blocks:
         # Fallback defaults for common strategy patterns

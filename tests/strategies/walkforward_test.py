@@ -212,6 +212,8 @@ def run_walkforward_test(strategy, df: pd.DataFrame, strategy_name: str):
                         print(f"   Bar {i}: Trade REJECTED (Confluence: {confluence}) - insufficient capital or existing position")
                         
             except Exception as e:
+                if signals_checked <= 3 or signals_checked % 5000 == 0:
+                    print(f"   [WARN] bar {i}: {type(e).__name__}: {e}", file=sys.stderr)
                 continue
         
         # Progress indicator every 1000 bars
