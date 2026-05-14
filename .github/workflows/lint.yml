@@ -41,43 +41,108 @@ jobs:
         run: python scripts/audit/secrets_audit.py
 
   archived-paths:
-    name: Guard against re-introduction of stale-code paths
+    name: Guard against re-introduction of archived paths (BTCAAAAA-26605)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify no stale-code paths exist on disk
+      - name: Cross-check archived/ entries against .gitignore stale-code blocklist
         run: |
           set -euo pipefail
-          VIOLATIONS=0
+          WARNINGS=0
 
-          # Dynamically parse the stale-code section from .gitignore.
-          # This keeps the CI guard in sync with .gitignore automatically —
-          # no need to update both files when adding new stale paths.
-          # Reference: .gitignore "Stale-code archival paths" section, BTCAAAAA-26587
+          # Derived "original" paths of archived items based on known archival commit mappings.
+          # When new items are added to archived/ without a corresponding .gitignore entry,
+          # this check will warn the developer at CI time.
+          # Mapping conventions:
+          #   archived/tests/*       → tests/*
+          #   archived/config/*      → config/*
+          #   archived/utils_*_legacy/* → src/utils/Strategy_Builder/ (already guarded)
+          #   archived/old_*/*       → scripts/*
+          #   Root-level .py/.sh     → root of repo (only if actually deployed there)
+
+          derive_original_path() {
+            local item="$1"
+            case "$item" in
+              tests/*)         echo "tests/${item#tests/}" ;;
+              config/*)        echo "config/${item#config/}" ;;
+              old_walkforward_system/walkforward_tests/*)
+                               echo "scripts/walkforward_tests/${item#old_walkforward_system/walkforward_tests/}" ;;
+              old_optimizer_v2/*)
+                               echo "scripts/${item#old_optimizer_v2/}" ;;
+              utils_strategy_builder_legacy/*)
+                               echo "src/utils/Strategy_Builder/${item#utils_strategy_builder_legacy/}" ;;
+              optimization_results/*)
+                               return 1 ;;
+              *)               return 1 ;;
+            esac
+            return 0
+          }
+
+          # Collect the .gitignore blocklist
+          GI_BLOCK=()
           IN_BLOCK=false
           while IFS= read -r line; do
-            # Detect start of stale-code block
             if [[ "$line" =~ ^#[[:space:]]*Stale-code[[:space:]]archival[[:space:]]paths ]]; then
               IN_BLOCK=true
               continue
             fi
             if $IN_BLOCK; then
-              # Blank line or non-comment section header ends the block
-              if [[ -z "$line" ]]; then
+              # Skip empty and comment lines within the block (multi-line header)
+              [[ -z "$line" ]] && continue
+              [[ "$line" =~ ^# ]] && continue
+              # Collect non-comment, non-blank entries
+              path="${line%"${line##*[![:space:]]}"}"
+              [[ -n "$path" ]] && GI_BLOCK+=("$path")
+            fi
+          done < .gitignore
+
+          # Walk archived/ directory recursively and check each file
+          while IFS= read -r -d '' entry; do
+            rel="${entry#archived/}"
+            if ! derive_original_path "$rel" >/dev/null 2>&1; then
+              continue
+            fi
+            original=$(derive_original_path "$rel")
+            found=false
+            for gi in "${GI_BLOCK[@]}"; do
+              if [[ "$original/" =~ ^"$gi/" ]] || [[ "$original" == "$gi" ]] || [[ "$gi/" =~ ^"$original/" ]]; then
+                found=true
                 break
               fi
-              if [[ "$line" =~ ^#[[:space:]] && ! "$line" =~ ^#[[:space:]]*$ ]]; then
-                # Another section comment — stop parsing
-                break
-              fi
-              # Skip inline comments within the block
-              [[ "$line" =~ ^[[:space:]]*# ]] && continue
-              # Trim trailing whitespace
+            done
+            if ! $found; then
+              echo "::warning::archived/$rel maps to $original but no matching entry found in .gitignore stale-code block. Add it to prevent re-introduction."
+              WARNINGS=$((WARNINGS + 1))
+            fi
+          done < <(find archived/ -type f -print0)
+
+          if [ "$WARNINGS" -gt 0 ]; then
+            echo "::warning::$WARNINGS archived file(s) lack .gitignore stale-code entries. See warnings above."
+          fi
+
+      - name: Verify no stale-code / archived paths exist on disk
+        run: |
+          set -euo pipefail
+          VIOLATIONS=0
+
+          # Parse the stale-code & archived-paths section from .gitignore.
+          # Collects ALL non-comment, non-blank lines from the block.
+          IN_BLOCK=false
+          while IFS= read -r line; do
+            if [[ "$line" =~ ^#[[:space:]]*Stale-code[[:space:]]archival[[:space:]]paths ]]; then
+              IN_BLOCK=true
+              continue
+            fi
+            if $IN_BLOCK; then
+              # Skip empty and comment lines within the block
+              [[ -z "$line" ]] && continue
+              [[ "$line" =~ ^# ]] && continue
+              # Check the entry
               path="${line%"${line##*[![:space:]]}"}"
               if [[ -n "$path" ]]; then
                 if [ -e "$path" ]; then
-                  echo "::error file=$path::Stale-code path found on disk — must not exist. See archived/ directory for the original. Reference: BTCAAAAA-26587"
+                  echo "::error file=$path::Archived path found on disk — must not exist. See archived/ directory for the original. Reference: BTCAAAAA-26587, BTCAAAAA-26605"
                   VIOLATIONS=$((VIOLATIONS + 1))
                 fi
               fi
@@ -85,8 +150,8 @@ jobs:
           done < .gitignore
 
           if [ "$VIOLATIONS" -gt 0 ]; then
-            echo "::error::${VIOLATIONS} stale-code path(s) found on disk. Remove them and move any needed logic elsewhere. Reference: BTCAAAAA-26587"
+            echo "::error::${VIOLATIONS} archived path(s) found on disk. Remove them and move any needed logic elsewhere. Reference: BTCAAAAA-26587, BTCAAAAA-26605"
             exit 1
           fi
 
-          echo "No stale-code path violations found."
+          echo "No archived-path violations found."

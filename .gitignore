@@ -126,8 +126,19 @@ tests/qa/QA_VERDICT_*
 # re-created on disk. See AGENTS.md for the full archival policy.
 # The CI archived-paths guard in lint.yml dynamically reads this block.
 # Each non-comment, non-blank line is checked for on-disk existence at CI time.
+# ---------------------------------------------------------------------------
+# Stale-code policy paths (commit 2573843f) — permanently removed from src/
 src/utils/Strategy_Builder/
 src/strategies/strategy_02_reversal_w_pattern.py
 src/strategy_builder/core/nautilus_code_generator.py
 src/strategy_builder/examples/complete_workflow_example.py
 src/strategy_builder/templates/strategy_template.py
+# Archived paths from earlier refactors — moved to archived/, must not return
+tests/building_blocks/
+scripts/walkforward_tests/
+scripts/generate_strategies.py
+config/sophisticated_m_pattern_only.py
+config/optimizer_001_01_hod_rejection.yaml
+config/optimizer_001_hod_rejection.yaml
+config/optimizer_002_lod_rejection.yaml
+config/optimizer_003_hod_continuation.yaml
