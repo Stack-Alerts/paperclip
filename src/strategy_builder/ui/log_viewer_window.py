@@ -398,7 +398,7 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
 
         all_events = [
             ("TRADE_OPENED", "🟢 Trade Opened"),
-            ("TRADE_CLOSED", "😘 Trade Closed"),
+            ("TRADE_CLOSED", "📘 Trade Closed"),
             ("TRADE_UPDATED", "🔄 Trade Updated"),
             ("POSITIONS_SNAPSHOT", "📊 Positions"),
             ("TRADE_NOT_FOUND", "❌ Not Found"),
@@ -572,6 +572,9 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
             self.tabs.setCurrentIndex(focused_tab)
 
         self._activate_tab(focused_tab)
+
+        # Restore last-viewed tab from QSettings (overrides focused_tab)
+        self._restore_last_tab()
 
     def _show_error_tab(self, error_msg: str):
         """Show an error tab when loading fails."""
