@@ -192,8 +192,8 @@ Run quarterly (or on every major release):
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-05-14 | Architect | Added §11: JSON Registry ↔ DB Traceability Reconciliation — BTCAAAAA-26497 |
 | 2026-05-13 | Architect | Added §10: Test-Case-to-Requirements Mapping — BTCAAAAA-25644 |
-
 | 2026-05-13 | DocWriter | Initial version — issue BTCAAAAA-25646 |
 
 ## 10. Test-Case-to-Requirements Mapping (Code-Level Traceability)
@@ -250,3 +250,59 @@ CEO Goal
 - [requirements_registry.json](../../requirements_registry.json) — Canonical registry
 - [ADR-0002](adr/ADR-0002-test-to-requirements-traceability.md) — Architecture decision
 - [requirements_registry.schema.md](requirements_registry.schema.md) — Schema documentation
+
+## 11. JSON Registry ↔ DB Traceability Reconciliation
+
+### 11.1 Overview
+
+The system has two complementary traceability layers:
+
+| Layer | Source | Scope | Update Trigger |
+|-------|--------|-------|----------------|
+| **JSON Registry** (`requirements_registry.json`) | Manually curated, 32 requirements | Code-level: maps requirements → source modules, test files, pytest markers, source issues | Architecture/feature change; PR review |
+| **PostgreSQL Traceability** (`trace_requirements`, `trace_test_cases`, `trace_issues`, `trace_links`) | Automated CI sync from pytest collection + Paperclip API | Runtime-level: queryable graph of requirements, tests, issues, and their relationships | On push to main (test sync) + 15-min cron (requirement/issue sync) |
+
+### 11.2 Relationship: JSON is Canonical, DB is Runtime
+
+The JSON registry is the **canonical source of truth** for requirement definitions and their intentional mappings. It is version-controlled and manually curated. The PostgreSQL traceability tables are the **automated runtime view**, populated by CI pipelines that discover tests, sync issues, and create links from markers.
+
+```
+requirements_registry.json                 trace_* (PostgreSQL)
+═════════════════════════                 ═══════════════════════
+Manual curation → source_modules          Auto-discovered → test_files
+Manual curation → test_files              Auto-discovered → test_functions
+Manual curation → test_markers            Auto-parsed → pytest markers → trace_links
+Manual curation → source_issues           Auto-synced → Paperclip issues → trace_issues
+Version-controlled (git)                  Live queryable (SQL)
+Human intent                              Machine observation
+```
+
+### 11.3 When to Update Which Layer
+
+| Change | Update JSON Registry? | Update DB? |
+|--------|----------------------|------------|
+| New requirement added | **Yes** — add entry with id, type, title, source_modules, test_files | **Auto** — next Paperclip sync picks up linked issue |
+| New test file created | **Yes** — update `test_files` and `test_markers` on the relevant requirement | **Auto** — next pytest collection sync picks up test |
+| Refactor: files renamed/moved | **Yes** — update `source_modules` and `test_files` paths | **Auto** — next sync picks up new paths |
+| Issue transitions to done | No | **Auto** — next issue sync updates status |
+| Gap analysis / coverage check | No | **Yes** — query `trace_links` JOINs for runtime coverage view |
+| New pytest marker added | **Yes** — update `test_markers` | **Auto** — next pytest collection creates `trace_links` row |
+
+### 11.4 Synchronization
+
+The layers do not actively synchronize with each other — they are independent projections of the same underlying reality. Consistency is maintained by convention:
+
+1. **JSON registry is the authority** for intentional requirement→test mappings. When CI needs to know "what tests verify REQ-X?", it consults the JSON registry first (fast file-read, no DB needed).
+2. **DB is the authority** for coverage gap detection and runtime queries. The gap report runs against `trace_links`, not the JSON registry, because the DB reflects what actually exists on disk (discovered by pytest), not what a human declared.
+3. **Discrepancies are expected and informative.** If the JSON registry says a requirement has tests but the DB shows no `trace_links` rows, that means the test markers are missing or the test file doesn't exist — a real gap.
+4. **No automated reconciliation job exists yet.** A future CI job could cross-check the JSON registry `test_files` list against the DB `trace_test_cases` table to flag inconsistencies (planned Phase 3 per ADR-0002).
+
+### 11.5 Agent Responsibilities
+
+| Agent | JSON Registry | DB Traceability |
+|-------|--------------|-----------------|
+| **Architect** | Owns schema, approves structural changes, defines requirement IDs | Defines link types, confidence model, query patterns |
+| **Engineering Agents** | Add/modify entries when implementing features or refactoring | Trigger pytest collection on push (auto) |
+| **QAEngineer** | Audits `test_files`/`test_markers` accuracy | Runs coverage gap queries; verifies `trace_links` integrity |
+| **AutomationEngineer** | Integrates JSON registry into CI lock gate | Owns sync pipelines, CI workflows |
+| **DatabaseAdministrator** | N/A | Owns Alembic migrations, indexes, query performance |
