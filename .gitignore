@@ -114,3 +114,10 @@ rclone.conf
 rclone-pass
 *.rclone.conf
 *.rclone-pass
+
+# Paperclip local issue status markers (agent state files, not for version control)
+.issue_*_status.json
+.issue_*_status.json_*
+
+# QA verdict artifacts (local audit trail, not for version control)
+tests/qa/QA_VERDICT_*
