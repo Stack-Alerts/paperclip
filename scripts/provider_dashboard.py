@@ -53,6 +53,12 @@ from scripts.provider_monitor import (
     save_state,
 )
 
+SWITCH_ACTIONS: dict[str, dict[str, str]] = {
+    "normal": {"pro": PRO_MODEL_NORMAL, "standard": STANDARD_MODEL_NORMAL, "state": "normal"},
+    "degrade_4hr": {"pro": PRO_MODEL_DEGRADED, "standard": PRO_MODEL_DEGRADED, "state": "claude_degraded"},
+    "degrade_full": {"pro": STANDARD_MODEL_DEGRADED, "standard": STANDARD_MODEL_DEGRADED, "state": "fully_degraded"},
+}
+
 API_TIMEOUT = 15
 RETRY_STRATEGY = Retry(
     total=2,
@@ -535,65 +541,56 @@ body {{
     .agent-grid {{ grid-template-columns: 1fr; }}
 }}
 
-.manual-controls {{
-    margin-top: 16px;
-}}
-.manual-controls h4 {{
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: #8b949e;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #21262d;
-}}
-.control-group {{
+.switch-buttons {{
     display: flex;
-    gap: 10px;
-    align-items: center;
-    margin-bottom: 10px;
-}}
-.control-label {{
-    font-size: 0.8rem;
-    color: #8b949e;
-    min-width: 160px;
+    gap: 12px;
+    flex-wrap: wrap;
 }}
 .switch-btn {{
-    padding: 6px 16px;
+    padding: 10px 24px;
     border: 1px solid #30363d;
     border-radius: 6px;
-    background: #21262d;
-    color: #8b949e;
+    background: #161b22;
+    color: #c9d1d9;
+    font-size: 0.85rem;
+    font-weight: 500;
     cursor: pointer;
-    font-size: 0.78rem;
-    font-family: inherit;
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    transition: background 0.15s, border-color 0.15s;
 }}
 .switch-btn:hover {{
-    background: #30363d;
-    border-color: #58a6ff;
+    filter: brightness(1.2);
 }}
+.switch-btn:active {{
+    filter: brightness(0.9);
+}}
+.switch-btn.normal {{ border-color: #3fb950; color: #3fb950; }}
+.switch-btn.normal:hover {{ background: #1a2a1a; }}
+.switch-btn.degrade-4hr {{ border-color: #d29922; color: #d29922; }}
+.switch-btn.degrade-4hr:hover {{ background: #2a241a; }}
+.switch-btn.degrade-full {{ border-color: #f85149; color: #f85149; }}
+.switch-btn.degrade-full:hover {{ background: #2a1a1a; }}
 .switch-btn:disabled {{
-    opacity: 0.4;
+    opacity: 0.5;
     cursor: not-allowed;
+    filter: none;
 }}
-.switch-btn.normal-btn.active {{
-    border-color: #3fb950;
-    color: #3fb950;
-    background: #1a2a1f;
+.switch-status {{
+    margin-top: 12px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    display: none;
 }}
-.switch-btn.degraded-btn.active {{
-    border-color: #d29922;
-    color: #d29922;
-    background: #2a2618;
+.switch-status.success {{ background: #1a2a1a; border: 1px solid #3fb950; color: #3fb950; display: block; }}
+.switch-status.error {{ background: #2a1a1a; border: 1px solid #f85149; color: #f85149; display: block; }}
+.switch-status.pending {{ background: #1a201a; border: 1px solid #d29922; color: #d29922; display: block; }}
+
+@media (max-width: 768px) {{
+    .container {{ padding: 12px; }}
+    .provider-grid {{ grid-template-columns: 1fr; }}
+    .agent-grid {{ grid-template-columns: 1fr; }}
+    .switch-buttons {{ flex-direction: column; }}
 }}
-.switch-result {{
-    font-size: 0.78rem;
-    margin-top: 8px;
-    min-height: 1.2em;
-}}
-.switch-result.success {{ color: #3fb950; }}
-.switch-result.error {{ color: #f85149; }}
-.switch-result.info {{ color: #8b949e; }}
 </style>
 </head>
 <body>
@@ -610,6 +607,19 @@ body {{
         {_render_openrouter_card(snap)}
         {_render_deepseek_card(snap)}
     </div>
+</div>
+
+<div class="provider-section">
+    <div class="section-title">Manual Switch</div>
+    <div class="switch-buttons">
+        <button class="switch-btn normal" onclick="handleSwitch('normal')"
+                title="Moves Pro agents (CEO, CTO, Architect, etc.) to Claude Sonnet 4.6; Standard agents to OR DS V4 Pro">Normal</button>
+        <button class="switch-btn degrade-4hr" onclick="handleSwitch('degrade_4hr')"
+                title="Moves all agents to OpenRouter DeepSeek V4 Pro (Claude 4hr &gt;= 95%)">4hr Degraded</button>
+        <button class="switch-btn degrade-full" onclick="handleSwitch('degrade_full')"
+                title="Moves all agents to OpenRouter DeepSeek V4 Flash (Claude 7day &gt;= 95%)">Fully Degraded</button>
+    </div>
+    <div class="switch-status" id="switch-status"></div>
 </div>
 
 <div class="provider-section">
@@ -637,33 +647,43 @@ body {{
     BTC Trade Engine Dashboard &mdash; Auto-refresh disabled (static snapshot)
 </div>
 <script>
-async function switchAgents(target, model) {{
-    var result = document.getElementById('switch-result');
+function handleSwitch(action) {{
     var buttons = document.querySelectorAll('.switch-btn');
+    var statusEl = document.getElementById('switch-status');
     buttons.forEach(function(b) {{ b.disabled = true; }});
-    result.textContent = 'Switching...';
-    result.className = 'switch-result info';
+    statusEl.className = 'switch-status pending';
+    statusEl.textContent = 'Switching to ' + (action === 'normal' ? 'Normal' : action === 'degrade_4hr' ? '4hr Degraded' : 'Fully Degraded') + ' ...';
 
-    try {{
-        var resp = await fetch('/switch', {{
-            method: 'POST',
-            headers: {{'Content-Type': 'application/json'}},
-            body: JSON.stringify({{target: target, model: model}})
-        }});
-        var data = await resp.json();
-        if (data.ok) {{
-            result.textContent = data.message + ' Refreshing...';
-            result.className = 'switch-result success';
-            setTimeout(function() {{ location.reload(); }}, 1500);
+    fetch('/api/switch', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ action: action }})
+    }})
+    .then(function(resp) {{ return resp.json().then(function(data) {{ return {{ status: resp.status, data: data }}; }}); }})
+    .then(function(result) {{
+        var data = result.data;
+        if (result.status === 200 && data.success) {{
+            statusEl.className = 'switch-status success';
+            statusEl.textContent = 'Switch complete: ' + data.state
+                + ' (Pro: ' + data.pro_ok + ' ok, Standard: ' + data.std_ok + ' ok). Reloading ...';
+            setTimeout(function() {{ location.reload(); }}, 2000);
+        }} else if (result.status === 200 && !data.success) {{
+            statusEl.className = 'switch-status pending';
+            statusEl.textContent = 'Partial success: ' + data.pro_ok + '/' + (data.pro_ok + data.pro_fail) + ' pro, '
+                + data.std_ok + '/' + (data.std_ok + data.std_fail) + ' std updated. Reloading ...';
+            setTimeout(function() {{ location.reload(); }}, 3000);
         }} else {{
-            result.textContent = data.message;
-            result.className = 'switch-result error';
+            statusEl.className = 'switch-status error';
+            statusEl.textContent = 'Switch failed: ' + (data.error || 'Unknown error')
+                + (result.status === 400 ? ' (check API key and network)' : ' (server error)');
         }}
-    }} catch(e) {{
-        result.textContent = 'Manual switching requires the dashboard to be served via --serve';
-        result.className = 'switch-result error';
-    }}
-    buttons.forEach(function(b) {{ b.disabled = false; }});
+        buttons.forEach(function(b) {{ b.disabled = false; }});
+    }})
+    .catch(function(err) {{
+        statusEl.className = 'switch-status error';
+        statusEl.textContent = 'Network error: ' + err.message;
+        buttons.forEach(function(b) {{ b.disabled = false; }});
+    }});
 }}
 </script>
 </body>
@@ -683,62 +703,72 @@ class _SingleFileHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(self.html_content)
 
+    def _send_json(self, status: int, data: dict) -> None:
+        body = json.dumps(data).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_POST(self) -> None:
-        if self.path != "/switch":
-            self._send_json(404, {"ok": False, "message": "Not found"})
+        if self.path != "/api/switch":
+            self._send_json(404, {"success": False, "error": "Not found"})
             return
 
         content_length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(content_length)
+        if content_length == 0:
+            self._send_json(400, {"success": False, "error": "Empty request body"})
+            return
+
         try:
-            data = json.loads(body)
-        except json.JSONDecodeError:
-            self._send_json(400, {"ok": False, "message": "Invalid JSON"})
+            body = json.loads(self.rfile.read(content_length))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self._send_json(400, {"success": False, "error": "Invalid JSON"})
             return
 
-        target = data.get("target")
-        model = data.get("model", "")
-
-        if target not in ("pro", "standard"):
-            self._send_json(400, {"ok": False, "message": "Invalid target. Must be 'pro' or 'standard'."})
+        action = body.get("action", "")
+        if action not in SWITCH_ACTIONS:
+            self._send_json(400, {"success": False, "error": f"Unknown action: {action}", "valid_actions": list(SWITCH_ACTIONS.keys())})
             return
 
-        agents = PRO_AGENTS if target == "pro" else STANDARD_AGENTS
-        success = 0
-        failed = 0
-        errors: list[str] = []
+        mapping = SWITCH_ACTIONS[action]
+        pro_model = mapping["pro"]
+        standard_model = mapping["standard"]
+        state_label = mapping["state"]
 
-        for name, agent_id in agents:
-            if patch_agent_model(agent_id, model, dry_run=False):
-                success += 1
+        pro_ok, pro_fail = 0, 0
+        std_ok, std_fail = 0, 0
+
+        for _name, agent_id in PRO_AGENTS:
+            if patch_agent_model(agent_id, pro_model, dry_run=False):
+                pro_ok += 1
             else:
-                failed += 1
-                errors.append(name)
+                pro_fail += 1
 
-        state = load_state()
-        if target == "pro":
-            state.pro_model = model
-        else:
-            state.standard_model = model
-        state.last_switch_at = datetime.now(timezone.utc).isoformat()
-        state.last_switch_direction = "manual"
-        save_state(state)
+        for _name, agent_id in STANDARD_AGENTS:
+            if patch_agent_model(agent_id, standard_model, dry_run=False):
+                std_ok += 1
+            else:
+                std_fail += 1
 
-        display = MODEL_DISPLAY.get(model, model)
-        total = success + failed
-        if failed == 0:
-            msg = f"Switched {success}/{total} {target} agents to {display}"
-        else:
-            msg = f"Switched {success}/{total} {target} agents to {display}. Failed: {', '.join(errors)}"
-        self._send_json(200, {"ok": True, "message": msg})
+        monitor_state = load_state()
+        direction = "degrade" if action.startswith("degrade") else "upgrade"
+        monitor_state.last_switch_at = datetime.now(timezone.utc).isoformat()
+        monitor_state.last_switch_direction = direction
+        monitor_state.current_provider_state = state_label
+        monitor_state.pro_model = pro_model
+        monitor_state.standard_model = standard_model
+        save_state(monitor_state)
 
-    def _send_json(self, status: int, body: dict) -> None:
-        payload = json.dumps(body).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(payload)))
-        self.end_headers()
-        self.wfile.write(payload)
+        self._send_json(200, {
+            "success": pro_fail == 0 and std_fail == 0,
+            "pro_ok": pro_ok,
+            "pro_fail": pro_fail,
+            "std_ok": std_ok,
+            "std_fail": std_fail,
+            "state": state_label,
+        })
 
     def log_message(self, format: str, *args: Any) -> None:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {args[0]}")
