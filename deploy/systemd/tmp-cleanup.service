@@ -1,0 +1,14 @@
+[Unit]
+Description=Cleanup stale /tmp artifacts (JIT .so, opencode config dirs, temp files)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/cleanup_tmp_artifacts.sh
+StandardOutput=append:/home/sirrus/.paperclip/instances/default/logs/tmp-cleanup.log
+StandardError=append:/home/sirrus/.paperclip/instances/default/logs/tmp-cleanup.log
+Environment=HOME=/home/sirrus
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/home/sirrus/.local/bin
+
+[Install]
+WantedBy=default.target

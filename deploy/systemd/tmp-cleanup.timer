@@ -1,0 +1,11 @@
+[Unit]
+Description=TMP artifact cleanup timer (hourly)
+Requires=tmp-cleanup.service
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target
