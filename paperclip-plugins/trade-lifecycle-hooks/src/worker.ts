@@ -20,7 +20,6 @@ import {
   queryStrategies,
   queryPositions,
   queryRiskMetrics,
-  type StrategyRow,
 } from "./db.js";
 
 // ---------------------------------------------------------------------------
@@ -579,7 +578,7 @@ async function queryRiskLimits(
 }
 
 // ---------------------------------------------------------------------------
-// Strategy Validation
+// Pre-Run Hooks
 // ---------------------------------------------------------------------------
 
 const BULLISH_KEYWORDS = [
@@ -610,11 +609,19 @@ function parseJsonbField(value: unknown, fallback: unknown): unknown {
 interface StrategyRow {
   strategy_id: string;
   name: string;
+  version_id?: string | null;
+  version_number?: number | null;
+  version_timestamp?: string | null;
   validation_status: string | null;
   blocks: unknown;
   signals: unknown;
+  risk_management?: unknown;
   strategy_type: string | null;
+  entry_conditions?: unknown;
   exit_conditions: unknown;
+  metrics?: unknown;
+  created_at?: string;
+  updated_at?: string;
 }
 
 function checkDirectionConsistency(

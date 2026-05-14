@@ -17,6 +17,7 @@ const config = {
   external: [
     "@paperclipai/plugin-sdk",
     "@paperclipai/shared",
+    "pg",
   ],
   logLevel: "info",
 };
