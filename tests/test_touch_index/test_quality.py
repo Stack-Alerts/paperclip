@@ -1143,7 +1143,8 @@ class TestRunBugQualityChecks:
         ):
             report = run_bug_quality_checks(engine)
 
-        assert report.passed is False
+        # null_closed_at rows are non-blocking (issue completedAt not set in Paperclip)
+        assert report.passed is True
 
     def test_exception_in_coverage_still_runs_others(self):
         engine = MagicMock()

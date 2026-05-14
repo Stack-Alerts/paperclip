@@ -669,7 +669,11 @@ def run_bug_quality_checks(
         consistency = check_bug_consistency(engine)
         issues = []
         if consistency.null_closed_at_rows:
-            issues.append(f"{consistency.null_closed_at_rows} null-closed_at rows")
+            logger.warning(
+                "BUG CONSISTENCY: %d null-closed_at rows — "
+                "issue completedAt not set in Paperclip (non-blocking)",
+                consistency.null_closed_at_rows,
+            )
         if consistency.null_updated_at_rows:
             issues.append(f"{consistency.null_updated_at_rows} null-updated_at rows")
         if consistency.duplicate_pairs:
