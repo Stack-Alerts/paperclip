@@ -129,8 +129,6 @@ tests/qa/QA_VERDICT_*
 # ---------------------------------------------------------------------------
 # Stale-code policy paths (commit 2573843f) — permanently removed from src/
 src/utils/Strategy_Builder/
-src/strategies/strategy_02_reversal_w_pattern.py
-src/strategy_builder/core/nautilus_code_generator.py
 src/strategy_builder/examples/complete_workflow_example.py
 src/strategy_builder/templates/strategy_template.py
 # Archived paths from earlier refactors — moved to archived/, must not return
