@@ -1,0 +1,8 @@
+{
+  "issue": "BTCAAAAA-25761",
+  "status": "done",
+  "resolvedBy": "AutomationEngineer",
+  "resolution": "Created missing regression test file tests/bug_regression/test_btcaaaaa_354_regression.py (12 tests, all passing, impact gate PASS)",
+  "commitSha": "7b84396f",
+  "completedAt": "2026-05-14T00:50:00Z"
+}
