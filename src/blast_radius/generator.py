@@ -54,6 +54,7 @@ def _post_comment(issue_id: str, body: str) -> None:
     issue is done (done-guard, BTCAAAAA-25832)."""
     try:
         from touch_index.paperclip_client import is_issue_done
+
         if is_issue_done(issue_id):
             log.info(
                 "_post_comment: issue %s is done — skipping comment (done-guard)",

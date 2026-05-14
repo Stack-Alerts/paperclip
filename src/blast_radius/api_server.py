@@ -252,7 +252,9 @@ class _Handler(BaseHTTPRequestHandler):
                     if result.issue_status == "done":
                         transition_issue_status_board(result.issue_id, "done")
                         transitioned = True
-                        log.info("FR webhook: marked %s as done", result.issue_identifier)
+                        log.info(
+                            "FR webhook: marked %s as done", result.issue_identifier
+                        )
                     else:
                         log.info(
                             "FR webhook: %s ingested but status is '%s' — "
@@ -370,7 +372,9 @@ class _Handler(BaseHTTPRequestHandler):
                     if result.issue_status == "done":
                         transition_issue_status_board(result.issue_id, "done")
                         transitioned = True
-                        log.info("Bug webhook: marked %s as done", result.issue_identifier)
+                        log.info(
+                            "Bug webhook: marked %s as done", result.issue_identifier
+                        )
                     else:
                         log.info(
                             "Bug webhook: %s ingested but status is '%s' — "

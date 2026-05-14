@@ -91,7 +91,10 @@ def _compute_severity(data: dict) -> tuple[str, str]:
     issues_with_errors = data.get("issues_with_errors", 0)
 
     if issues_processed == 0:
-        return ("low", "No issues processed in this run (idle cycle) — unexpected alert path")
+        return (
+            "low",
+            "No issues processed in this run (idle cycle) — unexpected alert path",
+        )
 
     error_rate = issues_with_errors / max(issues_processed, 1)
     if error_rate > 0.5:
