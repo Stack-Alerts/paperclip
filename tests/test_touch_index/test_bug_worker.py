@@ -986,6 +986,63 @@ class TestMain:
         assert data["worker"] == "bug"
         assert data["mode"] == "polling"
 
+    def test_main_credential_check_failure_exits(self, monkeypatch):
+        """When check_paperclip_credentials returns an error, SystemExit(1) is raised."""
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.check_paperclip_credentials",
+                return_value="Missing PAPERCLIP_API_KEY",
+            ),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues"
+            ) as mock_fetch,
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_fetch.assert_not_called()
+
+    def test_main_credential_check_failure_emits_json_summary(
+        self, monkeypatch, capsys
+    ):
+        """--json-summary with credential check failure emits JSON before SystemExit."""
+        import json
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.check_paperclip_credentials",
+                return_value="Missing PAPERCLIP_API_KEY",
+            ),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues"
+            ) as mock_fetch,
+        ):
+            monkeypatch.setattr(
+                "sys.argv", ["touch_index", "--json-summary"]
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        mock_fetch.assert_not_called()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out.strip())
+        assert data["worker"] == "bug"
+        assert data["mode"] == "polling"
+
     def test_main_no_issues_returns_early(self, monkeypatch, caplog):
         """When no closed non-FDR issues found, run_bug_worker is never called."""
         import logging
