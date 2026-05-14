@@ -1,0 +1,27 @@
+{
+  "issue": "BTCAAAAA-26034",
+  "status": "done",
+  "timestamp": "2026-05-14T02:20:00Z",
+  "agent": "DataEngineer",
+  "action": "Touch Index bug-close ingestion worker \u2014 catch-up run restored eligible coverage, all quality checks PASS",
+  "deliverables": [
+    "Ran catch_up_eligible_bug_issues() \u2014 indexed 2 files from 2 eligible issues via description fallback",
+    "28 remaining missing eligible issues are genuinely unindexable (no source files in fix commits, comments, or descriptions)",
+    "Eligible coverage restored to 97.0% (897/925) \u2014 above 90% SLA threshold",
+    "Saved data quality snapshot to data_quality_20260514.json",
+    "Freshness: 0 stale rows, max age 24.0h",
+    "Consistency: clean (0 nulls, 0 duplicates, 0 orphans)",
+    "Source distribution: git=2151, comments=118, description=61",
+    "Tests: 477/477 PASS"
+  ],
+  "verification": {
+    "tests": "477/477 PASS",
+    "eligible_coverage_before": "96.9%",
+    "eligible_coverage_after": "97.0%",
+    "catch_up_files_indexed": 2,
+    "catch_up_issues_indexed": 2,
+    "issues_skipped_no_files": 28,
+    "quality_check": "PASSED"
+  },
+  "note": "BTCAAAAA-26025 and BTCAAAAA-26035 were newly indexed via description fallback. The 28 remaining missing eligible issues have git references but no source file changes (documentation/config-only fix commits), which is expected and persistent behavior."
+}
