@@ -927,3 +927,194 @@ class TestMutedState:
                 monkeypatch.setattr(pc, "fetch_issue_comments", original)
             else:
                 monkeypatch.delattr(pc, "fetch_issue_comments", raising=False)
+
+
+class TestPurgeMutedEntries:
+    def test_purges_matching_statuses(self, tmp_path, monkeypatch):
+        p = tmp_path / "muted.json"
+        p.write_text('{"a": "ERROR", "b": "PASS", "c": "error", "d": "FAIL", "e": "SKIPPED"}')
+        monkeypatch.setattr(_scan, "_MUTED_STATE_PATH", p)
+        removed = _scan.purge_muted_entries({"ERROR"})
+        assert removed == 2
+        data = json.loads(p.read_text())
+        assert "a" not in data
+        assert "c" not in data
+        assert data["b"] == "PASS"
+        assert data["d"] == "FAIL"
+        assert data["e"] == "SKIPPED"
+
+    def test_purges_multiple_statuses(self, tmp_path, monkeypatch):
+        p = tmp_path / "muted.json"
+        p.write_text('{"a": "ERROR", "b": "FAIL", "c": "PASS"}')
+        monkeypatch.setattr(_scan, "_MUTED_STATE_PATH", p)
+        removed = _scan.purge_muted_entries({"ERROR", "FAIL"})
+        assert removed == 2
+        data = json.loads(p.read_text())
+        assert list(data.keys()) == ["c"]
+
+    def test_returns_zero_when_no_matches(self, tmp_path, monkeypatch):
+        p = tmp_path / "muted.json"
+        p.write_text('{"a": "PASS", "b": "SKIPPED", "c": "BYPASSED"}')
+        monkeypatch.setattr(_scan, "_MUTED_STATE_PATH", p)
+        removed = _scan.purge_muted_entries({"ERROR"})
+        assert removed == 0
+        data = json.loads(p.read_text())
+        assert len(data) == 3
+
+    def test_returns_zero_when_file_missing(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(_scan, "_MUTED_STATE_PATH", tmp_path / "nonexistent.json")
+        removed = _scan.purge_muted_entries({"ERROR"})
+        assert removed == 0
+
+    def test_case_insensitive_purge(self, tmp_path, monkeypatch):
+        p = tmp_path / "muted.json"
+        p.write_text('{"a": "Error", "b": "error", "c": "ERROR"}')
+        monkeypatch.setattr(_scan, "_MUTED_STATE_PATH", p)
+        removed = _scan.purge_muted_entries({"error"})
+        assert removed == 3
+
+    def test_handles_empty_json(self, tmp_path, monkeypatch):
+        p = tmp_path / "muted.json"
+        p.write_text("{}")
+        monkeypatch.setattr(_scan, "_MUTED_STATE_PATH", p)
+        removed = _scan.purge_muted_entries({"ERROR"})
+        assert removed == 0
+
+    def test_handles_corrupt_json(self, tmp_path, monkeypatch):
+        p = tmp_path / "muted.json"
+        p.write_text("not json")
+        monkeypatch.setattr(_scan, "_MUTED_STATE_PATH", p)
+        removed = _scan.purge_muted_entries({"ERROR"})
+        assert removed == 0
+
+    def test_writes_empty_json_when_all_purged(self, tmp_path, monkeypatch):
+        p = tmp_path / "muted.json"
+        p.write_text('{"a": "ERROR"}')
+        monkeypatch.setattr(_scan, "_MUTED_STATE_PATH", p)
+        _scan.purge_muted_entries({"ERROR"})
+        assert json.loads(p.read_text()) == {}
+
+
+class TestScanRetryFlags:
+    def test_retry_errors_purges_before_scan(self, monkeypatch):
+        from unittest.mock import MagicMock
+        purge_calls = []
+        monkeypatch.setattr(_scan, "_paginate", lambda path, params, page_size=100: [])
+        monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
+        monkeypatch.setattr(_scan, "purge_muted_entries", lambda statuses: purge_calls.append(statuses) or 0)
+        _scan.scan(retry_errors=True)
+        assert len(purge_calls) == 1
+        assert "ERROR" in purge_calls[0]
+
+    def test_retry_fails_purges_before_scan(self, monkeypatch):
+        from unittest.mock import MagicMock
+        purge_calls = []
+        monkeypatch.setattr(_scan, "_paginate", lambda path, params, page_size=100: [])
+        monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
+        monkeypatch.setattr(_scan, "purge_muted_entries", lambda statuses: purge_calls.append(statuses) or 0)
+        _scan.scan(retry_fails=True)
+        assert len(purge_calls) == 1
+        assert "FAIL" in purge_calls[0]
+
+    def test_retry_both_purges_both(self, monkeypatch):
+        from unittest.mock import MagicMock
+        purge_calls = []
+        monkeypatch.setattr(_scan, "_paginate", lambda path, params, page_size=100: [])
+        monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
+        monkeypatch.setattr(_scan, "purge_muted_entries", lambda statuses: purge_calls.append(statuses) or 0)
+        _scan.scan(retry_errors=True, retry_fails=True)
+        assert len(purge_calls) == 1
+        assert purge_calls[0] == {"ERROR", "FAIL"}
+
+    def test_no_purge_when_neither_flag_set(self, monkeypatch):
+        from unittest.mock import MagicMock
+        purge_calls = []
+        monkeypatch.setattr(_scan, "_paginate", lambda path, params, page_size=100: [])
+        monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
+        monkeypatch.setattr(_scan, "purge_muted_entries", lambda statuses: purge_calls.append(statuses) or 0)
+        _scan.scan()
+        assert len(purge_calls) == 0
+
+    def test_purged_ungated_issues_get_retroactive_gate(self, monkeypatch):
+        monkeypatch.setattr(_scan, "purge_muted_entries", lambda statuses: 3)
+        monkeypatch.setattr(
+            _scan,
+            "_paginate",
+            lambda path, params, page_size=100: [
+                {
+                    "id": "u1",
+                    "identifier": "BTCAAAAA-100",
+                    "title": "Fix A",
+                    "labels": [{"name": "fix"}],
+                    "status": "done",
+                },
+            ],
+        )
+        monkeypatch.setattr(_scan, "_company", lambda: "comp-uuid")
+        monkeypatch.setattr(
+            _scan, "fetch_issue_comments", lambda iid: [{"body": "Other comment"}]
+        )
+        calls = []
+        monkeypatch.setattr(
+            _scan,
+            "process_issue",
+            lambda iid, dry_run=False, **kwargs: (
+                calls.append({"iid": iid, "force": kwargs.get("force")}) or {"issue": "BTCAAAAA-100", "gate_status": "PASS"}
+            ),
+        )
+        result = _scan.scan(retry_errors=True, retroactive=True)
+        assert len(calls) == 1
+        assert calls[0]["force"] is True
+        assert result["gated"]["pass"] == 1
+        assert result["ungated_count"] == 0
+
+    def test_main_passes_retry_flags(self, monkeypatch):
+        kwargs_store = {}
+        monkeypatch.setattr(
+            _scan,
+            "scan",
+            lambda **kw: (
+                kwargs_store.update(kw)
+                or {
+                    "timestamp": "",
+                    "total_done_fix_issues": 0,
+                    "gated": {"pass": 0, "fail": 0, "bypassed": 0, "error": 0},
+                    "ungated_count": 0,
+                    "ungated_issues": [],
+                    "gated_issues": [],
+                }
+            ),
+        )
+        monkeypatch.setattr(
+            sys, "argv", ["scan_fix_issues_done.py", "--retry-errors", "--retry-fails"]
+        )
+        try:
+            _scan.main()
+        except SystemExit:
+            pass
+        assert kwargs_store.get("retry_errors") is True
+        assert kwargs_store.get("retry_fails") is True
+
+    def test_json_summary_includes_retry_flags(self, monkeypatch, capsys):
+        monkeypatch.setattr(
+            _scan,
+            "scan",
+            lambda **kw: {
+                "timestamp": "2026-05-12T00:00:00",
+                "total_done_fix_issues": 0,
+                "gated": {"pass": 0, "fail": 0, "bypassed": 0, "error": 0},
+                "ungated_count": 0,
+                "ungated_issues": [],
+                "gated_issues": [],
+            },
+        )
+        monkeypatch.setattr(
+            sys, "argv", ["scan_fix_issues_done.py", "--json-summary", "--retry-errors"]
+        )
+        try:
+            _scan.main()
+        except SystemExit:
+            pass
+        data = json.loads(capsys.readouterr().out)
+        assert data["retry_errors"] is True
+        assert data["retry_fails"] is False

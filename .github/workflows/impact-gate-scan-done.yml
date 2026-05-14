@@ -22,6 +22,14 @@ on:
         description: 'Run Impact Gate on ungated issues'
         required: false
         default: 'true'
+      retry_errors:
+        description: 'Purge muted ERROR entries and re-gate'
+        required: false
+        default: 'false'
+      retry_fails:
+        description: 'Purge muted FAIL entries and re-gate'
+        required: false
+        default: 'false'
 
 concurrency:
   group: impact-gate-scan-done
@@ -82,6 +90,12 @@ jobs:
             fi
             if [ "${{ github.event.inputs.retroactive }}" = "true" ]; then
               FLAGS="$FLAGS --retroactive"
+            fi
+            if [ "${{ github.event.inputs.retry_errors }}" = "true" ]; then
+              FLAGS="$FLAGS --retry-errors"
+            fi
+            if [ "${{ github.event.inputs.retry_fails }}" = "true" ]; then
+              FLAGS="$FLAGS --retry-fails"
             fi
             if [ "${{ github.event.inputs.full_scan }}" = "true" ]; then
               echo "Full scan mode — ignoring days_back"

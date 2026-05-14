@@ -116,10 +116,36 @@ def save_muted_gate_result(issue_id: str, gate_status: str) -> None:
     _MUTED_STATE_PATH.write_text(json.dumps(state, indent=2))
 
 
+def purge_muted_entries(statuses: set[str]) -> int:
+    """Remove muted entries matching *statuses* (case-insensitive).
+
+    Returns the number of entries removed.
+    """
+    state = _load_muted_state()
+    if not state:
+        return 0
+    removed = 0
+    purge_set = {s.upper() for s in statuses}
+    to_remove = [
+        iid for iid, status in state.items() if status.upper() in purge_set
+    ]
+    for iid in to_remove:
+        del state[iid]
+        removed += 1
+    _MUTED_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _MUTED_STATE_PATH.write_text(json.dumps(state, indent=2) if state else "{}")
+    logger.info(
+        "Purged %d muted entries for statuses %s", removed, sorted(purge_set)
+    )
+    return removed
+
+
 def scan(
     days_back: int | None = None,
     dry_run: bool = False,
     retroactive: bool = False,
+    retry_errors: bool = False,
+    retry_fails: bool = False,
 ) -> dict:
     """Scan done fix/bug issues and report Impact Gate coverage.
 
@@ -127,6 +153,8 @@ def scan(
         days_back: Only scan issues completed within this many days (None = all).
         dry_run: Log results but do NOT run retroactive gates.
         retroactive: Run the Impact Gate on ungated issues.
+        retry_errors: Purge muted ERROR entries so they get a fresh retroactive gate.
+        retry_fails: Purge muted FAIL entries so they get a fresh retroactive gate.
 
     Returns a summary dict (see module docstring for schema).
     """
@@ -154,6 +182,19 @@ def scan(
         logger.info(
             "Filtered to %d done issues within last %d days", len(issues), days_back
         )
+
+    if retry_errors or retry_fails:
+        statuses = set()
+        if retry_errors:
+            statuses.add("ERROR")
+        if retry_fails:
+            statuses.add("FAIL")
+        purged = purge_muted_entries(statuses)
+        if purged > 0 and retroactive:
+            logger.info(
+                "Retrying %d purged entries — enabling retroactive auto-gating",
+                purged,
+            )
 
     fix_issues = [i for i in issues if _is_fix_issue(i)]
     logger.info("Found %d fix/bug issues in done status", len(fix_issues))
@@ -347,12 +388,24 @@ def main() -> int:
         action="store_true",
         help="Output structured JSON summary to stdout (overrides --output)",
     )
+    parser.add_argument(
+        "--retry-errors",
+        action="store_true",
+        help="Purge muted ERROR entries so they get a fresh retroactive gate",
+    )
+    parser.add_argument(
+        "--retry-fails",
+        action="store_true",
+        help="Purge muted FAIL entries so they get a fresh retroactive gate",
+    )
     args = parser.parse_args()
 
     result = scan(
         days_back=args.days_back,
         dry_run=args.dry_run,
         retroactive=args.retroactive,
+        retry_errors=args.retry_errors,
+        retry_fails=args.retry_fails,
     )
 
     if args.json_summary:
@@ -360,6 +413,8 @@ def main() -> int:
             "worker": "impact-gate-scan-done",
             "dry_run": args.dry_run,
             "retroactive": args.retroactive,
+            "retry_errors": args.retry_errors,
+            "retry_fails": args.retry_fails,
             "days_back": args.days_back,
             "timestamp": result["timestamp"],
             "total_done_fix_issues": result["total_done_fix_issues"],
