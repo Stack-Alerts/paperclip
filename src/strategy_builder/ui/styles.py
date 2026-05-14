@@ -355,6 +355,11 @@ COLORS = {
     'exit_cumulative_multiple': '#FFA500',      # Yellow (101-500% - Multiple opportunities)
     'exit_cumulative_high': '#FF6B6B',          # Orange (>500% - High redundancy)
     'dead_code_strikethrough': '#6B7280',       # Gray for disabled signals
+
+    # Log viewer event colors (Sprint 2.x)
+    'gold': '#FFD700',                          # Event highlighting (updates, decisions)
+    'purple': '#8B5CF6',                        # Event highlighting (positions, blocks)
+    'dark_orange': '#FF8C00',                   # Event highlighting (warnings, missing)
 }
 
 # Standardized label styling (used throughout main window)
