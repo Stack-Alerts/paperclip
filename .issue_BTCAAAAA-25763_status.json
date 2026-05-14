@@ -1,0 +1,14 @@
+{
+  "issue": "BTCAAAAA-25763",
+  "status": "done",
+  "verdict": "PASS",
+  "timestamp": "2026-05-14T01:00:00Z",
+  "agent": "AutomationEngineer",
+  "note": "Created regression test file tests/bug_regression/test_btcaaaaa_381_regression.py with 14 tests covering the BTCAAAAA-381 dialog-close fix: method existence, timer-path finalize call, double-fire prevention, fast-path vs slow-path flag handling, dialog init wiring. Impact Gate runner --bugs BTCAAAAA-381 now returns PASS with 14/14 tests.",
+  "deliverables": [
+    "tests/bug_regression/test_btcaaaaa_381_regression.py"
+  ],
+  "verification_commit": "5de3dbc5",
+  "test_count": 14,
+  "test_result": "14/14 passed"
+}
