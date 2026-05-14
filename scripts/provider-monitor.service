@@ -1,0 +1,13 @@
+[Unit]
+Description=Provider usage monitor and agent model switching
+Documentation=https://github.com/anomalyco/opencode
+Wants=provider-monitor.timer
+
+[Service]
+Type=oneshot
+ExecStart=%h/projects/BTC-Trade-Engine-PaperClip/scripts/provider_monitor.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
