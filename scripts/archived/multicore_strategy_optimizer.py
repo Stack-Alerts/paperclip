@@ -100,12 +100,6 @@ def run_single_test(params: Dict) -> Dict:
         strategy._analyze_blocks = MPatternReversalStandard._analyze_blocks.__get__(strategy)
         strategy._calculate_confluence = MPatternReversalStandard._calculate_confluence.__get__(strategy)
         strategy._calculate_tp_sl = MPatternReversalStandard._calculate_tp_sl.__get__(strategy)
-        strategy._detect_double_top = MPatternReversalStandard._detect_double_top.__get__(strategy)
-        strategy._detect_rsi_divergence = MPatternReversalStandard._detect_rsi_divergence.__get__(strategy)
-        strategy._check_hod_rejection = MPatternReversalStandard._check_hod_rejection.__get__(strategy)
-        strategy._check_asia_50_position = MPatternReversalStandard._check_asia_50_position.__get__(strategy)
-        strategy._check_session_timing = MPatternReversalStandard._check_session_timing.__get__(strategy)
-        strategy._check_vwap_position = MPatternReversalStandard._check_vwap_position.__get__(strategy)
         
         # Initialize simulator
         sim_config = BacktestConfig(

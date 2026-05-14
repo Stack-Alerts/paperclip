@@ -13,6 +13,20 @@ import numpy as np
 from datetime import datetime, timedelta
 from pathlib import Path
 
+# Import building block detectors for mock strategy
+from src.detectors.building_blocks.patterns.double_top import DoubleTopPattern
+from src.detectors.building_blocks.oscillators.rsi_divergence import RSIDivergence
+from src.detectors.building_blocks.price_levels.hod import HOD
+from src.detectors.building_blocks.price_levels.asia_session_50_percent import AsiaSession50Percent
+from src.detectors.building_blocks.sessions.session_time import SessionTime
+from src.detectors.building_blocks.institutional.vwap import VWAP
+from src.detectors.building_blocks.moving_averages.ema_20_50_trend import EMA2050Trend
+from src.detectors.building_blocks.sessions.kill_zones import KillZones
+from src.detectors.building_blocks.volatility.adr import ADR
+from src.detectors.building_blocks.market_structure.swing_points import SwingPoints
+from src.detectors.building_blocks.moving_averages.ema_200_trend import EMA200Trend
+from src.detectors.building_blocks.market_structure.premium_discount_zones import PremiumDiscountZones
+
 def load_btc_data(days: int = 180) -> pd.DataFrame:
     """Load BTC 15min data"""
     print(f"Loading {days} days of BTC data...")
@@ -65,13 +79,36 @@ def test_confluence_scoring():
             self.peak_tolerance = 0.002
             self.bars_data = []
             
+            # Initialize REAL building block detectors
+            self.detectors = {
+                'double_top': DoubleTopPattern(timeframe='15min'),
+                'rsi_divergence': RSIDivergence(timeframe='15min'),
+                'hod': HOD(timeframe='15min'),
+                'asia_session_50_percent': AsiaSession50Percent(timeframe='15min'),
+                'session_time': SessionTime(timeframe='15min'),
+                'vwap': VWAP(timeframe='15min'),
+                'ema_20_50_trend': EMA2050Trend(timeframe='15min'),
+                'kill_zones': KillZones(timeframe='15min'),
+                'adr': ADR(timeframe='15min'),
+                'swing_points': SwingPoints(timeframe='15min'),
+                'ema_200_trend': EMA200Trend(timeframe='15min'),
+                'premium_discount_zones': PremiumDiscountZones(timeframe='15min'),
+            }
+            
+            # Initialize blocks (matching real strategy)
             self.blocks = {
-                'double_top': {'name': 'DoubleTopPattern', 'weight': 30, 'enabled': True},
-                'rsi_divergence': {'name': 'RSIDivergence', 'weight': 25, 'enabled': True},
-                'hod': {'name': 'HOD', 'weight': 20, 'enabled': True},
-                'asia_50': {'name': 'AsiaSession50Percent', 'weight': 18, 'enabled': True},
-                'session_time': {'name': 'SessionTime', 'weight': 15, 'enabled': True},
-                'vwap': {'name': 'VWAP', 'weight': 12, 'enabled': True}
+                'double_top': {'name': 'DoubleTopPattern', 'weight': 35, 'enabled': True},
+                'rsi_divergence': {'name': 'RSIDivergence', 'weight': 30, 'enabled': True},
+                'hod': {'name': 'HOD', 'weight': 15, 'enabled': True},
+                'asia_session_50_percent': {'name': 'AsiaSession50Percent', 'weight': 12, 'enabled': True},
+                'session_time': {'name': 'SessionTime', 'weight': 10, 'enabled': True},
+                'vwap': {'name': 'VWAP', 'weight': 10, 'enabled': True},
+                'ema_20_50_trend': {'name': 'EMA2050Trend', 'weight': 12, 'enabled': True},
+                'kill_zones': {'name': 'KillZones', 'weight': 12, 'enabled': True},
+                'adr': {'name': 'ADR', 'weight': 8, 'enabled': True},
+                'swing_points': {'name': 'SwingPoints', 'weight': 15, 'enabled': True},
+                'ema_200_trend': {'name': 'EMA200Trend', 'weight': 12, 'enabled': True},
+                'premium_discount_zones': {'name': 'PremiumDiscountZones', 'weight': 14, 'enabled': True},
             }
     
     strategy = MockStrategy()
@@ -80,12 +117,6 @@ def test_confluence_scoring():
     strategy._analyze_blocks = MPatternReversalStandard._analyze_blocks.__get__(strategy)
     strategy._calculate_confluence = MPatternReversalStandard._calculate_confluence.__get__(strategy)
     strategy._calculate_tp_sl = MPatternReversalStandard._calculate_tp_sl.__get__(strategy)
-    strategy._detect_double_top = MPatternReversalStandard._detect_double_top.__get__(strategy)
-    strategy._detect_rsi_divergence = MPatternReversalStandard._detect_rsi_divergence.__get__(strategy)
-    strategy._check_hod_rejection = MPatternReversalStandard._check_hod_rejection.__get__(strategy)
-    strategy._check_asia_50_position = MPatternReversalStandard._check_asia_50_position.__get__(strategy)
-    strategy._check_session_timing = MPatternReversalStandard._check_session_timing.__get__(strategy)
-    strategy._check_vwap_position = MPatternReversalStandard._check_vwap_position.__get__(strategy)
     
     print(f"\n🔍 Analyzing confluence scores...")
     print(f"   Min threshold: {strategy.min_confluence}")
