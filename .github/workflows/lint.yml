@@ -39,3 +39,39 @@ jobs:
 
       - name: Run secrets audit
         run: python scripts/audit/secrets_audit.py
+
+  archived-paths:
+    name: Guard against re-introduction of archived paths
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify no archived paths exist in src/
+        run: |
+          set -euo pipefail
+          VIOLATIONS=0
+
+          check_path() {
+            local path="$1"
+            if [ -e "$path" ]; then
+              echo "::error file=$path::Archived path found in src/ — must not exist. See archived/ directory for the original. Reference: BTCAAAAA-26587"
+              VIOLATIONS=$((VIOLATIONS + 1))
+            fi
+          }
+
+          # --- Archived path blocklist ---
+          # Add new archived paths here as a single line. Each path
+          # is relative to the repo root. Directories end with /.
+          # References: .gitignore stale-code section, BTCAAAAA-26587
+          check_path "src/utils/Strategy_Builder/"
+          check_path "src/strategies/strategy_02_reversal_w_pattern.py"
+          check_path "src/strategy_builder/core/nautilus_code_generator.py"
+          check_path "src/strategy_builder/examples/complete_workflow_example.py"
+          # --- End blocklist ---
+
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            echo "::error::${VIOLATIONS} archived path(s) found in src/. Remove them and move any needed logic elsewhere. Reference: BTCAAAAA-26587"
+            exit 1
+          fi
+
+          echo "No archived-path violations found."
