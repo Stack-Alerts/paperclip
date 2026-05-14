@@ -275,7 +275,7 @@ def _render_agent_map(agent_models: dict[str, str], agents_raw: list[dict]) -> s
         html += '</div></div>\n'
     html += '</div>\n'
 
-    ungrouped = set(agent_models) - set(agent_models)
+    ungrouped = {a["name"] for a in agents_raw} - set(agent_models)
     if ungrouped:
         html += f'<div class="note">Ungrouped agents: {", ".join(sorted(ungrouped))}</div>\n'
     return html
