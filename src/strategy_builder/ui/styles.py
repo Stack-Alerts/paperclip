@@ -1850,6 +1850,48 @@ def get_stepper_button_style(state: str = 'pending') -> str:
     return styles.get(state, styles['pending'])
 
 
+def get_log_text_edit_stylesheet() -> str:
+    """
+    Get stylesheet for QPlainTextEdit log display.
+
+    Dark-themed monospace log viewer with high-contrast text.
+    Used by LogViewerWindow for institutional-grade log display.
+
+    Returns:
+        QPlainTextEdit stylesheet string
+    """
+    return f"""
+        QPlainTextEdit {{
+            background-color: {COLORS['bg_dark']};
+            color: {COLORS['text_primary']};
+            border: 1px solid {COLORS['border']};
+            selection-background-color: {COLORS['bg_light']};
+        }}
+    """
+
+
+def get_event_filter_checkbox_style(color_hex: str) -> str:
+    """
+    Get stylesheet for event filter checkboxes in LogViewerWindow.
+
+    Args:
+        color_hex: Hex color string for the checkbox text (from get_color())
+
+    Returns:
+        QCheckBox stylesheet string
+    """
+    return f"""
+        QCheckBox {{
+            color: {color_hex};
+            background: transparent;
+        }}
+        QCheckBox::indicator {{
+            width: 40px;
+            height: 18px;
+        }}
+    """
+
+
 def get_stepper_arrow_style() -> str:
     """
     Get stylesheet for stepper arrow separators.

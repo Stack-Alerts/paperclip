@@ -1,32 +1,39 @@
 """
-Institutional-Grade Log Viewer Window - Performance Fix
+Institutional-Grade Log Viewer Window — Freeze Fix v2
 
 Multi-tabbed log viewer with event-based filtering across all log types.
+- Background content loading via QThreadPool (never block UI thread)
+- Pre-classified lines for O(1) per-line event matching during filtering
+- FreezeDetector watchdog captures stack traces if UI thread blocks >4s
 - QPlainTextEdit + QSyntaxHighlighter for performant large-file rendering
 - Lazy tab loading (content loaded on first activation)
-- Background worker for directory scanning and tab metadata
-- Event-based institutional-grade filtering
-- Capped line reads per file to prevent UI freezes
+- Capped line reads per file to prevent memory exhaustion
 
-ZERO HARDCODED STYLES - All from styles.py
+ZERO HARDCODED STYLES — All from styles.py
 """
 
-from typing import Dict, List, Optional, Set, Tuple, Callable
+from typing import Dict, List, Optional, Set, Tuple
 from pathlib import Path
 import re
+import sys
+import threading
+import time
+import traceback
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPlainTextEdit, QPushButton,
     QCheckBox, QLabel, QGroupBox, QApplication, QMessageBox,
     QTabWidget, QWidget, QGridLayout,
 )
 from PyQt5.QtCore import Qt, QSettings, QRunnable, QThreadPool, pyqtSignal, QTimer, QObject
-from PyQt5.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
+from PyQt5.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor
 
 from src.strategy_builder.ui.styles import (
     get_groupbox_header_stylesheet,
     get_label_style,
     get_panel_title_stylesheet,
     get_primary_button_stylesheet,
+    get_log_text_edit_stylesheet,
+    get_event_filter_checkbox_style,
     get_color,
     create_font,
     create_monospace_font,
@@ -36,11 +43,9 @@ from src.strategy_builder.ui.styles import (
 import logging
 logger = logging.getLogger(__name__)
 
-# Performant limits — prevents UI freeze with 3000+ log files
 MAX_LINES_PER_FILE = 5000
 MAX_FILES_ALL_LOGS = 100
 
-# Event patterns — color values via get_color() keys, zero hardcoded hex
 EVENT_PATTERNS: Dict[str, Tuple[str, str]] = {
     "TRADE_OPENED": (
         r"TRADE OPENED|trade.*opened|Opening trade|🟢.*TRADE",
@@ -91,61 +96,120 @@ EVENT_PATTERNS: Dict[str, Tuple[str, str]] = {
 
 _HEADER_SEP = "=" * 80
 
-
-# --------------------------------------------------------------------------- #
-# LogSyntaxHighlighter — QSyntaxHighlighter for colored log display
-# --------------------------------------------------------------------------- #
-
-
-class LogSyntaxHighlighter(QSyntaxHighlighter):
-    """Applies color coding to log lines via QSyntaxHighlighter.
-
-    Much faster than the previous QTextEdit.setHtml() approach because
-    highlighting happens lazily as lines are painted, not upfront on the
-    entire document.
-    """
-
-    def __init__(self, document):
-        super().__init__(document)
-        self._rules: List[Tuple[re.Pattern, QTextCharFormat]] = []
-        for event_key, (pattern_str, color_key) in EVENT_PATTERNS.items():
-            fmt = QTextCharFormat()
-            fmt.setForeground(QColor(get_color(color_key)))
-            self._rules.append((re.compile(pattern_str, re.IGNORECASE), fmt))
-
-    def highlightBlock(self, text: str) -> None:
-        for pattern, fmt in self._rules:
-            for match in pattern.finditer(text):
-                self.setFormat(match.start(), match.end() - match.start(), fmt)
+_COMPILED_PATTERNS: List[Tuple[str, re.Pattern, str]] = [
+    (key, re.compile(pattern_str, re.IGNORECASE), color_key)
+    for key, (pattern_str, color_key) in EVENT_PATTERNS.items()
+]
 
 
-# --------------------------------------------------------------------------- #
-# TabMetadata — lightweight tab definition (no loaded content)
-# --------------------------------------------------------------------------- #
+_CONTEXT_PREFIXES = (
+    "  ", "\t", "Location:", "Timestamp:", "Trade ID:",
+    "Side:", "Size:", "Entry Price:", "Status:",
+)
 
 
-class TabMetadata:
-    """Holds tab metadata without loaded content until first activation."""
+class LineClassification:
+    """Pre-classified data for a single log line — zero regex at filter time."""
 
-    def __init__(self, name: str, files: List[Path]):
-        self.name = name
-        self.files = files
-        self._content: Optional[str] = None
+    __slots__ = ('text', 'matching_events')
+
+    def __init__(self, text: str, matching_events: Set[str]):
+        self.text = text
+        self.matching_events = matching_events
 
     @property
-    def content(self) -> Optional[str]:
-        return self._content
+    def is_context_line(self) -> bool:
+        t = self.text
+        return (
+            t.startswith("  ")
+            or t.startswith("\t")
+            or t.startswith("Location:")
+            or t.startswith("Timestamp:")
+            or t.startswith("Trade ID:")
+            or t.startswith("Side:")
+            or t.startswith("Size:")
+            or t.startswith("Entry Price:")
+            or t.startswith("Status:")
+        )
 
-    def load_content(self) -> str:
-        """Read and cache file contents (capped to MAX_LINES_PER_FILE per file).
 
-        Uses streaming line-by-line reads to avoid loading huge files
-        (e.g. 389MB wiring_test.log) into memory.
+class ContentCache:
+    """Holds pre-classified lines for fast event filtering.
+
+    Filtering is O(n) with simple set intersection per line instead of
+    O(n*m) regex matching.  _update_stats also avoids re-splitting.
+    """
+
+    def __init__(self, lines: List[LineClassification]):
+        self.lines = lines
+        self.total_count = len(lines)
+
+    @staticmethod
+    def build_from_text(text: str) -> 'ContentCache':
+        classified: List[LineClassification] = []
+        for line in text.split('\n'):
+            matching: Set[str] = set()
+            for event_key, pattern, _ in _COMPILED_PATTERNS:
+                if pattern.search(line):
+                    matching.add(event_key)
+            classified.append(LineClassification(line, matching))
+        return ContentCache(classified)
+
+    def filter(self, enabled_events: Set[str]) -> Tuple[str, int]:
+        """Build filtered text + event count using pre-classified data.
+
+        Returns (filtered_text, event_count).
         """
-        if self._content is not None:
-            return self._content
+        parts: List[str] = []
+        event_count = 0
+        in_context = False
+        for cl in self.lines:
+            if enabled_events and cl.matching_events.intersection(enabled_events):
+                parts.append(cl.text)
+                event_count += 1
+                in_context = True
+            elif in_context and (cl.is_context_line or not cl.text.strip()):
+                parts.append(cl.text)
+            else:
+                in_context = False
+        return '\n'.join(parts), event_count
+
+
+class BackgroundContentSignals(QObject):
+    """Signal carrier for BackgroundContentLoader."""
+
+    loaded = pyqtSignal(int, object)
+    error = pyqtSignal(int, str)
+
+
+class BackgroundContentLoader(QRunnable):
+    """Reads log files and builds a ContentCache in a background thread.
+
+    Emits loaded(index, ContentCache) when done.
+    """
+
+    def __init__(self, tab_index: int, meta):
+        super().__init__()
+        self.tab_index = tab_index
+        self.meta = meta
+        self._cancelled = False
+        self.signals = BackgroundContentSignals()
+
+    def cancel(self):
+        self._cancelled = True
+
+    def run(self):
+        try:
+            cache = self._build_cache()
+            if not self._cancelled:
+                self.signals.loaded.emit(self.tab_index, cache)
+        except Exception as e:
+            if not self._cancelled:
+                self.signals.error.emit(self.tab_index, str(e))
+
+    def _build_cache(self) -> ContentCache:
         chunks: List[str] = []
-        for f in self.files:
+        for f in self.meta.files:
             chunks.append(f"\n{_HEADER_SEP}\n")
             chunks.append(f"LOG FILE: {f.name}\n")
             chunks.append(f"{_HEADER_SEP}\n\n")
@@ -162,26 +226,127 @@ class TabMetadata:
                         line_count += 1
             except Exception as exc:
                 chunks.append(f"ERROR: Could not read file - {exc}\n")
-        self._content = "".join(chunks)
-        return self._content
+            if self._cancelled:
+                return ContentCache([])
+        raw = "".join(chunks)
+        return ContentCache.build_from_text(raw)
 
 
-# --------------------------------------------------------------------------- #
-# LogLoadRunnable — background directory scanner + tab builder (QThreadPool)
-# --------------------------------------------------------------------------- #
+class LogSyntaxHighlighter(QSyntaxHighlighter):
+    """Applies color coding to log lines via QSyntaxHighlighter — uses
+    pre-compiled module-level patterns."""
+
+    def __init__(self, document):
+        super().__init__(document)
+        self._rules: List[Tuple[re.Pattern, QTextCharFormat]] = []
+        for _, pattern, color_key in _COMPILED_PATTERNS:
+            fmt = QTextCharFormat()
+            fmt.setForeground(QColor(get_color(color_key)))
+            self._rules.append((pattern, fmt))
+
+    def highlightBlock(self, text: str) -> None:
+        for pattern, fmt in self._rules:
+            for match in pattern.finditer(text):
+                self.setFormat(match.start(), match.end() - match.start(), fmt)
+
+
+class TabMetadata:
+    """Holds tab metadata with lazy background loading."""
+
+    def __init__(self, name: str, files: List[Path]):
+        self.name = name
+        self.files = files
+        self.cache: Optional[ContentCache] = None
+        self._loading = False
+
+    @property
+    def is_loaded(self) -> bool:
+        return self.cache is not None
+
+    def is_loading(self) -> bool:
+        return self._loading
+
+    def set_loading(self, val: bool):
+        self._loading = val
+
+    def set_cache(self, cache: ContentCache):
+        self.cache = cache
+        self._loading = False
+
+
+class FreezeDetector(QObject):
+    """Watchdog that captures stack traces when the Qt event loop is blocked.
+
+    A daemon thread monitors a timestamp that the UI timer periodically
+    updates.  If the timestamp is >4s stale, the main thread's call stack
+    is captured to a log file while the freeze is still in progress.
+    """
+
+    freeze_detected = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._running = False
+        self._last_alive = [0.0]
+        self._watchdog: Optional[QTimer] = None
+        self._thread: Optional[threading.Thread] = None
+
+    def start(self):
+        if self._running:
+            return
+        self._running = True
+        self._last_alive[0] = time.monotonic()
+
+        self._watchdog = QTimer()
+        self._watchdog.setInterval(1000)
+        self._watchdog.timeout.connect(self._mark_alive)
+        self._watchdog.start()
+
+        self._thread = threading.Thread(target=self._monitor, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._running = False
+        if self._watchdog is not None:
+            self._watchdog.stop()
+            self._watchdog = None
+        self._thread = None
+
+    def _mark_alive(self):
+        self._last_alive[0] = time.monotonic()
+
+    def _monitor(self):
+        while self._running:
+            time.sleep(1.5)
+            elapsed = time.monotonic() - self._last_alive[0]
+            if elapsed > 4.0:
+                frames = sys._current_frames()
+                main_thread_id = threading.main_thread().ident
+                stack = frames.get(main_thread_id)
+                if stack is not None:
+                    trace = ''.join(traceback.format_stack(stack))
+                    msg = (
+                        f"[FREEZE] UI thread blocked for {elapsed:.1f}s\n"
+                        f"{trace}"
+                    )
+                    logger.critical(msg)
+                    freeze_path = (
+                        f"/tmp/log_viewer_freeze_{int(time.time())}.txt"
+                    )
+                    try:
+                        with open(freeze_path, 'w') as f:
+                            f.write(msg)
+                    except OSError:
+                        pass
 
 
 class LogLoadSignals(QObject):
     """Signal carrier for LogLoadRunnable."""
-
     finished = pyqtSignal(object)
 
 
 class LogLoadRunnable(QRunnable):
-    """Background worker that scans log directories and builds tab metadata.
-
-    Runs via QThreadPool.globalInstance() — no manual thread lifecycle needed.
-    """
+    """Background worker that scans log directories and builds tab metadata."""
 
     def __init__(self, logs_base_dir: Path, current_log_file: Optional[Path] = None):
         super().__init__()
@@ -203,7 +368,6 @@ class LogLoadRunnable(QRunnable):
                 self.signals.finished.emit({"error": str(e)})
 
     def _build_tabs(self):
-        """Scan directory and build TabMetadata list."""
         tabs: List[TabMetadata] = []
         all_log_files: List[Path] = []
         log_directories: Set[str] = set()
@@ -222,10 +386,9 @@ class LogLoadRunnable(QRunnable):
             except ValueError:
                 pass
 
-        # All Logs tab: capped to MAX_FILES_ALL_LOGS, newest first
-        capped_all = sorted(all_log_files, key=lambda p: p.stat().st_mtime, reverse=True)[
-            :MAX_FILES_ALL_LOGS
-        ]
+        capped_all = sorted(
+            all_log_files, key=lambda p: p.stat().st_mtime, reverse=True
+        )[:MAX_FILES_ALL_LOGS]
         tabs.append(TabMetadata("All Logs", capped_all))
         if self._cancelled:
             return None
@@ -238,7 +401,9 @@ class LogLoadRunnable(QRunnable):
 
         root_log_files = [f for f in all_log_files if f.parent == self.logs_base_dir]
 
-        signal_log = next((f for f in root_log_files if f.name == "signal_evaluator.log"), None)
+        signal_log = next(
+            (f for f in root_log_files if f.name == "signal_evaluator.log"), None
+        )
         if signal_log is not None and not self._cancelled:
             tabs.append(TabMetadata("🔍 Signal Evaluator", [signal_log]))
 
@@ -261,7 +426,9 @@ class LogLoadRunnable(QRunnable):
                         focused_tab = i
                         break
             else:
-                tab_name = "Session" if cname.startswith("session_") else f"📄 {cname}"
+                tab_name = (
+                    "Session" if cname.startswith("session_") else f"📄 {cname}"
+                )
                 tabs.append(TabMetadata(tab_name, [self.current_log_file]))
                 focused_tab = len(tabs) - 1
 
@@ -271,16 +438,14 @@ class LogLoadRunnable(QRunnable):
         return {"tabs": tabs, "focused_tab": focused_tab}
 
 
-# --------------------------------------------------------------------------- #
-# LogViewerWindow — main viewer dialog
-# --------------------------------------------------------------------------- #
-
-
 class LogViewerWindow(WindowGeometryMixin, QDialog):
     """
     Institutional-grade log viewer with tabs and event-based filtering.
 
     Features:
+      - Background content loading (never blocks the UI thread)
+      - Pre-classified lines for O(1) per-line filter matching
+      - FreezeDetector watchdog for capturing stack traces
       - QPlainTextEdit + QSyntaxHighlighter for performant rendering
       - Lazy tab loading: content loaded only when tab is first activated
       - Background worker for directory scanning
@@ -297,7 +462,6 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
 
         project_root = Path(__file__).resolve().parent.parent.parent.parent
         self.logs_base_dir = project_root / "logs"
-
         self.current_log_file = log_file_path
 
         self.event_filters: Dict[str, bool] = {event: True for event in EVENT_PATTERNS}
@@ -307,6 +471,10 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
         self._tab_content_loaded: Set[int] = set()
 
         self._worker: Optional[LogLoadRunnable] = None
+        self._content_loaders: List[BackgroundContentLoader] = []
+
+        self._freeze_detector = FreezeDetector(self)
+        self._freeze_detector.start()
 
         self._init_ui()
         QTimer.singleShot(0, self._start_loading)
@@ -316,7 +484,6 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
     # =================================================================== #
 
     def _init_ui(self):
-        """Initialize UI with tabs and filters."""
         self.setWindowFlags(
             Qt.Window
             | Qt.WindowTitleHint
@@ -352,7 +519,6 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
         self.setLayout(main_layout)
 
     def _create_log_panel(self) -> QWidget:
-        """Create a log output panel with QPlainTextEdit + syntax highlighter."""
         widget = QWidget()
         layout = QVBoxLayout()
         layout.setContentsMargins(5, 5, 5, 5)
@@ -364,15 +530,7 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
         text_edit.setFont(large_font)
         text_edit.document().setDefaultFont(large_font)
 
-        text_edit.setStyleSheet(
-            "QPlainTextEdit {"
-            "   background-color: " + get_color("bg_dark") + ";"
-            "   color: " + get_color("text_primary") + ";"
-            "   border: 1px solid " + get_color("border") + ";"
-            "   padding: 8px;"
-            "   selection-background-color: " + get_color("bg_light") + ";"
-            "}"
-        )
+        text_edit.setStyleSheet(get_log_text_edit_stylesheet())
 
         highlighter = LogSyntaxHighlighter(text_edit.document())
         text_edit._highlighter = highlighter
@@ -383,20 +541,23 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
 
         return widget
 
-    def _display_content(self, tab_index: int, content: str):
-        """Display plain text content in a tab's QPlainTextEdit."""
+    def _display_content(self, tab_index: int):
         if tab_index not in self._tab_widgets:
             return
-        filtered = self._apply_event_filters(content)
+        if tab_index >= len(self._tabs_meta):
+            return
+        meta = self._tabs_meta[tab_index]
+        if meta.cache is None:
+            return
+
+        enabled = self._get_enabled_events()
+        filtered, event_count = meta.cache.filter(enabled)
         self._tab_widgets[tab_index].setPlainText(filtered)
-        self._update_stats(content, filtered)
+        self._update_stats(meta.cache, filtered, event_count)
 
     def _create_event_filters(self) -> QGroupBox:
-        """Create event-based filter checkboxes in a clean grid layout."""
         group = QGroupBox("📊 Event Filters")
-        group.setStyleSheet(
-            get_groupbox_header_stylesheet()
-        )
+        group.setStyleSheet(get_groupbox_header_stylesheet())
 
         container = QWidget()
         grid_layout = QGridLayout()
@@ -446,15 +607,7 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
 
                 hex_color = get_color(color_key)
                 checkbox.setStyleSheet(
-                    "QCheckBox {"
-                    "   color: " + hex_color + ";"
-                    "   background: transparent;"
-                    "   padding: 3px;"
-                    "}"
-                    "QCheckBox::indicator {"
-                    "   width: 40px;"
-                    "   height: 18px;"
-                    "}"
+                    get_event_filter_checkbox_style(hex_color)
                 )
                 checkbox.stateChanged.connect(
                     lambda state, e=event_key: self._on_event_filter_changed(e, state)
@@ -470,9 +623,13 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
 
         row += 1
         self.toggle_all_btn = QPushButton("Toggle All")
-        self.toggle_all_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        self.toggle_all_btn.setStyleSheet(
+            get_primary_button_stylesheet(compact=True)
+        )
         self.toggle_all_btn.setFixedSize(140, 36)
-        self.toggle_all_btn.setToolTip("Enable or disable all event filters at once")
+        self.toggle_all_btn.setToolTip(
+            "Enable or disable all event filters at once"
+        )
         self.toggle_all_btn.clicked.connect(self._toggle_all_filters)
         grid_layout.addWidget(self.toggle_all_btn, row, 0, 1, 1)
 
@@ -486,7 +643,6 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
         return group
 
     def _create_bottom_bar(self) -> QHBoxLayout:
-        """Create bottom bar with stats and buttons."""
         layout = QHBoxLayout()
         layout.setSpacing(15)
 
@@ -499,9 +655,7 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
         layout.addWidget(self.filtered_count_label)
 
         self.event_count_label = QLabel("Events: <b>0</b>")
-        self.event_count_label.setStyleSheet(
-            get_label_style("warning")
-        )
+        self.event_count_label.setStyleSheet(get_label_style("warning"))
         layout.addWidget(self.event_count_label)
 
         layout.addStretch()
@@ -514,14 +668,20 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
         layout.addWidget(copy_btn)
 
         copy_selection_btn = QPushButton("📋 Copy Selection")
-        copy_selection_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        copy_selection_btn.setStyleSheet(
+            get_primary_button_stylesheet(compact=True)
+        )
         copy_selection_btn.setFixedSize(240, 52)
-        copy_selection_btn.setToolTip("Copy only the currently selected text in the log viewer to the clipboard")
+        copy_selection_btn.setToolTip(
+            "Copy only the currently selected text in the log viewer to the clipboard"
+        )
         copy_selection_btn.clicked.connect(self._copy_selection)
         layout.addWidget(copy_selection_btn)
 
         clear_logs_btn = QPushButton("🗑️ Clear All Logs")
-        clear_logs_btn.setStyleSheet(get_primary_button_stylesheet(compact=True))
+        clear_logs_btn.setStyleSheet(
+            get_primary_button_stylesheet(compact=True)
+        )
         clear_logs_btn.setFixedSize(220, 52)
         clear_logs_btn.clicked.connect(self._clear_all_logs)
         clear_logs_btn.setToolTip("Delete ALL log files from logs directory")
@@ -541,28 +701,22 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
     # =================================================================== #
 
     def _start_loading(self):
-        """Start background worker to scan log directories and build tabs."""
         if self._worker is not None:
             return
-
         self._worker = LogLoadRunnable(self.logs_base_dir, self.current_log_file)
         self._worker.signals.finished.connect(self._on_logs_loaded)
         QThreadPool.globalInstance().start(self._worker)
 
     def _on_logs_loaded(self, result):
-        """Handle tab metadata from background worker."""
         self._worker = None
-
         if result is None:
             return
-
         if isinstance(result, dict) and "error" in result:
             try:
                 self._show_error_tab(str(result["error"]))
             except RuntimeError:
                 pass
             return
-
         try:
             self._tabs_meta = result.get("tabs", [])
             focused_tab = result.get("focused_tab", 0)
@@ -576,182 +730,120 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
                 self.tabs.setCurrentIndex(focused_tab)
 
             self._activate_tab(focused_tab)
-
             self._restore_last_tab()
         except RuntimeError:
             pass
 
     def _show_error_tab(self, error_msg: str):
-        """Show an error tab when loading fails."""
         panel = self._create_log_panel()
         self._tab_widgets[0] = panel.text_edit
         self.tabs.addTab(panel, "Error")
         panel.text_edit.setPlainText(f"Error loading logs:\n{error_msg}")
 
     # =================================================================== #
-    # Lazy Tab Activation
+    # Lazy Tab Activation (background loading)
     # =================================================================== #
 
     def _on_tab_changed(self, index: int):
-        """Handle tab change — load content lazily on first activation."""
         if index < 0:
             return
         if index not in self._tab_content_loaded:
             self._activate_tab(index)
         self._update_filter_visibility(index)
-        self._refresh_current_tab()
+        if index in self._tab_content_loaded:
+            self._display_content(index)
 
     def _activate_tab(self, index: int):
-        """Load content for a tab on first activation (lazy loading)."""
         if index in self._tab_content_loaded:
             return
         if index >= len(self._tabs_meta):
             return
 
         meta = self._tabs_meta[index]
-
-        # For non-focused tabs, load content lazily (may block briefly for
-        # a single tab's files, which is typically 1-10 files).
-        try:
-            content = meta.load_content()
+        if meta.cache is not None:
             self._tab_content_loaded.add(index)
-            self._display_content(index, content)
-        except Exception as e:
-            logger.error("Error loading tab %d: %s", index, e)
-            if index in self._tab_widgets:
-                self._tab_widgets[index].setPlainText(f"Error loading content: {e}")
+            self._display_content(index)
+            return
+
+        if meta.is_loading():
+            return
+
+        meta.set_loading(True)
+
+        if index in self._tab_widgets:
+            self._tab_widgets[index].setPlainText("(Loading log content...)")
+
+        loader = BackgroundContentLoader(index, meta)
+        loader.signals.loaded.connect(self._on_content_loaded)
+        loader.signals.error.connect(self._on_content_error)
+        self._content_loaders.append(loader)
+        QThreadPool.globalInstance().start(loader)
+
+    def _on_content_loaded(self, tab_index: int, cache: ContentCache):
+        self._content_loaders = [
+            cl for cl in self._content_loaders
+            if cl.tab_index != tab_index
+        ]
+        if tab_index >= len(self._tabs_meta):
+            return
+        meta = self._tabs_meta[tab_index]
+        meta.set_cache(cache)
+        self._tab_content_loaded.add(tab_index)
+
+        if self.tabs.currentIndex() == tab_index:
+            self._display_content(tab_index)
+
+    def _on_content_error(self, tab_index: int, error_msg: str):
+        self._content_loaders = [
+            cl for cl in self._content_loaders
+            if cl.tab_index != tab_index
+        ]
+        logger.error("Error loading tab %d: %s", tab_index, error_msg)
+        if tab_index in self._tab_widgets:
+            self._tab_widgets[tab_index].setPlainText(
+                f"Error loading content: {error_msg}"
+            )
 
     # =================================================================== #
-    # Event Filtering
+    # Event Filtering (uses pre-classified ContentCache)
     # =================================================================== #
 
-    def _apply_event_filters(self, content: str) -> str:
-        """Apply event-based filters to content — WITH CONTEXT."""
-        if not content:
-            return ""
-
-        current_tab_name = self.tabs.tabText(self.tabs.currentIndex()).lower()
-        if "ai" in current_tab_name and "recommendation" in current_tab_name:
-            return content
-
-        lines = content.split("\n")
-        filtered: List[str] = []
-
-        if not any(self.event_filters.values()):
-            return ""
-
-        in_event_block = False
-
-        for line in lines:
-            if self._line_matches_event_filters(line):
-                filtered.append(line)
-                in_event_block = True
-            elif in_event_block and (
-                line.startswith("  ")
-                or line.startswith("\t")
-                or line.startswith("Location:")
-                or line.startswith("Timestamp:")
-                or line.startswith("Trade ID:")
-                or line.startswith("Side:")
-                or line.startswith("Size:")
-                or line.startswith("Entry Price:")
-                or line.startswith("Status:")
-            ):
-                filtered.append(line)
-            elif not line.strip():
-                if in_event_block:
-                    filtered.append(line)
-                in_event_block = False
-            else:
-                in_event_block = False
-
-        return "\n".join(filtered)
-
-    def _line_matches_event_filters(self, line: str) -> bool:
-        """Check if line matches any enabled event filter."""
-        if not line.strip():
-            return False
-
-        for event, enabled in self.event_filters.items():
-            if enabled and event in EVENT_PATTERNS:
-                pattern_str, _ = EVENT_PATTERNS[event]
-                if re.search(pattern_str, line, re.IGNORECASE):
-                    return True
-
-        return False
+    def _get_enabled_events(self) -> Set[str]:
+        return {k for k, v in self.event_filters.items() if v}
 
     def _on_event_filter_changed(self, event: str, state: int):
-        """Handle event filter checkbox change."""
         self.event_filters[event] = state == Qt.Checked
         self._update_toggle_button_text()
         self._refresh_current_tab()
 
     def _update_filter_visibility(self, tab_index: int):
-        """Show only relevant filters for the selected tab."""
         tab_name = self.tabs.tabText(tab_index).replace("📄 ", "").lower()
 
         tab_event_map = {
             "all logs": list(EVENT_PATTERNS.keys()),
             "trades": [
-                "TRADE_OPENED",
-                "TRADE_CLOSED",
-                "TRADE_UPDATED",
-                "POSITIONS_SNAPSHOT",
-                "TRADE_NOT_FOUND",
-                "MULTIPLE_POSITIONS",
-                "CRITICAL",
-                "ERROR",
-                "WARNING",
+                "TRADE_OPENED", "TRADE_CLOSED", "TRADE_UPDATED",
+                "POSITIONS_SNAPSHOT", "TRADE_NOT_FOUND", "MULTIPLE_POSITIONS",
+                "CRITICAL", "ERROR", "WARNING",
             ],
             "strategy builder": [
-                "CONFIG_INITIALIZED",
-                "CONFIG_READ",
-                "CONFIG_VALIDATED",
-                "CONFIG_MISMATCH",
-                "CONFIG_MISSING",
-                "STARTED",
-                "STOPPED",
-                "PROGRESS",
-                "COMPLETED",
-                "CRITICAL",
-                "ERROR",
-                "WARNING",
-                "BLOCK_LOADED",
-                "BLOCK_ADDED",
-                "SEARCH_RESULTS",
+                "CONFIG_INITIALIZED", "CONFIG_READ", "CONFIG_VALIDATED",
+                "CONFIG_MISMATCH", "CONFIG_MISSING", "STARTED", "STOPPED",
+                "PROGRESS", "COMPLETED", "CRITICAL", "ERROR", "WARNING",
+                "BLOCK_LOADED", "BLOCK_ADDED", "SEARCH_RESULTS",
             ],
             "session": [
-                "CONFIG_INITIALIZED",
-                "CONFIG_READ",
-                "CONFIG_VALIDATED",
-                "STARTED",
-                "STOPPED",
-                "COMPLETED",
-                "ERROR",
-                "WARNING",
-                "BLOCK_LOADED",
-                "SEARCH_RESULTS",
+                "CONFIG_INITIALIZED", "CONFIG_READ", "CONFIG_VALIDATED",
+                "STARTED", "STOPPED", "COMPLETED", "ERROR", "WARNING",
+                "BLOCK_LOADED", "SEARCH_RESULTS",
             ],
             "optimizer": [
-                "STARTED",
-                "STOPPED",
-                "PROGRESS",
-                "COMPLETED",
-                "CRITICAL",
-                "ERROR",
-                "WARNING",
+                "STARTED", "STOPPED", "PROGRESS", "COMPLETED",
+                "CRITICAL", "ERROR", "WARNING",
             ],
             "backtest": [
-                "TRADE_OPENED",
-                "TRADE_CLOSED",
-                "TRADE_UPDATED",
-                "STARTED",
-                "STOPPED",
-                "PROGRESS",
-                "COMPLETED",
-                "CRITICAL",
-                "ERROR",
-                "WARNING",
+                "TRADE_OPENED", "TRADE_CLOSED", "TRADE_UPDATED", "STARTED",
+                "STOPPED", "PROGRESS", "COMPLETED", "CRITICAL", "ERROR", "WARNING",
             ],
         }
 
@@ -788,30 +880,13 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
         max_cols = 6
 
         all_events_ordered = [
-            "TRADE_OPENED",
-            "TRADE_CLOSED",
-            "TRADE_UPDATED",
-            "POSITIONS_SNAPSHOT",
-            "TRADE_NOT_FOUND",
-            "MULTIPLE_POSITIONS",
-            "CONFIG_INITIALIZED",
-            "CONFIG_READ",
-            "CONFIG_VALIDATED",
-            "CONFIG_MISMATCH",
-            "CONFIG_MISSING",
-            "STARTED",
-            "STOPPED",
-            "PROGRESS",
-            "COMPLETED",
-            "CRITICAL",
-            "ERROR",
-            "WARNING",
-            "BLOCK_LOADED",
-            "BLOCK_ADDED",
-            "SEARCH_RESULTS",
-            "DECISION",
-            "CONDITION_MET",
-            "SIGNAL_DETECTED",
+            "TRADE_OPENED", "TRADE_CLOSED", "TRADE_UPDATED",
+            "POSITIONS_SNAPSHOT", "TRADE_NOT_FOUND", "MULTIPLE_POSITIONS",
+            "CONFIG_INITIALIZED", "CONFIG_READ", "CONFIG_VALIDATED",
+            "CONFIG_MISMATCH", "CONFIG_MISSING", "STARTED", "STOPPED",
+            "PROGRESS", "COMPLETED", "CRITICAL", "ERROR", "WARNING",
+            "BLOCK_LOADED", "BLOCK_ADDED", "SEARCH_RESULTS",
+            "DECISION", "CONDITION_MET", "SIGNAL_DETECTED",
         ]
 
         for event_key in all_events_ordered:
@@ -825,57 +900,48 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
                     row += 1
 
     def _refresh_current_tab(self):
-        """Re-apply event filters to the current tab's cached content."""
         index = self.tabs.currentIndex()
         if index < 0:
             return
-        if index in self._tab_content_loaded and index < len(self._tabs_meta):
-            content = self._tabs_meta[index].content
-            if content is not None:
-                self._display_content(index, content)
+        self._display_content(index)
 
     def _toggle_all_filters(self):
-        """Toggle all event filters on/off."""
         new_state = self.toggle_all_btn.text() == "Select All"
         for checkbox in self.event_checkboxes.values():
             checkbox.setChecked(new_state)
 
     def _update_toggle_button_text(self):
-        """Update toggle button text based on current state."""
         all_selected = all(self.event_filters.values())
-        self.toggle_all_btn.setText("Unselect All" if all_selected else "Select All")
+        self.toggle_all_btn.setText(
+            "Unselect All" if all_selected else "Select All"
+        )
 
-    def _update_stats(self, original: str, filtered: str):
-        """Update statistics labels."""
-        total_lines = len(original.split("\n"))
-        displayed_lines = len(filtered.split("\n"))
+    def _update_stats(self, cache: ContentCache, filtered: str, event_count: int):
+        total_lines = cache.total_count
+        displayed_lines = len(filtered.split("\n")) if filtered else 0
 
-        event_count = 0
-        for line in filtered.split("\n"):
-            for pattern_str, _ in EVENT_PATTERNS.values():
-                if re.search(pattern_str, line, re.IGNORECASE):
-                    event_count += 1
-                    break
-
-        self.msg_count_label.setText(f"Total Lines: <b>{total_lines:,}</b>")
-        self.filtered_count_label.setText(f"Displayed: <b>{displayed_lines:,}</b>")
-        self.event_count_label.setText(f"Events: <b>{event_count:,}</b>")
+        self.msg_count_label.setText(
+            f"Total Lines: <b>{total_lines:,}</b>"
+        )
+        self.filtered_count_label.setText(
+            f"Displayed: <b>{displayed_lines:,}</b>"
+        )
+        self.event_count_label.setText(
+            f"Events: <b>{event_count:,}</b>"
+        )
 
     # =================================================================== #
     # Actions
     # =================================================================== #
 
     def _copy_to_clipboard(self):
-        """Copy all visible content from current tab to clipboard."""
         index = self.tabs.currentIndex()
         if index not in self._tab_widgets:
             return
-
         content = self._tab_widgets[index].toPlainText()
         if not content:
             QMessageBox.information(self, "Nothing to Copy", "No content to copy.")
             return
-
         QApplication.clipboard().setText(content)
         line_count = len(content.split("\n"))
         self.filtered_count_label.setText(
@@ -883,11 +949,9 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
         )
 
     def _copy_selection(self):
-        """Copy selected text from current tab."""
         index = self.tabs.currentIndex()
         if index not in self._tab_widgets:
             return
-
         selected = (
             self._tab_widgets[index]
             .textCursor()
@@ -895,9 +959,10 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
             .replace("\u2029", "\n")
         )
         if not selected:
-            QMessageBox.information(self, "No Selection", "Please select text to copy.")
+            QMessageBox.information(
+                self, "No Selection", "Please select text to copy."
+            )
             return
-
         QApplication.clipboard().setText(selected)
         line_count = len(selected.split("\n"))
         self.filtered_count_label.setText(
@@ -905,7 +970,6 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
         )
 
     def _clear_all_logs(self):
-        """Delete ALL log files from logs directory and reset the viewer."""
         try:
             if not self.logs_base_dir.exists():
                 QMessageBox.critical(
@@ -917,7 +981,9 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
             fresh_log_files = list(self.logs_base_dir.rglob("*.log"))
 
             if not fresh_log_files:
-                QMessageBox.warning(self, "No Logs", "No log files found to delete.")
+                QMessageBox.warning(
+                    self, "No Logs", "No log files found to delete."
+                )
                 return
 
             reply = QMessageBox.question(
@@ -980,27 +1046,26 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
             )
 
     def _restore_last_tab(self):
-        """Restore last active tab from settings."""
         settings = QSettings("BTC_Engine", "LogViewer")
         last_tab = settings.value("lastTab", 0, type=int)
         if 0 <= last_tab < self.tabs.count():
             self.tabs.setCurrentIndex(last_tab)
 
-    def _restore_geometry(self):
-        """Deprecated: geometry is now restored via WindowGeometryMixin in showEvent."""
-        self._restore_last_tab()
-
     def showEvent(self, event):
-        """Called when window is shown."""
         super().showEvent(event)
         self._restore_window_geometry(event)
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
 
     def closeEvent(self, event):
-        """Save geometry and last tab on close."""
+        self._freeze_detector.stop()
+
         if self._worker is not None:
             self._worker.cancel()
             self._worker = None
+
+        for cl in self._content_loaders:
+            cl.cancel()
+        self._content_loaders.clear()
 
         self._save_window_geometry()
         settings = QSettings("BTC_Engine", "LogViewer")
@@ -1008,5 +1073,4 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
         super().closeEvent(event)
 
 
-# Late import to avoid circular dependency in the class definition
 from .styles import apply_hand_cursor_to_buttons
