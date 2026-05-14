@@ -331,8 +331,7 @@
       "tags": [
         "database",
         "orm",
-        "locked-module",
-        "needs-test"
+        "locked-module"
       ],
       "owner_agent": "DatabaseAdministrator"
     },
