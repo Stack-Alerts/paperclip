@@ -76,10 +76,7 @@ class AIRecommendationsManager:
             
         Real Money Impact: HIGH - Creates AI recommendations for trading strategies
         
-        ORM Refactored: Sprint 1.6.1 Task 2.1.7
         """
-        from src.optimizer_v3.database.models import AIRecommendation
-        
         # Validate required fields
         required = ['strategy_id', 'recommendation_type', 'reasoning']
         missing = [f for f in required if f not in recommendation_data]
@@ -91,31 +88,64 @@ class AIRecommendationsManager:
         if recommendation_data['recommendation_type'] not in valid_types:
             raise ValueError(f"Invalid type. Must be one of: {', '.join(valid_types)}")
         
-        # Create ORM object — only set columns that exist in the current DB
-        # (title, description, rationale, suggested_changes, priority,
-        #  applied_version_id, applied_by are defined in the model but
-        #  the corresponding DB columns have not been migrated yet.)
-        recommendation = AIRecommendation(
-            strategy_id=recommendation_data['strategy_id'],
-            recommendation_type=recommendation_data['recommendation_type'],
-            reasoning=recommendation_data.get('reasoning', recommendation_data.get('rationale', '')),
-            configuration=recommendation_data.get('configuration'),
-            expected_impact=recommendation_data.get('expected_impact', {}),
-            combined_confidence=recommendation_data.get('combined_confidence', recommendation_data.get('confidence_score', 0.5)),
-        )
+        # Use raw SQL insert for columns that exist in the current DB schema.
+        # The AIRecommendation ORM model defines columns (title, description,
+        # rationale, suggested_changes, priority, applied_version_id,
+        # applied_by) that have not been migrated to the PostgreSQL table yet.
+        # Raw SQL avoids the ORM including unmigrated columns in the INSERT.
+        import uuid as _uuid_mod
+        _rec_id = _uuid_mod.uuid4()
+        _now = datetime.now(timezone.utc)
+        _reasoning = recommendation_data.get('reasoning', recommendation_data.get('rationale', ''))
+        _confidence = recommendation_data.get('combined_confidence', recommendation_data.get('confidence_score', 0.5))
+        _expected_impact = recommendation_data.get('expected_impact', {})
+        _configuration = recommendation_data.get('configuration')
+        _version_id = recommendation_data.get('strategy_version_id')
         
+        _strategy_version = recommendation_data.get('strategy_version')
+        if _strategy_version is None and _version_id is not None:
+            _vr = self.session.execute(
+                text("SELECT version_number FROM strategy_versions WHERE version_id = :vid"),
+                {"vid": _version_id}
+            ).scalar()
+            if _vr is not None:
+                _strategy_version = str(_vr)
+
         try:
-            self.session.add(recommendation)
+            self.session.execute(
+                text("""
+                    INSERT INTO ai_recommendations
+                        (recommendation_id, strategy_id, version_id,
+                         strategy_version, timestamp, recommendation_type,
+                         reasoning, expected_impact, combined_confidence,
+                         configuration, created_at)
+                    VALUES
+                        (:rec_id, :strategy_id, :version_id,
+                         :strategy_version, :ts, :rec_type,
+                         :reasoning, :expected_impact, :combined_confidence,
+                         :configuration, :created_at)
+                """),
+                {
+                    "rec_id": _rec_id,
+                    "strategy_id": recommendation_data['strategy_id'],
+                    "version_id": _version_id,
+                    "strategy_version": _strategy_version,
+                    "ts": _now,
+                    "rec_type": recommendation_data['recommendation_type'],
+                    "reasoning": _reasoning,
+                    "expected_impact": json.dumps(_expected_impact) if isinstance(_expected_impact, dict) else _expected_impact,
+                    "combined_confidence": _confidence,
+                    "configuration": json.dumps(_configuration) if isinstance(_configuration, dict) else _configuration,
+                    "created_at": _now,
+                }
+            )
             self.session.commit()
             
-            # Get UUID as string
-            rec_id = str(recommendation.recommendation_id)
-            
+            rec_id = str(_rec_id)
             self.logger.info(
                 f"Created AI recommendation: {rec_id} "
                 f"(strategy: {recommendation_data['strategy_id']}, type: {recommendation_data['recommendation_type']})"
             )
-            
             return rec_id
             
         except Exception as e:
@@ -125,30 +155,46 @@ class AIRecommendationsManager:
     
     def get_recommendation(self, recommendation_id: str) -> Optional[Dict[str, Any]]:
         """
-        Get recommendation by ID using ORM
-        
-        Args:
-            recommendation_id: Recommendation UUID string
-            
-        Returns:
-            Recommendation dict or None if not found
-            JSONB fields automatically deserialized to Python objects
-            
-        Real Money Impact: MEDIUM - Retrieves AI recommendation data
-        
-        ORM Refactored: Sprint 1.6.1 Task 2.1.1
+        Get recommendation by ID
+
+        Uses raw SQL to avoid ORM columns that have not been migrated
+        to the current PostgreSQL schema yet.
         """
-        # Import AIRecommendation ORM model
-        from src.optimizer_v3.database.models import AIRecommendation
-        
         try:
-            # Query using ORM
-            recommendation = self.session.query(AIRecommendation).filter_by(
-                recommendation_id=recommendation_id
-            ).first()
-            
-            if not recommendation:
+            row = self.session.execute(
+                text("""
+                    SELECT recommendation_id, strategy_id, version_id,
+                           recommendation_type, reasoning,
+                           expected_impact, configuration,
+                           combined_confidence, applied, applied_at,
+                           created_at
+                    FROM ai_recommendations
+                    WHERE recommendation_id = :rid
+                """),
+                {"rid": recommendation_id}
+            ).mappings().first()
+
+            if not row:
                 return None
+
+            return {
+                'recommendation_id': str(row['recommendation_id']),
+                'strategy_id': row['strategy_id'],
+                'strategy_version_id': str(row['version_id']) if row['version_id'] else None,
+                'recommendation_type': row['recommendation_type'],
+                'reasoning': row['reasoning'],
+                'configuration': row['configuration'],
+                'expected_impact': row['expected_impact'],
+                'combined_confidence': row['combined_confidence'],
+                'applied': row['applied'],
+                'applied_at': row['applied_at'],
+                'created_at': row['created_at'],
+            }
+
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to get recommendation {recommendation_id}: {e}")
+            return None
             
             # Convert ORM object to dict
             # JSONB fields are automatically deserialized by SQLAlchemy
@@ -190,65 +236,48 @@ class AIRecommendationsManager:
         pending_only: bool = False
     ) -> List[Dict[str, Any]]:
         """
-        Get all recommendations for a strategy using ORM
-        
-        Args:
-            strategy_id: Strategy ID
-            applied_only: Only return applied recommendations
-            pending_only: Only return pending recommendations
-            
-        Returns:
-            List of recommendation dicts with JSONB auto-deserialized
-            
-        Real Money Impact: MEDIUM - Lists AI recommendations for strategy
-        
-        ORM Refactored: Sprint 1.6.1 Task 2.1.2
+        Get all recommendations for a strategy
+
+        Uses raw SQL to avoid ORM columns that have not been migrated.
         """
-        from src.optimizer_v3.database.models import AIRecommendation
-        
         try:
-            # Build ORM query with filters
-            query = self.session.query(AIRecommendation).filter_by(
-                strategy_id=strategy_id
-            )
-            
+            where = "WHERE strategy_id = :sid"
+            params: dict = {"sid": strategy_id}
             if applied_only:
-                query = query.filter(AIRecommendation.applied == True)
+                where += " AND applied = TRUE"
             elif pending_only:
-                query = query.filter(AIRecommendation.applied == False)
-            
-            query = query.order_by(AIRecommendation.created_at.desc())
-            
-            recommendations = query.all()
-            
-            # Convert to list of dicts
+                where += " AND (applied IS NULL OR applied = FALSE)"
+
+            rows = self.session.execute(
+                text(
+                    f"SELECT recommendation_id, strategy_id, version_id, "
+                    f"recommendation_type, reasoning, expected_impact, "
+                    f"configuration, combined_confidence, applied, applied_at, "
+                    f"created_at "
+                    f"FROM ai_recommendations {where} "
+                    f"ORDER BY created_at DESC"
+                ),
+                params
+            ).mappings().all()
+
             result_list = []
-            for rec in recommendations:
-                rec_dict = {
-                    'recommendation_id': str(rec.recommendation_id),
-                    'strategy_id': rec.strategy_id,
-                    'strategy_version_id': str(rec.strategy_version_id) if rec.strategy_version_id else None,
-                    'recommendation_type': rec.recommendation_type,
-                    'reasoning': rec.reasoning,
-                    'configuration': rec.configuration,
-                    'expected_impact': rec.expected_impact,
-                    'warnings': rec.warnings,
-                    'combined_confidence': rec.combined_confidence,
-                    'block_name': rec.block_name,
-                    'signal_name': rec.signal_name,
-                    'parameter_name': rec.parameter_name,
-                    'root_cause': rec.root_cause,
-                    'ai_enhanced': rec.ai_enhanced,
-                    'applied': rec.applied,
-                    'applied_at': rec.applied_at,
-                    'metrics_before': rec.metrics_before,
-                    'metrics_after': rec.metrics_after,
-                    'created_at': rec.created_at
-                }
-                result_list.append(rec_dict)
-            
+            for row in rows:
+                result_list.append({
+                    'recommendation_id': str(row['recommendation_id']),
+                    'strategy_id': row['strategy_id'],
+                    'strategy_version_id': str(row['version_id']) if row['version_id'] else None,
+                    'recommendation_type': row['recommendation_type'],
+                    'reasoning': row['reasoning'],
+                    'configuration': row['configuration'],
+                    'expected_impact': row['expected_impact'],
+                    'combined_confidence': row['combined_confidence'],
+                    'applied': row['applied'],
+                    'applied_at': row['applied_at'],
+                    'created_at': row['created_at'],
+                })
+
             return result_list
-            
+
         except Exception as e:
             self.session.rollback()
             self.logger.error(f"Failed to get recommendations for strategy {strategy_id}: {e}")
@@ -261,27 +290,31 @@ class AIRecommendationsManager:
         applied_by: Optional[str] = None
     ) -> bool:
         """
-        Mark recommendation as applied to a version using ORM
+        Mark recommendation as applied to a version
 
-        Args:
-            recommendation_id: Recommendation UUID
-            applied_version_id: Version where recommendation was applied (stored in metrics_before JSONB for audit)
-            applied_by: User who applied it (ignored — column not in current schema)
-
-        Returns:
-            True if updated, False if not found
-
-        ORM Refactored: Sprint 1.6.1 Task 2.1.5
+        Uses raw SQL to avoid ORM columns that have not been migrated.
         """
-        from src.optimizer_v3.database.models import AIRecommendation
-
         try:
-            recommendation = self.session.query(AIRecommendation).filter_by(
-                recommendation_id=recommendation_id
-            ).first()
+            result = self.session.execute(
+                text("""
+                    UPDATE ai_recommendations
+                    SET applied = TRUE,
+                        applied_at = :now
+                    WHERE recommendation_id = :rid
+                """),
+                {"rid": recommendation_id, "now": datetime.now(timezone.utc)}
+            )
+            self.session.commit()
 
-            if not recommendation:
-                return False
+            updated = result.rowcount > 0
+            if updated:
+                self.logger.info(f"Marked recommendation {recommendation_id} as applied")
+            return updated
+
+        except Exception as e:
+            self.session.rollback()
+            self.logger.error(f"Failed to mark recommendation {recommendation_id} as applied: {e}")
+            return False
 
             # Update using ORM
             recommendation.applied = True

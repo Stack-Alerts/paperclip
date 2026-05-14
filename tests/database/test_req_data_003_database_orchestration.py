@@ -21,7 +21,19 @@ _REQUIRED_MANAGER_TABLES = {
     "ai_recommendations",
     "strategy_test_results",
 }
-_ALL_REQUIRED_TABLES = _REQUIRED_MANAGER_TABLES
+_REQUIRED_CORE_TABLES = {
+    "signal_events",
+    "signal_metrics",
+}
+_REQUIRED_TRACE_TABLES = {
+    "trace_requirements",
+    "trace_test_cases",
+    "trace_issues",
+    "trace_links",
+}
+_ALL_REQUIRED_TABLES = (
+    _REQUIRED_MANAGER_TABLES | _REQUIRED_CORE_TABLES | _REQUIRED_TRACE_TABLES
+)
 
 _MANAGER_COLUMNS = {
     "strategies": {"strategy_id", "name", "created_at", "updated_at"},
@@ -31,8 +43,8 @@ _MANAGER_COLUMNS = {
         "risk_management", "backtest_config", "created_at",
     },
     "ai_recommendations": {
-        "recommendation_id", "strategy_id", "version_id", "recommendation_type",
-        "reasoning", "configuration", "expected_impact",
+        "recommendation_id", "strategy_id", "version_id", "strategy_version",
+        "recommendation_type", "reasoning", "configuration", "expected_impact",
         "applied", "combined_confidence", "created_at",
     },
     "strategy_test_results": {
