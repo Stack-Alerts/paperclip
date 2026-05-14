@@ -1,16 +1,37 @@
 {
-  "timestamp": "2026-05-14T02:10:41.417822+00:00",
+  "timestamp": "2026-05-14T02:19:08.843596+00:00",
+  "touch_index_fr": {
+    "pass": true,
+    "coverage_pct": 95.2,
+    "indexed": 40,
+    "total": 42,
+    "missing": [
+      "BTCAAAAA-1191",
+      "BTCAAAAA-851"
+    ],
+    "total_rows": 150,
+    "stale_rows": 0,
+    "max_age_hours": 37.7,
+    "null_owner_rows": 0,
+    "null_updated_at_rows": 0,
+    "unknown_source_rows": 0,
+    "duplicate_pairs": 0,
+    "orphan_count": 0,
+    "source_distribution": {
+      "comments": 150
+    }
+  },
   "touch_index_bug": {
     "pass": true,
     "coverage_pct": 27.2,
     "indexed": 900,
-    "total": 3303,
-    "coverage_eligible_pct": 97.0,
-    "eligible_total": 923,
-    "missing_eligible_count": 28,
+    "total": 3307,
+    "coverage_eligible_pct": 96.8,
+    "eligible_total": 925,
+    "missing_eligible_count": 30,
     "total_rows": 2328,
     "stale_rows": 0,
-    "max_age_hours": 23.8,
+    "max_age_hours": 24.0,
     "null_closed_at_rows": 0,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
