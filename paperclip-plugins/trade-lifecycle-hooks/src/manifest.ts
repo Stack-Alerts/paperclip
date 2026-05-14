@@ -1,12 +1,13 @@
 // src/manifest.ts
 // Plugin manifest for @frenocorp/trade-lifecycle-hooks
 // See ADR-0005 for full architecture.
-// Phase 2: real exchange health probe (multi-exchange) and risk limit query.
+// Phase 3: Trade execution logging to activity stream and position
+// reconciliation with automatic follow-up issue creation.
 
 const manifest = {
   id: "paperclip-plugin-trade-lifecycle",
   apiVersion: 1 as const,
-  version: "0.2.0",
+  version: "0.3.0",
   displayName: "Trade Lifecycle Hooks",
   author: "FrenoCorp",
   description:

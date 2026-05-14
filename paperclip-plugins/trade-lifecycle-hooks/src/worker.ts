@@ -1,6 +1,7 @@
 // src/worker.ts
 // Trade Lifecycle Hooks — Plugin Worker
-// Phase 2: Real exchange health probe (multi-exchange) and risk limit query.
+// Phase 2: Real exchange health probe (multi-exchange), risk limit query,
+// and DB-backed strategy validation, position tracking, and risk metrics.
 //
 // Pre-run: strategy validation, exchange connectivity, risk limits
 // Post-run: trade execution logging, audit trail, position reconciliation
@@ -12,6 +13,15 @@ import type {
   ToolRunContext,
   ToolResult,
 } from "@paperclipai/plugin-sdk";
+import {
+  createPool,
+  closePool,
+  healthCheck as dbHealthCheck,
+  queryStrategies,
+  queryPositions,
+  queryRiskMetrics,
+  type StrategyRow,
+} from "./db.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -219,6 +229,39 @@ function resolveExchanges(config: PluginConfig): ExchangeConfig[] {
       expectedStatus: 200,
     },
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Database Connection
+// ---------------------------------------------------------------------------
+
+async function resolveDbUrl(ctx: PluginContext, config: PluginConfig): Promise<string> {
+  return ctx.secrets.resolve(config.databaseUrlRef);
+}
+
+let dbAvailable = false;
+
+async function initDatabase(ctx: PluginContext, config: PluginConfig): Promise<void> {
+  try {
+    const dbUrl = await resolveDbUrl(ctx, config);
+    ctx.logger.info("Connecting to BTC Trade Engine database");
+    await createPool({ connectionString: dbUrl });
+    const health = await dbHealthCheck();
+    if (health.ok) {
+      dbAvailable = true;
+      ctx.logger.info("BTC Trade Engine database connected", {
+        latencyMs: health.latencyMs,
+      });
+    } else {
+      ctx.logger.warn("BTC Trade Engine database health check failed", {
+        error: health.error,
+      });
+    }
+  } catch (err) {
+    ctx.logger.warn("BTC Trade Engine database unavailable — DB-backed checks disabled", {
+      error: String(err),
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -536,7 +579,230 @@ async function queryRiskLimits(
 }
 
 // ---------------------------------------------------------------------------
-// Post-Run Hooks
+// Strategy Validation
+// ---------------------------------------------------------------------------
+
+const BULLISH_KEYWORDS = [
+  "BULLISH", "LONG", "BUY", "ABOVE", "OVER", "UP", "HIGHER",
+  "BREAKOUT", "SUPPORT", "BOUNCE", "REVERSAL_UP", "UPTREND",
+  "ACCUMULATION", "REACCUMULATION", "SPRING", "SOS", "LPS",
+];
+
+const BEARISH_KEYWORDS = [
+  "BEARISH", "SHORT", "SELL", "BELOW", "UNDER", "DOWN", "LOWER",
+  "BREAKDOWN", "RESISTANCE", "REJECTION", "REVERSAL_DOWN", "DOWNTREND",
+  "DISTRIBUTION", "REDISTRIBUTION", "UPTHRUST", "SOW", "LPSY",
+];
+
+function parseJsonbField(value: unknown, fallback: unknown): unknown {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return fallback;
+    }
+  }
+  if (typeof value === "object") return value;
+  return fallback;
+}
+
+interface StrategyRow {
+  strategy_id: string;
+  name: string;
+  validation_status: string | null;
+  blocks: unknown;
+  signals: unknown;
+  strategy_type: string | null;
+  exit_conditions: unknown;
+}
+
+function checkDirectionConsistency(
+  blocks: unknown[],
+  strategyType: string | null
+): string[] {
+  const errors: string[] = [];
+  if (!strategyType || blocks.length === 0) return errors;
+
+  const st = strategyType.toUpperCase();
+  const expected = st === "BULLISH" ? BULLISH_KEYWORDS : BEARISH_KEYWORDS;
+  const opposite = st === "BULLISH" ? BEARISH_KEYWORDS : BULLISH_KEYWORDS;
+
+  let totalSignals = 0;
+  let oppositeCount = 0;
+
+  for (const block of blocks) {
+    const signals = (block as Record<string, unknown>).signals;
+    if (!Array.isArray(signals)) continue;
+    for (const signal of signals) {
+      totalSignals++;
+      const sigName = ((signal as Record<string, unknown>).name as string ?? "").toUpperCase();
+      if (opposite.some((kw) => sigName.includes(kw))) {
+        oppositeCount++;
+      }
+    }
+  }
+
+  if (totalSignals > 0 && oppositeCount / totalSignals > 0.7) {
+    errors.push(
+      `Direction mismatch: ${Math.round((oppositeCount / totalSignals) * 100)}% of signals are opposite to strategy type "${strategyType}"`
+    );
+  }
+
+  return errors;
+}
+
+async function validateStrategyFromDb(
+  ctx: PluginContext,
+  strategyId: string,
+  level: "basic" | "strict"
+): Promise<StrategyValidationResult> {
+  const result: StrategyValidationResult = {
+    strategyId,
+    isValid: false,
+    level,
+    errors: [],
+    warnings: [],
+    checkedAt: isoNow(),
+  };
+
+  try {
+    const rows = await ctx.db.query(
+      `SELECT s.strategy_id, s.name,
+              sv.validation_status,
+              sv.blocks, sv.signals, sv.strategy_type,
+              sv.exit_conditions
+       FROM strategies s
+       JOIN strategy_versions sv ON s.strategy_id = sv.strategy_id
+       WHERE s.strategy_id = $1
+       ORDER BY sv.version_number DESC
+       LIMIT 1`,
+      [strategyId]
+    );
+
+    if (!rows || rows.length === 0) {
+      result.errors.push(`Strategy "${strategyId}" not found in database`);
+      return result;
+    }
+
+    const row = rows[0] as unknown as StrategyRow;
+    const blocks = parseJsonbField(row.blocks, []) as Record<string, unknown>[];
+    const strategyType = row.strategy_type ?? null;
+
+    // ── BASIC validation ──
+    if (!row.name || row.name.trim() === "") {
+      result.errors.push("Strategy must have a non-empty name");
+    }
+
+    if (!Array.isArray(blocks) || blocks.length === 0) {
+      result.errors.push("Strategy must have at least one block");
+    } else {
+      for (const block of blocks) {
+        const blockName = (block.name as string) ?? "unnamed";
+        const sigs = block.signals;
+        if (!Array.isArray(sigs) || sigs.length === 0) {
+          result.errors.push(`Block "${blockName}" has no signals`);
+        }
+        const logic = block.logic as string | undefined;
+        if (logic && !["AND", "OR"].includes(logic.toUpperCase())) {
+          result.errors.push(
+            `Block "${blockName}" has invalid logic: "${logic}" (expected AND or OR)`
+          );
+        }
+      }
+    }
+
+    // ── STRICT validation ──
+    if (level === "strict") {
+      // Duplicate detection
+      if (Array.isArray(blocks)) {
+        const blockNames = blocks
+          .map((b) => (b.name as string) ?? "")
+          .filter(Boolean);
+        const seen = new Set<string>();
+        const dupBlocks: string[] = [];
+        for (const name of blockNames) {
+          if (seen.has(name)) dupBlocks.push(name);
+          seen.add(name);
+        }
+        if (dupBlocks.length > 0) {
+          result.errors.push(`Duplicate block names: ${[...new Set(dupBlocks)].join(", ")}`);
+        }
+
+        for (const block of blocks) {
+          const sigs = block.signals as Record<string, unknown>[] | undefined;
+          if (Array.isArray(sigs)) {
+            const sigNames = sigs
+              .map((s) => (s.name as string) ?? "")
+              .filter(Boolean);
+            const sigSeen = new Set<string>();
+            const dupSigs: string[] = [];
+            for (const name of sigNames) {
+              if (sigSeen.has(name)) dupSigs.push(name);
+              sigSeen.add(name);
+            }
+            if (dupSigs.length > 0) {
+              result.errors.push(
+                `Block "${block.name}" has duplicate signal names: ${[...new Set(dupSigs)].join(", ")}`
+              );
+            }
+          }
+        }
+      }
+
+      // Direction consistency
+      if (Array.isArray(blocks)) {
+        const dirErrors = checkDirectionConsistency(blocks, strategyType);
+        result.errors.push(...dirErrors);
+      }
+
+      // Size warnings
+      if (blocks.length > 15) {
+        result.warnings.push(`Strategy has ${blocks.length} blocks (recommended max: 15)`);
+      }
+      for (const block of blocks) {
+        const sigs = block.signals as unknown[] | undefined;
+        if (Array.isArray(sigs) && sigs.length > 10) {
+          result.warnings.push(
+            `Block "${block.name}" has ${sigs.length} signals (recommended max: 10)`
+          );
+        }
+      }
+    }
+
+    result.isValid = result.errors.length === 0;
+
+    // Update validation_status in the database
+    const newStatus = result.isValid ? "Pass" : "Fail";
+    await ctx.db.execute(
+      `UPDATE strategy_versions
+       SET validation_status = $1, validation_timestamp = NOW()$
+       WHERE strategy_id = $2
+       ORDER BY version_number DESC
+       LIMIT 1`,
+      [newStatus, strategyId]
+    );
+
+    ctx.logger.info("Strategy validation complete", {
+      strategyId,
+      isValid: result.isValid,
+      level,
+      errorCount: result.errors.length,
+      warningCount: result.warnings.length,
+    });
+  } catch (err) {
+    result.errors.push(`Database query failed: ${String(err)}`);
+    ctx.logger.error("Strategy validation DB query failed", {
+      strategyId,
+      error: String(err),
+    });
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Pre-Run Hooks
 // ---------------------------------------------------------------------------
 
 async function writeAuditTrail(
@@ -564,32 +830,89 @@ async function writeAuditTrail(
   });
 }
 
+async function writeTradeExecutionLog(
+  ctx: PluginContext,
+  runId: string,
+  agentId: string
+): Promise<TradeRecord[]> {
+  const rawTrades = await ctx.state.get({
+    scopeKind: "run",
+    scopeId: runId,
+    stateKey: "trade-executions",
+  });
+  const trades: TradeRecord[] = safeParse(rawTrades, []);
+
+  if (trades.length === 0) return trades;
+
+  for (const trade of trades) {
+    const slInfo = trade.stopLossPrice
+      ? ` SL=${trade.stopLossPrice}`
+      : "";
+    const tpInfo = trade.takeProfitPrice
+      ? ` TP=${trade.takeProfitPrice}`
+      : "";
+    const strategyInfo = trade.strategyId
+      ? ` strategy=${trade.strategyId}`
+      : "";
+
+    await ctx.activity.log({
+      companyId: "",
+      message: [
+        `Trade executed: ${trade.side} ${trade.quantity} ${trade.symbol}`,
+        `@ ${trade.price}`,
+        `tradeId=${trade.tradeId}`,
+        `run=${runId}`,
+        `agent=${agentId}`,
+        `${slInfo}${tpInfo}${strategyInfo}`,
+      ].join(" "),
+      entityType: "run",
+      entityId: runId,
+      metadata: {
+        tradeId: trade.tradeId,
+        side: trade.side,
+        symbol: trade.symbol,
+        quantity: trade.quantity,
+        price: trade.price,
+        strategyId: trade.strategyId,
+        stopLossPrice: trade.stopLossPrice,
+        takeProfitPrice: trade.takeProfitPrice,
+        timestamp: trade.timestamp,
+      },
+    });
+  }
+
+  return trades;
+}
+
 async function reconcilePositions(
   ctx: PluginContext,
-  _config: PluginConfig
+  config: PluginConfig,
+  runId?: string,
+  agentId?: string
 ): Promise<PositionDivergence[]> {
   const lastState = await ctx.state.get({
     scopeKind: "company",
     stateKey: "position-state",
   });
-  const trades = await ctx.state.get({
-    scopeKind: "run",
-    stateKey: "trade-executions",
-  });
-
-  const positions: Record<string, number> = {};
-  const parsedTrades: TradeRecord[] = safeParse(trades, []);
-
-  for (const t of parsedTrades) {
-    const delta = t.side === "BUY" ? t.quantity : -t.quantity;
-    positions[t.symbol] = (positions[t.symbol] ?? 0) + delta;
-  }
-
   const expectedState: Record<string, number> =
     safeParse(lastState, {});
 
+  const tradesRaw = await ctx.state.get({
+    scopeKind: "run",
+    scopeId: runId,
+    stateKey: "trade-executions",
+  });
+  const trades: TradeRecord[] = safeParse(tradesRaw, []);
+
+  const actualPositions: Record<string, number> = {};
+  for (const t of trades) {
+    const delta = t.side === "BUY" ? t.quantity : -t.quantity;
+    actualPositions[t.symbol] =
+      (actualPositions[t.symbol] ?? 0) + delta;
+  }
+
   const divergences: PositionDivergence[] = [];
-  for (const [symbol, qty] of Object.entries(positions)) {
+  for (const [symbol, qty] of Object.entries(actualPositions)) {
     const expected = expectedState[symbol] ?? 0;
     if (Math.abs(qty - expected) > 0.0001) {
       divergences.push({
@@ -603,6 +926,58 @@ async function reconcilePositions(
     }
   }
 
+  if (divergences.length > 0 && runId) {
+    ctx.logger.warn("Position divergences detected, creating follow-up issue", {
+      runId,
+      count: divergences.length,
+    });
+
+    try {
+      const criticalDivs = divergences.filter(
+        (d) => d.severity === "CRITICAL"
+      );
+      const severityLabel =
+        criticalDivs.length > 0 ? "CRITICAL" : "WARNING";
+
+      const divLines = divergences
+        .map(
+          (d) =>
+            `- [${d.severity}] ${d.symbol}: expected ${d.expectedQuantity}, actual ${d.actualQuantity}`
+        )
+        .join("\n");
+
+      await ctx.issues.create({
+        title: `[${severityLabel}] Position reconciliation divergence detected`,
+        description: [
+          `## Position Reconciliation Alert`,
+          ``,
+          `**Severity:** ${severityLabel}`,
+          `**Source Run:** \`${runId}\``,
+          `**Agent:** \`${agentId ?? "unknown"}\``,
+          `**Reconciled At:** ${isoNow()}`,
+          ``,
+          `### Divergences`,
+          ``,
+          divLines,
+          ``,
+          `Review the trade executions in this run and reconcile against exchange state.`,
+        ].join("\n"),
+        priority: criticalDivs.length > 0 ? "high" : "medium",
+        status: "todo",
+      });
+
+      ctx.logger.info("Position reconciliation follow-up issue created", {
+        runId,
+        severity: severityLabel,
+      });
+    } catch (err) {
+      ctx.logger.error("Failed to create position reconciliation issue", {
+        runId,
+        error: String(err),
+      });
+    }
+  }
+
   await ctx.state.set(
     { scopeKind: "instance", stateKey: "last-reconciliation" },
     isoNow()
@@ -612,12 +987,85 @@ async function reconcilePositions(
 }
 
 // ---------------------------------------------------------------------------
+// Strategy Validation (DB-backed)
+// ---------------------------------------------------------------------------
+
+function validateStrategyRow(
+  strategy: StrategyRow,
+  level: "basic" | "strict",
+  result: StrategyValidationResult
+): void {
+  result.isValid = true;
+
+  if (!strategy.version_id) {
+    result.warnings.push("Strategy has no versioned configuration");
+    return;
+  }
+
+  if (strategy.validation_status === "Fail") {
+    result.errors.push(
+      `Strategy validation status is 'Fail' (last validated at ${strategy.version_timestamp ?? "unknown"})`
+    );
+    result.isValid = false;
+    return;
+  }
+
+  if (strategy.validation_status === "Un-Validated") {
+    result.warnings.push("Strategy has not been validated yet (status: Un-Validated)");
+  }
+
+  const blocks = Array.isArray(strategy.blocks) ? strategy.blocks : [];
+  if (blocks.length === 0) {
+    result.errors.push("Strategy has no building blocks defined");
+    result.isValid = false;
+    return;
+  }
+
+  const signals = strategy.signals as Record<string, unknown> | undefined;
+  if (!signals || Object.keys(signals).length === 0) {
+    result.warnings.push("Strategy has no signals configured");
+  }
+
+  if (level === "strict") {
+    const riskMgmt = strategy.risk_management as Record<string, unknown> | undefined;
+    if (!riskMgmt || Object.keys(riskMgmt).length === 0) {
+      result.warnings.push("Strict mode: risk_management config is empty");
+    }
+
+    const entryConditions = Array.isArray(strategy.entry_conditions)
+      ? strategy.entry_conditions
+      : [];
+    const exitConditions = Array.isArray(strategy.exit_conditions)
+      ? strategy.exit_conditions
+      : [];
+    if (entryConditions.length === 0 && exitConditions.length === 0) {
+      result.warnings.push("Strict mode: no entry or exit conditions defined");
+    }
+
+    const blockNames = blocks.map((b: Record<string, unknown>) => b.block_name).filter(Boolean);
+    const signalBlockRefs = blocks.flatMap(
+      (b: Record<string, unknown>) => (Array.isArray(b.signals) ? b.signals : [])
+    );
+    if (blockNames.length > 0 && signalBlockRefs.length > 0) {
+      result.warnings.push(
+        `Strict mode: verify signal dependency graph for blocks: ${blockNames.join(", ")}`
+      );
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Plugin Definition
 // ---------------------------------------------------------------------------
 
 const plugin = definePlugin({
   async setup(ctx) {
-    ctx.logger.info("Trade Lifecycle Hooks plugin starting (v0.2.0)");
+    ctx.logger.info("Trade Lifecycle Hooks plugin starting (v0.3.0)");
+
+    // ── Database initialisation ─────────────────────────────────────
+
+    const config = await getConfig(ctx);
+    await initDatabase(ctx, config);
 
     // ── Pre-Run: agent.run.started ──────────────────────────────────
 
@@ -696,12 +1144,27 @@ const plugin = definePlugin({
         try {
           const config = await getConfig(ctx);
 
-          // 1. Write audit trail
+          // 1. Write run-level audit entry
           await writeAuditTrail(ctx, config, payload);
-          ctx.logger.info("Audit trail written", { runId });
 
-          // 2. Reconciled positions
-          const divergences = await reconcilePositions(ctx, config);
+          // 2. Write per-trade execution log entries to activity stream
+          const trades = await writeTradeExecutionLog(
+            ctx,
+            runId,
+            payload.agentId
+          );
+          ctx.logger.info("Audit trail and trade execution log written", {
+            runId,
+            tradeCount: trades.length,
+          });
+
+          // 3. Reconciled positions (creates follow-up issue if divergences)
+          const divergences = await reconcilePositions(
+            ctx,
+            config,
+            runId,
+            payload.agentId
+          );
           if (divergences.length > 0) {
             ctx.logger.warn("Position divergences detected", {
               runId,
@@ -766,20 +1229,33 @@ const plugin = definePlugin({
         runCtx: ToolRunContext
       ): Promise<ToolResult> => {
         const { strategyId } = params as { strategyId: string };
+        const config = await getConfig(ctx);
         const result: StrategyValidationResult = {
           strategyId,
           isValid: false,
-          level: "basic",
+          level: config.preRunCheckLevel,
           errors: [],
           warnings: [],
           checkedAt: isoNow(),
         };
 
         try {
-          result.warnings.push(
-            "DB-backed strategy validation not yet implemented (Phase 2)"
-          );
-          result.isValid = true;
+          if (!dbAvailable) {
+            result.warnings.push(
+              "BTC Trade Engine database unavailable — strategy validation skipped"
+            );
+            result.isValid = true;
+          } else {
+            const { strategy, error } = await queryStrategies(strategyId);
+
+            if (error) {
+              result.errors.push(`Database query failed: ${error}`);
+            } else if (!strategy) {
+              result.errors.push(`Strategy '${strategyId}' not found in database`);
+            } else {
+              validateStrategyRow(strategy, config.preRunCheckLevel, result);
+            }
+          }
 
           await ctx.state.set(
             {
@@ -799,7 +1275,7 @@ const plugin = definePlugin({
               ? `Strategy validation FAILED: ${result.errors.join("; ")}`
               : result.warnings.length > 0
                 ? `Strategy validation passed with warnings: ${result.warnings.join("; ")}`
-                : "Strategy validation passed.",
+                : `Strategy '${strategyId}' validation passed.`,
           data: result,
         };
       }
@@ -1043,6 +1519,41 @@ const plugin = definePlugin({
           positions
         );
 
+        await ctx.activity.log({
+          companyId: "",
+          message: [
+            `Trade executed: ${record.side} ${record.quantity} ${record.symbol}`,
+            `@ ${record.price}`,
+            `tradeId=${record.tradeId}`,
+            `run=${record.runId}`,
+            `agent=${record.agentId}`,
+            record.stopLossPrice
+              ? ` SL=${record.stopLossPrice}`
+              : "",
+            record.takeProfitPrice
+              ? ` TP=${record.takeProfitPrice}`
+              : "",
+            record.strategyId
+              ? ` strategy=${record.strategyId}`
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
+          entityType: "run",
+          entityId: record.runId,
+          metadata: {
+            tradeId: record.tradeId,
+            side: record.side,
+            symbol: record.symbol,
+            quantity: record.quantity,
+            price: record.price,
+            strategyId: record.strategyId,
+            stopLossPrice: record.stopLossPrice,
+            takeProfitPrice: record.takeProfitPrice,
+            timestamp: record.timestamp,
+          },
+        });
+
         ctx.logger.info("Trade logged", {
           tradeId: record.tradeId,
           side: record.side,
@@ -1050,7 +1561,7 @@ const plugin = definePlugin({
         });
 
         return {
-          content: `Trade ${record.tradeId} logged: ${record.side} ${record.quantity} ${record.symbol} @ ${record.price}`,
+          content: `Trade ${record.tradeId} logged and audited: ${record.side} ${record.quantity} ${record.symbol} @ ${record.price}`,
           data: record,
         };
       }
@@ -1075,10 +1586,15 @@ const plugin = definePlugin({
       },
       async (
         _params: unknown,
-        _runCtx: ToolRunContext
+        runCtx: ToolRunContext
       ): Promise<ToolResult> => {
         const config = await getConfig(ctx);
-        const divergences = await reconcilePositions(ctx, config);
+        const divergences = await reconcilePositions(
+          ctx,
+          config,
+          runCtx.runId,
+          runCtx.agentId
+        );
 
         if (divergences.length === 0) {
           return {
@@ -1094,15 +1610,30 @@ const plugin = definePlugin({
       }
     );
 
-    ctx.logger.info("Trade Lifecycle Hooks plugin ready (v0.2.0)");
+    ctx.logger.info("Trade Lifecycle Hooks plugin ready (v0.3.0)");
   },
 
   async onHealth() {
-    return { status: "ok", message: "Trade Lifecycle Hooks plugin v0.2.0 active" };
+    const checks: Record<string, string> = {};
+
+    if (dbAvailable) {
+      const dbHealth = await dbHealthCheck();
+      checks.db = dbHealth.ok
+        ? `connected (${dbHealth.latencyMs}ms)`
+        : `error: ${dbHealth.error ?? "unknown"}`;
+    } else {
+      checks.db = "unavailable";
+    }
+
+    return {
+      status: "ok",
+      message: "Trade Lifecycle Hooks plugin v0.3.0 active",
+      checks,
+    };
   },
 
   async onShutdown() {
-    // Flush any pending state
+    await closePool();
   },
 });
 
