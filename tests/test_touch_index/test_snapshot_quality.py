@@ -68,8 +68,13 @@ def _make_bug_report():
             total_bug_issues = 2326
             eligible_coverage_pct = 74.0
             eligible_bug_issues = 438
-            missing_eligible_identifiers = ['BTCAAAAA-999', 'BTCAAAAA-1000']
-            missing_issue_identifiers = ['BTCAAAAA-1', 'BTCAAAAA-2', 'BTCAAAAA-999', 'BTCAAAAA-1000']
+            missing_eligible_identifiers = ["BTCAAAAA-999", "BTCAAAAA-1000"]
+            missing_issue_identifiers = [
+                "BTCAAAAA-1",
+                "BTCAAAAA-2",
+                "BTCAAAAA-999",
+                "BTCAAAAA-1000",
+            ]
 
         class freshness:
             total_rows = 938
@@ -202,7 +207,6 @@ class TestBuildFrReport:
         assert d["orphan_count"] == 2
         assert d["pass"] is False
 
-
     def test_missing_issue_identifiers_populated(self):
         class MockReport:
             passed = False
@@ -211,7 +215,7 @@ class TestBuildFrReport:
                 coverage_pct = 88.0
                 indexed_fdr_issues = 35
                 total_fdr_issues = 40
-                missing_issue_identifiers = ['BTCAAAAA-900', 'BTCAAAAA-901']
+                missing_issue_identifiers = ["BTCAAAAA-900", "BTCAAAAA-901"]
 
             class freshness:
                 total_rows = 120
@@ -227,9 +231,8 @@ class TestBuildFrReport:
                 source_distribution = {}
 
         d = _build_fr_report(MockReport())
-        assert d['missing_issue_identifiers'] == ['BTCAAAAA-900', 'BTCAAAAA-901']
-        assert d['pass'] is False
-
+        assert d["missing_issue_identifiers"] == ["BTCAAAAA-900", "BTCAAAAA-901"]
+        assert d["pass"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -337,7 +340,9 @@ class TestBuildBugReport:
 class TestMain:
     def test_stdout_emits_json(self, monkeypatch, capsys):
         """--stdout emits JSON to stdout without writing a file."""
-        monkeypatch.setattr(sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"])
+        monkeypatch.setattr(
+            sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"]
+        )
         code, out = _run_main(capsys)
         assert code == 0
         data = json.loads(out.strip())
@@ -349,7 +354,9 @@ class TestMain:
 
     def test_stdout_fr_failure(self, monkeypatch, capsys):
         """--stdout with failing FR check still emits full JSON and exits 1."""
-        monkeypatch.setattr(sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"])
+        monkeypatch.setattr(
+            sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"]
+        )
         fr_report = _make_fr_report()
         fr_report.passed = False
         code, out = _run_main(capsys, fr_report=fr_report)
@@ -427,7 +434,9 @@ class TestMain:
 
     def test_default_stale_hours(self, monkeypatch):
         """Default stale-hours should be 168."""
-        monkeypatch.setattr(sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"])
+        monkeypatch.setattr(
+            sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"]
+        )
         with (
             patch("snapshot_touch_index_quality.get_engine") as mock_get_engine,
             patch("snapshot_touch_index_quality.health_check", return_value=True),
@@ -450,7 +459,9 @@ class TestMain:
 
     def test_default_stale_days(self, monkeypatch):
         """Default stale-days should be 30."""
-        monkeypatch.setattr(sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"])
+        monkeypatch.setattr(
+            sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"]
+        )
         with (
             patch("snapshot_touch_index_quality.get_engine") as mock_get_engine,
             patch("snapshot_touch_index_quality.health_check", return_value=True),
@@ -473,13 +484,17 @@ class TestMain:
 
     def test_overall_pass_exit_code_zero(self, monkeypatch):
         """When both FR and Bug pass, exit code is 0."""
-        monkeypatch.setattr(sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"])
+        monkeypatch.setattr(
+            sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"]
+        )
         code, _ = _run_main(fr_report=_make_fr_report(), bug_report=_make_bug_report())
         assert code == 0
 
     def test_overall_fail_exit_code_one(self, monkeypatch):
         """When FR fails, exit code is 1."""
-        monkeypatch.setattr(sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"])
+        monkeypatch.setattr(
+            sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"]
+        )
         fr_report = _make_fr_report()
         fr_report.passed = False
         code, _ = _run_main(fr_report=fr_report)
@@ -487,7 +502,9 @@ class TestMain:
 
     def test_bug_failure_exit_code_one(self, monkeypatch):
         """When Bug fails, exit code is 1."""
-        monkeypatch.setattr(sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"])
+        monkeypatch.setattr(
+            sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"]
+        )
         bug_report = _make_bug_report()
         bug_report.passed = False
         code, _ = _run_main(bug_report=bug_report)
@@ -495,7 +512,9 @@ class TestMain:
 
     def test_both_failure_exit_code_one(self, monkeypatch):
         """When both FR and Bug fail, exit code is 1."""
-        monkeypatch.setattr(sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"])
+        monkeypatch.setattr(
+            sys, "argv", ["snapshot_touch_index_quality.py", "--stdout"]
+        )
         fr_report = _make_fr_report()
         fr_report.passed = False
         bug_report = _make_bug_report()

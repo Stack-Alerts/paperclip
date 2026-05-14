@@ -353,7 +353,9 @@ class TestCheckConsistency:
             report = check_consistency(engine)
 
         assert report.source_distribution == {}
-        assert any("Could not query source distribution" in r.message for r in caplog.records)
+        assert any(
+            "Could not query source distribution" in r.message for r in caplog.records
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -920,7 +922,10 @@ class TestCheckBugConsistency:
             report = check_bug_consistency(engine)
 
         assert report.source_distribution == {}
-        assert any("Could not query bug source distribution" in r.message for r in caplog.records)
+        assert any(
+            "Could not query bug source distribution" in r.message
+            for r in caplog.records
+        )
 
 
 # ---------------------------------------------------------------------------

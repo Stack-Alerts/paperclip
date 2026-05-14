@@ -982,7 +982,10 @@ class TestListLiveRuns:
     def test_returns_live_runs(self):
         from touch_index.paperclip_client import list_live_runs
 
-        runs = [{"id": "run-1", "status": "running"}, {"id": "run-2", "status": "queued"}]
+        runs = [
+            {"id": "run-1", "status": "running"},
+            {"id": "run-2", "status": "queued"},
+        ]
         with (
             patch("touch_index.paperclip_client._session") as mock_session_factory,
             patch("touch_index.paperclip_client._base", return_value="https://api.x"),

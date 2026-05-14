@@ -279,7 +279,6 @@ class TestGetAllReferencedIssueIds:
         assert "BTCAAAAA-300" in ids
         assert "BTCAAAAA-301" in ids
 
-
     def test_empty_when_no_refs(self):
         with patch(
             "touch_index.git_extractor._run",

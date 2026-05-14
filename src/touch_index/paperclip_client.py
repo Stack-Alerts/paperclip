@@ -17,7 +17,9 @@ from urllib3.util import Retry
 
 logger = logging.getLogger(__name__)
 _PLACEHOLDER_PATTERNS = (
-    "your_", "example.com", "00000000-0000-0000-0000-000000000000",
+    "your_",
+    "example.com",
+    "00000000-0000-0000-0000-000000000000",
 )
 
 _REQUIRED_ENV_VARS = {

@@ -405,8 +405,6 @@ class TestRunFrWorker:
             run_fr_worker(engine, [{"id": "id-x", "identifier": "BTCAAAAA-X"}])
         # Should complete without error; git fallback used
 
-    
-
     def test_fetches_description_when_list_endpoint_omits_it(self):
         """When list endpoint omits description, run_fr_worker fetches full issue and retries."""
         engine, conn = _mock_engine()
@@ -501,9 +499,6 @@ class TestRunFrWorker:
         assert len(results) == 1
         assert results[0].source == "comments"
         mock_fetch.assert_not_called()
-
-
-
 
     def test_returns_none_when_issue_not_found(self):
         """When get_issue_by_id returns None, process_fr_issue returns None."""
@@ -603,11 +598,9 @@ class TestRunFrWorker:
         assert result.files_indexed == 1
         mock_desc.assert_called_once_with(issue["description"])
 
-
-# ---------------------------------------------------------------------------
-# main() — CLI entry point
-# ---------------------------------------------------------------------------
-
+    # ---------------------------------------------------------------------------
+    # main() — CLI entry point
+    # ---------------------------------------------------------------------------
 
     def test_propagates_issue_status_from_issue_dict(self):
         """run_fr_worker captures issue_status from the issue dict in each result."""
@@ -668,7 +661,6 @@ class TestRunFrWorker:
         assert results[0].issue_status == "in_review"
 
 
-
 class TestProcessFrIssue:
     def test_fetches_and_ingests_issue(self):
         """process_fr_issue fetches issue from API and delegates to ingest_fr_issue."""
@@ -696,6 +688,8 @@ class TestProcessFrIssue:
         assert result is not None
         assert result.files_indexed == 1
         assert result.issue_identifier == ISSUE_IDENTIFIER
+
+
 class TestMain:
     """Tests for fr_worker.main() CLI entry point."""
 
@@ -850,8 +844,10 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             monkeypatch.setattr(
                 "sys.argv",
                 ["touch_index"],
@@ -881,8 +877,10 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             monkeypatch.setattr(
                 "sys.argv",
                 ["touch_index", "--dry-run"],
@@ -951,8 +949,10 @@ class TestMain:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=[]),
             patch("touch_index.fr_worker.run_fr_worker") as mock_worker,
             caplog.at_level(logging.INFO),
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             monkeypatch.setattr(
                 "sys.argv",
                 ["touch_index"],
@@ -977,8 +977,10 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board"
             ) as mock_transition,
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             monkeypatch.setattr("sys.argv", ["touch_index"])
             with pytest.raises(SystemExit) as exc_info:
                 main()
@@ -1004,8 +1006,10 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board"
             ) as mock_transition,
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             monkeypatch.setattr("sys.argv", ["touch_index", "--json-summary"])
             with pytest.raises(SystemExit) as exc_info:
                 main()
@@ -1049,8 +1053,10 @@ class TestMain:
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
             caplog.at_level(logging.INFO),
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             mock_quality.return_value.passed = True
             monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
             main()
@@ -1087,8 +1093,10 @@ class TestMain:
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
             caplog.at_level(logging.INFO),
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             mock_quality.return_value.passed = False
             monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
             with pytest.raises(SystemExit) as exc_info:
@@ -1131,7 +1139,10 @@ class TestMain:
 
         mock_worker.assert_not_called()
         mock_catchup.assert_called_once()
-        assert any("Catch-up indexed 3 file(s) across 1 issue(s)" in r.message for r in caplog.records)
+        assert any(
+            "Catch-up indexed 3 file(s) across 1 issue(s)" in r.message
+            for r in caplog.records
+        )
 
     def test_main_polling_with_catchup_results(self, monkeypatch, caplog):
         """Polling with catch-up results: catch-up summary is logged after worker results."""
@@ -1178,7 +1189,10 @@ class TestMain:
             main()
 
         mock_catchup.assert_called_once()
-        assert any("Catch-up indexed 3 file(s) across 1 issue(s)" in r.message for r in caplog.records)
+        assert any(
+            "Catch-up indexed 3 file(s) across 1 issue(s)" in r.message
+            for r in caplog.records
+        )
         if any("FR worker done" in r.message for r in caplog.records):
             summary = [r for r in caplog.records if "FR worker done" in r.message][0]
             assert "2 issues processed" in summary.message
@@ -1198,8 +1212,10 @@ class TestMain:
             patch("touch_index.fr_worker.run_fr_worker") as mock_worker,
             patch("touch_index.quality.run_quality_checks") as mock_quality,
             caplog.at_level(logging.INFO),
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             mock_quality.return_value.passed = True
             monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
             main()
@@ -1218,8 +1234,10 @@ class TestMain:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=[]),
             patch("touch_index.fr_worker.run_fr_worker") as mock_worker,
             patch("touch_index.quality.run_quality_checks") as mock_quality,
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             mock_quality.return_value.passed = False
             monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
             with pytest.raises(SystemExit) as exc_info:
@@ -1254,8 +1272,10 @@ class TestMain:
             patch("touch_index.fr_worker.run_fr_worker", return_value=worker_results),
             patch("touch_index.quality.run_quality_checks") as mock_quality,
             patch("touch_index.paperclip_client.transition_issue_status_board"),
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             mock_quality.return_value.passed = True
             monkeypatch.setattr(
                 "sys.argv", ["touch_index", "--validate", "--stale-hours", "48"]
@@ -1274,8 +1294,10 @@ class TestMain:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=[]),
             patch("touch_index.fr_worker.run_fr_worker") as mock_worker,
             patch("touch_index.quality.run_quality_checks") as mock_quality,
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             mock_quality.return_value.passed = True
             monkeypatch.setattr(
                 "sys.argv", ["touch_index", "--validate", "--stale-hours", "72"]
@@ -1458,6 +1480,7 @@ class TestMain:
 
         captured = capsys.readouterr()
         import json
+
         data = json.loads(captured.out.strip())
         assert data["result"]["issue_status"] is None
 
@@ -1486,8 +1509,10 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             monkeypatch.setattr(
                 "sys.argv",
                 ["touch_index", "--json-summary"],
@@ -1528,8 +1553,10 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ),
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             monkeypatch.setattr(
                 "sys.argv",
                 ["touch_index", "--json-summary", "--dry-run"],
@@ -1709,8 +1736,9 @@ class TestMain:
             ]
         )
 
-
-    def test_main_polling_skips_transition_for_non_done_result(self, monkeypatch, caplog):
+    def test_main_polling_skips_transition_for_non_done_result(
+        self, monkeypatch, caplog
+    ):
         """Polling mode: result with issue_status='in_progress' skips transition and logs."""
         import logging
 
@@ -1975,8 +2003,10 @@ class TestMainProcessFrIssueError:
             patch("touch_index.fr_worker.run_fr_worker", return_value=results),
             patch("touch_index.quality.run_quality_checks") as mock_quality,
             patch("touch_index.paperclip_client.transition_issue_status_board"),
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             mock_quality.return_value.passed = True
             mock_quality.return_value.to_dict.return_value = {"passed": True}
             monkeypatch.setattr(
@@ -2003,8 +2033,10 @@ class TestMainProcessFrIssueError:
             patch("touch_index.paperclip_client.get_fdr_issues", return_value=[]),
             patch("touch_index.fr_worker.run_fr_worker") as mock_worker,
             patch("touch_index.paperclip_client.transition_issue_status_board"),
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             monkeypatch.setattr(
                 "sys.argv",
                 ["touch_index", "--json-summary"],
@@ -2031,8 +2063,10 @@ class TestMainProcessFrIssueError:
             patch("touch_index.fr_worker.run_fr_worker") as mock_worker,
             patch("touch_index.quality.run_quality_checks") as mock_quality,
             patch("touch_index.paperclip_client.transition_issue_status_board"),
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             mock_quality.return_value.passed = True
             mock_quality.return_value.to_dict.return_value = {"passed": True}
             monkeypatch.setattr(
@@ -2088,8 +2122,10 @@ class TestMainProcessFrIssueError:
             patch(
                 "touch_index.paperclip_client.transition_issue_status_board",
             ) as mock_transition,
-        
-            patch("touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]) as mock_catchup,):
+            patch(
+                "touch_index.fr_worker.catch_up_eligible_fr_issues", return_value=[]
+            ) as mock_catchup,
+        ):
             monkeypatch.setattr(
                 "sys.argv",
                 ["touch_index", "--json-summary"],
@@ -2208,14 +2244,12 @@ class TestMainProcessFrIssueError:
         assert data["total_files_indexed"] == 3
 
 
-
 # ---------------------------------------------------------------------------
 # catch_up_eligible_fr_issues — catch-up phase
 # ---------------------------------------------------------------------------
 
 
 class TestCatchUpEligibleFrIssues:
-
     def _connect_engine(self):
         """Return an engine mock with both .begin() and .connect() mocked."""
         engine, conn = _mock_engine()
@@ -2351,6 +2385,7 @@ class TestCatchUpEligibleFrIssues:
         ]
 
         call_count = [0]
+
         def _side_effect(*args, **kwargs):
             call_count[0] += 1
             # First call (id 300) raises, second call (id 301) succeeds
@@ -2362,9 +2397,7 @@ class TestCatchUpEligibleFrIssues:
             patch(
                 "touch_index.paperclip_client.get_fdr_issues", return_value=fdr_issues
             ),
-            patch(
-                "touch_index.fr_worker.fetch_and_extract", side_effect=_side_effect
-            ),
+            patch("touch_index.fr_worker.fetch_and_extract", side_effect=_side_effect),
             patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
         ):
             results = catch_up_eligible_fr_issues(engine)
@@ -2381,9 +2414,7 @@ class TestCatchUpEligibleFrIssues:
         issues = [{"id": "id-1", "identifier": "BTCAAAAA-400"}]
 
         with (
-            patch(
-                "touch_index.paperclip_client.get_fdr_issues", return_value=issues
-            ),
+            patch("touch_index.paperclip_client.get_fdr_issues", return_value=issues),
             patch(
                 "touch_index.fr_worker.fetch_and_extract", return_value=["src/ok.py"]
             ),
@@ -2435,14 +2466,14 @@ class TestCatchUpEligibleFrIssues:
 
         assert not any("Catch-up complete" in r.message for r in caplog.records)
 
-
-# ---------------------------------------------------------------------------
-# _emit_json_summary — required worker param (regression for BTCAAAAA-4892)
-# ---------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------
+    # _emit_json_summary — required worker param (regression for BTCAAAAA-4892)
+    # ---------------------------------------------------------------------------
 
     def test_propagates_issue_status_in_catch_up(self):
         """catch_up_eligible_fr_issues captures issue_status from the issue dict."""
         from tests.test_touch_index.test_fr_worker import FDR_LABEL_ID, OWNER_AGENT_ID
+
         engine, conn = _mock_engine()
         conn.execute.return_value.fetchall.return_value = []
         fdr_issues = [
@@ -2468,9 +2499,7 @@ class TestCatchUpEligibleFrIssues:
             patch(
                 "touch_index.paperclip_client.get_fdr_issues", return_value=fdr_issues
             ),
-            patch(
-                "touch_index.fr_worker.fetch_and_extract", return_value=["src/a.py"]
-            ),
+            patch("touch_index.fr_worker.fetch_and_extract", return_value=["src/a.py"]),
             patch("touch_index.fr_worker.get_files_for_issue", return_value=[]),
         ):
             results = catch_up_eligible_fr_issues(engine)
@@ -2479,13 +2508,16 @@ class TestCatchUpEligibleFrIssues:
         assert results[0].issue_status == "done"
         assert results[1].issue_status == "in_progress"
 
-
     def test_catch_up_fetches_description_when_list_endpoint_omits_it(self):
         """When list endpoint omits description, catch-up fetches full issue and retries."""
         engine, conn = self._connect_engine()
         conn.execute.return_value.fetchall.return_value = []
         fdr_issues = [
-            {"id": "fdr-uuid-omit", "identifier": "BTCAAAAA-900", "labelIds": [FDR_LABEL_ID]},
+            {
+                "id": "fdr-uuid-omit",
+                "identifier": "BTCAAAAA-900",
+                "labelIds": [FDR_LABEL_ID],
+            },
         ]
         full_issue = {
             "id": "fdr-uuid-omit",
@@ -2541,7 +2573,9 @@ class TestCatchUpEligibleFrIssues:
         assert results[0].source == "git"
         mock_fetch.assert_not_called()
 
-    def test_catch_up_skips_description_retry_when_full_issue_still_no_description(self):
+    def test_catch_up_skips_description_retry_when_full_issue_still_no_description(
+        self,
+    ):
         """When full issue also lacks description, original 'none' result is preserved."""
         engine, conn = self._connect_engine()
         conn.execute.return_value.fetchall.return_value = []
@@ -2565,7 +2599,6 @@ class TestCatchUpEligibleFrIssues:
         assert len(results) == 1
         assert results[0].source == "none"
         assert results[0].skipped_no_commits is True
-
 
 
 class TestEmitJsonSummaryRequiresWorker:
@@ -2592,4 +2625,3 @@ class TestEmitJsonSummaryRequiresWorker:
 
         data = json.loads(captured.out.strip())
         assert data["worker"] == "fr"
-

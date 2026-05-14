@@ -1142,7 +1142,11 @@ class TestMain:
             patch(
                 "touch_index.paperclip_client.get_closed_non_fdr_issues",
                 return_value=[
-                    {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+                    {
+                        "id": "id-1",
+                        "identifier": "BTCAAAAA-101",
+                        "completedAt": "2026-05-11T10:00:00Z",
+                    },
                 ],
             ),
             patch("touch_index.bug_worker.run_bug_worker", return_value=results),
@@ -1171,7 +1175,11 @@ class TestMain:
 
         engine = MagicMock()
         issues = [
-            {"id": "id-1", "identifier": "BTCAAAAA-101", "completedAt": "2026-05-11T10:00:00Z"},
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
         ]
         results = [
             BugIngestionResult(
@@ -1216,7 +1224,6 @@ class TestMain:
         # Only the worker result should be transitioned, not the catch-up result
         mock_transition.assert_called_once_with("id-1", "done")
 
-
     def test_main_catch_up_dry_run(self, monkeypatch):
         """--dry-run is passed through to catch_up_eligible_bug_issues."""
         from touch_index.__main__ import _run_bug_cli as main
@@ -1236,9 +1243,7 @@ class TestMain:
                 return_value=[],
             ) as mock_catchup,
         ):
-            monkeypatch.setattr(
-                "sys.argv", ["touch_index", "--dry-run"]
-            )
+            monkeypatch.setattr("sys.argv", ["touch_index", "--dry-run"])
             main()
 
         mock_worker.assert_not_called()
@@ -1949,7 +1954,6 @@ class TestMain:
         # Only the done issue should be transitioned
         mock_transition.assert_called_once_with("id-1", "done")
         assert any("skipping transition to done" in r.message for r in caplog.records)
-
 
     def test_main_transition_error_logged_does_not_crash(self, monkeypatch, caplog):
         """A failed transition is logged but does not halt the worker."""
@@ -2774,7 +2778,13 @@ class TestEmitJsonSummaryRequiresWorker:
         ):
             results = run_bug_worker(
                 engine,
-                [{"id": "id-1", "identifier": "BTCAAAAA-200", "completedAt": "2026-05-11T12:00:00Z"}],
+                [
+                    {
+                        "id": "id-1",
+                        "identifier": "BTCAAAAA-200",
+                        "completedAt": "2026-05-11T12:00:00Z",
+                    }
+                ],
             )
 
         assert len(results) == 1
@@ -2884,7 +2894,9 @@ class TestEmitJsonSummaryRequiresWorker:
         with (
             patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
             patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
-            patch("touch_index.bug_worker.get_issue_by_id", return_value=None) as mock_get,
+            patch(
+                "touch_index.bug_worker.get_issue_by_id", return_value=None
+            ) as mock_get,
         ):
             results = run_bug_worker(
                 engine,
@@ -3131,11 +3143,17 @@ class TestCatchUpEligibleBugIssues:
             ),
             patch(
                 "touch_index.bug_worker.get_issue_by_identifier",
-                side_effect=lambda i: done_issue if i == ISSUE_IDENTIFIER else other_issue,
+                side_effect=lambda i: (
+                    done_issue if i == ISSUE_IDENTIFIER else other_issue
+                ),
             ),
             patch(
                 "touch_index.bug_worker.get_files_for_issue",
-                side_effect=lambda i: ["src/ok.py"] if i == other_id else (_ for _ in ()).throw(RuntimeError("git error")),
+                side_effect=lambda i: (
+                    ["src/ok.py"]
+                    if i == other_id
+                    else (_ for _ in ()).throw(RuntimeError("git error"))
+                ),
             ),
             patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
         ):
@@ -3175,9 +3193,7 @@ class TestCatchUpEligibleBugIssues:
             ),
             patch("touch_index.bug_worker.get_files_for_issue", return_value=[]),
             patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
-            patch(
-                "touch_index.bug_worker.get_issue_by_id", return_value=full_issue
-            ),
+            patch("touch_index.bug_worker.get_issue_by_id", return_value=full_issue),
             patch(
                 "touch_index.bug_worker.extract_files_from_text",
                 return_value=["src/touch_index/bug_worker.py"],
@@ -3227,7 +3243,9 @@ class TestCatchUpEligibleBugIssues:
         assert results[0].source == "git"
         mock_fetch.assert_not_called()
 
-    def test_catch_up_skips_description_retry_when_full_issue_still_no_description(self):
+    def test_catch_up_skips_description_retry_when_full_issue_still_no_description(
+        self,
+    ):
         """When full issue also lacks description, original 'none' result is preserved."""
         engine, conn = _mock_engine()
         done_issue = {
@@ -3259,4 +3277,3 @@ class TestCatchUpEligibleBugIssues:
         assert len(results) == 1
         assert results[0].source == "none"
         assert results[0].skipped_no_commits is True
-
