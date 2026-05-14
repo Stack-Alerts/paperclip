@@ -54,6 +54,10 @@ class RiskEnforcer:
 
         stop_price = Price.from_str(str(stop_price_value))
 
+        if self._strategy.order_factory is None:
+            log.info(f"Dry run: {side} {quantity} @ {price}, stop @ {stop_price}")
+            return
+
         entry_order = self._strategy.order_factory.market(
             instrument_id=instrument_id,
             order_side=side,

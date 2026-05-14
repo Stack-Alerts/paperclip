@@ -76,39 +76,39 @@ class TestStrategyInitialization:
         """Test parameters are set correctly"""
         assert strategy.min_confluence == 60
         assert strategy.max_bars_held == 200
-        assert strategy.risk_per_trade_pct == 8.0
-        assert strategy.max_leverage == 15.0
+        assert strategy.risk_per_trade_pct == 1.0
+        assert strategy.max_leverage == 1.0
     
     def test_init_creates_blocks(self, strategy):
         """Test building blocks are initialized"""
         assert len(strategy.blocks) == 5
         
         # Check each block
-        assert 'hod' in strategy.blocks
-        assert strategy.blocks['hod']['weight'] == 20
-        assert 'hod' in strategy.blocks
-        assert strategy.blocks['hod']['weight'] == 20
-        assert 'stochastic_rsi' in strategy.blocks
-        assert strategy.blocks['stochastic_rsi']['weight'] == 25
-        assert 'range_liquidity' in strategy.blocks
-        assert strategy.blocks['range_liquidity']['weight'] == 15
-        assert 'how' in strategy.blocks
-        assert strategy.blocks['how']['weight'] == 20
+        assert 'hod_0' in strategy.blocks
+        assert strategy.blocks['hod_0']['weight'] == 18
+        assert 'hod_1' in strategy.blocks
+        assert strategy.blocks['hod_1']['weight'] == 18
+        assert 'stochastic_rsi_2' in strategy.blocks
+        assert strategy.blocks['stochastic_rsi_2']['weight'] == 15
+        assert 'range_liquidity_3' in strategy.blocks
+        assert strategy.blocks['range_liquidity_3']['weight'] == 12
+        assert 'how_4' in strategy.blocks
+        assert strategy.blocks['how_4']['weight'] == 15
     
     def test_init_creates_detectors(self, strategy):
         """Test detectors are initialized"""
         assert len(strategy.detectors) == 5
         
-        assert 'hod' in strategy.detectors
-        assert strategy.detectors['hod'] is not None
-        assert 'hod' in strategy.detectors
-        assert strategy.detectors['hod'] is not None
-        assert 'stochastic_rsi' in strategy.detectors
-        assert strategy.detectors['stochastic_rsi'] is not None
-        assert 'range_liquidity' in strategy.detectors
-        assert strategy.detectors['range_liquidity'] is not None
-        assert 'how' in strategy.detectors
-        assert strategy.detectors['how'] is not None
+        assert 'hod_0' in strategy.detectors
+        assert strategy.detectors['hod_0'] is not None
+        assert 'hod_1' in strategy.detectors
+        assert strategy.detectors['hod_1'] is not None
+        assert 'stochastic_rsi_2' in strategy.detectors
+        assert strategy.detectors['stochastic_rsi_2'] is not None
+        assert 'range_liquidity_3' in strategy.detectors
+        assert strategy.detectors['range_liquidity_3'] is not None
+        assert 'how_4' in strategy.detectors
+        assert strategy.detectors['how_4'] is not None
 
 
 class TestBlockProcessing:
@@ -123,11 +123,11 @@ class TestBlockProcessing:
         assert len(results) == 5
         
         # Check each block returns a result
-        assert 'hod' in results
-        assert 'hod' in results
-        assert 'stochastic_rsi' in results
-        assert 'range_liquidity' in results
-        assert 'how' in results
+        assert 'hod_0' in results
+        assert 'hod_1' in results
+        assert 'stochastic_rsi_2' in results
+        assert 'range_liquidity_3' in results
+        assert 'how_4' in results
     
     def test_analyze_blocks_handles_insufficient_data(self, strategy):
         """Test analysis handles insufficient data gracefully"""
