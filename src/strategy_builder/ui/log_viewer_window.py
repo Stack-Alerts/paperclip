@@ -550,15 +550,19 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
 
     def _on_logs_loaded(self, result):
         """Handle tab metadata from background worker."""
-        self._worker_thread = None
-        self._worker = None
+        try:
+            self._worker_thread = None
+            self._worker = None
 
-        if isinstance(result, dict) and "error" in result:
-            self._show_error_tab(str(result["error"]))
-            return
+            if isinstance(result, dict) and "error" in result:
+                self._show_error_tab(str(result["error"]))
+                return
 
-        if result is None:
-            return
+            if result is None:
+                return
+        except RuntimeError:
+            # Widget's C++ backing already destroyed — safe to ignore
+            pass
 
         self._tabs_meta = result.get("tabs", [])
         focused_tab = result.get("focused_tab", 0)
@@ -993,6 +997,15 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
 
     def closeEvent(self, event):
         """Save geometry and last tab on close."""
+        # Clean up background thread to prevent QThread crash on exit
+        if self._worker is not None:
+            self._worker.cancel()
+        if self._worker_thread is not None and self._worker_thread.isRunning():
+            self._worker_thread.quit()
+            self._worker_thread.wait(3000)
+        self._worker = None
+        self._worker_thread = None
+
         self._save_window_geometry()
         settings = QSettings("BTC_Engine", "LogViewer")
         settings.setValue("lastTab", self.tabs.currentIndex())
