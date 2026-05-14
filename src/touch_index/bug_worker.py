@@ -264,7 +264,9 @@ def catch_up_eligible_bug_issues(
         try:
             issue = get_issue_by_identifier(identifier)
             if issue is None:
-                logger.debug("Catch-up: %s not found in Paperclip -- skipping", identifier)
+                logger.debug(
+                    "Catch-up: %s not found in Paperclip -- skipping", identifier
+                )
                 continue
             if issue.get("status") != "done":
                 logger.debug(
@@ -277,7 +279,9 @@ def catch_up_eligible_bug_issues(
                 logger.debug("Catch-up: %s is FDR-labelled -- skipping", identifier)
                 continue
         except Exception:
-            logger.exception("Catch-up: error fetching issue %s -- skipping", identifier)
+            logger.exception(
+                "Catch-up: error fetching issue %s -- skipping", identifier
+            )
             continue
         try:
             result = ingest_bug_issue(
