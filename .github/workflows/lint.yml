@@ -41,37 +41,52 @@ jobs:
         run: python scripts/audit/secrets_audit.py
 
   archived-paths:
-    name: Guard against re-introduction of archived paths
+    name: Guard against re-introduction of stale-code paths
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify no archived paths exist in src/
+      - name: Verify no stale-code paths exist on disk
         run: |
           set -euo pipefail
           VIOLATIONS=0
 
-          check_path() {
-            local path="$1"
-            if [ -e "$path" ]; then
-              echo "::error file=$path::Archived path found in src/ — must not exist. See archived/ directory for the original. Reference: BTCAAAAA-26587"
-              VIOLATIONS=$((VIOLATIONS + 1))
+          # Dynamically parse the stale-code section from .gitignore.
+          # This keeps the CI guard in sync with .gitignore automatically —
+          # no need to update both files when adding new stale paths.
+          # Reference: .gitignore "Stale-code archival paths" section, BTCAAAAA-26587
+          IN_BLOCK=false
+          while IFS= read -r line; do
+            # Detect start of stale-code block
+            if [[ "$line" =~ ^#[[:space:]]*Stale-code[[:space:]]archival[[:space:]]paths ]]; then
+              IN_BLOCK=true
+              continue
             fi
-          }
-
-          # --- Archived path blocklist ---
-          # Add new archived paths here as a single line. Each path
-          # is relative to the repo root. Directories end with /.
-          # References: .gitignore stale-code section, BTCAAAAA-26587
-          check_path "src/utils/Strategy_Builder/"
-          check_path "src/strategies/strategy_02_reversal_w_pattern.py"
-          check_path "src/strategy_builder/core/nautilus_code_generator.py"
-          check_path "src/strategy_builder/examples/complete_workflow_example.py"
-          # --- End blocklist ---
+            if $IN_BLOCK; then
+              # Blank line or non-comment section header ends the block
+              if [[ -z "$line" ]]; then
+                break
+              fi
+              if [[ "$line" =~ ^#[[:space:]] && ! "$line" =~ ^#[[:space:]]*$ ]]; then
+                # Another section comment — stop parsing
+                break
+              fi
+              # Skip inline comments within the block
+              [[ "$line" =~ ^[[:space:]]*# ]] && continue
+              # Trim trailing whitespace
+              path="${line%"${line##*[![:space:]]}"}"
+              if [[ -n "$path" ]]; then
+                if [ -e "$path" ]; then
+                  echo "::error file=$path::Stale-code path found on disk — must not exist. See archived/ directory for the original. Reference: BTCAAAAA-26587"
+                  VIOLATIONS=$((VIOLATIONS + 1))
+                fi
+              fi
+            fi
+          done < .gitignore
 
           if [ "$VIOLATIONS" -gt 0 ]; then
-            echo "::error::${VIOLATIONS} archived path(s) found in src/. Remove them and move any needed logic elsewhere. Reference: BTCAAAAA-26587"
+            echo "::error::${VIOLATIONS} stale-code path(s) found on disk. Remove them and move any needed logic elsewhere. Reference: BTCAAAAA-26587"
             exit 1
           fi
 
-          echo "No archived-path violations found."
+          echo "No stale-code path violations found."
