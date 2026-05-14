@@ -162,12 +162,12 @@ case "${OK_VAL:-}" in
             if [ "$EXP_SECS" -lt 0 ]; then
                 echo "  token: EXPIRED ($(( EXP_SECS * -1 / 60 ))m ago)"
             elif [ "$EXP_SECS" -lt 3600 ]; then
-                echo "  token: valid but EXPIRES in ${EXP_SECS}s (< 1h) \u2014 and no refresh_token"
+                echo "  token: valid but EXPIRES in ${EXP_SECS}s (< 1h) — and no refresh_token"
             else
-                echo "  token: valid (expires in ~$(( EXP_SECS / 60 ))m) \u2014 but no refresh_token"
+                echo "  token: valid (expires in ~$(( EXP_SECS / 60 ))m) — but no refresh_token"
             fi
         else
-            echo "  token: present \u2014 but no refresh_token"
+            echo "  token: present — but no refresh_token"
         fi
         echo "  refresh_token: MISSING (token cannot auto-refresh)"
         ;;
@@ -248,7 +248,7 @@ if $CONN_FAILED; then
 fi
 
 echo "  OAuth health: PASS"
-echo 
+echo ""
 
 LOCKFILE="/tmp/paperclip-backup.lock"
 exec 200>"$LOCKFILE"
