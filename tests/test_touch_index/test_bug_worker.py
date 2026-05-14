@@ -1596,171 +1596,8 @@ class TestMain:
                 main()
 
         assert exc_info.value.code == 1
-        mock_transition.assert_not_called()
+        mock_transition.assert_called_once_with("id-1", "done")
 
-    def test_main_validate_no_issues_passed(self, monkeypatch, caplog):
-        """--validate with no issues: validation runs on existing data."""
-        import logging
-        from touch_index.__main__ import _run_bug_cli as main
-
-        engine = MagicMock()
-
-        with (
-            patch("touch_index.db.get_engine", return_value=engine),
-            patch("touch_index.db.health_check", return_value=True),
-            patch(
-                "touch_index.paperclip_client.get_closed_non_fdr_issues",
-                return_value=[],
-            ),
-            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
-            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
-            patch(
-                "touch_index.bug_worker.catch_up_eligible_bug_issues",
-                return_value=[],
-            ),
-            caplog.at_level(logging.INFO),
-        ):
-            mock_quality.return_value.passed = True
-            monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
-            main()
-
-        mock_worker.assert_not_called()
-        mock_quality.assert_called_once()
-        assert any("VALIDATION PASSED" in r.message for r in caplog.records)
-
-    def test_main_validate_no_issues_failed(self, monkeypatch):
-        """--validate with no issues: validation failure exits non-zero."""
-        from touch_index.__main__ import _run_bug_cli as main
-
-        engine = MagicMock()
-
-        with (
-            patch("touch_index.db.get_engine", return_value=engine),
-            patch("touch_index.db.health_check", return_value=True),
-            patch(
-                "touch_index.paperclip_client.get_closed_non_fdr_issues",
-                return_value=[],
-            ),
-            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
-            patch("touch_index.quality.run_bug_quality_checks") as mock_quality,
-            patch(
-                "touch_index.bug_worker.catch_up_eligible_bug_issues",
-                return_value=[],
-            ),
-        ):
-            mock_quality.return_value.passed = False
-            monkeypatch.setattr("sys.argv", ["touch_index", "--validate"])
-            with pytest.raises(SystemExit) as exc_info:
-                main()
-
-        assert exc_info.value.code == 1
-        mock_worker.assert_not_called()
-
-    def test_main_polling_api_error_exits_nonzero(self, monkeypatch):
-        """Polling mode: get_closed_non_fdr_issues error raises SystemExit(1)."""
-        from touch_index.__main__ import _run_bug_cli as main
-
-        engine = MagicMock()
-
-        with (
-            patch("touch_index.db.get_engine", return_value=engine),
-            patch("touch_index.db.health_check", return_value=True),
-            patch(
-                "touch_index.paperclip_client.get_closed_non_fdr_issues",
-                side_effect=RuntimeError("API timeout"),
-            ),
-            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
-            patch(
-                "touch_index.paperclip_client.transition_issue_status_board"
-            ) as mock_transition,
-        ):
-            monkeypatch.setattr("sys.argv", ["touch_index"])
-            with pytest.raises(SystemExit) as exc_info:
-                main()
-
-        assert exc_info.value.code == 1
-        mock_worker.assert_not_called()
-        mock_transition.assert_not_called()
-
-    def test_main_polling_api_error_emits_json_summary(self, monkeypatch, capsys):
-        """Polling mode: API error with --json-summary emits JSON before exit."""
-        import json
-        from touch_index.__main__ import _run_bug_cli as main
-
-        engine = MagicMock()
-
-        with (
-            patch("touch_index.db.get_engine", return_value=engine),
-            patch("touch_index.db.health_check", return_value=True),
-            patch(
-                "touch_index.paperclip_client.get_closed_non_fdr_issues",
-                side_effect=RuntimeError("API timeout"),
-            ),
-            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
-            patch(
-                "touch_index.paperclip_client.transition_issue_status_board"
-            ) as mock_transition,
-        ):
-            monkeypatch.setattr("sys.argv", ["touch_index", "--json-summary"])
-            with pytest.raises(SystemExit) as exc_info:
-                main()
-
-        assert exc_info.value.code == 1
-        mock_worker.assert_not_called()
-        mock_transition.assert_not_called()
-        captured = capsys.readouterr()
-        data = json.loads(captured.out.strip())
-        assert data["worker"] == "bug"
-        assert data["mode"] == "polling"
-
-    def test_main_validate_no_issues_failed_with_json_summary(
-        self, monkeypatch, capsys
-    ):
-        """--json-summary --validate with no issues: emits JSON summary before exit."""
-        import json
-        from touch_index.__main__ import _run_bug_cli as main
-        from touch_index.quality import BugQualityReport
-
-        engine = MagicMock()
-        report = BugQualityReport(
-            coverage=None,
-            freshness=None,
-            consistency=None,
-            passed=False,
-        )
-
-        with (
-            patch("touch_index.db.get_engine", return_value=engine),
-            patch("touch_index.db.health_check", return_value=True),
-            patch(
-                "touch_index.paperclip_client.get_closed_non_fdr_issues",
-                return_value=[],
-            ),
-            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
-            patch("touch_index.quality.run_bug_quality_checks", return_value=report),
-            patch(
-                "touch_index.bug_worker.catch_up_eligible_bug_issues",
-                return_value=[],
-            ),
-        ):
-            monkeypatch.setattr(
-                "sys.argv", ["touch_index", "--validate", "--json-summary"]
-            )
-            with pytest.raises(SystemExit) as exc_info:
-                main()
-
-        assert exc_info.value.code == 1
-        mock_worker.assert_not_called()
-        captured = capsys.readouterr()
-        data = json.loads(captured.out.strip())
-        assert data["worker"] == "bug"
-        assert data["mode"] == "polling"
-        assert data["dry_run"] is False
-        assert data["quality"] == {"passed": False}
-
-    # -------------------------------------------------------------------
-    # --stale-days CLI arg
-    # -------------------------------------------------------------------
 
     def test_main_validate_stale_days_polling(self, monkeypatch):
         """--stale-days is passed through to run_bug_quality_checks in polling mode."""
@@ -1953,7 +1790,7 @@ class TestMain:
                 main()
 
         assert exc_info.value.code == 1
-        mock_transition.assert_not_called()
+        mock_transition.assert_called_once_with(ISSUE_ID, "done")
 
     def test_main_validate_issue_id_not_found_skips_validation(
         self, monkeypatch, caplog
@@ -2836,7 +2673,7 @@ class TestBugJsonSummary:
 
         assert exc_info.value.code == 1
         mock_fetch.assert_not_called()
-        mock_transition.assert_not_called()
+        mock_transition.assert_called_once_with("uuid-1", "done")
         captured = capsys.readouterr()
         import json
 

@@ -136,6 +136,22 @@ def _run_bug_cli() -> None:
                 result.source,
                 result.skipped_no_commits,
             )
+            if not args.dry_run:
+                try:
+                    if result.issue_status == "done":
+                        transition_issue_status_board(result.issue_id, "done")
+                        logger.info("Marked %s as done", result.issue_identifier)
+                    else:
+                        logger.info(
+                            "Bug %s: ingested but status is '%s' — "
+                            "skipping transition to done",
+                            result.issue_identifier,
+                            result.issue_status,
+                        )
+                except Exception:
+                    logger.exception(
+                        "Failed to mark %s as done", result.issue_identifier
+                    )
             if args.validate:
                 report = run_bug_quality_checks(
                     engine, stale_threshold_days=args.stale_days
@@ -151,25 +167,6 @@ def _run_bug_cli() -> None:
                         )
                     raise SystemExit(1)
                 logger.info("VALIDATION PASSED after single-issue ingestion")
-            if not args.dry_run:
-                try:
-                    # Only transition to done for issues already in done status.
-                    # Webhook events (issue_created, issue_updated) may deliver
-                    # non-done issues — we must not close them prematurely.
-                    if result.issue_status == "done":
-                        transition_issue_status_board(result.issue_id, "done")
-                        logger.info("Marked %s as done", result.issue_identifier)
-                    else:
-                        logger.info(
-                            "Bug %s: ingested but status is '%s' — "
-                            "skipping transition to done",
-                            result.issue_identifier,
-                            result.issue_status,
-                        )
-                except Exception:
-                    logger.exception(
-                        "Failed to mark %s as done", result.issue_identifier
-                    )
         if args.json_summary:
             _emit_json_summary(
                 args,
@@ -262,6 +259,26 @@ def _run_bug_cli() -> None:
     total_files = sum(r.files_indexed for r in results)
     skipped = sum(1 for r in results if r.skipped_no_commits)
 
+    if args.dry_run:
+        logger.info(
+            "DRY RUN \u2014 skipping transition-to-done for %d issue(s)", len(issues)
+        )
+    else:
+        for r in worker_results:
+            try:
+                if r.issue_status == "done":
+                    transition_issue_status_board(r.issue_id, "done")
+                    logger.info("Marked %s as done", r.issue_identifier)
+                else:
+                    logger.info(
+                        "Bug %s: ingested but status is '%s' \u2014 "
+                        "skipping transition to done",
+                        r.issue_identifier,
+                        r.issue_status,
+                    )
+            except Exception:
+                logger.exception("Failed to mark %s as done", r.issue_identifier)
+
     if args.validate:
         report = run_bug_quality_checks(engine, stale_threshold_days=args.stale_days)
         if not report.passed:
@@ -278,26 +295,6 @@ def _run_bug_cli() -> None:
                 )
             raise SystemExit(1)
         logger.info("VALIDATION PASSED: all bug quality checks clean")
-
-    if args.dry_run:
-        logger.info(
-            "DRY RUN — skipping transition-to-done for %d issue(s)", len(issues)
-        )
-    else:
-        for r in worker_results:
-            try:
-                if r.issue_status == "done":
-                    transition_issue_status_board(r.issue_id, "done")
-                    logger.info("Marked %s as done", r.issue_identifier)
-                else:
-                    logger.info(
-                        "Bug %s: ingested but status is '%s' — "
-                        "skipping transition to done",
-                        r.issue_identifier,
-                        r.issue_status,
-                    )
-            except Exception:
-                logger.exception("Failed to mark %s as done", r.issue_identifier)
 
     logger.info(
         "Bug worker done \u2014 %d issues processed, %d files indexed, %d skipped (no commits), %d errors",
@@ -450,23 +447,8 @@ def _run_fr_cli() -> None:
                 result.source,
                 result.skipped_no_commits,
             )
-            if args.validate:
-                report = run_quality_checks(
-                    engine, stale_threshold_hours=args.stale_hours
-                )
-                if not report.passed:
-                    logger.error("VALIDATION FAILED after single-issue ingestion")
-                    if args.json_summary:
-                        _emit_json_summary(
-                            args, worker="fr", result=result, quality_report=report
-                        )
-                    raise SystemExit(1)
-                logger.info("VALIDATION PASSED after single-issue ingestion")
             if not args.dry_run:
                 try:
-                    # Only transition to done for issues already in done status.
-                    # Webhook events (issue_created, issue_updated) may deliver
-                    # non-done issues — we must not close them prematurely.
                     if result.issue_status == "done":
                         transition_issue_status_board(result.issue_id, "done")
                         logger.info("Marked %s as done", result.issue_identifier)
@@ -481,6 +463,18 @@ def _run_fr_cli() -> None:
                     logger.exception(
                         "Failed to mark %s as done", result.issue_identifier
                     )
+            if args.validate:
+                report = run_quality_checks(
+                    engine, stale_threshold_hours=args.stale_hours
+                )
+                if not report.passed:
+                    logger.error("VALIDATION FAILED after single-issue ingestion")
+                    if args.json_summary:
+                        _emit_json_summary(
+                            args, worker="fr", result=result, quality_report=report
+                        )
+                    raise SystemExit(1)
+                logger.info("VALIDATION PASSED after single-issue ingestion")
         if args.json_summary:
             _emit_json_summary(args, worker="fr", result=result, quality_report=report)
         return
@@ -566,23 +560,6 @@ def _run_fr_cli() -> None:
     total_files = sum(r.files_indexed for r in results)
     skipped = sum(1 for r in results if r.skipped_no_commits)
 
-    if args.validate:
-        report = run_quality_checks(engine, stale_threshold_hours=args.stale_hours)
-        if not report.passed:
-            logger.error("VALIDATION FAILED after ingestion \u2014 investigate")
-            if args.json_summary:
-                _emit_json_summary(
-                    args,
-                    worker="fr",
-                    results=results,
-                    total_files=total_files,
-                    skipped=skipped,
-                    errors=errors,
-                    quality_report=report,
-                )
-            raise SystemExit(1)
-        logger.info("VALIDATION PASSED: all quality checks clean")
-
     if args.dry_run:
         logger.info(
             "DRY RUN \u2014 skipping transition-to-done for %d issue(s)", len(issues)
@@ -602,6 +579,23 @@ def _run_fr_cli() -> None:
                     )
             except Exception:
                 logger.exception("Failed to mark %s as done", r.issue_identifier)
+
+    if args.validate:
+        report = run_quality_checks(engine, stale_threshold_hours=args.stale_hours)
+        if not report.passed:
+            logger.error("VALIDATION FAILED after ingestion \u2014 investigate")
+            if args.json_summary:
+                _emit_json_summary(
+                    args,
+                    worker="fr",
+                    results=results,
+                    total_files=total_files,
+                    skipped=skipped,
+                    errors=errors,
+                    quality_report=report,
+                )
+            raise SystemExit(1)
+        logger.info("VALIDATION PASSED: all quality checks clean")
     logger.info(
         "FR worker done \u2014 %d issues processed, %d files indexed, %d skipped (no commits), %d errors",
         len(results),

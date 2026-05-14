@@ -1188,7 +1188,7 @@ class TestMain:
                 main()
 
         assert exc_info.value.code == 1
-        mock_transition.assert_not_called()
+        mock_transition.assert_called_once_with("id-1", "done")
         done_logs = [r for r in caplog.records if "FR worker done" in r.message]
         assert len(done_logs) == 0
 
