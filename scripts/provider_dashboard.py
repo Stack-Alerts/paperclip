@@ -48,7 +48,9 @@ from scripts.provider_monitor import (
     fetch_deepseek_balance,
     fetch_openrouter_credits,
     load_state,
+    patch_agent_model,
     poll_all_providers,
+    save_state,
 )
 
 API_TIMEOUT = 15
@@ -532,6 +534,66 @@ body {{
     .provider-grid {{ grid-template-columns: 1fr; }}
     .agent-grid {{ grid-template-columns: 1fr; }}
 }}
+
+.manual-controls {{
+    margin-top: 16px;
+}}
+.manual-controls h4 {{
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #8b949e;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #21262d;
+}}
+.control-group {{
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}}
+.control-label {{
+    font-size: 0.8rem;
+    color: #8b949e;
+    min-width: 160px;
+}}
+.switch-btn {{
+    padding: 6px 16px;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    background: #21262d;
+    color: #8b949e;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-family: inherit;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}}
+.switch-btn:hover {{
+    background: #30363d;
+    border-color: #58a6ff;
+}}
+.switch-btn:disabled {{
+    opacity: 0.4;
+    cursor: not-allowed;
+}}
+.switch-btn.normal-btn.active {{
+    border-color: #3fb950;
+    color: #3fb950;
+    background: #1a2a1f;
+}}
+.switch-btn.degraded-btn.active {{
+    border-color: #d29922;
+    color: #d29922;
+    background: #2a2618;
+}}
+.switch-result {{
+    font-size: 0.78rem;
+    margin-top: 8px;
+    min-height: 1.2em;
+}}
+.switch-result.success {{ color: #3fb950; }}
+.switch-result.error {{ color: #f85149; }}
+.switch-result.info {{ color: #8b949e; }}
 </style>
 </head>
 <body>
@@ -574,6 +636,36 @@ body {{
 <div class="footer">
     BTC Trade Engine Dashboard &mdash; Auto-refresh disabled (static snapshot)
 </div>
+<script>
+async function switchAgents(target, model) {{
+    var result = document.getElementById('switch-result');
+    var buttons = document.querySelectorAll('.switch-btn');
+    buttons.forEach(function(b) {{ b.disabled = true; }});
+    result.textContent = 'Switching...';
+    result.className = 'switch-result info';
+
+    try {{
+        var resp = await fetch('/switch', {{
+            method: 'POST',
+            headers: {{'Content-Type': 'application/json'}},
+            body: JSON.stringify({{target: target, model: model}})
+        }});
+        var data = await resp.json();
+        if (data.ok) {{
+            result.textContent = data.message + ' Refreshing...';
+            result.className = 'switch-result success';
+            setTimeout(function() {{ location.reload(); }}, 1500);
+        }} else {{
+            result.textContent = data.message;
+            result.className = 'switch-result error';
+        }}
+    }} catch(e) {{
+        result.textContent = 'Manual switching requires the dashboard to be served via --serve';
+        result.className = 'switch-result error';
+    }}
+    buttons.forEach(function(b) {{ b.disabled = false; }});
+}}
+</script>
 </body>
 </html>"""
 
@@ -590,6 +682,63 @@ class _SingleFileHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", str(len(self.html_content)))
         self.end_headers()
         self.wfile.write(self.html_content)
+
+    def do_POST(self) -> None:
+        if self.path != "/switch":
+            self._send_json(404, {"ok": False, "message": "Not found"})
+            return
+
+        content_length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(content_length)
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            self._send_json(400, {"ok": False, "message": "Invalid JSON"})
+            return
+
+        target = data.get("target")
+        model = data.get("model", "")
+
+        if target not in ("pro", "standard"):
+            self._send_json(400, {"ok": False, "message": "Invalid target. Must be 'pro' or 'standard'."})
+            return
+
+        agents = PRO_AGENTS if target == "pro" else STANDARD_AGENTS
+        success = 0
+        failed = 0
+        errors: list[str] = []
+
+        for name, agent_id in agents:
+            if patch_agent_model(agent_id, model, dry_run=False):
+                success += 1
+            else:
+                failed += 1
+                errors.append(name)
+
+        state = load_state()
+        if target == "pro":
+            state.pro_model = model
+        else:
+            state.standard_model = model
+        state.last_switch_at = datetime.now(timezone.utc).isoformat()
+        state.last_switch_direction = "manual"
+        save_state(state)
+
+        display = MODEL_DISPLAY.get(model, model)
+        total = success + failed
+        if failed == 0:
+            msg = f"Switched {success}/{total} {target} agents to {display}"
+        else:
+            msg = f"Switched {success}/{total} {target} agents to {display}. Failed: {', '.join(errors)}"
+        self._send_json(200, {"ok": True, "message": msg})
+
+    def _send_json(self, status: int, body: dict) -> None:
+        payload = json.dumps(body).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
 
     def log_message(self, format: str, *args: Any) -> None:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {args[0]}")
