@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-05-14T14:27:12.192916+00:00",
+  "timestamp": "2026-05-14T14:45:25.554403+00:00",
   "impact_gate_scan": {
-    "total_done_fix_issues": 251,
+    "total_done_fix_issues": 252,
     "gated": {
       "pass": 82,
       "fail": 42,
@@ -9,8 +9,8 @@
       "error": 39,
       "skipped": 88
     },
-    "ungated_count": 0,
-    "coverage_pct": 100.0,
+    "ungated_count": 1,
+    "coverage_pct": 99.6,
     "window_days": null,
     "last_24h": {
       "total_done_fix_issues": 35,
@@ -19,9 +19,9 @@
         "fail": 6,
         "bypassed": 0,
         "error": 7,
-        "skipped": 16
+        "skipped": 15
       },
-      "ungated_count": 0
+      "ungated_count": 1
     }
   }
 }
