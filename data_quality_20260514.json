@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-14T02:38:27.068170+00:00",
+  "timestamp": "2026-05-14T02:48:35.470622+00:00",
   "touch_index_fr": {
     "pass": true,
     "coverage_pct": 95.2,
@@ -11,7 +11,7 @@
     ],
     "total_rows": 150,
     "stale_rows": 0,
-    "max_age_hours": 38.0,
+    "max_age_hours": 38.2,
     "null_owner_rows": 0,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
