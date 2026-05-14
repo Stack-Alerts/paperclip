@@ -321,7 +321,9 @@
       "source_modules": [
         "src/optimizer_v3/database/"
       ],
-      "test_files": [],
+      "test_files": [
+        "tests/database/test_req_data_003_database_orchestration.py"
+      ],
       "test_markers": [],
       "status": "active",
       "priority": "critical",
