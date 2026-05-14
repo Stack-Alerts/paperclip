@@ -1,0 +1,10 @@
+{
+  "issue": "BTCAAAAA-25214",
+  "patched_status": "done",
+  "timestamp": "2026-05-14T00:30:00Z",
+  "agent": "AutomationEngineer",
+  "note": "API PATCH endpoint unavailable in local mode. Local marker created per atomic-declaration policy. Regression tests expanded from 5 to 10, all 10 PASS. Commit 7647efe1.",
+  "deliverables": [
+    "tests/regression/bug_regression/test_btcaaaaa_92_regression.py"
+  ]
+}
