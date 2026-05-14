@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-14T02:35:56.434449+00:00",
+  "timestamp": "2026-05-14T02:38:27.068170+00:00",
   "touch_index_fr": {
     "pass": true,
     "coverage_pct": 95.2,
@@ -11,7 +11,7 @@
     ],
     "total_rows": 150,
     "stale_rows": 0,
-    "max_age_hours": 37.9,
+    "max_age_hours": 38.0,
     "null_owner_rows": 0,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
@@ -25,10 +25,10 @@
     "pass": true,
     "coverage_pct": 27.6,
     "indexed": 917,
-    "total": 3319,
-    "coverage_eligible_pct": 96.9,
-    "eligible_total": 933,
-    "missing_eligible_count": 29,
+    "total": 3322,
+    "coverage_eligible_pct": 96.8,
+    "eligible_total": 934,
+    "missing_eligible_count": 30,
     "missing_eligible_identifiers": [
       "BTCAAAAA-1166",
       "BTCAAAAA-1171",
@@ -53,6 +53,7 @@
       "BTCAAAAA-25972",
       "BTCAAAAA-25976",
       "BTCAAAAA-26010",
+      "BTCAAAAA-26042",
       "BTCAAAAA-442",
       "BTCAAAAA-4895",
       "BTCAAAAA-700",
@@ -60,7 +61,7 @@
       "BTCAAAAA-7381",
       "BTCAAAAA-907"
     ],
-    "missing_total_count": 2407,
+    "missing_total_count": 2410,
     "total_rows": 2348,
     "stale_rows": 0,
     "max_age_hours": 24.3,
