@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-14T10:03:33.167667+00:00",
+  "timestamp": "2026-05-14T10:36:35.606389+00:00",
   "touch_index_fr": {
     "pass": true,
     "coverage_pct": 95.2,
@@ -11,7 +11,7 @@
     ],
     "total_rows": 150,
     "stale_rows": 0,
-    "max_age_hours": 45.4,
+    "max_age_hours": 45.9,
     "null_owner_rows": 0,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
@@ -23,11 +23,11 @@
   },
   "touch_index_bug": {
     "pass": true,
-    "coverage_pct": 38.3,
-    "indexed": 1397,
-    "total": 3651,
+    "coverage_pct": 38.4,
+    "indexed": 1410,
+    "total": 3669,
     "coverage_eligible_pct": 96.9,
-    "eligible_total": 1040,
+    "eligible_total": 1041,
     "missing_eligible_count": 32,
     "missing_eligible_identifiers": [
       "BTCAAAAA-1166",
@@ -63,19 +63,19 @@
       "BTCAAAAA-7381",
       "BTCAAAAA-907"
     ],
-    "missing_total_count": 2242,
-    "total_rows": 3240,
+    "missing_total_count": 2263,
+    "total_rows": 3255,
     "stale_rows": 0,
-    "max_age_hours": 31.8,
+    "max_age_hours": 32.3,
     "null_closed_at_rows": 4,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
     "duplicate_pairs": 0,
     "orphan_count": 0,
     "source_distribution": {
-      "comments": 150,
-      "description": 164,
-      "git": 2219
+      "comments": 606,
+      "description": 324,
+      "git": 2325
     }
   }
 }
