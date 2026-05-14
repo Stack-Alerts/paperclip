@@ -141,20 +141,25 @@ class TestASTRegressionGuard:
         )
 
     def test_restore_reads_maximized_screen_name(self):
-        """AC-2 (AST): _restore_window_geometry must read 'maximized_screen_name' via settings.value()."""
-        tree = _styles_ast()
-        restore_method = _find_method_node(tree, "_restore_window_geometry")
-        assert restore_method is not None, "_restore_window_geometry not found in styles.py"
+        """AC-2 (AST): showEvent (not _restore_window_geometry) reads 'maximized_screen_name'.
 
-        # Find any string constant with 'maximized_screen_name' in the restore method
+        BTCAAAAA-26202: maximize handling moved from _restore_window_geometry to
+        WindowGeometryMixin.showEvent(). The maximized_screen_name QSettings key
+        is now read in showEvent for pre-maximize positioning.
+        """
+        tree = _styles_ast()
+        # Check showEvent for the maximized_screen_name reference (BTCAAAAA-26202)
+        showevent_method = _find_method_node(tree, "showEvent")
+        assert showevent_method is not None, "showEvent not found in styles.py"
+
         found = any(
             isinstance(node, ast.Constant) and isinstance(node.value, str)
             and "maximized_screen_name" in node.value
-            for node in ast.walk(restore_method)
+            for node in ast.walk(showevent_method)
         )
         assert found, (
-            "_restore_window_geometry must read a QSettings key containing "
-            "'maximized_screen_name'."
+            "WindowGeometryMixin.showEvent must read a QSettings key containing "
+            "'maximized_screen_name'. The BTCAAAAA-637/26202 fix is missing from showEvent."
         )
 
     def test_save_writes_maximized_screen_name_key(self):

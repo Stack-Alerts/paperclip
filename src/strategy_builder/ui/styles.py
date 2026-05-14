@@ -1857,7 +1857,14 @@ class WindowGeometryMixin:
         )
 
     def _restore_window_geometry(self, show_event=None) -> None:
-        """Restore window to its saved position, size, and maximized state.
+        """Restore window to its saved position and size (non-maximized).
+
+        WindowGeometryMixin.showEvent() handles maximized state restoration
+        (positioning on the correct screen + setWindowState AFTER the WM
+        maps the window — see BTCAAAAA-26202).  By the time this method is
+        called from the subclass showEvent(), _geometry_restored is already
+        True for maximized windows, so this method only processes the
+        non-maximized path.
 
         Validates the full window rect against all connected screens:
         - If the saved geometry intersects any connected screen, restore it.
@@ -1876,19 +1883,32 @@ class WindowGeometryMixin:
         settings = _QSettings("BTC_Engine", "StrategyBuilder")
         key = self.GEOMETRY_SETTINGS_KEY
 
-        maximized = settings.value(f"{key}/maximized", False, type=bool)
         saved_pos = settings.value(f"{key}/pos", None)
+
+        # Maximized state is handled exclusively by WindowGeometryMixin.showEvent().
+        # If we reach here the window is NOT maximized; only position/size
+        # restoration is needed.
+        if saved_pos is None:
+            default_w, default_h = self.GEOMETRY_DEFAULT_SIZE
+            import logging as _logging
+            _logging.getLogger("WindowGeometry").debug(
+                "[FIRST RUN] %s: centering on primary", key,
+            )
+            self._center_on_primary(default_w, default_h)
+            return
+
         saved_size = settings.value(f"{key}/size", None)
         saved_screen_name = settings.value(f"{key}/screen_name", None)
-        # BTCAAAAA-637: screen the window was maximized on (saved even when no
-        # normal pos/size exists — e.g. window was always opened maximized).
-        maximized_screen_name = settings.value(f"{key}/maximized_screen_name", None)
+        default_w, default_h = self.GEOMETRY_DEFAULT_SIZE
+        target_size = saved_size if saved_size is not None else _QSize(default_w, default_h)
+        self.resize(target_size)
+        saved_rect = _QRect(saved_pos, target_size)
 
         import logging as _logging
         _wg_log = _logging.getLogger("WindowGeometry")
         _wg_log.debug(
-            "[RESTORE] %s: saved_pos=%s saved_size=%s maximized=%s screen=%s max_screen=%s",
-            key, saved_pos, saved_size, maximized, saved_screen_name, maximized_screen_name,
+            "[RESTORE] %s: saved_pos=%s saved_size=%s screen=%s",
+            key, saved_pos, saved_size, saved_screen_name,
         )
         _wg_log.debug(
             "[SCREENS] %s",
@@ -1896,12 +1916,6 @@ class WindowGeometryMixin:
               s.availableGeometry().width(), s.availableGeometry().height())
              for s in _QGuiApplication.screens()]
         )
-
-        default_w, default_h = self.GEOMETRY_DEFAULT_SIZE
-
-        # Determine the target size
-        target_size = saved_size if saved_size is not None else _QSize(default_w, default_h)
-        self.resize(target_size)
 
         # Helper: minimum visible overlap to consider a rect "on" a screen
         MIN_VISIBLE_W = 100
@@ -1911,6 +1925,32 @@ class WindowGeometryMixin:
             intersection = rect.intersected(screen.availableGeometry())
             return (intersection.width() >= MIN_VISIBLE_W and
                     intersection.height() >= MIN_VISIBLE_H)
+
+        available_screens = _QGuiApplication.screens()
+
+        # Preferred screen: the one the window was on last time (by name)
+        preferred_screen = None
+        if saved_screen_name:
+            for s in available_screens:
+                if s.name() == saved_screen_name:
+                    preferred_screen = s
+                    break
+
+        # Try preferred screen first, then any screen (by full-rect intersection)
+        target_screen = None
+        if preferred_screen and _rect_is_usable(saved_rect, preferred_screen):
+            target_screen = preferred_screen
+        else:
+            for s in available_screens:
+                if _rect_is_usable(saved_rect, s):
+                    target_screen = s
+                    break
+
+        # BTCAAAAA-638 fallback: point-based lookup for windows near screen edges
+        if target_screen is None:
+            point_screen = _QGuiApplication.screenAt(saved_pos)
+            if point_screen is not None:
+                target_screen = point_screen
 
         def _screen_name_at(pos):
             s = _QGuiApplication.screenAt(pos)
@@ -1923,55 +1963,21 @@ class WindowGeometryMixin:
                 int(self.windowState()), _screen_name_at(self.frameGeometry().center()),
             )
 
-        if maximized:
-            # When restoring to a maximized state, skip saved_pos positioning
-            # entirely.  Moving to saved_pos first and then to the maximized-screen
-            # centre causes a double-move that races the WM: the window may still
-            # be "on" the first screen when showMaximized() fires 50 ms later.
-            # maximized_screen_name is the sole authority for the target screen.
-            if maximized_screen_name:
-                available_screens = _QGuiApplication.screens()
-                target_screen = None
-                for s in available_screens:
-                    if s.name() == maximized_screen_name:
-                        target_screen = s
-                        break
-                if target_screen is not None:
-                    screen_rect = target_screen.availableGeometry()
-                    dest_x = screen_rect.center().x() - target_size.width() // 2
-                    dest_y = screen_rect.center().y() - target_size.height() // 2
-                    _wg_log.debug(
-                        "[PRE-MAX MOVE] %s: -> (%d,%d) screen=%s rect=%s",
-                        key, dest_x, dest_y, maximized_screen_name, screen_rect,
-                    )
-                    self.move(dest_x, dest_y)
-                    _log_pos("POST-MOVE")
-                else:
-                    _wg_log.debug(
-                        "[PRE-MAX MOVE] %s: screen %s not found, centering on primary",
-                        key, maximized_screen_name,
-                    )
-                    self._center_on_primary(default_w, default_h)
-            else:
-                _wg_log.debug("[PRE-MAX MOVE] %s: no maximized_screen_name, centering on primary", key)
-                self._center_on_primary(default_w, default_h)
-
-            # Maximize is handled by WindowGeometryMixin.showEvent() BEFORE
-            # super().showEvent() processes the initial map, so the WM sees
-            # the maximize request during the map cycle (fixes Linux WM
-            # ignoring deferred showMaximized on multi-monitor).
-
-            # Logging-only: window state after restore
-            try:
-                state_val = int(self.windowState())
-            except (AttributeError, RuntimeError):
-                state_val = -1
+        if target_screen is not None:
+            screen_rect = target_screen.availableGeometry()
+            clamped_x = max(screen_rect.left(),
+                            min(saved_pos.x(), screen_rect.right() - MIN_VISIBLE_W))
+            clamped_y = max(screen_rect.top(),
+                            min(saved_pos.y(), screen_rect.bottom() - MIN_VISIBLE_H))
             _wg_log.debug(
-                "[MAX RESTORE] %s: geometry handled by mixin showEvent, state=%s",
-                key, state_val,
+                "[NORMAL MOVE] %s: -> (%d,%d) clamped from saved_pos=%s screen=%s",
+                key, clamped_x, clamped_y, saved_pos, target_screen.name(),
             )
-
-        elif saved_pos is not None:
+            self.move(clamped_x, clamped_y)
+            _log_pos("POST-MOVE")
+        else:
+            _wg_log.debug("[NORMAL MOVE] %s: saved_pos off all screens, centering on primary", key)
+            self._center_on_primary(default_w, default_h)
             # Normal (non-maximized) restore: position at the saved normal pos.
             saved_rect = _QRect(saved_pos, target_size)
             available_screens = _QGuiApplication.screens()
@@ -2016,10 +2022,6 @@ class WindowGeometryMixin:
                 _wg_log.debug("[NORMAL MOVE] %s: saved_pos off all screens, centering on primary", key)
                 self._center_on_primary(default_w, default_h)
 
-        else:
-            # No saved position and not maximized — first run or cleared state.
-            _wg_log.debug("[FIRST RUN] %s: centering on primary", key)
-            self._center_on_primary(default_w, default_h)
 
     # ------------------------------------------------------------------ #
     # Internal helpers                                                     #

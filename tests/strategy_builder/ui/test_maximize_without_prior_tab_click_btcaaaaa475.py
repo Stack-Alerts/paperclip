@@ -1,8 +1,8 @@
 """
 QA re-test for BTCAAAAA-475 follow-up fix.
-Updated for BTCAAAAA-25580: removed QTimer deferral, maximize is now
-applied synchronously in WindowGeometryMixin.showEvent() before the
-WM maps the window (fixes Linux WM ignoring deferred showMaximized).
+Updated for BTCAAAAA-26202: setWindowState is now called AFTER
+super().showEvent() so the WM receives the maximise request on an
+already-mapped window, keeping Qt and WM state in sync.
 
 Board-reported reproduction sequence (MUST pass):
     1. Open window fresh — no prior state from this session
@@ -11,8 +11,8 @@ Board-reported reproduction sequence (MUST pass):
 
 Pass criteria tested here:
     AC-1  WindowGeometryMixin.showEvent() calls setWindowState(WindowMaximized)
-          synchronously when saved state has maximized=True.
-    AC-2  When maximized=True in QSettings, showEvent applies the state before
+          after super().showEvent() when saved state has maximized=True.
+    AC-2  When maximized=True in QSettings, showEvent maximizes after
           delegating to super().showEvent().
     AC-3  When maximized=False in QSettings, showEvent does NOT maximize.
     AC-4  Maximized window positioning on target screen works correctly.
@@ -107,7 +107,7 @@ class TestSynchronousMaximizeAST:
         calls = self._find_setwindowstate_calls_in_showevent(tree)
         assert calls, (
             "styles.py: WindowGeometryMixin.showEvent must call setWindowState "
-            "to apply maximized state BEFORE the WM processes the initial map."
+            "to apply maximized state AFTER super().showEvent() (BTCAAAAA-26202)."
         )
 
     def test_setwindowstate_uses_windowmaximized(self):

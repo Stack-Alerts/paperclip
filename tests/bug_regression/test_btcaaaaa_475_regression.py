@@ -1,23 +1,14 @@
-"""Regression tests for BTCAAAAA-475 / BTCAAAAA-25580: Qt window maximize fix.
+"""Regression tests for BTCAAAAA-475 / BTCAAAAA-25580 / BTCAAAAA-26202: Qt window maximize fix.
 
-Issues: BTCAAAAA-475, BTCAAAAA-25580
-Fix: Synchronous setWindowState(WindowMaximized) in WindowGeometryMixin.showEvent()
-
-What changed:
-    QTimer.singleShot(50, self.showMaximized)
-    ->
-    setWindowState(windowState() | Qt.WindowMaximized)  # in showEvent, before super
-
-Why:
-    A deferred showMaximized() via QTimer fires after the window is already
-    mapped by the window manager. Some Linux WMs reject maximize requests
-    that arrive after the initial map cycle, causing the window to remain
-    unmaximized on multi-monitor setups.
+Issues: BTCAAAAA-475, BTCAAAAA-25580, BTCAAAAA-26202
+Fix: Defer setWindowState(WindowMaximized) in WindowGeometryMixin.showEvent()
+     to AFTER super().showEvent() so the WM receives the maximize request
+     on a mapped window (BTCAAAAA-26202).
 
 Pass criteria tested here:
     AC-1  WindowGeometryMixin.showEvent() calls setWindowState(WindowMaximized)
-          synchronously when saved state has maximized=True.
-    AC-2  When maximized=True in QSettings, showEvent applies the state before
+          after super().showEvent() when saved state has maximized=True.
+    AC-2  When maximized=True in QSettings, showEvent maximizes after
           delegating to super().showEvent().
     AC-3  When maximized=False in QSettings, showEvent does NOT maximize.
     AC-4  Maximized window positioning on target screen works correctly.
