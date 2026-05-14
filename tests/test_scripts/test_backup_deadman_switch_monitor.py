@@ -58,7 +58,7 @@ class TestGhRunList:
         assert len(runs) == 2
         assert runs[0]["conclusion"] == "success"
 
-    def test_returns_empty_on_cli_error(self, monkeypatch):
+    def test_returns_none_on_cli_error(self, monkeypatch):
         from scripts.backup_deadman_switch_monitor import _gh_run_list
 
         monkeypatch.setattr(
@@ -66,7 +66,7 @@ class TestGhRunList:
             lambda *a, **kw: MagicMock(returncode=1, stdout="", stderr="gh: not found"),
         )
         runs = _gh_run_list("deadman-switch-monitor.yml")
-        assert runs == []
+        assert runs is None
 
     def test_returns_none_on_auth_error(self, monkeypatch):
         from scripts.backup_deadman_switch_monitor import _gh_run_list
@@ -115,7 +115,7 @@ class TestGhRunList:
         runs = _gh_run_list("deadman-switch-monitor.yml")
         assert runs is None
 
-    def test_returns_empty_on_invalid_json(self, monkeypatch):
+    def test_returns_none_on_invalid_json(self, monkeypatch):
         from scripts.backup_deadman_switch_monitor import _gh_run_list
 
         monkeypatch.setattr(
@@ -123,7 +123,7 @@ class TestGhRunList:
             lambda *a, **kw: MagicMock(returncode=0, stdout="not json", stderr=""),
         )
         runs = _gh_run_list("deadman-switch-monitor.yml")
-        assert runs == []
+        assert runs is None
 
     def test_returns_none_on_missing_gh_token_env(self, monkeypatch):
         from scripts.backup_deadman_switch_monitor import _gh_run_list

@@ -73,6 +73,7 @@ def _gh_run_list(workflow: str, limit: int = 5) -> list[dict] | None:
         result = subprocess.run(
             [
                 "gh", "run", "list",
+                "--repo", "Stack-Alerts/BTC-Trade-Engine-PaperClip",
                 "--workflow", workflow,
                 "--limit", str(limit),
                 "--json", "status,conclusion,createdAt,databaseId,headSha",
@@ -80,6 +81,7 @@ def _gh_run_list(workflow: str, limit: int = 5) -> list[dict] | None:
             capture_output=True,
             text=True,
             timeout=30,
+            cwd=str(REPO_ROOT),
         )
     except FileNotFoundError:
         logger.error("gh CLI not found in PATH — cannot query workflow runs")
@@ -96,13 +98,13 @@ def _gh_run_list(workflow: str, limit: int = 5) -> list[dict] | None:
                     "Run 'gh auth login' or set GH_TOKEN. Skipping alert."
                 )
                 return None
-        logger.error("gh run list failed: %s", result.stderr.strip())
-        return []
+        logger.error("gh run list failed (rc=%d): %s", result.returncode, result.stderr.strip())
+        return None
     try:
         return json.loads(result.stdout)
     except json.JSONDecodeError:
         logger.error("gh run list returned non-JSON: %s", result.stdout[:200])
-        return []
+        return None
 
 
 def _get_latest_success_age_minutes(runs: list[dict]) -> float | None:
