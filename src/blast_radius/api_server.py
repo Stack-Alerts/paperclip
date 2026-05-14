@@ -249,9 +249,17 @@ class _Handler(BaseHTTPRequestHandler):
             transitioned = False
             if not dry_run:
                 try:
-                    transition_issue_status_board(result.issue_id, "done")
-                    transitioned = True
-                    log.info("FR webhook: marked %s as done", result.issue_identifier)
+                    if result.issue_status == "done":
+                        transition_issue_status_board(result.issue_id, "done")
+                        transitioned = True
+                        log.info("FR webhook: marked %s as done", result.issue_identifier)
+                    else:
+                        log.info(
+                            "FR webhook: %s ingested but status is '%s' — "
+                            "skipping transition to done",
+                            result.issue_identifier,
+                            result.issue_status,
+                        )
                 except Exception as exc:
                     log.error(
                         "FR webhook: failed to mark %s as done: %s",
@@ -359,9 +367,17 @@ class _Handler(BaseHTTPRequestHandler):
             transitioned = False
             if not dry_run:
                 try:
-                    transition_issue_status_board(result.issue_id, "done")
-                    transitioned = True
-                    log.info("Bug webhook: marked %s as done", result.issue_identifier)
+                    if result.issue_status == "done":
+                        transition_issue_status_board(result.issue_id, "done")
+                        transitioned = True
+                        log.info("Bug webhook: marked %s as done", result.issue_identifier)
+                    else:
+                        log.info(
+                            "Bug webhook: %s ingested but status is '%s' — "
+                            "skipping transition to done",
+                            result.issue_identifier,
+                            result.issue_status,
+                        )
                 except Exception as exc:
                     log.error(
                         "Bug webhook: failed to mark %s as done: %s",
