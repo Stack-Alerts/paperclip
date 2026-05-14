@@ -910,8 +910,17 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
 
     def _toggle_all_filters(self):
         new_state = self.toggle_all_btn.text() == "Select All"
+
         for checkbox in self.event_checkboxes.values():
+            checkbox.blockSignals(True)
             checkbox.setChecked(new_state)
+            checkbox.blockSignals(False)
+
+        for event_key in self.event_filters:
+            self.event_filters[event_key] = new_state
+
+        self._update_toggle_button_text()
+        self._refresh_current_tab()
 
     def _update_toggle_button_text(self):
         all_selected = all(self.event_filters.values())
