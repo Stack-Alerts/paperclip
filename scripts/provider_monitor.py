@@ -468,13 +468,10 @@ def evaluate_triggers(snap: UsageSnapshot, state: MonitorState) -> SwitchingDeci
     # Prevents thrashing where 4hr resets while 7day remains exhausted.
 
     if current_state == "claude_degraded":
-        c1_recovered = snap.claude_4hr_pct is not None and snap.claude_4hr_pct < 95.0
-        c2_recovered = snap.claude_7day_pct is not None and snap.claude_7day_pct < 95.0
-
-        if not c1_recovered or not c2_recovered:
+        if not snap.claude_available:
             return SwitchingDecision(
                 action="noop",
-                reason=f"U1 upgrade blocked: 4hr={snap.claude_4hr_pct} 7day={snap.claude_7day_pct} — both must be < 95% (rev 3 AND gate)",
+                reason=f"U1 upgrade blocked: claude_available=False (4hr={snap.claude_4hr_pct}% 7day={snap.claude_7day_pct}%)",
             )
         if upgrade_cooldown > 0:
             return SwitchingDecision(
