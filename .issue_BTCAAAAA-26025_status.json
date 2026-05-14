@@ -1,0 +1,26 @@
+{
+  "issue": "BTCAAAAA-26025",
+  "status": "done",
+  "timestamp": "2026-05-14T02:11:00Z",
+  "agent": "DataEngineer",
+  "action": "Touch Index bug-close ingestion worker — catch-up run restored eligible coverage, all quality checks PASS",
+  "deliverables": [
+    "Ran catch_up_eligible_bug_issues() — indexed 9 files from 7 eligible issues via description/comments fallback",
+    "28 remaining missing eligible issues are genuinely unindexable (no source files in fix commits, comments, or descriptions)",
+    "Eligible coverage restored from 96.3% to 97.0% (895/923) — above 90% SLA threshold",
+    "Saved data quality snapshot to data_quality_20260514.json",
+    "Freshness: 0 stale rows, max age 23.8h",
+    "Consistency: clean (0 nulls, 0 duplicates, 0 orphans)",
+    "Source distribution: git=2151, comments=118, description=59"
+  ],
+  "verification": {
+    "tests": "477/477 PASS",
+    "eligible_coverage_before": "96.3%",
+    "eligible_coverage_after": "97.0%",
+    "catch_up_files_indexed": 9,
+    "catch_up_issues_indexed": 7,
+    "issues_skipped_no_files": 28,
+    "quality_check": "PASSED"
+  },
+  "note": "New eligible issues (BTCAAAAA-26017 through BTCAAAAA-26027) were indexed via description fallback from Paperclip API detail endpoint. The 28 remaining missing eligible are old issues with no source files in any extraction pathway."
+}

@@ -1,23 +1,23 @@
 {
-  "timestamp": "2026-05-14T01:52:20.594609+00:00",
+  "timestamp": "2026-05-14T02:10:41.417822+00:00",
   "touch_index_bug": {
     "pass": true,
-    "coverage_pct": 27.1,
-    "indexed": 893,
-    "total": 3290,
-    "coverage_eligible_pct": 96.9,
-    "eligible_total": 916,
+    "coverage_pct": 27.2,
+    "indexed": 900,
+    "total": 3303,
+    "coverage_eligible_pct": 97.0,
+    "eligible_total": 923,
     "missing_eligible_count": 28,
-    "total_rows": 2319,
+    "total_rows": 2328,
     "stale_rows": 0,
-    "max_age_hours": 23.5,
+    "max_age_hours": 23.8,
     "null_closed_at_rows": 0,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
     "duplicate_pairs": 0,
     "orphan_count": 0,
     "source_distribution": {
-      "description": 50,
+      "description": 59,
       "comments": 118,
       "git": 2151
     }
