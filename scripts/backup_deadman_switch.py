@@ -103,7 +103,7 @@ def _find_existing_alert() -> dict | None:
         base_url = _base()
         company_id = _company()
     except (KeyError, OSError) as exc:
-        logger.error("Failed to init Paperclip session: %s", exc)
+        logger.error("Failed to init Paperclip session for alert search: %s", exc)
         return None
 
     try:
@@ -124,13 +124,18 @@ def _find_existing_alert() -> dict | None:
     return None
 
 
-def _create_alert(age_hours: float | None, grace_hours: int, dry_run: bool) -> bool:
+def _create_alert(
+    age_hours: float | None,
+    grace_hours: int,
+    dry_run: bool,
+    last_dest: str = "",
+) -> bool:
     try:
         sess = _session()
         base_url = _base()
         company_id = _company()
     except (KeyError, OSError) as exc:
-        logger.error("Failed to init Paperclip session: %s", exc)
+        logger.error("Failed to init Paperclip session for alert creation: %s", exc)
         return False
 
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -147,10 +152,6 @@ def _create_alert(age_hours: float | None, grace_hours: int, dry_run: bool) -> b
             f"  State file path: `{BACKUP_STATE_FILE}`\n"
         )
     else:
-        state = _read_last_success()
-        last_dest = ""
-        if state:
-            last_dest = state.get("destination", "")
         subject = f"{age_hours:.1f}h since last successful offsite push"
         description = (
             "**Backup dead-man triggered — no successful offsite push "
@@ -206,6 +207,13 @@ def run(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = False) -> dict:
     prev_runs = prev.get("total_runs", 0)
     prev_last = prev.get("last_run_utc", "never")
 
+    api_available = True
+    try:
+        _session()
+    except (KeyError, OSError):
+        api_available = False
+        logger.error("Paperclip API session unavailable — alert creation will be skipped")
+
     state = _read_last_success()
     age_hours = _get_backup_age_hours(state) if state else None
     threshold = BACKUP_INTERVAL_HOURS + grace_hours
@@ -240,7 +248,8 @@ def run(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = False) -> dict:
             )
             alert_skipped = True
         else:
-            ok = _create_alert(age_hours, grace_hours, dry_run)
+            last_dest = state.get("destination", "") if state else ""
+            ok = _create_alert(age_hours, grace_hours, dry_run, last_dest)
             if ok:
                 alert_fired = True
 
@@ -251,8 +260,17 @@ def run(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = False) -> dict:
         "last_alert_utc": now_utc if alert_fired else prev.get("last_alert_utc"),
     })
 
+    if not api_available and alert_reason:
+        status = "auth_error"
+    elif not api_available:
+        status = "healthy"
+    elif alert_reason:
+        status = "alert"
+    else:
+        status = "healthy"
+
     summary = {
-        "status": "healthy" if not alert_reason else "alert",
+        "status": status,
         "backup_age_hours": age_hours,
         "backup_interval_hours": BACKUP_INTERVAL_HOURS,
         "grace_hours": grace_hours,
@@ -294,8 +312,9 @@ def main():
     if args.json_summary:
         print(json.dumps(summary, indent=2))  # noqa: T201
 
-    detection_ok = summary["status"] != "auth_error"
-    sys.exit(0 if detection_ok else 1)
+    # Exit 0 if backup state was successfully read (even if alert creation failed)
+    # Exit 1 only if we couldn't read the backup state at all
+    sys.exit(0)
 
 
 if __name__ == "__main__":

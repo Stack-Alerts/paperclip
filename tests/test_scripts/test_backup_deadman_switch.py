@@ -289,8 +289,7 @@ class TestCreateAlert:
             monkeypatch, post_return={"identifier": "BTCAAAAA-999", "id": "uuid-99"}
         )
         state = _make_fresh_state(15.0)
-        with patch("scripts.backup_deadman_switch._read_last_success", return_value=state):
-            _create_alert(age_hours=15.0, grace_hours=8, dry_run=False)
+        _create_alert(age_hours=15.0, grace_hours=8, dry_run=False, last_dest=state["destination"])
         payload = mock_sess.post.call_args[1]["json"]
         assert "gdrive" in payload["description"]
 
@@ -445,3 +444,67 @@ class TestRun:
             result = run(grace_hours=8)
             assert result["backup_age_hours"] is None
             assert result["alert_reason"] == "no_success_ever"
+
+    def test_auth_error_when_session_unavailable_and_overdue(self, monkeypatch):
+        from scripts.backup_deadman_switch import run
+
+        self._setup_env(monkeypatch)
+        self._patch_state_and_rotate(monkeypatch)
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._session",
+            lambda: (_ for _ in ()).throw(KeyError("missing env")),
+        )
+        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
+        state = _make_fresh_state(20.0)
+        with patch("scripts.backup_deadman_switch._read_last_success", return_value=state):
+            result = run(grace_hours=8)
+            assert result["status"] == "auth_error"
+            assert result["alert_reason"] == "overdue"
+            assert result["alert_fired"] is False
+
+    def test_auth_error_when_session_unavailable_and_healthy(self, monkeypatch):
+        from scripts.backup_deadman_switch import run
+
+        self._setup_env(monkeypatch)
+        self._patch_state_and_rotate(monkeypatch)
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._session",
+            lambda: (_ for _ in ()).throw(KeyError("missing env")),
+        )
+        state = _make_fresh_state(2.0)
+        with patch("scripts.backup_deadman_switch._read_last_success", return_value=state):
+            result = run(grace_hours=8)
+            assert result["status"] == "healthy"
+            assert result["alert_fired"] is False
+
+    def test_create_alert_passes_destination(self, monkeypatch):
+        from scripts.backup_deadman_switch import _create_alert
+
+        mock_sess = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"identifier": "BTCAAAAA-999", "id": "uuid-99"}
+        mock_sess.post.return_value = mock_resp
+        monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
+        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
+        _create_alert(
+            age_hours=15.0, grace_hours=8, dry_run=False,
+            last_dest="gdrive:custom/path",
+        )
+        payload = mock_sess.post.call_args[1]["json"]
+        assert "gdrive:custom/path" in payload["description"]
+
+    def test_create_alert_default_destination(self, monkeypatch):
+        from scripts.backup_deadman_switch import _create_alert
+
+        mock_sess = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"identifier": "BTCAAAAA-999", "id": "uuid-99"}
+        mock_sess.post.return_value = mock_resp
+        monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
+        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
+        _create_alert(age_hours=15.0, grace_hours=8, dry_run=False)
+        payload = mock_sess.post.call_args[1]["json"]
+        assert "unknown" in payload["description"]
