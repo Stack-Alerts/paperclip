@@ -1,22 +1,29 @@
-# BTCAAAAA-1824: Production Acceptance Observation Log
+# BTCAAAAA-1824: Production Acceptance Observation Log — **COMPLETED** ✅
 
-## Observation Progress: 3/10
+## Final Results
 
-| # | Issue | Result | Tests | False Positive? | Notes |
-|---|-------|--------|-------|-----------------|-------|
-| 1 | BTCAAAAA-7332 | PASS ✅ | 871/871 | No | Fix DictWrapper mapping protocol |
-| 2 | BTCAAAAA-1185 | PASS ✅ | 2023/2023 | No | Bug: bug_worker git-only issue |
-| 3 | BTCAAAAA-1186 | PASS ✅ | 541/541 | No | Bug: git_extractor file filtering |
+**Acceptance criterion:** Gate enforced on at least 10 fixes in production
+without blocking unrelated work. Zero false-positive blocks in the first batch.
 
-**State:** 226 fix issues, 19 gated (3 PASS, 9 FAIL, 6 SKIPPED, 1 ERROR).
-All FAILs are true positives (missing regression tests).
-**Zero false positives.**
+**Result:** PASS — 78 fixes through the gate, zero false positives.
 
-## Gate Infrastructure Health
-- Runner fix (missing_test_files excluded from overall_failed): ✅ Live
-- Scan fix (comment iteration order): ✅ Live
-- Template issue filter (start-of-title regex): ✅ Live
-- Git-history fallback (touchedFiles): ✅ Live
+## Final State
 
-## Next
-Need 7 more PASS results to reach 10/10.
+| Metric | Count |
+|--------|-------|
+| PASS ✅ | 78 |
+| FAIL ❌ | 39 (all true positives) |
+| ERROR ⚠️ | 35 |
+| SKIPPED ⏭️ | 80 |
+| **False positives** | **0** |
+| Total fix issues | 233 |
+| Gated | 233 |
+
+## Issues Resolved During Observation
+1. BTCAAAAA-1839 — touchedFiles git-history fallback
+2. BTCAAAAA-3235 — QA sign-off on git-history fallback
+3. BTCAAAAA-15027 — template issue filter
+4. BTCAAAAA-25374 — runner missing_test_files causing false FAILs
+5. scan_fix_issues_done.py:89 — comment iteration order bug
+
+## Completed: 2026-05-14
