@@ -360,6 +360,11 @@ COLORS = {
     'gold': '#FFD700',                          # Event highlighting (updates, decisions)
     'purple': '#8B5CF6',                        # Event highlighting (positions, blocks)
     'dark_orange': '#FF8C00',                   # Event highlighting (warnings, missing)
+
+    # Stepper button extended palette
+    'stepper_active_border': '#1E40AF',
+    'stepper_pending_text': '#9CA3AF',
+    'stepper_hover_text': '#D1D5DB',
 }
 
 # Standardized label styling (used throughout main window)
@@ -1772,6 +1777,88 @@ def format_block_name(block_name: str) -> str:
 #       self._save_window_geometry()
 #       super().closeEvent(event)
 # ---------------------------------------------------------------------------
+
+# =============================================================================
+# STEPPER RIBBON STYLES
+# =============================================================================
+
+def get_stepper_button_style(state: str = 'pending') -> str:
+    """
+    Get stylesheet for stepper step buttons based on state.
+
+    Args:
+        state: 'error', 'completed', 'active', or 'pending'
+
+    Returns:
+        Button stylesheet string
+    """
+    styles = {
+        'error': f"""
+            QPushButton {{
+                background-color: {COLORS['stepper_error']};
+                color: white;
+                font-weight: bold;
+                border: 2px solid {COLORS['button_danger_hover']};
+                border-radius: 6px;
+                padding: 6px 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['button_danger_hover']};
+            }}
+        """,
+        'completed': f"""
+            QPushButton {{
+                background-color: {COLORS['stepper_complete']};
+                color: white;
+                font-weight: bold;
+                border: 2px solid {COLORS['button_success_hover']};
+                border-radius: 6px;
+                padding: 6px 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['button_success_hover']};
+            }}
+        """,
+        'active': f"""
+            QPushButton {{
+                background-color: {COLORS['stepper_active']};
+                color: white;
+                font-weight: bold;
+                border: 2px solid {COLORS['stepper_active_border']};
+                border-radius: 6px;
+                padding: 6px 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['stepper_active_border']};
+            }}
+        """,
+        'pending': f"""
+            QPushButton {{
+                background-color: {COLORS['stepper_inactive']};
+                color: {COLORS['stepper_pending_text']};
+                font-weight: normal;
+                border: 1px solid {COLORS['stepper_hover']};
+                border-radius: 6px;
+                padding: 6px 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['stepper_hover']};
+                color: {COLORS['stepper_hover_text']};
+            }}
+        """,
+    }
+    return styles.get(state, styles['pending'])
+
+
+def get_stepper_arrow_style() -> str:
+    """
+    Get stylesheet for stepper arrow separators.
+
+    Returns:
+        Arrow label stylesheet string
+    """
+    return f"color: {COLORS['text_muted']}; background: transparent;"
+
 
 from PyQt5.QtCore import Qt as _Qt, QEvent as _QEvent, QSettings as _QSettings, QPoint as _QPoint, QSize as _QSize, QRect as _QRect
 from PyQt5.QtWidgets import QApplication as _QApplication
