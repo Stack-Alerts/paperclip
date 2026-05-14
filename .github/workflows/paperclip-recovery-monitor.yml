@@ -1,0 +1,159 @@
+name: PaperClip Recovery Monitor
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (log only, do not execute recovery actions)'
+        required: false
+        default: 'true'
+      scenario:
+        description: 'Target a specific recovery scenario (leave empty for all)'
+        required: false
+        default: ''
+      matches_only:
+        description: 'Show matches only, do not execute recovery'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+
+jobs:
+  recovery-monitor:
+    name: Monitor and recover stalled workflows
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests python-dotenv
+
+      - name: Run recovery monitor (matches)
+        if: ${{ github.event.inputs.matches_only == 'true' || github.event_name == 'schedule' }}
+        id: matches
+        env:
+          PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+          PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+          PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+          PAPERCLIP_BOARD_API_KEY: ${{ secrets.PAPERCLIP_BOARD_API_KEY }}
+        run: |
+          FLAGS="matches"
+          if [ -n "${{ github.event.inputs.scenario }}" ]; then
+            FLAGS="$FLAGS --scenario ${{ github.event.inputs.scenario }}"
+          fi
+          python scripts/paperclip_recovery_monitor.py $FLAGS > /tmp/recovery-matches.json
+          echo "Matches written to /tmp/recovery-matches.json"
+
+      - name: Run recovery monitor (execute)
+        if: ${{ github.event.inputs.matches_only != 'true' && github.event_name != 'schedule' }}
+        id: recovery
+        env:
+          PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+          PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+          PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+          PAPERCLIP_BOARD_API_KEY: ${{ secrets.PAPERCLIP_BOARD_API_KEY }}
+        run: |
+          FLAGS="run --json-summary"
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            FLAGS="$FLAGS --dry-run"
+          fi
+          if [ -n "${{ github.event.inputs.scenario }}" ]; then
+            FLAGS="$FLAGS --scenario ${{ github.event.inputs.scenario }}"
+          fi
+          python scripts/paperclip_recovery_monitor.py $FLAGS > /tmp/recovery-summary.json
+          echo "Summary written to /tmp/recovery-summary.json"
+
+      - name: Write step summary
+        if: always()
+        run: |
+          if [ -f /tmp/recovery-summary.json ]; then
+            python -c "
+          import json
+          d = json.load(open('/tmp/recovery-summary.json'))
+          lines = []
+          lines.append('## PaperClip Recovery Monitor')
+          lines.append('')
+          lines.append('**Run at:** ' + d.get('timestamp', '?')[:19])
+          lines.append('**Mode:** ' + ('dry-run' if d.get('dry_run') else 'live'))
+          lines.append('**Issues scanned:** ' + str(d.get('issues_scanned', 0)))
+          lines.append('**Scenarios checked:** ' + str(d.get('scenarios_checked', 0)))
+          lines.append('**Total actions taken:** ' + str(len(d.get('actions_taken', []))))
+          lines.append('')
+          if d.get('error'):
+              lines.append('**Error:** ' + d['error'])
+          matches = d.get('matches', {})
+          if matches:
+              lines.append('### Scenario Matches')
+              lines.append('| Scenario | Matches |')
+              lines.append('|----------|---------|')
+              for sid, count in matches.items():
+                  lines.append(f'| {sid} | {count} |')
+              lines.append('')
+          actions = d.get('actions_taken', [])
+          if actions:
+              lines.append('### Actions Taken')
+              for a in actions[:20]:
+                  act = a.get('action', '?')
+                  iss = a.get('issue', '?')
+                  err = a.get('error')
+                  esc = a.get('escalation_issue_id', '')[:8]
+                  parts = [f'- **{act}** on {iss}']
+                  if esc:
+                      parts.append(f' escalation={esc}')
+                  if err:
+                      parts.append(f' ERROR: {err[:60]}')
+                  lines.append(' '.join(parts))
+          print('\n'.join(lines))
+          " > $GITHUB_STEP_SUMMARY
+          elif [ -f /tmp/recovery-matches.json ]; then
+            python -c "
+          import json
+          d = json.load(open('/tmp/recovery-matches.json'))
+          lines = []
+          lines.append('## PaperClip Recovery Monitor — Matches (scheduled check)')
+          lines.append('')
+          for s in d:
+              lines.append(f'- **{s[\"scenario\"]}** ({s[\"name\"]}): {s[\"matched\"]} match(es)')
+          print('\n'.join(lines))
+          " > $GITHUB_STEP_SUMMARY
+          else
+            echo "## PaperClip Recovery Monitor" >> $GITHUB_STEP_SUMMARY
+            echo "**Status:** unknown (no output file)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload monitor logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovery-monitor-logs
+          path: ~/.paperclip/recovery_monitor.log
+          retention-days: 7
+
+      - name: Upload recovery state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovery-monitor-state
+          path: ~/.paperclip/recovery_monitor_state.json
+          retention-days: 7
+
+      - name: Upload summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovery-monitor-summary
+          path: |
+            /tmp/recovery-summary.json
+            /tmp/recovery-matches.json
+          retention-days: 7

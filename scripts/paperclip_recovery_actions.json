@@ -1,0 +1,213 @@
+{
+  "description": "PaperClip Recovery Actions — auto-detection and recovery for stalled agent workflows. Part of P5.1 / BTCAAAAA-26508.",
+  "version": "1.0.0",
+  "company_id": "73419cf3-bd37-4a7c-8782-311ccb47fced",
+  "defaults": {
+    "recovery_cooldown_minutes": 120,
+    "max_recovery_attempts": 3,
+    "escalation_agent_id": "41b5ede6-e209-40ba-b923-dc969c722e6d",
+    "alert_project_id": "0163ad7d-d05e-4742-9fbb-f206a17fc649"
+  },
+  "agent_scope_map": {
+    "exchange_agents": [
+      "73eaab54-0d5f-4a5c-a9f9-0019064ee418",
+      "58cd0e89-a143-4102-98aa-45a412a70248",
+      "a472d315-3e2e-4c3b-a1ba-a931295628cc"
+    ],
+    "data_agents": [
+      "000f41e8-8514-4100-94f7-93ea4b9876af",
+      "f680b3fd-945b-4e0b-ae42-1f9639a4cbd3"
+    ],
+    "signal_agents": [
+      "e3fcab65-c9a3-45bd-97e8-5145d3d6db5e",
+      "79beb038-0309-4e15-95c8-d310455dfb0e"
+    ],
+    "risk_agents": [
+      "24041495-386b-4be7-ae8b-7fc0c0ed5c9d",
+      "840eb9ff-f746-47da-9fdc-f0ec9d071155"
+    ],
+    "monitoring_agents": [
+      "2b9152a6-07f6-4ae9-87fa-c824012c9ff6",
+      "a1d7dba5-6b71-4fff-86cb-8ee1734a35c5"
+    ]
+  },
+  "recovery_scenarios": [
+    {
+      "id": "exchange_api_timeout",
+      "name": "Exchange API Timeout Recovery",
+      "description": "Detect and recover stalled workflows related to exchange API calls (Binance, order placement, market data fetching).",
+      "enabled": true,
+      "source_scope": {
+        "agent_scopes": ["exchange_agents", "data_agents"],
+        "issue_keywords": ["exchange", "api", "binance", "order", "trade", "market", "fetch", "request", "timeout"],
+        "issue_url_patterns": []
+      },
+      "detection": {
+        "status": "in_progress",
+        "min_age_hours": 2,
+        "max_age_hours": 72,
+        "check_live_runs": true,
+        "run_silence_levels": ["suspicious", "critical"],
+        "min_issues_for_batch_alert": 3
+      },
+      "recovery_actions": [
+        {
+          "order": 1,
+          "action": "add_comment",
+          "description": "Post a diagnostic comment on the stalled issue to prompt agent self-recovery on next heartbeat."
+        },
+        {
+          "order": 2,
+          "action": "invoke_heartbeat",
+          "description": "Trigger the assigned agent's heartbeat to resume the stalled workflow."
+        },
+        {
+          "order": 3,
+          "action": "create_escalation",
+          "description": "Create an escalation issue for the CTO if auto-recovery fails after max attempts.",
+          "escalation_agent_id": "41b5ede6-e209-40ba-b923-dc969c722e6d",
+          "escalation_title_prefix": "[RECOVERY] Exchange API timeout — "
+        }
+      ]
+    },
+    {
+      "id": "position_mismatch",
+      "name": "Position Mismatch Detection",
+      "description": "Detect issues indicating position reconciliation failures or trade execution discrepancies.",
+      "enabled": true,
+      "source_scope": {
+        "agent_scopes": ["risk_agents"],
+        "issue_keywords": ["position", "mismatch", "discrepancy", "reconcile", "pnl", "balance", "exposure", "hedge"],
+        "issue_url_patterns": []
+      },
+      "detection": {
+        "status": "in_progress",
+        "min_age_hours": 1,
+        "max_age_hours": 24,
+        "check_live_runs": false,
+        "run_silence_levels": [],
+        "min_issues_for_batch_alert": 1
+      },
+      "recovery_actions": [
+        {
+          "order": 1,
+          "action": "add_comment",
+          "description": "Post a diagnostic comment prompting the assignee to validate position state and resume."
+        },
+        {
+          "order": 2,
+          "action": "create_escalation",
+          "description": "Escalate to RiskAnalyst for manual position verification.",
+          "escalation_agent_id": "24041495-386b-4be7-ae8b-7fc0c0ed5c9d",
+          "escalation_title_prefix": "[RECOVERY] Position mismatch — "
+        }
+      ]
+    },
+    {
+      "id": "signal_timeout",
+      "name": "Signal Generation Timeout",
+      "description": "Detect stalled signal generation pipelines (indicator computation, strategy evaluation, backtest runs).",
+      "enabled": true,
+      "source_scope": {
+        "agent_scopes": ["signal_agents", "data_agents"],
+        "issue_keywords": ["signal", "indicator", "backtest", "walkforward", "strategy", "evaluate", "optimize", "compute"],
+        "issue_url_patterns": []
+      },
+      "detection": {
+        "status": "in_progress",
+        "min_age_hours": 3,
+        "max_age_hours": 48,
+        "check_live_runs": true,
+        "run_silence_levels": ["suspicious", "critical"],
+        "min_issues_for_batch_alert": 2
+      },
+      "recovery_actions": [
+        {
+          "order": 1,
+          "action": "add_comment",
+          "description": "Post a diagnostic comment to prompt resumption from last checkpoint."
+        },
+        {
+          "order": 2,
+          "action": "invoke_heartbeat",
+          "description": "Trigger the assigned agent's heartbeat."
+        },
+        {
+          "order": 3,
+          "action": "create_escalation",
+          "description": "Escalate to the NautilusEngineer if signal pipeline stalls persist.",
+          "escalation_agent_id": "a472d315-3e2e-4c3b-a1ba-a931295628cc",
+          "escalation_title_prefix": "[RECOVERY] Signal timeout — "
+        }
+      ]
+    },
+    {
+      "id": "orphan_checkout",
+      "name": "Orphaned Checkout Recovery",
+      "description": "Detect issues that are checked out but have no live heartbeat run backing them (ghost/dead agent).",
+      "enabled": true,
+      "source_scope": {
+        "agent_scopes": [],
+        "issue_keywords": [],
+        "issue_url_patterns": []
+      },
+      "detection": {
+        "status": "in_progress",
+        "min_age_hours": 6,
+        "max_age_hours": 168,
+        "check_live_runs": true,
+        "run_silence_levels": ["critical"],
+        "min_issues_for_batch_alert": 1
+      },
+      "recovery_actions": [
+        {
+          "order": 1,
+          "action": "force_release",
+          "description": "Force-release the issue so it can be reassigned."
+        },
+        {
+          "order": 2,
+          "action": "create_escalation",
+          "description": "Notify the CTO of orphaned checkout requiring reassignment.",
+          "escalation_agent_id": "41b5ede6-e209-40ba-b923-dc969c722e6d",
+          "escalation_title_prefix": "[RECOVERY] Orphaned checkout — "
+        }
+      ]
+    },
+    {
+      "id": "agent_paused_stalled",
+      "name": "Paused Agent Work Recovery",
+      "description": "Detect agents that are paused but still have assigned in_progress work, and resume them.",
+      "enabled": true,
+      "source_scope": {
+        "agent_scopes": [],
+        "issue_keywords": [],
+        "issue_url_patterns": []
+      },
+      "detection": {
+        "status": "in_progress",
+        "min_age_hours": 2,
+        "max_age_hours": 72,
+        "check_live_runs": false,
+        "run_silence_levels": [],
+        "min_issues_for_batch_alert": 1
+      },
+      "recovery_actions": [
+        {
+          "order": 1,
+          "action": "resume_agent",
+          "description": "Resume the paused agent so it can pick up stalled work."
+        }
+      ]
+    }
+  ],
+  "recovery_state_schema": {
+    "description": "Per-issue recovery state tracked to prevent over-recovery and respect cooldown intervals.",
+    "fields": {
+      "last_recovery_attempt_at": "ISO timestamp of last recovery action",
+      "recovery_attempts": "Number of recovery attempts made for this scenario",
+      "last_action": "The last recovery action that was executed",
+      "escalation_issue_id": "UUID of the escalation issue if one was created"
+    }
+  }
+}
