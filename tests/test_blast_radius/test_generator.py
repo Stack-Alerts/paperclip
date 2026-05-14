@@ -341,7 +341,8 @@ class TestPostComment:
         mock_sess = _mock_session()
 
         with (
-            patch("blast_radius.generator._session", return_value=mock_sess),
+            patch("touch_index.paperclip_client.is_issue_done", return_value=False),
+            patch("blast_radius.generator._board_session", return_value=mock_sess),
             patch("blast_radius.generator.PAPERCLIP_RUN_ID", ""),
         ):
             _post_comment("issue-uuid", "body text")
@@ -356,13 +357,13 @@ class TestPostComment:
         mock_sess = _mock_session()
 
         with (
-            patch("blast_radius.generator._session", return_value=mock_sess),
+            patch("touch_index.paperclip_client.is_issue_done", return_value=False),
+            patch("blast_radius.generator._board_session", return_value=mock_sess),
             patch("blast_radius.generator.PAPERCLIP_RUN_ID", "run-123"),
         ):
             _post_comment("issue-uuid", "body")
 
         _, kwargs = mock_sess.post.call_args
-        # The headers are set via sess.headers.update()
         mock_sess.headers.update.assert_called_once()
 
 
