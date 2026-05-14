@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
     QCheckBox, QLabel, QGroupBox, QApplication, QMessageBox,
     QTabWidget, QWidget, QGridLayout,
 )
-from PyQt5.QtCore import Qt, QSettings, QThread, pyqtSignal, QTimer, QObject
+from PyQt5.QtCore import Qt, QSettings, QRunnable, QThreadPool, pyqtSignal, QTimer, QObject
 from PyQt5.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
 
 from src.strategy_builder.ui.styles import (
@@ -167,20 +167,28 @@ class TabMetadata:
 
 
 # --------------------------------------------------------------------------- #
-# LogLoadWorker — background directory scanner + tab builder
+# LogLoadRunnable — background directory scanner + tab builder (QThreadPool)
 # --------------------------------------------------------------------------- #
 
 
-class LogLoadWorker(QObject):
-    """Background worker that scans log directories and builds tab metadata."""
+class LogLoadSignals(QObject):
+    """Signal carrier for LogLoadRunnable."""
 
     finished = pyqtSignal(object)
+
+
+class LogLoadRunnable(QRunnable):
+    """Background worker that scans log directories and builds tab metadata.
+
+    Runs via QThreadPool.globalInstance() — no manual thread lifecycle needed.
+    """
 
     def __init__(self, logs_base_dir: Path, current_log_file: Optional[Path] = None):
         super().__init__()
         self.logs_base_dir = logs_base_dir
         self.current_log_file = current_log_file
         self._cancelled = False
+        self.signals = LogLoadSignals()
 
     def cancel(self):
         self._cancelled = True
@@ -189,10 +197,10 @@ class LogLoadWorker(QObject):
         try:
             result = self._build_tabs()
             if not self._cancelled:
-                self.finished.emit(result)
+                self.signals.finished.emit(result)
         except Exception as e:
             if not self._cancelled:
-                self.finished.emit({"error": str(e)})
+                self.signals.finished.emit({"error": str(e)})
 
     def _build_tabs(self):
         """Scan directory and build TabMetadata list."""
@@ -298,8 +306,7 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
         self._tab_widgets: Dict[int, QPlainTextEdit] = {}
         self._tab_content_loaded: Set[int] = set()
 
-        self._worker_thread: Optional[QThread] = None
-        self._worker: Optional[LogLoadWorker] = None
+        self._worker: Optional[LogLoadRunnable] = None
 
         self._init_ui()
         QTimer.singleShot(0, self._start_loading)
@@ -535,50 +542,44 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
 
     def _start_loading(self):
         """Start background worker to scan log directories and build tabs."""
-        if self._worker_thread is not None:
+        if self._worker is not None:
             return
 
-        self._worker_thread = QThread()
-        self._worker = LogLoadWorker(self.logs_base_dir, self.current_log_file)
-        self._worker.moveToThread(self._worker_thread)
-        self._worker_thread.started.connect(self._worker.run)
-        self._worker.finished.connect(self._on_logs_loaded)
-        self._worker.finished.connect(self._worker_thread.quit)
-        self._worker.finished.connect(self._worker.deleteLater)
-        self._worker_thread.finished.connect(self._worker_thread.deleteLater)
-        self._worker_thread.start()
+        self._worker = LogLoadRunnable(self.logs_base_dir, self.current_log_file)
+        self._worker.signals.finished.connect(self._on_logs_loaded)
+        QThreadPool.globalInstance().start(self._worker)
 
     def _on_logs_loaded(self, result):
         """Handle tab metadata from background worker."""
-        try:
-            self._worker_thread = None
-            self._worker = None
+        self._worker = None
 
-            if isinstance(result, dict) and "error" in result:
+        if result is None:
+            return
+
+        if isinstance(result, dict) and "error" in result:
+            try:
                 self._show_error_tab(str(result["error"]))
-                return
+            except RuntimeError:
+                pass
+            return
 
-            if result is None:
-                return
+        try:
+            self._tabs_meta = result.get("tabs", [])
+            focused_tab = result.get("focused_tab", 0)
+
+            for i, meta in enumerate(self._tabs_meta):
+                panel = self._create_log_panel()
+                self._tab_widgets[i] = panel.text_edit
+                self.tabs.addTab(panel, meta.name)
+
+            if focused_tab < self.tabs.count():
+                self.tabs.setCurrentIndex(focused_tab)
+
+            self._activate_tab(focused_tab)
+
+            self._restore_last_tab()
         except RuntimeError:
-            # Widget's C++ backing already destroyed — safe to ignore
             pass
-
-        self._tabs_meta = result.get("tabs", [])
-        focused_tab = result.get("focused_tab", 0)
-
-        for i, meta in enumerate(self._tabs_meta):
-            panel = self._create_log_panel()
-            self._tab_widgets[i] = panel.text_edit
-            self.tabs.addTab(panel, meta.name)
-
-        if focused_tab < self.tabs.count():
-            self.tabs.setCurrentIndex(focused_tab)
-
-        self._activate_tab(focused_tab)
-
-        # Restore last-viewed tab from QSettings (overrides focused_tab)
-        self._restore_last_tab()
 
     def _show_error_tab(self, error_msg: str):
         """Show an error tab when loading fails."""
@@ -997,14 +998,9 @@ class LogViewerWindow(WindowGeometryMixin, QDialog):
 
     def closeEvent(self, event):
         """Save geometry and last tab on close."""
-        # Clean up background thread to prevent QThread crash on exit
         if self._worker is not None:
             self._worker.cancel()
-        if self._worker_thread is not None and self._worker_thread.isRunning():
-            self._worker_thread.quit()
-            self._worker_thread.wait(3000)
-        self._worker = None
-        self._worker_thread = None
+            self._worker = None
 
         self._save_window_geometry()
         settings = QSettings("BTC_Engine", "LogViewer")
