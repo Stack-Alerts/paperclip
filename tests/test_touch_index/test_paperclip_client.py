@@ -1176,3 +1176,123 @@ class TestForceReleaseIssue:
 
         url = sess.post.call_args[0][0]
         assert "clearAssignee=true" in url
+
+
+class TestCheckPaperclipCredentials:
+    """Tests for check_paperclip_credentials environment validation."""
+
+    def test_returns_none_when_all_vars_present(self):
+        from touch_index.paperclip_client import check_paperclip_credentials
+
+        with patch.dict(
+            os.environ,
+            {
+                "PAPERCLIP_API_URL": "https://api.paperclip.prod.com",
+                "PAPERCLIP_API_KEY": "sk-real-token-abc123",
+                "PAPERCLIP_COMPANY_ID": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            },
+            clear=True,
+        ):
+            result = check_paperclip_credentials()
+
+        assert result is None
+
+    def test_detects_missing_var(self):
+        from touch_index.paperclip_client import check_paperclip_credentials
+
+        with patch.dict(
+            os.environ,
+            {
+                "PAPERCLIP_API_URL": "https://api.paperclip.prod.com",
+                "PAPERCLIP_API_KEY": "sk-real-token-abc123",
+            },
+            clear=True,
+        ):
+            result = check_paperclip_credentials()
+
+        assert result is not None
+        assert "Missing" in result
+        assert "PAPERCLIP_COMPANY_ID" in result
+
+    def test_detects_placeholder_url(self):
+        from touch_index.paperclip_client import check_paperclip_credentials
+
+        with patch.dict(
+            os.environ,
+            {
+                "PAPERCLIP_API_URL": "https://api.paperclip.example.com",
+                "PAPERCLIP_API_KEY": "sk-real-token-abc123",
+                "PAPERCLIP_COMPANY_ID": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            },
+            clear=True,
+        ):
+            result = check_paperclip_credentials()
+
+        assert result is not None
+        assert "placeholder" in result
+        assert "example.com" in result
+
+    def test_detects_placeholder_key(self):
+        from touch_index.paperclip_client import check_paperclip_credentials
+
+        with patch.dict(
+            os.environ,
+            {
+                "PAPERCLIP_API_URL": "https://api.paperclip.prod.com",
+                "PAPERCLIP_API_KEY": "your_paperclip_api_key_here",
+                "PAPERCLIP_COMPANY_ID": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            },
+            clear=True,
+        ):
+            result = check_paperclip_credentials()
+
+        assert result is not None
+        assert "placeholder" in result
+        assert "your_" in result
+
+    def test_detects_zero_uuid_company_id(self):
+        from touch_index.paperclip_client import check_paperclip_credentials
+
+        with patch.dict(
+            os.environ,
+            {
+                "PAPERCLIP_API_URL": "https://api.paperclip.prod.com",
+                "PAPERCLIP_API_KEY": "sk-real-token-abc123",
+                "PAPERCLIP_COMPANY_ID": "00000000-0000-0000-0000-000000000000",
+            },
+            clear=True,
+        ):
+            result = check_paperclip_credentials()
+
+        assert result is not None
+        assert "placeholder" in result
+        assert "00000000" in result
+
+    def test_detects_missing_all_vars(self):
+        from touch_index.paperclip_client import check_paperclip_credentials
+
+        with patch.dict(os.environ, {}, clear=True):
+            result = check_paperclip_credentials()
+
+        assert result is not None
+        assert "Missing" in result
+        assert "PAPERCLIP_API_URL" in result
+        assert "PAPERCLIP_API_KEY" in result
+        assert "PAPERCLIP_COMPANY_ID" in result
+
+    def test_empty_string_treated_as_missing(self):
+        from touch_index.paperclip_client import check_paperclip_credentials
+
+        with patch.dict(
+            os.environ,
+            {
+                "PAPERCLIP_API_URL": "",
+                "PAPERCLIP_API_KEY": "",
+                "PAPERCLIP_COMPANY_ID": "",
+            },
+            clear=True,
+        ):
+            result = check_paperclip_credentials()
+
+        assert result is not None
+        assert "Missing" in result

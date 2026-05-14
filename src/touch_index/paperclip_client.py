@@ -16,6 +16,45 @@ from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
 logger = logging.getLogger(__name__)
+_PLACEHOLDER_PATTERNS = (
+    "your_", "example.com", "00000000-0000-0000-0000-000000000000",
+)
+
+_REQUIRED_ENV_VARS = {
+    "PAPERCLIP_API_URL": "Paperclip API base URL",
+    "PAPERCLIP_API_KEY": "API bearer token",
+    "PAPERCLIP_COMPANY_ID": "Company UUID",
+}
+
+
+def check_paperclip_credentials() -> str | None:
+    """Validate Paperclip credential env vars, returning an error message or None.
+
+    Checks that required variables are set, non-empty, and don't contain
+    placeholder values from the template .env.example.  Returns a
+    human-readable error string on failure, or None when all checks pass.
+    """
+    missing: list[str] = []
+    placeholders: list[str] = []
+    for var, desc in _REQUIRED_ENV_VARS.items():
+        val = os.environ.get(var, "")
+        if not val:
+            missing.append(f"{var} ({desc})")
+        elif any(p in val.lower() for p in _PLACEHOLDER_PATTERNS):
+            placeholders.append(f"{var}={val!r}")
+    if missing:
+        return (
+            f"Missing Paperclip environment variable(s): {', '.join(missing)}. "
+            "Set them in .env or export before running."
+        )
+    if placeholders:
+        return (
+            f"Paperclip environment variable(s) still contain placeholder values: "
+            f"{'; '.join(placeholders)}. "
+            "Replace them with real credentials in .env."
+        )
+    return None
+
 
 # Retry strategy for Paperclip API calls — exponential backoff, 3 attempts
 _RETRY_STRATEGY = Retry(
