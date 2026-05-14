@@ -1,0 +1,7 @@
+{
+  "issue": "BTCAAAAA-25992",
+  "status": "done",
+  "resolvedBy": "AutomationEngineer",
+  "resolution": "Impact Gate scan-done completed \u2014 retroactive gating run on 2 ungated issues (BTCAAAAA-25570 SKIPPED, BTCAAAAA-25693 PASS 477/477). Result: 0 ungated, 233 gated (100% coverage).",
+  "completedAt": "2026-05-14T01:05:48Z"
+}
