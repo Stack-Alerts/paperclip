@@ -11,9 +11,11 @@ Run:
 
 import pytest
 from PyQt5.QtWidgets import QLineEdit, QTextEdit, QPushButton, QRadioButton
+from PyQt5.QtCore import QTimer
 
 from src.strategy_builder.ui.new_strategy_dialog import NewStrategyDialog
 from src.strategy_builder.ui.strategy_info_panel import StrategyInfoPanel
+from src.strategy_builder.ui.strategy_browser_dialog import StrategyBrowserDialog
 
 
 # ---------------------------------------------------------------------------
@@ -189,3 +191,86 @@ def test_strategy_info_panel_type_change_emits_signal(qtbot):
         panel.bullish_radio.setChecked(True)
 
     assert len(emitted) > 0, "strategy_type_changed was not emitted after radio toggle"
+
+
+# ---------------------------------------------------------------------------
+# StrategyBrowserDialog close tests (BTCAAAAA-26209 — RuntimeError when
+# closing strategy browser, QPushButton deleted)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.qt_real
+def test_strategy_browser_reject_no_runtime_error(qtbot):
+    """
+    Closing the strategy browser via reject() (Cancel button) must not
+    raise RuntimeError("underlying C/C++ object has been deleted").
+
+    The showEvent() installs a QTimer.singleShot(200ms, ...) that can fire
+    after the dialog is already closed; verifies no stale C++ reference crash.
+    """
+    dlg = StrategyBrowserDialog(mode='open')
+    qtbot.addWidget(dlg)
+    dlg.show()
+
+    # Let the 200 ms hand-cursor timer start
+    qtbot.wait(50)
+
+    # Close via reject path (Cancel button or programmatic)
+    dlg.reject()
+
+    # After close, the dialog should be hidden.  Force pending Qt events
+    # (including any delayed timer callbacks) to confirm they don't crash.
+    qtbot.wait(300)
+
+    # At minimum the Python wrapper must not have raised RuntimeError
+    # from a signal firing after its C++ children were destroyed.
+    assert not dlg.isVisible()
+
+
+@pytest.mark.qt_real
+def test_strategy_browser_accept_no_runtime_error(qtbot):
+    """
+    Closing the strategy browser via accept() (double-click / Open button)
+    must not raise RuntimeError even when no row is selected (edge case).
+    """
+    dlg = StrategyBrowserDialog(mode='open')
+    qtbot.addWidget(dlg)
+    dlg.show()
+    qtbot.wait(100)
+
+    dlg.accept()
+    qtbot.wait(300)
+    assert not dlg.isVisible()
+
+
+@pytest.mark.qt_real
+def test_strategy_browser_rapid_open_close(qtbot):
+    """
+    Rapidly opening and closing the strategy browser must not trigger
+    RuntimeError.  Repeated show/close cycles exercise timer races and
+    stale C++ widget access patterns (BTCAAAAA-26209).
+    """
+    for _ in range(3):
+        dlg = StrategyBrowserDialog(mode='open')
+        qtbot.addWidget(dlg)
+        dlg.show()
+        qtbot.wait(50)
+        dlg.close()
+        qtbot.wait(100)
+
+
+@pytest.mark.qt_real
+def test_strategy_browser_close_event_no_runtime_error(qtbot):
+    """
+    Closing the strategy browser via the native window close (closeEvent)
+    must not raise RuntimeError.  The closeEvent chain saves settings,
+    closes the DB connection, and calls super().closeEvent().
+    """
+    dlg = StrategyBrowserDialog(mode='open')
+    qtbot.addWidget(dlg)
+    dlg.show()
+    qtbot.wait(100)
+
+    # Simulate native window close
+    dlg.close()
+    qtbot.wait(300)
+    assert not dlg.isVisible()
