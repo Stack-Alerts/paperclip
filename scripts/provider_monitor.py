@@ -98,12 +98,9 @@ STANDARD_AGENTS = [
 ]
 
 PRO_MODEL_NORMAL = "claude-sonnet-4-6"
-PRO_MODEL_DEGRADED = "deepseek/deepseek-v4-pro"
-PRO_MODEL_FALLBACK = "deepseek/deepseek-v4-pro"
-
-STANDARD_MODEL_NORMAL = "deepseek/deepseek-v4-pro"
-STANDARD_MODEL_DEGRADED = "deepseek/deepseek-v4-flash"
-STANDARD_MODEL_FALLBACK = "deepseek/deepseek-v4-flash"
+PRO_MODEL_DEGRADED = "openrouter/deepseek/deepseek-v4-pro"
+STANDARD_MODEL_NORMAL = "openrouter/deepseek/deepseek-v4-pro"
+STANDARD_MODEL_DEGRADED = "openrouter/deepseek/deepseek-v4-flash"
 
 
 @dataclass
@@ -311,7 +308,7 @@ def fetch_claude_usage() -> tuple[float | None, float | None, bool, str | None]:
         limit_7d = float(tokens_7day.get("limit", 1))
         pct_4h = round((used_4h / limit_4h * 100.0), 1) if limit_4h > 0 else 0.0
         pct_7d = round((used_7d / limit_7d * 100.0), 1) if limit_7d > 0 else 0.0
-        available = pct_4h < 90.0 and pct_7d < 90.0
+        available = pct_4h < 95.0 and pct_7d < 95.0
         return pct_4h, pct_7d, available, None
     except requests.RequestException as e:
         return None, None, False, f"Anthropic usage API request failed: {e}"
@@ -384,85 +381,57 @@ def evaluate_triggers(snap: UsageSnapshot, state: MonitorState) -> SwitchingDeci
     degrade_cooldown = _cooldown_remaining(state, "degrade", DEGRADE_COOLDOWN_MIN)
     upgrade_cooldown = _cooldown_remaining(state, "upgrade", UPGRADE_COOLDOWN_MIN)
 
-    claude_4h_high = snap.claude_4hr_pct is not None and snap.claude_4hr_pct >= 90.0
-    claude_7d_high = snap.claude_7day_pct is not None and snap.claude_7day_pct >= 90.0
-    claude_exhausted = claude_4h_high or claude_7d_high
-    claude_ok = (
-        snap.claude_available
-        and snap.claude_4hr_pct is not None and snap.claude_4hr_pct < 90.0
-        and snap.claude_7day_pct is not None and snap.claude_7day_pct < 90.0
-    )
+    c1_active = snap.claude_4hr_pct is not None and snap.claude_4hr_pct >= 95.0
+    c2_active = snap.claude_7day_pct is not None and snap.claude_7day_pct >= 95.0
 
-    deepseek_low = (
-        snap.deepseek_pct_remaining is not None and snap.deepseek_pct_remaining <= 10.0
-    )
-    deepseek_ok = (
-        snap.deepseek_pct_remaining is not None and snap.deepseek_pct_remaining > 10.0
-    )
-
-    openrouter_low = (
+    # OpenRouter credit alert flag management
+    or_low = (
         snap.openrouter_remaining is not None
-        and (snap.openrouter_remaining <= 5.0 or snap.openrouter_pct_remaining is not None
-             and snap.openrouter_pct_remaining <= 10.0)
+        and (snap.openrouter_remaining <= 5.0
+             or (snap.openrouter_pct_remaining is not None
+                 and snap.openrouter_pct_remaining <= 10.0))
     )
-
-    current_state = state.current_provider_state
-
-    # Reset D2 alert flag when OpenRouter recovers above threshold
-    openrouter_ok = (
+    or_ok = (
         snap.openrouter_remaining is not None
         and snap.openrouter_remaining > 5.0
         and (snap.openrouter_pct_remaining is None or snap.openrouter_pct_remaining > 10.0)
     )
-    if openrouter_ok and state.alert_sent_d2:
-        logger.info("OpenRouter recovered, clearing D2 alert flag")
+    if or_ok and state.alert_sent_d2:
+        logger.info("OpenRouter recovered, clearing alert flag")
         state.alert_sent_d2 = False
 
-    # D2: OpenRouter credit low — alert only, no auto switch
-    if openrouter_low and not state.alert_sent_d2:
+    # OpenRouter credit low — alert only, not a switching trigger
+    if or_low and not state.alert_sent_d2:
         return SwitchingDecision(
-            action="alert_d2",
+            action="alert_or",
             reason=f"OpenRouter credits low: {snap.openrouter_remaining:.1f} remaining ({snap.openrouter_pct_remaining:.1f}%)",
             alert_only=True,
         )
 
-    # D1: DeepSeek low — full fallback to OpenRouter
-    if deepseek_low:
-        if current_state == "full_fallback":
-            return SwitchingDecision(action="noop", reason="Already in full fallback (D1 active)")
-        if degrade_cooldown > 0 and current_state != "normal":
-            return SwitchingDecision(
-                action="noop",
-                reason=f"D1 degrade blocked by hysteresis ({degrade_cooldown:.0f}m remaining)",
-                blocked_by_hysteresis=True,
-            )
-        return SwitchingDecision(
-            action="degrade_d1",
-            pro_model=PRO_MODEL_FALLBACK,
-            standard_model=STANDARD_MODEL_FALLBACK,
-            reason=f"DeepSeek balance low ({snap.deepseek_pct_remaining:.1f}%) — switching to OpenRouter",
-        )
+    current_state = state.current_provider_state
 
-    # C2: Claude 7-day >= 90% — both tiers degrade
-    if claude_7d_high:
-        if current_state == "claude_degraded" or current_state == "full_fallback":
-            return SwitchingDecision(action="noop", reason="Already degraded (C2 active)")
+    # ── Degrade triggers ──────────────────────────────────────────────────
+
+    if c1_active and c2_active:
+        # Both 4hr and 7day >= 95% — both tiers → OR V4 Flash
+        if current_state == "claude_degraded":
+            return SwitchingDecision(action="noop", reason="Already degraded (C1+C2 active)")
         if degrade_cooldown > 0:
             return SwitchingDecision(
                 action="noop",
-                reason=f"C2 degrade blocked by hysteresis ({degrade_cooldown:.0f}m remaining)",
+                reason=f"C1+C2 degrade blocked by hysteresis ({degrade_cooldown:.0f}m remaining)",
                 blocked_by_hysteresis=True,
             )
         return SwitchingDecision(
-            action="degrade_c2",
-            pro_model=PRO_MODEL_DEGRADED,
+            action="degrade_c1c2",
+            pro_model=STANDARD_MODEL_DEGRADED,
             standard_model=STANDARD_MODEL_DEGRADED,
-            reason=f"Claude 7-day usage >= 90% ({snap.claude_7day_pct:.1f}%) — degrading both tiers",
+            reason=f"Claude 4hr={snap.claude_4hr_pct:.1f}% 7day={snap.claude_7day_pct:.1f}% — both >=95%, both tiers → OR V4 Flash",
         )
 
-    # C1: Claude 4-hour >= 90% — pro tier only
-    if claude_4h_high:
-        if current_state == "claude_degraded" or current_state == "full_fallback":
+    if c1_active:
+        # C1: 4hr >= 95% — pro tier → OR V4 Pro
+        if current_state == "claude_degraded":
             return SwitchingDecision(action="noop", reason="Already degraded (C1 active)")
         if degrade_cooldown > 0:
             return SwitchingDecision(
@@ -474,30 +443,34 @@ def evaluate_triggers(snap: UsageSnapshot, state: MonitorState) -> SwitchingDeci
             action="degrade_c1",
             pro_model=PRO_MODEL_DEGRADED,
             standard_model=STANDARD_MODEL_NORMAL,
-            reason=f"Claude 4-hour usage >= 90% ({snap.claude_4hr_pct:.1f}%) — degrading pro tier",
+            reason=f"Claude 4hr={snap.claude_4hr_pct:.1f}% >= 95% — degrading pro tier to OR V4 Pro",
         )
 
-    # U3: DeepSeek restored — restore native from OpenRouter
-    if deepseek_ok and not claude_exhausted and current_state == "full_fallback":
-        if upgrade_cooldown > 0:
+    if c2_active:
+        # C2: 7day >= 95% — agents on OR V4 Pro → OR V4 Flash
+        if current_state == "claude_degraded":
+            return SwitchingDecision(action="noop", reason="Already degraded (C2 active)")
+        if degrade_cooldown > 0:
             return SwitchingDecision(
                 action="noop",
-                reason=f"U3 upgrade blocked by hysteresis ({upgrade_cooldown:.0f}m remaining)",
+                reason=f"C2 degrade blocked by hysteresis ({degrade_cooldown:.0f}m remaining)",
                 blocked_by_hysteresis=True,
             )
         return SwitchingDecision(
-            action="upgrade_u3",
-            pro_model=PRO_MODEL_DEGRADED,
+            action="degrade_c2",
+            pro_model=PRO_MODEL_NORMAL,
             standard_model=STANDARD_MODEL_DEGRADED,
-            reason=f"DeepSeek credits restored ({snap.deepseek_pct_remaining:.1f}%) — restoring native models",
+            reason=f"Claude 7day={snap.claude_7day_pct:.1f}% >= 95% — degrading standard tier to OR V4 Flash",
         )
 
-    # U1/U2: Claude recovered — full upgrade
-    if claude_ok and current_state in ("claude_degraded", "full_fallback"):
+    # ── Recovery trigger (U1) ─────────────────────────────────────────────
+    # Claude 4hr < 95% — one-step upgrade from degraded state
+
+    if current_state == "claude_degraded":
         if upgrade_cooldown > 0:
             return SwitchingDecision(
                 action="noop",
-                reason=f"U1/U2 upgrade blocked by hysteresis ({upgrade_cooldown:.0f}m remaining)",
+                reason=f"U1 upgrade blocked by hysteresis ({upgrade_cooldown:.0f}m remaining)",
                 blocked_by_hysteresis=True,
             )
         return SwitchingDecision(
@@ -564,6 +537,7 @@ def apply_switch(decision: SwitchingDecision, state: MonitorState, dry_run: bool
         direction = "degrade" if decision.action.startswith("degrade") else "upgrade"
         state.last_switch_at = datetime.now(timezone.utc).isoformat()
         state.last_switch_direction = direction
+        state.current_provider_state = "claude_degraded" if direction == "degrade" else "normal"
         state.pro_model = pro_model
         state.standard_model = std_model
         save_state(state)
@@ -649,11 +623,11 @@ def main() -> None:
     if len(state.checks) > 50:
         state.checks = state.checks[-50:]
 
-    if decision.alert_only and decision.action == "alert_d2":
+    if decision.alert_only and decision.action == "alert_or":
         post_board_alert(decision.reason, args.dry_run)
         state.alert_sent_d2 = True
         save_state(state)
-        logger.info("D2 alert sent, alert_sent_d2 flag set")
+        logger.info("OR credit alert sent, alert_sent_d2 flag set")
         return
 
     if args.no_switch:
@@ -661,7 +635,7 @@ def main() -> None:
         save_state(state)
         return
 
-    if decision.action not in ("noop", "alert_d2"):
+    if decision.action not in ("noop", "alert_or"):
         apply_switch(decision, state, args.dry_run)
 
     save_state(state)
