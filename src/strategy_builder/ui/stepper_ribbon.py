@@ -234,7 +234,15 @@ class StepperRibbon(QWidget):
     
     def _update_display(self):
         """Update the visual display of all steps."""
+        try:
+            from PyQt5 import sip
+        except ImportError:
+            sip = None
+
         for idx, btn in enumerate(self.step_buttons):
+            if sip is not None and sip.isdeleted(btn):
+                continue
+
             step = self.STEPS[idx]
             
             # Determine state
