@@ -41,7 +41,7 @@ jobs:
         run: python scripts/audit/secrets_audit.py
 
   archived-paths:
-    name: Guard against re-introduction of archived paths (BTCAAAAA-26605)
+    name: Guard against re-introduction of archived paths (BTCAAAAA-26602)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -122,36 +122,102 @@ jobs:
           fi
 
       - name: Verify no stale-code / archived paths exist on disk
+        id: verify-archived
         run: |
           set -euo pipefail
           VIOLATIONS=0
+          VIOLATION_FILE=/tmp/archived-path-violations.txt
+          :> "$VIOLATION_FILE"
 
-          # Parse the stale-code & archived-paths section from .gitignore.
-          # Collects ALL non-comment, non-blank lines from the block.
+          # Dynamically parse the stale-code & archived-paths section from .gitignore.
+          # This keeps the CI guard in sync with .gitignore automatically —
+          # no need to update both files when adding new stale paths.
+          # Reference: .gitignore "Stale-code archival paths" section
           IN_BLOCK=false
           while IFS= read -r line; do
+            # Detect start of stale-code block
             if [[ "$line" =~ ^#[[:space:]]*Stale-code[[:space:]]archival[[:space:]]paths ]]; then
               IN_BLOCK=true
               continue
             fi
             if $IN_BLOCK; then
-              # Skip empty and comment lines within the block
+              # Skip empty and comment lines within the block (multi-line header)
               [[ -z "$line" ]] && continue
-              [[ "$line" =~ ^# ]] && continue
-              # Check the entry
+              [[ "$line" =~ ^[[:space:]]*# ]] && continue
+              # Trim trailing whitespace
               path="${line%"${line##*[![:space:]]}"}"
               if [[ -n "$path" ]]; then
                 if [ -e "$path" ]; then
-                  echo "::error file=$path::Archived path found on disk — must not exist. See archived/ directory for the original. Reference: BTCAAAAA-26587, BTCAAAAA-26605"
+                  echo "::error file=$path::Archived path $path must not be re-created. See docs/runbook-archive.md."
+                  echo "$path" >> "$VIOLATION_FILE"
                   VIOLATIONS=$((VIOLATIONS + 1))
                 fi
               fi
             fi
           done < .gitignore
 
+          echo "violation_count=$VIOLATIONS" >> "$GITHUB_OUTPUT"
+
           if [ "$VIOLATIONS" -gt 0 ]; then
-            echo "::error::${VIOLATIONS} archived path(s) found on disk. Remove them and move any needed logic elsewhere. Reference: BTCAAAAA-26587, BTCAAAAA-26605"
+            echo "::error::${VIOLATIONS} archived path(s) must not be re-created. See docs/runbook-archive.md."
             exit 1
           fi
 
-          echo "No archived-path violations found."
+          echo "No archived-path violations found." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate Markdown report
+        if: always() && steps.verify-archived.outputs.violation_count != '0'
+        run: |
+          {
+            echo "## Archived Path Guard (BTCAAAAA-26602)"
+            echo ""
+            echo "| Status | Details |"
+            echo "|---|---|"
+            echo "| ❌ Guard failed | ${{ steps.verify-archived.outputs.violation_count }} archived path(s) detected on disk |"
+            echo ""
+            echo "### Violations"
+            echo ""
+            while IFS= read -r path; do
+              [[ -z "$path" ]] && continue
+              echo "- \`$path\` — Archived path must not be re-created. See [docs/runbook-archive.md](../docs/runbook-archive.md)."
+            done < /tmp/archived-path-violations.txt
+            echo ""
+            echo "Remove the listed files and move any needed logic elsewhere."
+          } > /tmp/archived-path-report.md
+
+          cat /tmp/archived-path-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post PR comment
+        if: github.event_name == 'pull_request' && steps.verify-archived.outputs.violation_count != '0'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('/tmp/archived-path-report.md', 'utf8');
+            const body = report;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('Archived Path Guard'));
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            }
