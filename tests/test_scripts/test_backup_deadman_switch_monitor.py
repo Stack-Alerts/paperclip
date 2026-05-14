@@ -740,6 +740,9 @@ class TestRun:
             }
         ]
         mock_sess.get.return_value = mock_resp
+        mock_comment_resp = MagicMock()
+        mock_comment_resp.json.return_value = {"id": "comment-1"}
+        mock_sess.post.return_value = mock_comment_resp
         monkeypatch.setattr(
             "scripts.backup_deadman_switch_monitor._session", lambda: mock_sess
         )
@@ -751,7 +754,11 @@ class TestRun:
         )
         result = run(threshold_minutes=60)
         assert result["alert_skipped"] is True
-        mock_sess.post.assert_not_called()
+        assert result["alert_fired"] is False
+        assert result["commented"] is True
+        assert mock_sess.post.call_count == 1
+        called_url = mock_sess.post.call_args[0][0]
+        assert "/comments" in called_url
 
     def test_auth_error_fallback_to_primary_state_healthy(self, monkeypatch):
         from scripts.backup_deadman_switch_monitor import run

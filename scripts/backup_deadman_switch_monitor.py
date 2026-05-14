@@ -295,6 +295,56 @@ def _create_alert(
         return False
 
 
+
+def _comment_on_existing_alert(
+    issue: dict,
+    age_minutes: float | None,
+    threshold_minutes: int,
+    dry_run: bool,
+) -> bool:
+    try:
+        sess = _session()
+        base_url = _base()
+        company_id = _company()
+    except (KeyError, OSError) as exc:
+        logger.error("Failed to init Paperclip session for commenting: %s", exc)
+        return False
+
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    issue_id = issue.get("identifier", issue.get("id", "?"))
+
+    if age_minutes is None:
+        age_line = "- **Last success:** NONE found (no successful runs)"
+    else:
+        age_line = f"- **Last success:** {age_minutes:.0f} min ago"
+
+    body = (
+        f"**Backup dead-man's-switch monitor re-check \u2014 {now_str}**\n\n"
+        f"- **Check time:** {now_str}\n"
+        f"{age_line}\n"
+        f"- **Target workflow:** `{TARGET_WORKFLOW}`\n"
+        f"- **Threshold:** {threshold_minutes} min\n"
+        f"- **Status:** {TARGET_WORKFLOW} still overdue, existing alert remains open"
+    )
+
+    if dry_run:
+        logger.info("DRY RUN: would comment on alert %s", issue_id)
+        print(json.dumps({"issueId": issue_id, "body": body}, indent=2))  # noqa: T201
+        return True
+
+    try:
+        resp = sess.post(
+            f"{base_url}/api/issues/{issue_id}/comments",
+            json={"body": body},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        logger.info("Commented on existing alert %s", issue_id)
+        return True
+    except Exception as exc:
+        logger.error("Failed to comment on alert %s: %s", issue_id, exc)
+        return False
+
 def run(
     threshold_minutes: int = MONITOR_THRESHOLD_MINUTES,
     dry_run: bool = False,
@@ -374,9 +424,10 @@ def run(
         existing = _find_existing_alert()
         if existing:
             logger.info(
-                "Existing alert %s already open — skipping duplicate creation",
+                "Existing alert %s already open — commenting with re-check status",
                 existing.get("identifier", existing.get("id")),
             )
+            _comment_on_existing_alert(existing, age_minutes, threshold_minutes, dry_run)
             alert_skipped = True
         else:
             extra = ""
@@ -408,6 +459,7 @@ def run(
         "primary_state_age_minutes": primary_state_age,
         "alert_fired": alert_fired,
         "alert_skipped": alert_skipped,
+        "commented": alert_skipped,
         "alert_reason": alert_reason or "none",
         "self_last_run_utc": now_utc,
         "self_prev_run_utc": prev_last,
