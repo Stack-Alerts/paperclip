@@ -1,0 +1,12 @@
+[Unit]
+Description=PaperClip Recovery Monitor Timer (every 30 min, offset by 15 min from GH Actions)
+Requires=paperclip-recovery-monitor.service
+
+[Timer]
+OnCalendar=*-*-* *:15:00
+OnCalendar=*-*-* *:45:00
+Persistent=true
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target
