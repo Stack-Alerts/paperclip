@@ -142,6 +142,36 @@ export async function healthCheck(): Promise<HealthCheckResult> {
 }
 
 // ---------------------------------------------------------------------------
+// updateValidationStatus — persist validation result to latest strategy version
+// ---------------------------------------------------------------------------
+
+export async function updateValidationStatus(
+  strategyId: string,
+  status: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (!pool) return { ok: false, error: "Pool not initialized" };
+
+  try {
+    const result = await pool.query(
+      `UPDATE strategy_versions
+       SET validation_status = $1, validation_timestamp = NOW()
+       WHERE strategy_id = $2
+       AND version_number = (
+         SELECT MAX(version_number)
+         FROM strategy_versions
+         WHERE strategy_id = $2
+       )`,
+      [status, strategyId]
+    );
+    return {
+      ok: result.rowCount !== null && result.rowCount > 0,
+    };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // queryStrategies — fetch strategy definition from strategies + latest version
 // ---------------------------------------------------------------------------
 

@@ -20,6 +20,8 @@ import {
   queryStrategies,
   queryPositions,
   queryRiskMetrics,
+  updateValidationStatus,
+  type StrategyRow,
 } from "./db.js";
 
 // ---------------------------------------------------------------------------
@@ -581,237 +583,6 @@ async function queryRiskLimits(
 // Pre-Run Hooks
 // ---------------------------------------------------------------------------
 
-const BULLISH_KEYWORDS = [
-  "BULLISH", "LONG", "BUY", "ABOVE", "OVER", "UP", "HIGHER",
-  "BREAKOUT", "SUPPORT", "BOUNCE", "REVERSAL_UP", "UPTREND",
-  "ACCUMULATION", "REACCUMULATION", "SPRING", "SOS", "LPS",
-];
-
-const BEARISH_KEYWORDS = [
-  "BEARISH", "SHORT", "SELL", "BELOW", "UNDER", "DOWN", "LOWER",
-  "BREAKDOWN", "RESISTANCE", "REJECTION", "REVERSAL_DOWN", "DOWNTREND",
-  "DISTRIBUTION", "REDISTRIBUTION", "UPTHRUST", "SOW", "LPSY",
-];
-
-function parseJsonbField(value: unknown, fallback: unknown): unknown {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value === "string") {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return fallback;
-    }
-  }
-  if (typeof value === "object") return value;
-  return fallback;
-}
-
-interface StrategyRow {
-  strategy_id: string;
-  name: string;
-  version_id?: string | null;
-  version_number?: number | null;
-  version_timestamp?: string | null;
-  validation_status: string | null;
-  blocks: unknown;
-  signals: unknown;
-  risk_management?: unknown;
-  strategy_type: string | null;
-  entry_conditions?: unknown;
-  exit_conditions: unknown;
-  metrics?: unknown;
-  created_at?: string;
-  updated_at?: string;
-}
-
-function checkDirectionConsistency(
-  blocks: unknown[],
-  strategyType: string | null
-): string[] {
-  const errors: string[] = [];
-  if (!strategyType || blocks.length === 0) return errors;
-
-  const st = strategyType.toUpperCase();
-  const expected = st === "BULLISH" ? BULLISH_KEYWORDS : BEARISH_KEYWORDS;
-  const opposite = st === "BULLISH" ? BEARISH_KEYWORDS : BULLISH_KEYWORDS;
-
-  let totalSignals = 0;
-  let oppositeCount = 0;
-
-  for (const block of blocks) {
-    const signals = (block as Record<string, unknown>).signals;
-    if (!Array.isArray(signals)) continue;
-    for (const signal of signals) {
-      totalSignals++;
-      const sigName = ((signal as Record<string, unknown>).name as string ?? "").toUpperCase();
-      if (opposite.some((kw) => sigName.includes(kw))) {
-        oppositeCount++;
-      }
-    }
-  }
-
-  if (totalSignals > 0 && oppositeCount / totalSignals > 0.7) {
-    errors.push(
-      `Direction mismatch: ${Math.round((oppositeCount / totalSignals) * 100)}% of signals are opposite to strategy type "${strategyType}"`
-    );
-  }
-
-  return errors;
-}
-
-async function validateStrategyFromDb(
-  ctx: PluginContext,
-  strategyId: string,
-  level: "basic" | "strict"
-): Promise<StrategyValidationResult> {
-  const result: StrategyValidationResult = {
-    strategyId,
-    isValid: false,
-    level,
-    errors: [],
-    warnings: [],
-    checkedAt: isoNow(),
-  };
-
-  try {
-    const rows = await ctx.db.query(
-      `SELECT s.strategy_id, s.name,
-              sv.validation_status,
-              sv.blocks, sv.signals, sv.strategy_type,
-              sv.exit_conditions
-       FROM strategies s
-       JOIN strategy_versions sv ON s.strategy_id = sv.strategy_id
-       WHERE s.strategy_id = $1
-       ORDER BY sv.version_number DESC
-       LIMIT 1`,
-      [strategyId]
-    );
-
-    if (!rows || rows.length === 0) {
-      result.errors.push(`Strategy "${strategyId}" not found in database`);
-      return result;
-    }
-
-    const row = rows[0] as unknown as StrategyRow;
-    const blocks = parseJsonbField(row.blocks, []) as Record<string, unknown>[];
-    const strategyType = row.strategy_type ?? null;
-
-    // ── BASIC validation ──
-    if (!row.name || row.name.trim() === "") {
-      result.errors.push("Strategy must have a non-empty name");
-    }
-
-    if (!Array.isArray(blocks) || blocks.length === 0) {
-      result.errors.push("Strategy must have at least one block");
-    } else {
-      for (const block of blocks) {
-        const blockName = (block.name as string) ?? "unnamed";
-        const sigs = block.signals;
-        if (!Array.isArray(sigs) || sigs.length === 0) {
-          result.errors.push(`Block "${blockName}" has no signals`);
-        }
-        const logic = block.logic as string | undefined;
-        if (logic && !["AND", "OR"].includes(logic.toUpperCase())) {
-          result.errors.push(
-            `Block "${blockName}" has invalid logic: "${logic}" (expected AND or OR)`
-          );
-        }
-      }
-    }
-
-    // ── STRICT validation ──
-    if (level === "strict") {
-      // Duplicate detection
-      if (Array.isArray(blocks)) {
-        const blockNames = blocks
-          .map((b) => (b.name as string) ?? "")
-          .filter(Boolean);
-        const seen = new Set<string>();
-        const dupBlocks: string[] = [];
-        for (const name of blockNames) {
-          if (seen.has(name)) dupBlocks.push(name);
-          seen.add(name);
-        }
-        if (dupBlocks.length > 0) {
-          result.errors.push(`Duplicate block names: ${[...new Set(dupBlocks)].join(", ")}`);
-        }
-
-        for (const block of blocks) {
-          const sigs = block.signals as Record<string, unknown>[] | undefined;
-          if (Array.isArray(sigs)) {
-            const sigNames = sigs
-              .map((s) => (s.name as string) ?? "")
-              .filter(Boolean);
-            const sigSeen = new Set<string>();
-            const dupSigs: string[] = [];
-            for (const name of sigNames) {
-              if (sigSeen.has(name)) dupSigs.push(name);
-              sigSeen.add(name);
-            }
-            if (dupSigs.length > 0) {
-              result.errors.push(
-                `Block "${block.name}" has duplicate signal names: ${[...new Set(dupSigs)].join(", ")}`
-              );
-            }
-          }
-        }
-      }
-
-      // Direction consistency
-      if (Array.isArray(blocks)) {
-        const dirErrors = checkDirectionConsistency(blocks, strategyType);
-        result.errors.push(...dirErrors);
-      }
-
-      // Size warnings
-      if (blocks.length > 15) {
-        result.warnings.push(`Strategy has ${blocks.length} blocks (recommended max: 15)`);
-      }
-      for (const block of blocks) {
-        const sigs = block.signals as unknown[] | undefined;
-        if (Array.isArray(sigs) && sigs.length > 10) {
-          result.warnings.push(
-            `Block "${block.name}" has ${sigs.length} signals (recommended max: 10)`
-          );
-        }
-      }
-    }
-
-    result.isValid = result.errors.length === 0;
-
-    // Update validation_status in the database
-    const newStatus = result.isValid ? "Pass" : "Fail";
-    await ctx.db.execute(
-      `UPDATE strategy_versions
-       SET validation_status = $1, validation_timestamp = NOW()$
-       WHERE strategy_id = $2
-       ORDER BY version_number DESC
-       LIMIT 1`,
-      [newStatus, strategyId]
-    );
-
-    ctx.logger.info("Strategy validation complete", {
-      strategyId,
-      isValid: result.isValid,
-      level,
-      errorCount: result.errors.length,
-      warningCount: result.warnings.length,
-    });
-  } catch (err) {
-    result.errors.push(`Database query failed: ${String(err)}`);
-    ctx.logger.error("Strategy validation DB query failed", {
-      strategyId,
-      error: String(err),
-    });
-  }
-
-  return result;
-}
-
-// ---------------------------------------------------------------------------
-// Pre-Run Hooks
-// ---------------------------------------------------------------------------
-
 async function writeAuditTrail(
   ctx: PluginContext,
   config: PluginConfig,
@@ -997,6 +768,62 @@ async function reconcilePositions(
 // Strategy Validation (DB-backed)
 // ---------------------------------------------------------------------------
 
+const BULLISH_KEYWORDS = [
+  "BULLISH", "LONG", "BUY", "ABOVE", "OVER", "UP", "HIGHER",
+  "BREAKOUT", "SUPPORT", "BOUNCE", "REVERSAL_UP", "UPTREND",
+  "ACCUMULATION", "REACCUMULATION", "SPRING", "SOS", "LPS",
+];
+
+const BEARISH_KEYWORDS = [
+  "BEARISH", "SHORT", "SELL", "BELOW", "UNDER", "DOWN", "LOWER",
+  "BREAKDOWN", "RESISTANCE", "REJECTION", "REVERSAL_DOWN", "DOWNTREND",
+  "DISTRIBUTION", "REDISTRIBUTION", "UPTHRUST", "SOW", "LPSY",
+];
+
+const MAX_BLOCKS_WARN = 15;
+const MAX_SIGNALS_PER_BLOCK_WARN = 10;
+
+type BlockVal = Record<string, unknown>;
+type SignalVal = Record<string, unknown>;
+
+function checkDirectionConsistency(
+  blocks: Record<string, unknown>[],
+  strategyType: string | null
+): string[] {
+  const errors: string[] = [];
+  if (!strategyType || blocks.length === 0) return errors;
+
+  const st = strategyType.toUpperCase();
+  const opposite = st === "BULLISH" ? BEARISH_KEYWORDS : BULLISH_KEYWORDS;
+
+  let totalSignals = 0;
+  let oppositeCount = 0;
+
+  for (const block of blocks) {
+    const signals = block.signals;
+    if (!Array.isArray(signals)) continue;
+    for (const signal of signals) {
+      totalSignals++;
+      const sigName = ((signal as SignalVal).name as string ?? "").toUpperCase();
+      if (opposite.some((kw) => sigName.includes(kw))) {
+        oppositeCount++;
+      }
+    }
+  }
+
+  if (totalSignals > 0 && oppositeCount / totalSignals > 0.7) {
+    errors.push(
+      `Direction mismatch: ${Math.round((oppositeCount / totalSignals) * 100)}% of signals are opposite to strategy type "${strategyType}"`
+    );
+  }
+
+  return errors;
+}
+
+function getBlockName(block: BlockVal): string {
+  return (block.name as string) ?? (block.block_name as string) ?? "unnamed";
+}
+
 function validateStrategyRow(
   strategy: StrategyRow,
   level: "basic" | "strict",
@@ -1004,11 +831,51 @@ function validateStrategyRow(
 ): void {
   result.isValid = true;
 
+  // ── Phase-1 gate: must have a versioned configuration ──
   if (!strategy.version_id) {
     result.warnings.push("Strategy has no versioned configuration");
     return;
   }
 
+  // ── Name validation (BASIC) ──
+  if (!strategy.name || strategy.name.trim() === "") {
+    result.errors.push("Strategy must have a non-empty name");
+    result.isValid = false;
+  }
+
+  // ── Block structure validation ──
+  const blocks: BlockVal[] = Array.isArray(strategy.blocks) ? strategy.blocks : [];
+  if (blocks.length === 0) {
+    result.errors.push("Strategy has no building blocks defined");
+    result.isValid = false;
+    return;
+  }
+
+  // ── Per-block signal + logic validation (BASIC) ──
+  for (const block of blocks) {
+    const blockName = getBlockName(block);
+    const sigs = block.signals;
+    if (!Array.isArray(sigs) || sigs.length === 0) {
+      result.errors.push(`Block "${blockName}" has no signals`);
+      result.isValid = false;
+    }
+
+    const logic = (block.logic as string ?? "").toUpperCase();
+    if (logic && logic !== "AND" && logic !== "OR") {
+      result.errors.push(
+        `Block "${blockName}" has invalid logic: "${block.logic}" (expected AND or OR)`
+      );
+      result.isValid = false;
+    }
+  }
+
+  // ── Top-level signals presence ──
+  const strategySignals = strategy.signals as Record<string, unknown> | undefined;
+  if (!strategySignals || Object.keys(strategySignals).length === 0) {
+    result.warnings.push("Strategy has no signals configured");
+  }
+
+  // ── Previous validation status ──
   if (strategy.validation_status === "Fail") {
     result.errors.push(
       `Strategy validation status is 'Fail' (last validated at ${strategy.version_timestamp ?? "unknown"})`
@@ -1021,24 +888,15 @@ function validateStrategyRow(
     result.warnings.push("Strategy has not been validated yet (status: Un-Validated)");
   }
 
-  const blocks = Array.isArray(strategy.blocks) ? strategy.blocks : [];
-  if (blocks.length === 0) {
-    result.errors.push("Strategy has no building blocks defined");
-    result.isValid = false;
-    return;
-  }
-
-  const signals = strategy.signals as Record<string, unknown> | undefined;
-  if (!signals || Object.keys(signals).length === 0) {
-    result.warnings.push("Strategy has no signals configured");
-  }
-
+  // ── STANDARD / STRICT level checks ──
   if (level === "strict") {
+    // Risk management
     const riskMgmt = strategy.risk_management as Record<string, unknown> | undefined;
     if (!riskMgmt || Object.keys(riskMgmt).length === 0) {
       result.warnings.push("Strict mode: risk_management config is empty");
     }
 
+    // Entry / exit conditions
     const entryConditions = Array.isArray(strategy.entry_conditions)
       ? strategy.entry_conditions
       : [];
@@ -1049,11 +907,88 @@ function validateStrategyRow(
       result.warnings.push("Strict mode: no entry or exit conditions defined");
     }
 
-    const blockNames = blocks.map((b: Record<string, unknown>) => b.block_name).filter(Boolean);
+    // Exit condition percentage validation
+    if (exitConditions.length > 0) {
+      for (const ec of exitConditions) {
+        const exc = ec as Record<string, unknown>;
+        const pct = exc.percentage as number | undefined;
+        if (pct !== undefined && (pct <= 0 || pct > 1)) {
+          result.warnings.push(
+            `Exit condition "${exc.signal_name ?? "unnamed"}" has invalid percentage: ${pct}`
+          );
+        }
+      }
+      const totalPct = exitConditions.reduce(
+        (sum, ec) => sum + ((ec as Record<string, unknown>).percentage as number ?? 0),
+        0
+      );
+      if (totalPct !== 0 && Math.abs(totalPct - 1) > 0.001) {
+        result.warnings.push(
+          `Exit condition percentages sum to ${(totalPct * 100).toFixed(0)}% (expected 100%)`
+        );
+      }
+    }
+
+    // Duplicate detection
+    const blockNames = blocks.map(getBlockName).filter(Boolean);
+    const seenBlocks = new Set<string>();
+    const dupBlocks: string[] = [];
+    for (const name of blockNames) {
+      if (seenBlocks.has(name)) dupBlocks.push(name);
+      seenBlocks.add(name);
+    }
+    if (dupBlocks.length > 0) {
+      result.errors.push(`Duplicate block names: ${[...new Set(dupBlocks)].join(", ")}`);
+      result.isValid = false;
+    }
+
+    for (const block of blocks) {
+      const sigs = block.signals;
+      if (!Array.isArray(sigs)) continue;
+      const sigNames = sigs
+        .map((s) => ((s as SignalVal).name as string) ?? "")
+        .filter(Boolean);
+      const seenSignals = new Set<string>();
+      const dupSignals: string[] = [];
+      for (const name of sigNames) {
+        if (seenSignals.has(name)) dupSignals.push(name);
+        seenSignals.add(name);
+      }
+      if (dupSignals.length > 0) {
+        result.errors.push(
+          `Block "${getBlockName(block)}" has duplicate signal names: ${[...new Set(dupSignals)].join(", ")}`
+        );
+        result.isValid = false;
+      }
+    }
+
+    // Direction consistency
+    const dirErrors = checkDirectionConsistency(blocks, strategy.strategy_type ?? null);
+    if (dirErrors.length > 0) {
+      result.errors.push(...dirErrors);
+      result.isValid = false;
+    }
+
+    // Size warnings
+    if (blocks.length > MAX_BLOCKS_WARN) {
+      result.warnings.push(
+        `Strategy has ${blocks.length} blocks (recommended max: ${MAX_BLOCKS_WARN})`
+      );
+    }
+    for (const block of blocks) {
+      const sigs = block.signals as SignalVal[] | undefined;
+      if (Array.isArray(sigs) && sigs.length > MAX_SIGNALS_PER_BLOCK_WARN) {
+        result.warnings.push(
+          `Block "${getBlockName(block)}" has ${sigs.length} signals (recommended max: ${MAX_SIGNALS_PER_BLOCK_WARN})`
+        );
+      }
+    }
+
+    // Signal dependency graph check
     const signalBlockRefs = blocks.flatMap(
-      (b: Record<string, unknown>) => (Array.isArray(b.signals) ? b.signals : [])
+      (b) => (Array.isArray(b.signals) ? (b.signals as SignalVal[]) : [])
     );
-    if (blockNames.length > 0 && signalBlockRefs.length > 0) {
+    if (blocks.length > 0 && signalBlockRefs.length > 0) {
       result.warnings.push(
         `Strict mode: verify signal dependency graph for blocks: ${blockNames.join(", ")}`
       );
@@ -1261,6 +1196,14 @@ const plugin = definePlugin({
               result.errors.push(`Strategy '${strategyId}' not found in database`);
             } else {
               validateStrategyRow(strategy, config.preRunCheckLevel, result);
+
+              const newStatus = result.isValid ? "Pass" : "Fail";
+              const updateResult = await updateValidationStatus(strategyId, newStatus);
+              if (!updateResult.ok) {
+                result.warnings.push(
+                  `Failed to persist validation status: ${updateResult.error ?? "unknown"}`
+                );
+              }
             }
           }
 
