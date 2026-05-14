@@ -1,0 +1,116 @@
+name: Rclone OAuth Health Monitor
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (log only, do not create alerts)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+
+jobs:
+  oauth-health:
+    name: Monitor rclone GDrive OAuth token health
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests python-dotenv
+
+      - name: Run rclone OAuth health check
+        id: oauth
+        env:
+          PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+          PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+          PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+          RCLONE_CONFIG: /home/sirrus/.config/rclone/rclone.conf
+          RCLONE_PASS_FILE: /home/sirrus/.config/rclone/rclone-pass
+        run: |
+          FLAGS="--json-summary"
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            FLAGS="$FLAGS --dry-run"
+          fi
+          python scripts/rclone_oauth_health.py $FLAGS > /tmp/rclone-oauth-summary.json
+
+      - name: Write step summary
+        if: always()
+        run: |
+          if [ -f /tmp/rclone-oauth-summary.json ]; then
+            python -c "
+          import json
+          d = json.load(open('/tmp/rclone-oauth-summary.json'))
+          th = d.get('token_health') or {}
+          lines = []
+          lines.append('## Rclone OAuth Health Monitor')
+          lines.append('')
+          lines.append('**Status:** ' + d.get('status', 'unknown'))
+          lines.append('**Remote:** ' + d.get('remote', '?'))
+          lines.append('**rclone:** ' + d.get('rclone_version', '?'))
+          lines.append('**Alert fired:** ' + str(d.get('alert_fired', False)))
+          lines.append('**Alert skipped (dup):** ' + str(d.get('alert_skipped', False)))
+          lines.append('**Reason:** ' + d.get('alert_reason', 'none'))
+          lines.append('')
+          lines.append('**Token health:**')
+          lines.append('- Access token: ' + ('present' if th.get('has_access_token') else 'MISSING'))
+          lines.append('- Refresh token: ' + ('present' if th.get('has_refresh_token') else 'MISSING'))
+          expiry = th.get('expiry')
+          if expiry:
+              lines.append('- Expiry: ' + str(expiry)[:19])
+          secs = th.get('expiry_secs_left')
+          if secs is not None:
+              if secs < 0:
+                  lines.append('- Expired: ' + str(-secs // 60) + 'm ago')
+              else:
+                  lines.append('- Expires in: ' + str(secs // 60) + 'm')
+          conn = d.get('connectivity_ok')
+          if conn is not None:
+              lines.append('- Connectivity: ' + ('OK' if conn else 'FAIL'))
+          lines.append('')
+          lines.append('**Self-health:**')
+          lines.append('- Total runs: ' + str(d.get('self_total_runs', '?')))
+          lines.append('- Last run: ' + str(d.get('self_last_run_utc', '?'))[:19])
+          lines.append('- Prev run: ' + str(d.get('self_prev_run_utc', '?'))[:19])
+          print('\n'.join(lines))
+          " > $GITHUB_STEP_SUMMARY
+          else
+            echo "## Rclone OAuth Health Monitor" >> $GITHUB_STEP_SUMMARY
+            echo "**Status:** unknown (summary file missing)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload monitor logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rclone-oauth-health-logs
+          path: ~/.paperclip/rclone_oauth_health.log
+          retention-days: 7
+
+      - name: Upload monitor state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rclone-oauth-health-state
+          path: ~/.paperclip/rclone_oauth_health_state.json
+          retention-days: 7
+
+      - name: Upload summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rclone-oauth-health-summary
+          path: /tmp/rclone-oauth-summary.json
+          retention-days: 7
