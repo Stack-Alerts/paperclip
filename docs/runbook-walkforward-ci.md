@@ -6,12 +6,12 @@
 
 ## Overview
 
-The walkforward CI pipeline validates every strategy against institutional-grade thresholds before paper trading. It runs real building block detectors on 30m BTC data and gates strategies on win rate, profit factor, drawdown, and trade count.
+The walkforward CI pipeline validates strategies against institutional-grade thresholds before paper trading. The CI runs pytest-based walkforward tests on 15m BTC data. A standalone runner script (`scripts/run_walkforward_ci.py`) is also available for local validation on 30m data.
 
-## Quick start
+## Quick start — local validation
 
 ```bash
-# Validate a single strategy locally
+# Validate a single strategy locally (uses 30m data directly)
 python scripts/run_walkforward_ci.py \
   --strategy src/strategies/strategy_01_reversal_m_pattern.py \
   --data data/raw/BTC_USDT_PERP_30m.pkl \
@@ -41,21 +41,35 @@ Exit codes: `0` = pass, `1` = threshold failure, `2` = runtime error.
 **File:** `.github/workflows/walkforward-validation.yml`
 
 ### Triggers
-- **Push/PR** to `main`: when strategy files, walkforward engine, or runner script change
+- **Push/PR** to `main`/`master`: when strategy files, walkforward engine, or CI workflow change
 - **Schedule:** nightly at 06:00 UTC
-- **Manual:** `workflow_dispatch` with optional `--strategy` input
+- **Manual:** `workflow_dispatch` (no input parameters — uses default test suite)
 
 ### Jobs
-1. `walkforward-unit` — fast unit tests (no data dependency, ~0.3s)
-2. `walkforward-gate` — real-data threshold validation on 30m bars
+1. `walkforward-unit` — fast unit tests on `test_walkforward_test_engine.py` (no data dependency, ~0.3s)
+2. `walkforward-strategy` — real-data threshold validation via pytest on 15m BTC bars
+
+### Key differences from local runner
+The CI does **not** use `scripts/run_walkforward_ci.py`. Instead, it runs:
+```bash
+python -m pytest tests/strategies/01_test_strategy_Reversal_M_Pattern_Standard.py \
+  tests/strategies/02_test_strategy_Reversal_W_Pattern_Standard.py \
+  tests/strategies/test_strategy_with_backtest.py \
+  tests/strategies/walkforward_test.py \
+  -v --tb=short --timeout=900 -p no:cacheprovider
+```
+
+These pytest test files implement walkforward logic with integrated building block detectors, loading `data/raw/BTC_USDT_PERP_15m.csv` directly.
 
 ### Artifacts
-- `walkforward-results`: per-strategy JSON output (30-day retention)
-- `walkforward-registry`: cumulative `walkforward_results_registry.json` (90-day retention)
+- `walkforward-reports`: test output log + `data/reports/walkforward_tests/` directory (14-day retention)
+
+### Nightly failure alert
+When the scheduled run fails, `scripts/nightly_test_alert.py` creates a `critical`-priority issue assigned to the CTO with the CI run URL.
 
 ## Registry
 
-Each run appends to `walkforward_results_registry.json`:
+The runner script (`scripts/run_walkforward_ci.py`) appends results to `walkforward_results_registry.json`:
 
 ```json
 {
@@ -78,13 +92,15 @@ Each run appends to `walkforward_results_registry.json`:
 }
 ```
 
-## How it works
+The registry is updated by local runs only — the CI workflow does not write to it.
+
+## How the local runner works
 
 1. Runner imports the strategy module dynamically via `importlib`
 2. Extracts block weights from strategy source (parses `self.blocks['key'] = {'weight': N, ...}`)
 3. Initializes real building block detector instances (16 detectors)
 4. Binds `_analyze_blocks`, `_calculate_confluence`, `_calculate_tp_sl` from the strategy class
-5. Loads 30m BTC data, trims to `--days` recent bars
+5. Loads 30m BTC data (`.pkl` or `.csv`), trims to `--days` recent bars
 6. Walks forward bar-by-bar: builds bars incrementally, analyzes, checks confluence
 7. Simulates trades via `backtest_simulator.py` (starting capital $10k, 15x max leverage)
 8. Checks metrics against thresholds, writes registry, returns exit code
@@ -96,13 +112,14 @@ Each run appends to `walkforward_results_registry.json`:
 | `signals_checked=0` | Missing detector import | Check `Detectors initialized: N blocks` — verify >= 12 |
 | `FATAL: missing required detectors` | Strategy uses detector not in spec | Add detector to `detector_specs` dict in runner |
 | Timeout | Too many bars with too many detectors | Reduce `--days` or increase `--timeout` |
-| `FATAL: data load failed` | 30m pickle missing | Ensure `data/raw/BTC_USDT_PERP_30m.pkl` exists |
+| `FATAL: data load failed` | 30m pickle or 15m CSV missing | Ensure `data/raw/BTC_USDT_PERP_30m.pkl` or `BTC_USDT_PERP_15m.csv` exists |
 | `FATAL: failed to import strategy` | Missing NautilusTrader or other dep | Install deps: `pip install nautilus_trader pandas numpy` |
+| CI: test timeout / OOM | pytest --timeout fires | Increase `--timeout` in CI workflow step or reduce test scope |
 
 ## Dependencies
 
-- `data/raw/BTC_USDT_PERP_30m.pkl` (5.3 MB, 109,949 bars)
+- `data/raw/BTC_USDT_PERP_30m.pkl` (runner, 5.3 MB, 109,949 bars)
+- `data/raw/BTC_USDT_PERP_15m.csv` (CI pytest tests)
 - Building block detectors in `src/detectors/building_blocks/`
 - `tests/strategies/backtest_simulator.py`
-- `src/strategies/universal_optimizer/modules/confluence_calculator.py`
-- Python 3.11+ with pandas, numpy, nautilus_trader
+- Python 3.11+ with pandas, numpy
