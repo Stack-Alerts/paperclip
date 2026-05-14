@@ -1451,7 +1451,7 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
             QMessageBox.critical(self, "Error", f"Could not read strategy config: {e}")
             return
 
-        end_date = datetime.now(timezone.utc)
+        end_date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         start_date = end_date - timedelta(days=30)
         backtest_config = {
             'lookback_days': 30,
