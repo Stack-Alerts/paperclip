@@ -83,6 +83,11 @@ jobs:
           if [ "${{ github.event_name }}" = "schedule" ]; then
             # Scheduled runs: retroactively gate issues done in the last 7 days
             FLAGS="$FLAGS --retroactive --days-back 7"
+            # Auto-retry muted ERROR entries on the hourly boundary run
+            # (every 12th run) to clear transient infrastructure failures
+            if [ "$(date +%M)" = "00" ]; then
+              FLAGS="$FLAGS --retry-errors"
+            fi
           else
             # workflow_dispatch: use provided inputs with sensible defaults
             if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then

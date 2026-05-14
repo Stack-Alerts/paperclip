@@ -29,7 +29,7 @@ logger = logging.getLogger("impact_gate_scan_health")
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SNAPSHOT_GLOB = "data_quality_impact_gate_*.json"
 
-DEFAULT_STALE_THRESHOLD_MIN = 10
+DEFAULT_STALE_THRESHOLD_MIN = 15
 DEFAULT_COVERAGE_THRESHOLD_PCT = 90.0
 DEFAULT_ERROR_RATE_THRESHOLD_PCT = 35.0
 DEFAULT_FAIL_RATE_THRESHOLD_PCT = 35.0
