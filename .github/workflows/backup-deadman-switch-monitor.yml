@@ -36,6 +36,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests python-dotenv
 
+      - name: Ensure gh CLI in PATH
+        run: |
+          export PATH="/snap/bin:$PATH"
+          echo "$PATH" >> "$GITHUB_PATH"
+          which gh || echo "WARNING: gh not found, monitor will fall back to state file"
+
       - name: Run backup dead-man's-switch monitor
         id: monitor
         env:

@@ -528,6 +528,75 @@ Tests:
 pytest tests/test_scripts/test_deadman_switch_local_monitor.py -v
 ```
 
+#### 6.6.6 Backup Dead-Man's-Switch Monitor (Layer 3 — watchdog for the watchdog)
+
+The backup dead-man's-switch monitor watches the deadman-switch-monitor
+(the ubuntu-latest monitor from §6.6.4).  It closes the monitoring loop:
+if the ubuntu-latest-based deadman-switch-monitor stops reporting, this
+backup monitor detects the gap and alerts.
+
+Runs in two redundant forms, both on the self-hosted machine:
+
+| Form | Trigger | Offsets |
+|------|---------|---------|
+| Systemd timer | every 30 min | :08, :38 |
+| GH Actions workflow | every 30 min | :12, :42 |
+
+The :08/:38 (systemd) and :12/:42 (GH Actions) offsets are 4 min apart so
+the two forms never collide and provide redundancy if one scheduler fails.
+
+The monitor uses a dual-source liveness check:
+
+1. **Primary:** ``gh run list`` against ``deadman-switch-monitor.yml``
+   (queries the GH Actions API for recent successful runs).
+2. **Fallback:** reads ``deadman_switch_monitor_state.json`` from the
+   deadman-switch-monitor's own state file (if available on the
+   self-hosted machine).
+
+- **Systemd service:** ``deploy/systemd/paperclip-backup-deadman-monitor.service``
+- **Systemd timer:** ``deploy/systemd/paperclip-backup-deadman-monitor.timer``
+- **GH Actions workflow:** ``.github/workflows/backup-deadman-switch-monitor.yml``
+- **Interval:** 30 min (expected deadman-switch-monitor runs at :15/:45)
+- **Threshold:** 60 min since last successful deadman-switch-monitor run
+- **Runner:** self-hosted machine
+- **Action:** Creates a critical Paperclip issue assigned to CTO if the
+  deadman-switch-monitor has no successful runs within the threshold
+- **State file:** ``~/.paperclip/backup_deadman_switch_monitor_state.json``
+- **Log file:** ``~/.paperclip/backup_deadman_switch_monitor.log`` (auto-rotated at 1 MB)
+- **Alert query:** "Backup dead-man's-switch monitor alert"
+
+Manual check:
+
+```bash
+python scripts/backup_deadman_switch_monitor.py
+python scripts/backup_deadman_switch_monitor.py --dry-run
+python scripts/backup_deadman_switch_monitor.py --threshold 30
+python scripts/backup_deadman_switch_monitor.py --json-summary
+```
+
+Enable the timer:
+
+```bash
+deploy/systemd/install-backup-deadman-monitor.sh
+```
+
+Or manually:
+
+```bash
+mkdir -p ~/.config/systemd/user/
+cp deploy/systemd/paperclip-backup-deadman-monitor.service ~/.config/systemd/user/
+cp deploy/systemd/paperclip-backup-deadman-monitor.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now paperclip-backup-deadman-monitor.timer
+systemctl --user status paperclip-backup-deadman-monitor.timer
+```
+
+Tests:
+
+```bash
+pytest tests/test_scripts/test_backup_deadman_switch_monitor.py -v
+```
+
 ### 6.7 Troubleshooting
 
 | Symptom | Check |
@@ -540,6 +609,7 @@ pytest tests/test_scripts/test_deadman_switch_local_monitor.py -v
 | Dead-man self-health shows old last_run_utc | The systemd timer may have stopped. Check `systemctl --user status paperclip-backup-deadman-switch.timer`. Verify `~/.paperclip/backup_deadman_switch_state.json` has recent `last_run_utc`. Check linger: `loginctl show-user sirrus --property=Linger` |
 | Dead-man switch local monitor alert fired | The dead-man switch state file is stale or missing. Check `~/.paperclip/backup_deadman_switch_state.json` for `last_run_utc`. Check monitor log: `~/.paperclip/deadman_switch_local_monitor.log`. The local monitor runs via systemd: `systemctl --user status paperclip-deadman-monitor.timer` |
 | Dead-man switch monitor alert fired | The dead-man's-switch itself is not running. Check systemd timer: `systemctl --user status paperclip-backup-deadman-switch.timer`. Check journal: `journalctl --user -u paperclip-backup-deadman-switch.service -n 20`. The systemd user session may have stopped. Verify linger: `loginctl show-user sirrus --property=Linger`. Check monitor log: `~/.paperclip/deadman_switch_monitor.log` |
+| Backup dead-man-switch monitor alert fired | The deadman-switch-monitor (ubuntu-latest) is stalled or failing. Check workflow runs: `gh run list --repo Stack-Alerts/BTC-Trade-Engine-PaperClip --workflow deadman-switch-monitor.yml --limit 5`. Check backup monitor log: `~/.paperclip/backup_deadman_switch_monitor.log`. Check systemd timer: `systemctl --user status paperclip-backup-deadman-monitor.timer` |
 | Service fails with "status=216/GROUP" | Remove any `User=` directive from the service unit — it's redundant in `systemctl --user` and causes GROUP permission errors. Also ensure `WantedBy=default.target` (not `multi-user.target`) for user units. |
 | Timer not firing despite being enabled | Run `loginctl show-user sirrus --property=Linger` — must be `yes`. If `no`: `sudo loginctl enable-linger sirrus`. |
 | | Lock held (flock) | Stale lock file: `rm /tmp/paperclip-backup.lock` |
