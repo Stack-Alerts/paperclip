@@ -1,0 +1,73 @@
+{
+  "name": "EMA Trend Continuation",
+  "number": "98",
+  "category": "TREND_CONTINUATION",
+  "timeframe": "15min",
+  "description": "Trade pullbacks in established trends using moving average alignment and Fibonacci retracement levels.",
+  "author": "Strategy Factory",
+  "expected_frequency": "8-15 signals/month",
+  "instrument_id": "BTC/USDT.BINANCE",
+  "min_confluence": 60,
+  "entry_side": "LONG",
+  "max_leverage": 1.0,
+  "risk_per_trade_pct": 1.0,
+  "min_risk_reward": 1.2,
+  "tp1_multiplier": 1.5,
+  "tp2_multiplier": 2.5,
+  "tp3_multiplier": 4.0,
+  "sl_atr_multiplier": 2.0,
+  "strategy_type": "Bullish",
+  "building_blocks": [
+    {
+      "name": "EMA_20_50_Trend",
+      "weight": 15,
+      "description": "Short-term trend direction"
+    },
+    {
+      "name": "EMA_200_Trend",
+      "weight": 12,
+      "description": "Major trend filter"
+    },
+    {
+      "name": "EMA_20_50_Cross",
+      "weight": 25,
+      "description": "Entry trigger on pullback"
+    },
+    {
+      "name": "MACD",
+      "weight": 22,
+      "description": "Momentum confirmation"
+    },
+    {
+      "name": "ADX",
+      "weight": 20,
+      "description": "Trend strength validation"
+    },
+    {
+      "name": "VWAP",
+      "weight": 15,
+      "description": "Pullback target reference"
+    },
+    {
+      "name": "Fibonacci_Retracements",
+      "weight": 16,
+      "description": "Retracement entry level"
+    }
+  ],
+  "entry_rules": [
+    "Major trend alignment required (EMA 200 bullish)",
+    "Short-term trend aligned (EMA 20/50)",
+    "ADX shows strong trend (not ranging)",
+    "Pullback to Fibonacci 61.8% or 50% level",
+    "EMA cross triggers re-entry in trend direction",
+    "MACD confirms momentum resumption",
+    "Price above VWAP for trend confirmation",
+    "Minimum 60 confluence points required"
+  ],
+  "exit_rules": [
+    "TP1: 1.5R (50% position)",
+    "TP2: 2.5R (30% position)",
+    "TP3: 4.0R (20% position)",
+    "SL: Below Fibonacci level + buffer"
+  ]
+}

@@ -121,6 +121,44 @@ Legacy 14-day implementation plan (archived).
 
 **Next Steps:** Building block patterns and confluence strategies (Days 11-13)
 
+
+
+## Strategy Factory (BTCAAAAA-25614)
+
+Template-based generator for production-grade NautilusTrader strategies.
+
+### Usage
+
+```bash
+# Generate a single strategy from a JSON config
+python scripts/generate_strategy.py --config strategy_definitions/my_strategy.json
+
+# Batch generate from a directory of configs
+python scripts/generate_strategy.py --config-dir strategy_definitions/ --start 1 --end 10
+
+# List available building blocks
+python scripts/generate_strategy.py --list-blocks
+```
+
+### Config Format
+
+Strategy definitions are JSON files in `strategy_definitions/`.
+See `strategy_definitions/m_pattern_reversal.json` for a full example.
+
+### Generated Strategy Features
+
+- Complete NautilusTrader `Strategy` subclass with all required methods
+- RiskEnforcer pre-trade checks (position size, daily loss limit, stop loss)
+- Centralized ConfluenceCalculator integration
+- ATR-based dynamic TP/SL calculation
+- Daily PnL tracking with UTC midnight reset
+
+### Known Block Registry
+
+The factory currently supports 19 building blocks across patterns, indicators,
+and market structure categories. Use `--list-blocks` to see all available blocks.
+
+
 ## Validated Systems
 
 ### ✅ M/W Pattern System (DEPLOYMENT-READY)

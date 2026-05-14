@@ -1,0 +1,66 @@
+{
+  "name": "M Pattern Reversal Standard",
+  "number": "99",
+  "category": "REVERSAL",
+  "timeframe": "15min",
+  "description": "Classic M-pattern double top reversal strategy with bearish divergence confirmation. Looks for price rejection at HOD, positioning below Asia 50% equilibrium, with session timing and VWAP confluence.",
+  "author": "Strategy Factory",
+  "expected_frequency": "2-4 signals/month",
+  "instrument_id": "BTC/USDT.BINANCE",
+  "min_confluence": 70,
+  "entry_side": "SHORT",
+  "max_leverage": 1.0,
+  "risk_per_trade_pct": 1.0,
+  "min_risk_reward": 2.0,
+  "tp1_multiplier": 1.5,
+  "tp2_multiplier": 3.0,
+  "tp3_multiplier": 5.0,
+  "sl_atr_multiplier": 2.0,
+  "building_blocks": [
+    {
+      "name": "Double_Top",
+      "weight": 30,
+      "description": "Primary reversal signal"
+    },
+    {
+      "name": "RSI_Divergence",
+      "weight": 25,
+      "description": "Bearish momentum confirmation"
+    },
+    {
+      "name": "HOD",
+      "weight": 20,
+      "description": "Resistance level rejection"
+    },
+    {
+      "name": "Asia_Session_50_Percent",
+      "weight": 18,
+      "description": "Equilibrium positioning"
+    },
+    {
+      "name": "Session_Time",
+      "weight": 15,
+      "description": "London/NY open timing"
+    },
+    {
+      "name": "VWAP",
+      "weight": 12,
+      "description": "Institutional positioning"
+    }
+  ],
+  "entry_rules": [
+    "Double top pattern forms with equal highs",
+    "Bearish RSI divergence between the two tops",
+    "Price rejected at or near HOD",
+    "Price positioned below Asia 50% (premium zone)",
+    "Signal during London open or NY AM session",
+    "Price below VWAP (bearish context)",
+    "Minimum 70 confluence points required"
+  ],
+  "exit_rules": [
+    "TP1: 1.5R (50% position) - First support level",
+    "TP2: 3.0R (30% position) - Major support",
+    "TP3: 5.0R (20% position) - Extended target",
+    "SL: Pattern invalidation (above second top + buffer)"
+  ]
+}
