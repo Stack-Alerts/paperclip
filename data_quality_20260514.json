@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-14T10:36:35.606389+00:00",
+  "timestamp": "2026-05-14T11:09:56.144301+00:00",
   "touch_index_fr": {
     "pass": true,
     "coverage_pct": 95.2,
@@ -11,7 +11,7 @@
     ],
     "total_rows": 150,
     "stale_rows": 0,
-    "max_age_hours": 45.9,
+    "max_age_hours": 46.5,
     "null_owner_rows": 0,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
@@ -23,12 +23,12 @@
   },
   "touch_index_bug": {
     "pass": true,
-    "coverage_pct": 38.4,
-    "indexed": 1410,
-    "total": 3669,
-    "coverage_eligible_pct": 96.9,
-    "eligible_total": 1041,
-    "missing_eligible_count": 32,
+    "coverage_pct": 38.5,
+    "indexed": 1423,
+    "total": 3694,
+    "coverage_eligible_pct": 96.8,
+    "eligible_total": 1047,
+    "missing_eligible_count": 34,
     "missing_eligible_identifiers": [
       "BTCAAAAA-1166",
       "BTCAAAAA-1171",
@@ -56,6 +56,8 @@
       "BTCAAAAA-26010",
       "BTCAAAAA-26100",
       "BTCAAAAA-26183",
+      "BTCAAAAA-26393",
+      "BTCAAAAA-26443",
       "BTCAAAAA-442",
       "BTCAAAAA-4895",
       "BTCAAAAA-700",
@@ -63,19 +65,19 @@
       "BTCAAAAA-7381",
       "BTCAAAAA-907"
     ],
-    "missing_total_count": 2263,
-    "total_rows": 3255,
+    "missing_total_count": 2275,
+    "total_rows": 3279,
     "stale_rows": 0,
-    "max_age_hours": 32.3,
+    "max_age_hours": 32.8,
     "null_closed_at_rows": 4,
     "null_updated_at_rows": 0,
     "unknown_source_rows": 0,
     "duplicate_pairs": 0,
     "orphan_count": 0,
     "source_distribution": {
-      "comments": 606,
-      "description": 324,
-      "git": 2325
+      "comments": 617,
+      "description": 332,
+      "git": 2330
     }
   }
 }
