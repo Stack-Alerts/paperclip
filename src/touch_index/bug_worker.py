@@ -259,13 +259,25 @@ def catch_up_eligible_bug_issues(
     results: list[BugIngestionResult] = []
     for identifier in sorted(all_git_ids):
         if identifier in indexed_in_db:
+            logger.debug("Catch-up: %s already indexed -- skipping", identifier)
             continue
-        issue = get_issue_by_identifier(identifier)
-        if issue is None:
-            continue
-        if issue.get("status") != "done":
-            continue
-        if FDR_LABEL_ID in (issue.get("labelIds") or []):
+        try:
+            issue = get_issue_by_identifier(identifier)
+            if issue is None:
+                logger.debug("Catch-up: %s not found in Paperclip -- skipping", identifier)
+                continue
+            if issue.get("status") != "done":
+                logger.debug(
+                    "Catch-up: %s has status %r -- skipping (only done issues eligible)",
+                    identifier,
+                    issue.get("status"),
+                )
+                continue
+            if FDR_LABEL_ID in (issue.get("labelIds") or []):
+                logger.debug("Catch-up: %s is FDR-labelled -- skipping", identifier)
+                continue
+        except Exception:
+            logger.exception("Catch-up: error fetching issue %s -- skipping", identifier)
             continue
         try:
             result = ingest_bug_issue(

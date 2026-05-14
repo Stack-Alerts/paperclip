@@ -3301,6 +3301,44 @@ class TestCatchUpEligibleBugIssues:
         assert results[0].issue_identifier == other_id
         assert results[0].files_indexed == 1
 
+    def test_catch_up_skips_on_api_error_fetching_issue(self):
+        """When get_issue_by_identifier raises, the error is logged and issue is skipped."""
+        engine, conn = _mock_engine()
+        other_id = "BTCAAAAA-999"
+        other_issue = {
+            "id": "cccccccc-0000-0000-0000-999999999999",
+            "identifier": other_id,
+            "status": "done",
+        }
+
+        with (
+            patch(
+                "touch_index.bug_worker.get_all_referenced_issue_ids",
+                return_value={ISSUE_IDENTIFIER, other_id},
+            ),
+            patch(
+                "touch_index.bug_worker.get_issue_by_identifier",
+                side_effect=lambda i: (
+                    other_issue
+                    if i == other_id
+                    else (_ for _ in ()).throw(RuntimeError("API timeout"))
+                ),
+            ),
+            patch(
+                "touch_index.bug_worker.get_files_for_issue",
+                return_value=["src/ok.py"],
+            ),
+            patch("touch_index.bug_worker.fetch_and_extract", return_value=[]),
+        ):
+            rows = conn.execute.return_value.fetchall.return_value
+            rows.__iter__.return_value = []
+            results = catch_up_eligible_bug_issues(engine)
+
+        assert len(results) == 1
+        assert results[0].issue_identifier == other_id
+
+
+
     def test_catch_up_fetches_description_when_list_endpoint_omits_it(self):
         """When list endpoint omits description, catch-up fetches full issue and retries."""
         engine, conn = _mock_engine()
