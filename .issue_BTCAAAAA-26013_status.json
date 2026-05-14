@@ -1,0 +1,23 @@
+{
+  "issue": "BTCAAAAA-26013",
+  "status": "done",
+  "timestamp": "2026-05-14T04:00:00Z",
+  "agent": "AutomationEngineer",
+  "verdict": "PASS",
+  "summary": "Blast Radius worker — detect fix→in_review and post report: verified operational.",
+  "verification": {
+    "tests": "204/204 PASS",
+    "lint": "ruff clean",
+    "dry_run": "imports verified, worker module operational",
+    "ci_pipeline": ".github/workflows/blast-radius-worker.yml configured (cron */5 min, webhook, manual dispatch)",
+    "monitoring": ".github/workflows/blast-radius-monitor.yml configured (cron */30 min, workflow_run trigger)",
+    "runbook": "docs/runbook-blast-radius-worker.md up to date",
+    "rollback": "documented in runbook"
+  },
+  "implementation_commits": [
+    "9709d72e fix(impact-gate): add done-guard to prevent reopen loops on done issues",
+    "c3cc8557 style(blast-radius): fix ruff formatting in process_issue warning log call",
+    "a97b990b fix(blast-radius): add self-close logic to run_once() polling path",
+    "519d5488 fix(blast-radius): add self-close logic to process_issue for routine issues"
+  ]
+}
