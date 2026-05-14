@@ -90,6 +90,7 @@ class BlockConfigItem(QWidget):
         position_font.setPointSize(12)
         position_label.setFont(position_font)
         position_label.setStyleSheet(f"color: {get_color('button_primary')}; font-weight: bold; min-width: 40px;")
+        position_label.setObjectName("position_label")
         header_layout.addWidget(position_label)
         
         # Block info layout
@@ -105,6 +106,7 @@ class BlockConfigItem(QWidget):
         name_font.setPointSize(10)
         name_label.setFont(name_font)
         name_label.setStyleSheet(get_label_style('default'))
+        name_label.setObjectName("block_name_label")
         name_layout.addWidget(name_label)
         
         # NEW: AND/OR Badge - prominent display with centralized styling
@@ -121,6 +123,7 @@ class BlockConfigItem(QWidget):
         logic_badge = QLabel(badge_text)
         logic_badge.setStyleSheet(get_logic_badge_style(badge_type_style))
         logic_badge.setToolTip(badge_tooltip)
+        logic_badge.setObjectName("logic_badge")
         # Set size policy to prevent expansion
         from PyQt5.QtWidgets import QSizePolicy
         logic_badge.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
@@ -133,6 +136,7 @@ class BlockConfigItem(QWidget):
         signals_count = len(self.block_info.get('signals', []))
         signals_label = QLabel(f"Signals: {signals_count}")
         signals_label.setStyleSheet(get_label_style('muted') + " font-size: 9pt;")
+        signals_label.setObjectName("signals_label")
         info_layout.addWidget(signals_label)
         
         header_layout.addLayout(info_layout, stretch=1)
@@ -150,6 +154,7 @@ class BlockConfigItem(QWidget):
         self.up_button.setMaximumWidth(40)
         self.up_button.setStyleSheet("font-size: 18px; font-weight: bold;")  # Bigger triangle
         self.up_button.setToolTip("Move block up")
+        self.up_button.setObjectName("up_button")
         self.up_button.clicked.connect(lambda: self.move_up_clicked.emit(self.block_name))
         self.up_button.setEnabled(self.position > 1)  # Disable if first
         move_layout.addWidget(self.up_button)
@@ -159,6 +164,7 @@ class BlockConfigItem(QWidget):
         self.down_button.setMaximumWidth(40)
         self.down_button.setStyleSheet("font-size: 18px; font-weight: bold;")  # Bigger triangle
         self.down_button.setToolTip("Move block down")
+        self.down_button.setObjectName("down_button")
         self.down_button.clicked.connect(lambda: self.move_down_clicked.emit(self.block_name))
         self.down_button.setEnabled(self.position < self.total)  # Disable if last
         move_layout.addWidget(self.down_button)
@@ -181,6 +187,7 @@ class BlockConfigItem(QWidget):
         set_hand_cursor(self.remove_button)
         self.remove_button.setMinimumWidth(100)  # Changed from setMaximumWidth(90)
         self.remove_button.setStyleSheet(get_danger_button_stylesheet())
+        self.remove_button.setObjectName("remove_button")
         self.remove_button.clicked.connect(lambda: self.remove_clicked.emit(self.block_name))
         controls_layout.addWidget(self.remove_button)
         
@@ -192,6 +199,7 @@ class BlockConfigItem(QWidget):
         if self.block_info.get('signals'):
             signals_widget = QFrame()
             signals_widget.setFrameShape(QFrame.StyledPanel)
+            signals_widget.setObjectName("signals_widget")
             from src.strategy_builder.ui.styles import get_color
             signals_widget.setStyleSheet(f"background-color: {get_color('bg_light')}; border: 1px solid {get_color('border')}; border-radius: 6px; padding: 5px;")
             
@@ -595,6 +603,8 @@ class BlockConfigItem(QWidget):
                 background-color: {get_color('bg_medium')};
             }}
         """)
+        
+        self.setObjectName("block_config_item")
         
         self.setLayout(layout)
     
@@ -1330,9 +1340,11 @@ class StrategyBlocksPanel(QWidget):
         self.blocks_scroll_area = QScrollArea()
         self.blocks_scroll_area.setWidgetResizable(True)
         self.blocks_scroll_area.setMinimumHeight(300)
+        self.blocks_scroll_area.setObjectName("blocks_scroll_area")
         
         # Container widget for blocks
         self.blocks_container = QWidget()
+        self.blocks_container.setObjectName("blocks_container")
         self.blocks_layout = QVBoxLayout()
         self.blocks_layout.setSpacing(10)
         self.blocks_layout.setContentsMargins(5, 5, 5, 5)
@@ -1340,6 +1352,7 @@ class StrategyBlocksPanel(QWidget):
         # Empty state label - dark theme
         self.empty_label = QLabel("No blocks added yet.\n\nSearch and add blocks from the panel to the right.")
         self.empty_label.setAlignment(Qt.AlignCenter)
+        self.empty_label.setObjectName("empty_label")
         self.empty_label.setStyleSheet(
             get_label_style('muted') + " font-size: 12pt; padding: 50px; "
             "background-color: #1E2128; border: 1px solid #3C4149; border-radius: 8px;"
@@ -1357,6 +1370,7 @@ class StrategyBlocksPanel(QWidget):
         
         # Sprint 1.8 Task 1.8.49: Strategy-level Exit Conditions Section
         self.strategy_exit_section = QGroupBox("🔴 Strategy Exit Conditions")
+        self.strategy_exit_section.setObjectName("strategy_exit_section")
         exit_section_font = QFont()
         exit_section_font.setPointSize(12)
         exit_section_font.setBold(True)
@@ -1375,6 +1389,7 @@ class StrategyBlocksPanel(QWidget):
         
         # Container for exit conditions list (no add button - use red button in search panel)
         self.strategy_exits_container = QWidget()
+        self.strategy_exits_container.setObjectName("strategy_exits_container")
         self.strategy_exits_layout = QVBoxLayout()
         self.strategy_exits_layout.setSpacing(5)
         self.strategy_exits_layout.setContentsMargins(0, 10, 0, 0)
@@ -1383,6 +1398,8 @@ class StrategyBlocksPanel(QWidget):
         
         self.strategy_exit_section.setLayout(exit_section_layout)
         layout.addWidget(self.strategy_exit_section)
+        
+        self.setObjectName("strategy_blocks_panel")
         
         self.setLayout(layout)
     
