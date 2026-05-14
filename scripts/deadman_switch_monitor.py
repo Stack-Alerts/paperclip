@@ -99,12 +99,12 @@ def _gh_run_list(workflow: str, limit: int = 5) -> list[dict] | None:
                 )
                 return None
         logger.error("gh run list failed (rc=%d): %s", result.returncode, result.stderr.strip())
-        return None
+        return []
     try:
         return json.loads(result.stdout)
     except json.JSONDecodeError:
         logger.error("gh run list returned non-JSON: %s", result.stdout[:200])
-        return None
+        return []
 
 
 def _get_latest_success_age_minutes(runs: list[dict]) -> float | None:
