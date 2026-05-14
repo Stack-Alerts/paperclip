@@ -1,0 +1,13 @@
+{
+  "issue": "BTCAAAAA-25765",
+  "status": "done",
+  "verdict": "PASS",
+  "verification_commit": "2d948486",
+  "test_file": "tests/bug_regression/test_btcaaaaa_732_regression.py",
+  "test_count": 11,
+  "test_result": "11/11 passed",
+  "impact_gate": "PASS",
+  "ci_pipeline": "test.yml line continuations clean",
+  "verification_report": "docs/verification/BTCAAAAA-25254-impact-gate-732-verification.md",
+  "resolution": "CI pipeline corruption (literal \\n in test.yml:104) repaired in commit 2d948486. No code changes needed for BTCAAAAA-732 itself."
+}
