@@ -1,0 +1,109 @@
+name: Walkforward Validation
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  push:
+    branches: ["main", "master"]
+    paths:
+      - 'src/strategy_builder/testing/walkforward_test_engine.py'
+      - 'src/strategy_builder/core/**'
+      - 'src/strategy_builder/execution/**'
+      - 'src/strategies/**'
+      - 'tests/strategy_builder/testing/**'
+      - 'tests/strategies/**'
+      - '.github/workflows/walkforward-validation.yml'
+  pull_request:
+    branches: ["main", "master"]
+    paths:
+      - 'src/strategy_builder/testing/walkforward_test_engine.py'
+      - 'src/strategy_builder/core/**'
+      - 'src/strategy_builder/execution/**'
+      - 'src/strategies/**'
+      - 'tests/strategy_builder/testing/**'
+      - 'tests/strategies/**'
+      - '.github/workflows/walkforward-validation.yml'
+  workflow_dispatch:
+
+env:
+  PYTHONPATH: src
+
+jobs:
+  walkforward-unit:
+    name: Walkforward unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pytest pytest-cov numpy pandas pyarrow
+
+      - name: Run walkforward unit tests
+        run: |
+          python -m pytest \
+            tests/strategy_builder/testing/test_walkforward_test_engine.py \
+            -v --tb=short
+
+  walkforward-strategy:
+    name: Walkforward strategy validation (real data)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pytest pandas numpy pyarrow
+
+      - name: Verify BTC data availability
+        run: |
+          if [ ! -f data/raw/BTC_USDT_PERP_15m.csv ]; then
+            echo "BTC data file not found — skipping real-data walkforward"
+            exit 0
+          fi
+          echo "BTC data file found ($(wc -c < data/raw/BTC_USDT_PERP_15m.csv) bytes)"
+
+      - name: Run walkforward strategy validation
+        run: |
+          python -m pytest \
+            tests/strategies/01_test_strategy_Reversal_M_Pattern_Standard.py \
+            tests/strategies/02_test_strategy_Reversal_W_Pattern_Standard.py \
+            tests/strategies/test_strategy_with_backtest.py \
+            tests/strategies/walkforward_test.py \
+            -v --tb=short --timeout=900 -p no:cacheprovider \
+            2>&1 | tee /tmp/walkforward-output.txt
+
+      - name: Alert on nightly walkforward failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          PYTHONPATH: src
+        run: |
+          python scripts/nightly_test_alert.py \
+            --workflow "Walkforward Validation" \
+            --run-id "${{ github.run_id }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --test-output /tmp/walkforward-output.txt
+
+      - name: Upload walkforward artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: walkforward-reports
+          path: |
+            data/reports/walkforward_tests/
+            /tmp/walkforward-output.txt
+          retention-days: 14

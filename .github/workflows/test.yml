@@ -83,6 +83,7 @@ jobs:
             tests/strategy_builder/persistence/ \
             tests/strategy_builder/core/test_signal_dependency_resolver.py \
             tests/strategy_builder/core/test_strategy_config_engine.py \
+            tests/strategy_builder/testing/test_walkforward_test_engine.py \
             tests/optimizer_v3/test_error_recovery.py \
             tests/itm/state/ \
             tests/qa/ \
