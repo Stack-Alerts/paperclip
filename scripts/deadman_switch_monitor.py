@@ -374,8 +374,8 @@ def main():
     if args.json_summary:
         print(json.dumps(summary, indent=2))  # noqa: T201
 
-    ok = summary["status"] != "alert" or summary["alert_fired"] or summary["alert_skipped"]
-    sys.exit(0 if ok else 1)
+    detection_ok = summary["status"] != "auth_error"
+    sys.exit(0 if detection_ok else 1)
 
 
 if __name__ == "__main__":
