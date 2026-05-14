@@ -42,6 +42,8 @@ CTO_AGENT_ID = "41b5ede6-e209-40ba-b923-dc969c722e6d"
 DEADMAN_INTERVAL_MINUTES = 30
 MONITOR_THRESHOLD_MINUTES = 45
 
+MONITOR_LOG.parent.mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",

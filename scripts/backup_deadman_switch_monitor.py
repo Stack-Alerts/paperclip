@@ -46,6 +46,8 @@ CTO_AGENT_ID = "41b5ede6-e209-40ba-b923-dc969c722e6d"
 MONITOR_INTERVAL_MINUTES = 30
 MONITOR_THRESHOLD_MINUTES = 60
 
+MONITOR_LOG.parent.mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -73,17 +75,24 @@ _GH_AUTH_ERROR_PATTERNS = [
 
 
 def _gh_run_list(workflow: str, limit: int = 10) -> list[dict] | None:
-    result = subprocess.run(
-        [
-            "gh", "run", "list",
-            "--workflow", workflow,
-            "--limit", str(limit),
-            "--json", "status,conclusion,createdAt,databaseId,headSha",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    try:
+        result = subprocess.run(
+            [
+                "gh", "run", "list",
+                "--workflow", workflow,
+                "--limit", str(limit),
+                "--json", "status,conclusion,createdAt,databaseId,headSha",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except FileNotFoundError:
+        logger.error("gh CLI not found in PATH — cannot query workflow runs")
+        return None
+    except subprocess.TimeoutExpired:
+        logger.error("gh run list timed out — cannot query workflow runs")
+        return None
     if result.returncode != 0:
         stderr_lower = result.stderr.lower() if result.stderr else ""
         for pattern in _GH_AUTH_ERROR_PATTERNS:
