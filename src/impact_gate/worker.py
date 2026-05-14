@@ -23,6 +23,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
 from touch_index.paperclip_client import (
@@ -700,6 +701,7 @@ def scan_done_issues(
 
 if __name__ == "__main__":
     import argparse
+    import signal
 
     logging.basicConfig(
         level=logging.INFO,
@@ -712,16 +714,115 @@ if __name__ == "__main__":
     parser.add_argument(
         "--issue-id",
         type=str,
-        required=True,
+        default=None,
         metavar="UUID",
-        help="Paperclip issue UUID of the fix/bug issue to gate",
+        help="Paperclip issue UUID of the fix/bug issue to gate (single-issue mode)",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Log results but do not post comments or transition issues",
     )
+    parser.add_argument(
+        "--poll",
+        action="store_true",
+        help="Continuous polling mode — scan done fix/bug issues every --poll-interval seconds",
+    )
+    parser.add_argument(
+        "--poll-interval",
+        type=int,
+        default=300,
+        metavar="SECONDS",
+        help="Poll interval in seconds for --poll mode (default: 300 = 5 min)",
+    )
+    parser.add_argument(
+        "--retroactive",
+        action="store_true",
+        help="Run retroactive Impact Gate on ungated issues (used with --poll)",
+    )
+    parser.add_argument(
+        "--days-back",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Only scan issues completed within the last N days (default: all, used with --poll)",
+    )
+    parser.add_argument(
+        "--json-summary",
+        action="store_true",
+        help="Output structured JSON summary to stdout (used with --poll, one-shot mode)",
+    )
     args = parser.parse_args()
 
-    result = process_issue(args.issue_id, dry_run=args.dry_run)
-    print(json.dumps(result, indent=2))  # noqa: T201
+    if args.poll:
+        if args.issue_id:
+            log.error("--issue-id is not compatible with --poll mode")
+            sys.exit(2)
+
+        log.info(
+            "Starting Impact Gate scan-done poll (interval=%ds, retroactive=%s, dry_run=%s, days_back=%s)",
+            args.poll_interval,
+            args.retroactive,
+            args.dry_run,
+            args.days_back,
+        )
+
+        _shutdown = [False]
+
+        def _handle_signal(signum: int, _frame: object) -> None:
+            log.info(
+                "Received signal %d (%s) — shutting down after current poll cycle",
+                signum,
+                signal.Signals(signum).name,
+            )
+            _shutdown[0] = True
+
+        signal.signal(signal.SIGTERM, _handle_signal)
+        signal.signal(signal.SIGINT, _handle_signal)
+
+        _first = True
+        while not _shutdown[0]:
+            try:
+                result = scan_done_issues(
+                    days_back=args.days_back,
+                    dry_run=args.dry_run,
+                    retroactive=args.retroactive,
+                )
+                if args.json_summary:
+                    summary = {
+                        "worker": "impact-gate-scan-done",
+                        "dry_run": args.dry_run,
+                        "retroactive": args.retroactive,
+                        "days_back": args.days_back,
+                        "timestamp": result.get("timestamp"),
+                        "total_done_fix_issues": result.get("total_done_fix_issues"),
+                        "gated": result.get("gated"),
+                        "ungated_count": result.get("ungated_count"),
+                        "last_24h": result.get("last_24h"),
+                    }
+                    if "retroactive_results" in result:
+                        summary["retroactive_results"] = result["retroactive_results"]
+                    print(json.dumps(summary, default=str))  # noqa: T201
+            except Exception as exc:
+                log.exception("Poll cycle failed: %s", exc)
+
+            if _first and args.poll_interval == 0:
+                log.info("--once mode (poll-interval=0) — exiting after single cycle")
+                break
+            _first = False
+
+            if not _shutdown[0]:
+                log.info(
+                    "Sleeping %ds until next poll cycle ...", args.poll_interval
+                )
+                time.sleep(args.poll_interval)
+
+        log.info("Shutdown complete")
+        sys.exit(0)
+
+    if args.issue_id:
+        result = process_issue(args.issue_id, dry_run=args.dry_run)
+        print(json.dumps(result, indent=2))  # noqa: T201
+        sys.exit(0)
+
+    parser.error("Either --issue-id or --poll is required")
