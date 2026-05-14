@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -851,3 +852,78 @@ class TestMain:
         data = json.loads(captured.out)
         assert data["worker"] == "impact-gate-scan-done"
         assert data["total_done_fix_issues"] == 1
+
+
+class TestMutedState:
+    def test_muted_state_path_is_repo_root_not_data(self):
+        path = str(_scan._MUTED_STATE_PATH)
+        assert "/data/" not in path, (
+            f"_MUTED_STATE_PATH should be in repo root, got {path}"
+        )
+        assert ".impact_gate_muted_state.json" in path
+
+    def test_load_muted_state_empty_when_file_missing(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(_scan, "_MUTED_STATE_PATH", tmp_path / "nonexistent.json")
+        result = _scan._load_muted_state()
+        assert result == {}
+
+    def test_load_muted_state_reads_json(self, tmp_path, monkeypatch):
+        p = tmp_path / "muted.json"
+        p.write_text('{"abc": "PASS", "def": "FAIL"}')
+        monkeypatch.setattr(_scan, "_MUTED_STATE_PATH", p)
+        result = _scan._load_muted_state()
+        assert result == {"abc": "PASS", "def": "FAIL"}
+
+    def test_load_muted_state_handles_corrupt_json(self, tmp_path, monkeypatch):
+        p = tmp_path / "muted.json"
+        p.write_text("{not valid json")
+        monkeypatch.setattr(_scan, "_MUTED_STATE_PATH", p)
+        result = _scan._load_muted_state()
+        assert result == {}
+
+    def test_save_muted_gate_result_persists_entry(self, tmp_path, monkeypatch):
+        p = tmp_path / "muted.json"
+        monkeypatch.setattr(_scan, "_MUTED_STATE_PATH", p)
+        _scan.save_muted_gate_result("issue-1", "PASS")
+        data = json.loads(p.read_text())
+        assert data == {"issue-1": "PASS"}
+
+    def test_save_muted_gate_result_appends_to_existing(self, tmp_path, monkeypatch):
+        p = tmp_path / "muted.json"
+        p.write_text('{"existing": "FAIL"}')
+        monkeypatch.setattr(_scan, "_MUTED_STATE_PATH", p)
+        _scan.save_muted_gate_result("new", "BYPASSED")
+        data = json.loads(p.read_text())
+        assert data == {"existing": "FAIL", "new": "BYPASSED"}
+
+    def test_save_muted_gate_result_overwrites_existing(self, tmp_path, monkeypatch):
+        p = tmp_path / "muted.json"
+        p.write_text('{"issue-1": "FAIL"}')
+        monkeypatch.setattr(_scan, "_MUTED_STATE_PATH", p)
+        _scan.save_muted_gate_result("issue-1", "PASS")
+        data = json.loads(p.read_text())
+        assert data == {"issue-1": "PASS"}
+
+    def test_check_gate_status_uses_muted_state_first(self, monkeypatch):
+        monkeypatch.setattr(
+            _scan,
+            "_load_muted_state",
+            lambda: {"cached-id": "BYPASSED"},
+        )
+        from touch_index import paperclip_client as pc
+        original = getattr(pc, "fetch_issue_comments", None)
+        monkeypatch.setattr(
+            pc,
+            "fetch_issue_comments",
+            lambda iid: (_ for _ in ()).throw(RuntimeError("should not call API")),
+        )
+        try:
+            result = _scan._check_gate_status("cached-id")
+            assert result == "BYPASSED", (
+                f"Expected BYPASSED from muted state, got {result}"
+            )
+        finally:
+            if original is not None:
+                monkeypatch.setattr(pc, "fetch_issue_comments", original)
+            else:
+                monkeypatch.delattr(pc, "fetch_issue_comments", raising=False)
