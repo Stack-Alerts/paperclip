@@ -448,3 +448,27 @@ def fetch_issue_comments(issue_id: str) -> list[dict]:
         resp = sess.get(f"{_base()}/api/issues/{issue_id}/comments", timeout=30)
         resp.raise_for_status()
         return resp.json()
+
+
+def post_issue_comment(issue_id: str, body: str, *, board_session: bool = False) -> dict:
+    """Post a comment on an issue.
+
+    Args:
+        issue_id: The Paperclip issue UUID.
+        body: Comment body (Markdown).
+        board_session: Use board-level API key (bypasses checkoutRunId validation).
+
+    Returns the created comment dict.
+    """
+    sess_factory = _board_session if board_session else _session
+    with sess_factory() as sess:
+        resp = sess.post(
+            f"{_base()}/api/issues/{issue_id}/comments",
+            json={"body": body},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+IMPACT_GATE_BYPASS_LABEL_ID = "impact-gate-bypass"
