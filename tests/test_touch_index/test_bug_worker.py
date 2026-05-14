@@ -720,6 +720,7 @@ class TestMain:
             files_indexed=2,
             source="git",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -818,6 +819,7 @@ class TestMain:
             files_indexed=2,
             source="git",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -865,6 +867,7 @@ class TestMain:
                         files_indexed=2,
                         source="git",
                         skipped_no_commits=False,
+                        issue_status="done",
                     )
                 ],
             ) as mock_worker,
@@ -1026,6 +1029,7 @@ class TestMain:
             files_indexed=2,
             source="git",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -1078,6 +1082,7 @@ class TestMain:
                         files_indexed=2,
                         source="git",
                         skipped_no_commits=False,
+                        issue_status="done",
                     )
                 ],
             ) as mock_worker,
@@ -1109,6 +1114,7 @@ class TestMain:
                 files_indexed=3,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
         catchup_results = [
@@ -1118,6 +1124,7 @@ class TestMain:
                 files_indexed=1,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
             BugIngestionResult(
                 issue_id="id-cu2",
@@ -1125,6 +1132,7 @@ class TestMain:
                 files_indexed=0,
                 source="none",
                 skipped_no_commits=True,
+                issue_status="done",
             ),
         ]
 
@@ -1172,6 +1180,7 @@ class TestMain:
                 files_indexed=2,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
         catchup_results = [
@@ -1181,6 +1190,7 @@ class TestMain:
                 files_indexed=1,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -1292,6 +1302,7 @@ class TestMain:
                 files_indexed=3,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
             BugIngestionResult(
                 issue_id="id-2",
@@ -1299,6 +1310,7 @@ class TestMain:
                 files_indexed=0,
                 source="none",
                 skipped_no_commits=True,
+                issue_status="done",
             ),
         ]
 
@@ -1373,6 +1385,7 @@ class TestMain:
                         files_indexed=2,
                         source="git",
                         skipped_no_commits=False,
+                        issue_status="done",
                     )
                 ],
             ),
@@ -1423,6 +1436,7 @@ class TestMain:
                         files_indexed=2,
                         source="git",
                         skipped_no_commits=False,
+                        issue_status="done",
                     )
                 ],
             ),
@@ -1626,6 +1640,7 @@ class TestMain:
                 files_indexed=2,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -1692,6 +1707,7 @@ class TestMain:
             files_indexed=2,
             source="git",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -1737,6 +1753,7 @@ class TestMain:
             files_indexed=2,
             source="git",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -1774,6 +1791,7 @@ class TestMain:
             files_indexed=2,
             source="git",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -1850,6 +1868,7 @@ class TestMain:
                         files_indexed=2,
                         source="git",
                         skipped_no_commits=False,
+                        issue_status="done",
                     )
                 ],
             ),
@@ -1952,6 +1971,7 @@ class TestMain:
                 files_indexed=2,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -1993,6 +2013,7 @@ class TestMain:
             files_indexed=2,
             source="git",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -2181,6 +2202,7 @@ class TestBugJsonSummary:
             files_indexed=2,
             source="git",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -2231,6 +2253,7 @@ class TestBugJsonSummary:
                 files_indexed=3,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -2296,6 +2319,7 @@ class TestBugJsonSummary:
                 files_indexed=3,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
             BugIngestionResult(
                 issue_identifier="BTCAAAAA-103",
@@ -2303,6 +2327,7 @@ class TestBugJsonSummary:
                 files_indexed=0,
                 source="none",
                 skipped_no_commits=True,
+                issue_status="done",
             ),
         ]
 
@@ -2356,6 +2381,7 @@ class TestBugJsonSummary:
                 files_indexed=3,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -2442,6 +2468,7 @@ class TestBugJsonSummary:
                 files_indexed=2,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -2538,6 +2565,7 @@ class TestBugJsonSummary:
                 files_indexed=2,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -2589,6 +2617,7 @@ class TestBugJsonSummary:
             files_indexed=2,
             source="git",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         qc = MagicMock()
@@ -2637,6 +2666,7 @@ class TestBugJsonSummary:
             files_indexed=2,
             source="git",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         qc = MagicMock()

@@ -712,6 +712,7 @@ class TestMain:
             files_indexed=2,
             source="comments",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -802,6 +803,7 @@ class TestMain:
             files_indexed=2,
             source="git",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -833,6 +835,7 @@ class TestMain:
                 files_indexed=2,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -1032,6 +1035,7 @@ class TestMain:
                 files_indexed=2,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -1069,6 +1073,7 @@ class TestMain:
                 files_indexed=2,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -1106,6 +1111,7 @@ class TestMain:
                 files_indexed=3,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -1140,6 +1146,7 @@ class TestMain:
                 files_indexed=2,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
         catchup_results = [
@@ -1149,6 +1156,7 @@ class TestMain:
                 files_indexed=3,
                 source="comments",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -1235,6 +1243,7 @@ class TestMain:
                 files_indexed=2,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -1285,6 +1294,7 @@ class TestMain:
             files_indexed=2,
             source="comments",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -1323,6 +1333,7 @@ class TestMain:
             files_indexed=2,
             source="comments",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -1353,6 +1364,7 @@ class TestMain:
             files_indexed=2,
             source="comments",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -1462,6 +1474,7 @@ class TestMain:
                 files_indexed=3,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -1503,6 +1516,7 @@ class TestMain:
                 files_indexed=3,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -1593,6 +1607,7 @@ class TestMain:
                 files_indexed=3,
                 source="comments",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
             FRIngestionResult(
                 issue_identifier="BTCAAAAA-102",
@@ -1600,6 +1615,7 @@ class TestMain:
                 files_indexed=0,
                 source="none",
                 skipped_no_commits=True,
+                issue_status="done",
             ),
         ]
 
@@ -1659,6 +1675,7 @@ class TestMain:
                 files_indexed=2,
                 source="comments",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
             FRIngestionResult(
                 issue_identifier="BTCAAAAA-102",
@@ -1666,6 +1683,7 @@ class TestMain:
                 files_indexed=1,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -1742,6 +1760,7 @@ class TestMain:
                 files_indexed=2,
                 source="comments",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -1775,6 +1794,7 @@ class TestMain:
             files_indexed=2,
             source="comments",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -1905,6 +1925,7 @@ class TestMainProcessFrIssueError:
             files_indexed=2,
             source="comments",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -1943,6 +1964,7 @@ class TestMainProcessFrIssueError:
                 files_indexed=3,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 
@@ -2046,6 +2068,7 @@ class TestMainProcessFrIssueError:
                 files_indexed=3,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
             FRIngestionResult(
                 issue_identifier="BTCAAAAA-103",
@@ -2053,6 +2076,7 @@ class TestMainProcessFrIssueError:
                 files_indexed=0,
                 source="none",
                 skipped_no_commits=True,
+                issue_status="done",
             ),
         ]
 
@@ -2096,6 +2120,7 @@ class TestMainProcessFrIssueError:
             files_indexed=2,
             source="comments",
             skipped_no_commits=False,
+            issue_status="done",
         )
 
         with (
@@ -2148,6 +2173,7 @@ class TestMainProcessFrIssueError:
                 files_indexed=3,
                 source="git",
                 skipped_no_commits=False,
+                issue_status="done",
             ),
         ]
 

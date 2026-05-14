@@ -146,7 +146,7 @@ def _run_bug_cli() -> None:
                     # Only transition to done for issues already in done status.
                     # Webhook events (issue_created, issue_updated) may deliver
                     # non-done issues — we must not close them prematurely.
-                    if result.issue_status == "done" or result.issue_status is None:
+                    if result.issue_status == "done":
                         transition_issue_status_board(result.issue_id, "done")
                         logger.info("Marked %s as done", result.issue_identifier)
                     else:
@@ -268,7 +268,7 @@ def _run_bug_cli() -> None:
     else:
         for r in worker_results:
             try:
-                if r.issue_status == "done" or r.issue_status is None:
+                if r.issue_status == "done":
                     transition_issue_status_board(r.issue_id, "done")
                     logger.info("Marked %s as done", r.issue_identifier)
                 else:
@@ -440,7 +440,7 @@ def _run_fr_cli() -> None:
                     # Only transition to done for issues already in done status.
                     # Webhook events (issue_created, issue_updated) may deliver
                     # non-done issues — we must not close them prematurely.
-                    if result.issue_status == "done" or result.issue_status is None:
+                    if result.issue_status == "done":
                         transition_issue_status_board(result.issue_id, "done")
                         logger.info("Marked %s as done", result.issue_identifier)
                     else:
@@ -555,7 +555,7 @@ def _run_fr_cli() -> None:
     else:
         for r in worker_results:
             try:
-                if r.issue_status == "done" or r.issue_status is None:
+                if r.issue_status == "done":
                     transition_issue_status_board(r.issue_id, "done")
                     logger.info("Marked %s as done", r.issue_identifier)
                 else:
