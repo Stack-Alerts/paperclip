@@ -19,9 +19,10 @@ from typing import Optional
 
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (
-    QDialog, QDialogButtonBox, QFormLayout, QGroupBox, QHBoxLayout,
-    QLabel, QLineEdit, QPushButton, QScrollArea, QTabWidget,
-    QVBoxLayout, QWidget, QMessageBox, QFrame
+    QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
+    QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea,
+    QStackedWidget, QTabWidget, QVBoxLayout, QWidget, QMessageBox,
+    QFrame,
 )
 
 from src.strategy_builder.ui.settings_service import SettingsService
@@ -40,6 +41,16 @@ from src.strategy_builder.ui.styles import (
     apply_hand_cursor_to_buttons,
     WindowGeometryMixin,
 )
+
+# ---------------------------------------------------------------------------
+# Provider pricing info
+# ---------------------------------------------------------------------------
+
+_PROVIDER_INFO = {
+    "anthropic": "Default pricing: $3.00/M input \u00b7 $15.00/M output",
+    "openai": "Default pricing: $5.00/M input \u00b7 $15.00/M output",
+    "ollama": "Cost: Free (local inference)",
+}
 
 # ---------------------------------------------------------------------------
 # Secret field widget
@@ -621,25 +632,7 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
         # ----------------------------------------------------------------
         # Group: AI Configuration
         # ----------------------------------------------------------------
-        ai_group = QGroupBox("AI Configuration")
-        ai_group.setFont(create_font(10, bold=True))
-        ai_form = QFormLayout(ai_group)
-        ai_form.setSpacing(10)
-        ai_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
-
-        self._plain_fields["AI_MODEL"] = QLineEdit()
-        self._plain_fields["AI_MODEL"].setText(
-            self._service.get_with_default("AI_MODEL", "anthropic/claude-4.5-sonnet")
-        )
-        self._plain_fields["AI_MODEL"].setPlaceholderText("anthropic/claude-4.5-sonnet")
-        self._plain_fields["AI_MODEL"].setStyleSheet(get_input_field_stylesheet())
-        self._plain_fields["AI_MODEL"].setFont(create_font(10))
-        self._plain_fields["AI_MODEL"].setToolTip(
-            "OpenRouter model identifier (e.g. anthropic/claude-4.5-sonnet)"
-        )
-        ai_form.addRow(self._make_label("AI Model:"), self._plain_fields["AI_MODEL"])
-
-        layout.addWidget(ai_group)
+        layout.addWidget(self._build_ai_config_group())
 
         # ----------------------------------------------------------------
         # Group: Performance & Resources
@@ -786,6 +779,157 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
         layout.addStretch()
         scroll.setWidget(container)
         return scroll
+
+    # ------------------------------------------------------------------
+    # AI Configuration group
+    # ------------------------------------------------------------------
+
+    def _build_ai_config_group(self) -> QGroupBox:
+        ai_group = QGroupBox("AI Configuration")
+        ai_group.setFont(create_font(10, bold=True))
+        form = QFormLayout(ai_group)
+        form.setSpacing(10)
+        form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        # Provider selector
+        self._provider_combo = QComboBox()
+        self._provider_combo.addItems(["anthropic", "openai", "ollama"])
+        current = self._service.get_with_default("LLM_PROVIDER", "anthropic")
+        idx = self._provider_combo.findText(current)
+        if idx >= 0:
+            self._provider_combo.setCurrentIndex(idx)
+        self._provider_combo.setFont(create_font(10))
+        form.addRow(self._make_label("AI Provider:"), self._provider_combo)
+
+        # Provider-specific fields stacked by index matching combo order
+        self._provider_stack = QStackedWidget()
+        self._provider_stack.setStyleSheet("background: transparent;")
+
+        # -- Anthropic page (index 0) --
+        anth_page = QWidget()
+        anth_form = QFormLayout(anth_page)
+        anth_form.setSpacing(8)
+        anth_form.setContentsMargins(0, 0, 0, 0)
+        anth_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        sec = SecretFieldWidget("ANTHROPIC_API_KEY", self._service)
+        self._secret_widgets["ANTHROPIC_API_KEY"] = sec
+        anth_form.addRow(self._make_label("API Key:"), sec)
+
+        self._plain_fields["ANTHROPIC_MODEL"] = QLineEdit()
+        self._plain_fields["ANTHROPIC_MODEL"].setText(
+            self._service.get_with_default("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+        )
+        self._plain_fields["ANTHROPIC_MODEL"].setPlaceholderText("claude-sonnet-4-6")
+        self._plain_fields["ANTHROPIC_MODEL"].setStyleSheet(get_input_field_stylesheet())
+        self._plain_fields["ANTHROPIC_MODEL"].setFont(create_font(10))
+        self._plain_fields["ANTHROPIC_MODEL"].setToolTip(
+            "Anthropic Claude model ID (e.g. claude-sonnet-4-6, claude-opus-4-7, claude-haiku-4-5)"
+        )
+        anth_form.addRow(self._make_label("Model:"), self._plain_fields["ANTHROPIC_MODEL"])
+
+        self._provider_stack.addWidget(anth_page)
+
+        # -- OpenAI page (index 1) --
+        oai_page = QWidget()
+        oai_form = QFormLayout(oai_page)
+        oai_form.setSpacing(8)
+        oai_form.setContentsMargins(0, 0, 0, 0)
+        oai_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        sec = SecretFieldWidget("OPENAI_API_KEY", self._service)
+        self._secret_widgets["OPENAI_API_KEY"] = sec
+        oai_form.addRow(self._make_label("API Key:"), sec)
+
+        self._plain_fields["OPENAI_MODEL"] = QLineEdit()
+        self._plain_fields["OPENAI_MODEL"].setText(
+            self._service.get_with_default("OPENAI_MODEL", "gpt-4o")
+        )
+        self._plain_fields["OPENAI_MODEL"].setPlaceholderText("gpt-4o")
+        self._plain_fields["OPENAI_MODEL"].setStyleSheet(get_input_field_stylesheet())
+        self._plain_fields["OPENAI_MODEL"].setFont(create_font(10))
+        self._plain_fields["OPENAI_MODEL"].setToolTip(
+            "OpenAI model ID (e.g. gpt-4o, gpt-4o-mini)"
+        )
+        oai_form.addRow(self._make_label("Model:"), self._plain_fields["OPENAI_MODEL"])
+
+        self._provider_stack.addWidget(oai_page)
+
+        # -- Ollama page (index 2) --
+        ol_page = QWidget()
+        ol_form = QFormLayout(ol_page)
+        ol_form.setSpacing(8)
+        ol_form.setContentsMargins(0, 0, 0, 0)
+        ol_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        self._plain_fields["OLLAMA_BASE_URL"] = QLineEdit()
+        self._plain_fields["OLLAMA_BASE_URL"].setText(
+            self._service.get_with_default("OLLAMA_BASE_URL", "http://localhost:11434")
+        )
+        self._plain_fields["OLLAMA_BASE_URL"].setPlaceholderText("http://localhost:11434")
+        self._plain_fields["OLLAMA_BASE_URL"].setStyleSheet(get_input_field_stylesheet())
+        self._plain_fields["OLLAMA_BASE_URL"].setFont(create_font(10))
+        self._plain_fields["OLLAMA_BASE_URL"].setToolTip(
+            "Ollama API base URL (e.g. http://localhost:11434)"
+        )
+        ol_form.addRow(self._make_label("Base URL:"), self._plain_fields["OLLAMA_BASE_URL"])
+
+        self._plain_fields["OLLAMA_MODEL"] = QLineEdit()
+        self._plain_fields["OLLAMA_MODEL"].setText(
+            self._service.get_with_default("OLLAMA_MODEL", "llama3")
+        )
+        self._plain_fields["OLLAMA_MODEL"].setPlaceholderText("llama3")
+        self._plain_fields["OLLAMA_MODEL"].setStyleSheet(get_input_field_stylesheet())
+        self._plain_fields["OLLAMA_MODEL"].setFont(create_font(10))
+        self._plain_fields["OLLAMA_MODEL"].setToolTip(
+            "Ollama model name (e.g. llama3, mistral, codellama)"
+        )
+        ol_form.addRow(self._make_label("Model:"), self._plain_fields["OLLAMA_MODEL"])
+
+        self._provider_stack.addWidget(ol_page)
+
+        form.addRow("", self._provider_stack)
+
+        # Provider info label
+        self._provider_info_label = QLabel()
+        self._provider_info_label.setFont(create_font(9))
+        self._provider_info_label.setStyleSheet(get_label_style("muted"))
+        form.addRow("", self._provider_info_label)
+
+        # Separator before legacy model field
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setStyleSheet(f"background-color: {COLORS['border']}; max-height: 1px;")
+        form.addRow("", sep)
+
+        # Legacy OpenRouter model (used by optimizer, separate from AI consultant)
+        self._plain_fields["AI_MODEL"] = QLineEdit()
+        self._plain_fields["AI_MODEL"].setText(
+            self._service.get_with_default("AI_MODEL", "anthropic/claude-4.5-sonnet")
+        )
+        self._plain_fields["AI_MODEL"].setPlaceholderText("anthropic/claude-4.5-sonnet")
+        self._plain_fields["AI_MODEL"].setStyleSheet(get_input_field_stylesheet())
+        self._plain_fields["AI_MODEL"].setFont(create_font(10))
+        self._plain_fields["AI_MODEL"].setToolTip(
+            "OpenRouter model identifier for optimizer (e.g. anthropic/claude-4.5-sonnet)"
+        )
+        form.addRow(self._make_label("Optimizer Model:"), self._plain_fields["AI_MODEL"])
+
+        # Connect provider change handler and set initial info
+        self._provider_combo.currentIndexChanged.connect(self._on_provider_changed)
+        self._update_provider_info()
+
+        return ai_group
+
+    # ------------------------------------------------------------------
+
+    def _on_provider_changed(self, index: int) -> None:
+        self._provider_stack.setCurrentIndex(index)
+        self._update_provider_info()
+
+    def _update_provider_info(self) -> None:
+        provider = self._provider_combo.currentText()
+        self._provider_info_label.setText(_PROVIDER_INFO.get(provider, ""))
 
     # ------------------------------------------------------------------
 
@@ -1381,6 +1525,9 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
         # User-editable keys (non-admin)
         _user_keys = {
             "OPENROUTER_API_KEY", "LAKEAPI_KEY", "LAKEAPI_SECRET",
+            "ANTHROPIC_API_KEY", "OPENAI_API_KEY",
+            "LLM_PROVIDER", "ANTHROPIC_MODEL", "OPENAI_MODEL",
+            "OLLAMA_BASE_URL", "OLLAMA_MODEL",
             "AI_MODEL", "ALERT_EMAIL",
             "LAKEAPI_REGION", "LAKEAPI_LIMIT_GB",
             "MULTICORE_WORKERS", "MEMORY_LIMIT_GB",

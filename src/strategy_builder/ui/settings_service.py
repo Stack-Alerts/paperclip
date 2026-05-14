@@ -44,6 +44,8 @@ SECRET_KEYS = {
     "OPENROUTER_API_KEY",
     "LAKEAPI_KEY",
     "LAKEAPI_SECRET",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
     "POSTGRES_PASSWORD",
     "POSTGRES_SSL_CERT_PATH",
     "POSTGRES_SSL_KEY_PATH",
@@ -169,6 +171,14 @@ USER_KEYS = {
     "OPENROUTER_API_KEY",
     "LAKEAPI_KEY",
     "LAKEAPI_SECRET",
+    # AI provider config
+    "LLM_PROVIDER",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_MODEL",
+    "OPENAI_MODEL",
+    "OLLAMA_BASE_URL",
+    "OLLAMA_MODEL",
     # AI config
     "AI_MODEL",
     # Data & API (non-secret)
@@ -194,6 +204,11 @@ USER_KEYS = {
 
 # Default non-secret user-editable values
 USER_DEFAULTS = {
+    "LLM_PROVIDER": "anthropic",
+    "ANTHROPIC_MODEL": "claude-sonnet-4-6",
+    "OPENAI_MODEL": "gpt-4o",
+    "OLLAMA_BASE_URL": "http://localhost:11434",
+    "OLLAMA_MODEL": "llama3",
     "AI_MODEL": "anthropic/claude-4.5-sonnet",
     "LAKEAPI_REGION": "eu-west-1",
     "LAKEAPI_LIMIT_GB": "300",
