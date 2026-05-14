@@ -191,9 +191,7 @@ def _run_bug_cli() -> None:
     if not issues:
         logger.info("Nothing to do")
         try:
-            catchup_results = catch_up_eligible_bug_issues(
-                engine, dry_run=args.dry_run
-            )
+            catchup_results = catch_up_eligible_bug_issues(engine, dry_run=args.dry_run)
         except Exception:
             logger.exception("Catch-up eligible bug issues failed")
             catchup_results = []
@@ -240,9 +238,7 @@ def _run_bug_cli() -> None:
     worker_results = list(results)
 
     try:
-        catchup_results = catch_up_eligible_bug_issues(
-            engine, dry_run=args.dry_run
-        )
+        catchup_results = catch_up_eligible_bug_issues(engine, dry_run=args.dry_run)
     except Exception:
         logger.exception("Catch-up eligible bug issues failed")
         catchup_results = []
@@ -500,9 +496,7 @@ def _run_fr_cli() -> None:
     if not issues:
         logger.info("Nothing to do")
         try:
-            catchup_results = catch_up_eligible_fr_issues(
-                engine, dry_run=args.dry_run
-            )
+            catchup_results = catch_up_eligible_fr_issues(engine, dry_run=args.dry_run)
         except Exception:
             logger.exception("Catch-up eligible FR issues failed")
             catchup_results = []
@@ -547,9 +541,7 @@ def _run_fr_cli() -> None:
     worker_results = list(results)
 
     try:
-        catchup_results = catch_up_eligible_fr_issues(
-            engine, dry_run=args.dry_run
-        )
+        catchup_results = catch_up_eligible_fr_issues(engine, dry_run=args.dry_run)
     except Exception:
         logger.exception("Catch-up eligible FR issues failed")
         catchup_results = []
