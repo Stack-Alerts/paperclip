@@ -62,7 +62,8 @@ python -m pytest tests/strategies/01_test_strategy_Reversal_M_Pattern_Standard.p
 These pytest test files implement walkforward logic with integrated building block detectors, loading `data/raw/BTC_USDT_PERP_15m.csv` directly.
 
 ### Artifacts
-- `walkforward-reports`: test output log + `data/reports/walkforward_tests/` directory (14-day retention)
+- `walkforward-reports`: test output log + `data/reports/walkforward_tests/` directory (90-day retention)
+- `walkforward-registry`: consolidated `walkforward_results_registry.json` with `overwrite: true` (90-day retention, replaced each run)
 
 ### Nightly failure alert
 When the scheduled run fails, `scripts/nightly_test_alert.py` creates a `critical`-priority issue assigned to the CTO with the CI run URL.
@@ -92,7 +93,7 @@ The runner script (`scripts/run_walkforward_ci.py`) appends results to `walkforw
 }
 ```
 
-The registry is updated by local runs only — the CI workflow does not write to it.
+The registry is written during CI and local runs. In CI, the runner step calls `scripts/run_walkforward_ci.py` which calls `update_registry()`, appending to any previously-downloaded registry artifact. The updated file is uploaded with `overwrite: true` as the `walkforward-registry` artifact, so the next CI run picks it up via `actions/download-artifact`.
 
 ## How the local runner works
 
