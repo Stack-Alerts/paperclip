@@ -1281,6 +1281,85 @@ class TestMain:
         # Only the worker result should be transitioned, not the catch-up result
         mock_transition.assert_called_once_with("id-1", "done")
 
+
+    def test_main_no_issues_catch_up_error_logged(self, monkeypatch, caplog):
+        """When catch_up_eligible_bug_issues raises, error is logged and worker continues."""
+        import logging
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=[],
+            ),
+            patch("touch_index.bug_worker.run_bug_worker") as mock_worker,
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                side_effect=RuntimeError("API timeout"),
+            ),
+            caplog.at_level(logging.ERROR),
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            main()
+
+        mock_worker.assert_not_called()
+        assert any("Catch-up eligible bug issues failed" in r.message for r in caplog.records)
+
+
+    def test_main_polling_catch_up_error_logged(self, monkeypatch, caplog):
+        """Polling path: catch_up_eligible_bug_issues raises, error logged, worker continues."""
+        import logging
+        from touch_index.__main__ import _run_bug_cli as main
+
+        engine = MagicMock()
+        issues = [
+            {
+                "id": "id-1",
+                "identifier": "BTCAAAAA-101",
+                "completedAt": "2026-05-11T10:00:00Z",
+            },
+        ]
+        worker_results = [
+            BugIngestionResult(
+                issue_id="id-1",
+                issue_identifier="BTCAAAAA-101",
+                files_indexed=2,
+                source="git",
+                skipped_no_commits=False,
+                issue_status="done",
+            ),
+        ]
+
+        with (
+            patch("touch_index.db.get_engine", return_value=engine),
+            patch("touch_index.db.health_check", return_value=True),
+            patch(
+                "touch_index.paperclip_client.get_closed_non_fdr_issues",
+                return_value=issues,
+            ),
+            patch(
+                "touch_index.bug_worker.run_bug_worker",
+                return_value=worker_results,
+            ),
+            patch(
+                "touch_index.bug_worker.catch_up_eligible_bug_issues",
+                side_effect=RuntimeError("API timeout"),
+            ),
+            patch(
+                "touch_index.paperclip_client.transition_issue_status_board",
+            ) as mock_transition,
+            caplog.at_level(logging.ERROR),
+        ):
+            monkeypatch.setattr("sys.argv", ["touch_index"])
+            main()
+
+        assert any("Catch-up eligible bug issues failed" in r.message for r in caplog.records)
+        mock_transition.assert_called_once_with("id-1", "done")
+
     def test_main_catch_up_dry_run(self, monkeypatch):
         """--dry-run is passed through to catch_up_eligible_bug_issues."""
         from touch_index.__main__ import _run_bug_cli as main

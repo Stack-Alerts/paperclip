@@ -190,7 +190,13 @@ def _run_bug_cli() -> None:
 
     if not issues:
         logger.info("Nothing to do")
-        catchup_results = catch_up_eligible_bug_issues(engine, dry_run=args.dry_run)
+        try:
+            catchup_results = catch_up_eligible_bug_issues(
+                engine, dry_run=args.dry_run
+            )
+        except Exception:
+            logger.exception("Catch-up eligible bug issues failed")
+            catchup_results = []
         if catchup_results:
             logger.info(
                 "Catch-up indexed %d file(s) across %d issue(s)",
@@ -233,7 +239,13 @@ def _run_bug_cli() -> None:
     worker_count = len(results)
     worker_results = list(results)
 
-    catchup_results = catch_up_eligible_bug_issues(engine, dry_run=args.dry_run)
+    try:
+        catchup_results = catch_up_eligible_bug_issues(
+            engine, dry_run=args.dry_run
+        )
+    except Exception:
+        logger.exception("Catch-up eligible bug issues failed")
+        catchup_results = []
     if catchup_results:
         logger.info(
             "Catch-up indexed %d file(s) across %d issue(s)",
