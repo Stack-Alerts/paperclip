@@ -110,3 +110,7 @@ target-version = "py312"
 #   Added after BTCAAAAA-198 migrated all 1,783 print() calls to structured logging.
 #   Any new print() in src/ will fail CI immediately.
 select = ["DTZ003", "T201"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/btc-spend" = ["T201"]
+

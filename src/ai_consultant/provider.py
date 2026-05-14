@@ -422,13 +422,195 @@ class OllamaProvider(LLMProvider):
         ]
 
 
+# ── DeepSeek ──────────────────────────────────────────────────────────────────
+
+
+class DeepSeekProvider(LLMProvider):
+    """DeepSeek v4 Flash / Pro backend via OpenAI-compatible API."""
+
+    _DEFAULT_BASE_URL = "https://api.deepseek.com/v1"
+    _DEFAULT_MODEL = "deepseek-v4-pro"
+
+    _FLASH_INPUT_COST_PER_M = 0.20
+    _FLASH_OUTPUT_COST_PER_M = 1.10
+    _PRO_INPUT_COST_PER_M = 0.55
+    _PRO_OUTPUT_COST_PER_M = 2.19
+
+    def __init__(self, config: ProviderConfig) -> None:
+        super().__init__(config)
+        import openai as _openai  # lazy import
+
+        api_key = config.api_key or os.environ.get("DEEPSEEK_API_KEY")
+        base_url = config.base_url or os.environ.get(
+            "DEEPSEEK_BASE_URL", self._DEFAULT_BASE_URL
+        )
+        self._model = config.model or os.environ.get(
+            "DEEPSEEK_MODEL", self._DEFAULT_MODEL
+        )
+        self._client = _openai.OpenAI(api_key=api_key, base_url=base_url)
+
+    def chat(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+    ) -> ChatResponse:
+        adapted = OpenAIProvider._adapt_messages(messages)
+
+        def _call() -> Any:
+            kwargs: dict[str, Any] = {
+                "model": self._model,
+                "messages": adapted,
+            }
+            if tools:
+                kwargs["tools"] = self._format_tools(tools)
+            return self._client.chat.completions.create(**kwargs)
+
+        resp = self._retry(_call)
+        msg = resp.choices[0].message
+
+        tool_calls: list[ToolCall] = []
+        if msg.tool_calls:
+            for tc in msg.tool_calls:
+                tool_calls.append(
+                    ToolCall(
+                        id=tc.id,
+                        name=tc.function.name,
+                        arguments=json.loads(tc.function.arguments),
+                    )
+                )
+
+        return ChatResponse(
+            content=msg.content or "",
+            tool_calls=tool_calls,
+            prompt_tokens=resp.usage.prompt_tokens,
+            completion_tokens=resp.usage.completion_tokens,
+            model=resp.model,
+        )
+
+    def estimate_cost(self, prompt_tokens: int, completion_tokens: int) -> float:
+        if self._model and "flash" in self._model.lower():
+            input_rate = self._FLASH_INPUT_COST_PER_M
+            output_rate = self._FLASH_OUTPUT_COST_PER_M
+        else:
+            input_rate = self._PRO_INPUT_COST_PER_M
+            output_rate = self._PRO_OUTPUT_COST_PER_M
+        return (
+            prompt_tokens * input_rate / 1_000_000
+            + completion_tokens * output_rate / 1_000_000
+        )
+
+    @staticmethod
+    def _format_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": t["name"],
+                    "description": t.get("description", ""),
+                    "parameters": t.get(
+                        "parameters", {"type": "object", "properties": {}}
+                    ),
+                },
+            }
+            for t in tools
+        ]
+
+
+# ── OpenRouter ────────────────────────────────────────────────────────────────
+
+
+class OpenRouterProvider(LLMProvider):
+    """OpenRouter backend via OpenAI-compatible API with model-agnostic cost."""
+
+    _DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
+    _DEFAULT_MODEL = "deepseek/deepseek-v4-pro"
+    _INPUT_COST_PER_M = 0.55
+    _OUTPUT_COST_PER_M = 2.19
+
+    def __init__(self, config: ProviderConfig) -> None:
+        super().__init__(config)
+        import openai as _openai  # lazy import
+
+        api_key = config.api_key or os.environ.get("OPENROUTER_API_KEY")
+        base_url = config.base_url or os.environ.get(
+            "OPENROUTER_BASE_URL", self._DEFAULT_BASE_URL
+        )
+        self._model = config.model or os.environ.get(
+            "OPENROUTER_MODEL", self._DEFAULT_MODEL
+        )
+        self._client = _openai.OpenAI(api_key=api_key, base_url=base_url)
+
+    def chat(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+    ) -> ChatResponse:
+        adapted = OpenAIProvider._adapt_messages(messages)
+
+        def _call() -> Any:
+            kwargs: dict[str, Any] = {
+                "model": self._model,
+                "messages": adapted,
+            }
+            if tools:
+                kwargs["tools"] = self._format_tools(tools)
+            return self._client.chat.completions.create(**kwargs)
+
+        resp = self._retry(_call)
+        msg = resp.choices[0].message
+
+        tool_calls: list[ToolCall] = []
+        if msg.tool_calls:
+            for tc in msg.tool_calls:
+                tool_calls.append(
+                    ToolCall(
+                        id=tc.id,
+                        name=tc.function.name,
+                        arguments=json.loads(tc.function.arguments),
+                    )
+                )
+
+        return ChatResponse(
+            content=msg.content or "",
+            tool_calls=tool_calls,
+            prompt_tokens=resp.usage.prompt_tokens,
+            completion_tokens=resp.usage.completion_tokens,
+            model=resp.model,
+        )
+
+    def estimate_cost(self, prompt_tokens: int, completion_tokens: int) -> float:
+        return (
+            prompt_tokens * self._INPUT_COST_PER_M / 1_000_000
+            + completion_tokens * self._OUTPUT_COST_PER_M / 1_000_000
+        )
+
+    @staticmethod
+    def _format_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": t["name"],
+                    "description": t.get("description", ""),
+                    "parameters": t.get(
+                        "parameters", {"type": "object", "properties": {}}
+                    ),
+                },
+            }
+            for t in tools
+        ]
+
+
 # ── Factory ───────────────────────────────────────────────────────────────────
 
 _PROVIDERS: dict[str, type[LLMProvider]] = {
     "anthropic": AnthropicProvider,
     "openai": OpenAIProvider,
     "ollama": OllamaProvider,
+    "deepseek": DeepSeekProvider,
+    "openrouter": OpenRouterProvider,
 }
+
 
 
 def _config_from_yaml(path: str) -> ProviderConfig:

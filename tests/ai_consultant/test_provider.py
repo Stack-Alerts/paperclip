@@ -13,8 +13,10 @@ import pytest
 from ai_consultant.provider import (
     AnthropicProvider,
     ChatResponse,
+    DeepSeekProvider,
     OllamaProvider,
     OpenAIProvider,
+    OpenRouterProvider,
     ProviderConfig,
     RetryConfig,
     ToolCall,
@@ -505,3 +507,153 @@ def _make_openai_text_response(text: str) -> MagicMock:
     resp.usage.completion_tokens = 3
     resp.model = "gpt-4o"
     return resp
+
+
+# ── DeepSeek ──────────────────────────────────────────────────────────────────
+
+
+class TestDeepSeekProvider:
+    def _mock_text_response(self, text: str = "Hello") -> MagicMock:
+        msg = MagicMock()
+        msg.content = text
+        msg.tool_calls = None
+        choice = MagicMock()
+        choice.message = msg
+        resp = MagicMock()
+        resp.choices = [choice]
+        resp.usage.prompt_tokens = 10
+        resp.usage.completion_tokens = 5
+        resp.model = "deepseek-v4-pro"
+        return resp
+
+    def test_chat_plain_text(self) -> None:
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = self._mock_text_response("Hi")
+        with patch("openai.OpenAI", return_value=mock_client):
+            p = DeepSeekProvider(_make_config("deepseek"))
+            result = p.chat([{"role": "user", "content": "Hello"}])
+        assert result.content == "Hi"
+        assert result.model == "deepseek-v4-pro"
+
+    def test_estimate_cost_flash(self) -> None:
+        with patch("openai.OpenAI", return_value=MagicMock()):
+            p = DeepSeekProvider(
+                ProviderConfig(provider="deepseek", model="deepseek-v4-flash", api_key="k")
+            )
+        cost = p.estimate_cost(1_000_000, 1_000_000)
+        assert cost == pytest.approx(1.30)  # $0.20 input + $1.10 output
+
+    def test_estimate_cost_pro(self) -> None:
+        with patch("openai.OpenAI", return_value=MagicMock()):
+            p = DeepSeekProvider(
+                ProviderConfig(provider="deepseek", model="deepseek-v4-pro", api_key="k")
+            )
+        cost = p.estimate_cost(1_000_000, 1_000_000)
+        assert cost == pytest.approx(2.74)  # $0.55 input + $2.19 output
+
+    def test_estimate_cost_default_is_pro(self) -> None:
+        with patch("openai.OpenAI", return_value=MagicMock()):
+            p = DeepSeekProvider(_make_config("deepseek"))
+        cost = p.estimate_cost(1_000_000, 0)
+        assert cost == pytest.approx(0.55)
+
+    def test_default_base_url(self) -> None:
+        with patch("openai.OpenAI", return_value=MagicMock()):
+            p = DeepSeekProvider(_make_config("deepseek"))
+        assert p._DEFAULT_BASE_URL == "https://api.deepseek.com/v1"
+
+
+# ── OpenRouter ────────────────────────────────────────────────────────────────
+
+
+class TestOpenRouterProvider:
+    def _mock_text_response(self, text: str = "Hello") -> MagicMock:
+        msg = MagicMock()
+        msg.content = text
+        msg.tool_calls = None
+        choice = MagicMock()
+        choice.message = msg
+        resp = MagicMock()
+        resp.choices = [choice]
+        resp.usage.prompt_tokens = 10
+        resp.usage.completion_tokens = 5
+        resp.model = "deepseek/deepseek-v4-pro"
+        return resp
+
+    def test_chat_plain_text(self) -> None:
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = self._mock_text_response("Hi")
+        with patch("openai.OpenAI", return_value=mock_client):
+            p = OpenRouterProvider(_make_config("openrouter"))
+            result = p.chat([{"role": "user", "content": "Hello"}])
+        assert result.content == "Hi"
+
+    def test_estimate_cost(self) -> None:
+        with patch("openai.OpenAI", return_value=MagicMock()):
+            p = OpenRouterProvider(_make_config("openrouter"))
+        cost = p.estimate_cost(1_000_000, 1_000_000)
+        assert cost == pytest.approx(2.74)  # $0.55 input + $2.19 output
+
+    def test_default_base_url(self) -> None:
+        with patch("openai.OpenAI", return_value=MagicMock()):
+            p = OpenRouterProvider(_make_config("openrouter"))
+        assert p._DEFAULT_BASE_URL == "https://openrouter.ai/api/v1"
+
+
+# ── Factory (updated) ─────────────────────────────────────────────────────────
+
+
+class TestCreateProviderExtended:
+    def test_env_var_selects_deepseek(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("LLM_PROVIDER", "deepseek")
+        monkeypatch.delenv("LLM_CONFIG_PATH", raising=False)
+        with patch("openai.OpenAI", return_value=MagicMock()):
+            p = create_provider()
+        assert isinstance(p, DeepSeekProvider)
+
+    def test_env_var_selects_openrouter(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("LLM_PROVIDER", "openrouter")
+        monkeypatch.delenv("LLM_CONFIG_PATH", raising=False)
+        with patch("openai.OpenAI", return_value=MagicMock()):
+            p = create_provider()
+        assert isinstance(p, OpenRouterProvider)
+
+
+# ── Cost tracker helpers ──────────────────────────────────────────────────────
+
+
+class TestCostTrackerHelpers:
+    def test_classify_anthropic(self) -> None:
+        from ai_consultant.cost_tracker import _classify_provider
+        assert _classify_provider("claude-sonnet-4-6") == "Anthropic"
+        assert _classify_provider("claude-opus-4") == "Anthropic"
+
+    def test_classify_openai(self) -> None:
+        from ai_consultant.cost_tracker import _classify_provider
+        assert _classify_provider("gpt-4o") == "OpenAI"
+        assert _classify_provider("gpt-4-turbo") == "OpenAI"
+
+    def test_classify_deepseek(self) -> None:
+        from ai_consultant.cost_tracker import _classify_provider
+        assert _classify_provider("deepseek-v4-flash") == "DeepSeek"
+        assert _classify_provider("deepseek-v4-pro") == "DeepSeek"
+        assert _classify_provider("deepseek/deepseek-v4-pro") == "DeepSeek"
+
+    def test_classify_openrouter_fallback(self) -> None:
+        from ai_consultant.cost_tracker import _classify_provider
+        assert _classify_provider("some-future-model") == "OpenRouter"
+
+    def test_estimate_cost_anthropic(self) -> None:
+        from ai_consultant.cost_tracker import _estimate_cost
+        cost = _estimate_cost("Anthropic", "claude-sonnet-4-6", 1_000_000, 1_000_000)
+        assert cost == pytest.approx(18.0)  # $3 input + $15 output
+
+    def test_estimate_cost_deepseek_flash(self) -> None:
+        from ai_consultant.cost_tracker import _estimate_cost
+        cost = _estimate_cost("DeepSeek", "deepseek-v4-flash", 1_000_000, 1_000_000)
+        assert cost == pytest.approx(1.30)  # $0.20 input + $1.10 output
+
+    def test_estimate_cost_deepseek_pro(self) -> None:
+        from ai_consultant.cost_tracker import _estimate_cost
+        cost = _estimate_cost("DeepSeek", "deepseek-v4-pro", 1_000_000, 1_000_000)
+        assert cost == pytest.approx(2.74)  # $0.55 input + $2.19 output
