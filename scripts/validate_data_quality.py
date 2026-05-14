@@ -142,7 +142,7 @@ def check_recency(data_dir: Path, timeframes: list) -> dict:
         try:
             df = pd.read_parquet(latest_file, columns=['timestamp'])
             df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
-        except Exception:
+        except Exception as e:
             results[tf] = {'error': str(e), 'pass': False}
             continue
 
