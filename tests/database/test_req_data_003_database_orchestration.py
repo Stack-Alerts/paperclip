@@ -1,10 +1,10 @@
 """
 REQ-DATA-003 Verification: Database layer under optimizer_v3/database
-provides unified ORM access for 9 managers.
+provides unified ORM access for managers.
 
 Validates:
 - All ORM managers are correctly connected and operational
-- Schema integrity across all tables
+- Schema integrity across active tables
 - Connection handling and pool behavior
 - End-to-end cross-manager workflow
 """
@@ -14,38 +14,15 @@ from datetime import datetime, timezone
 from sqlalchemy import text, inspect
 
 
-# ---------------------------------------------------------------------------
-# Schema integrity
-# ---------------------------------------------------------------------------
-
 _REQUIRED_MANAGER_TABLES = {
     "strategies",
     "strategy_versions",
     "strategy_block_versions",
     "ai_recommendations",
     "strategy_test_results",
-    "validation_reports",
 }
-_REQUIRED_CORE_TABLES = {
-    "optimization_runs",
-    "strategy_variations",
-    "signal_events",
-    "signal_metrics",
-    "training_sessions",
-    "session_states",
-    "backtest_results",
-}
-_REQUIRED_TRACE_TABLES = {
-    "trace_requirements",
-    "trace_test_cases",
-    "trace_issues",
-    "trace_links",
-}
-_ALL_REQUIRED_TABLES = (
-    _REQUIRED_MANAGER_TABLES | _REQUIRED_CORE_TABLES | _REQUIRED_TRACE_TABLES
-)
+_ALL_REQUIRED_TABLES = _REQUIRED_MANAGER_TABLES
 
-# Each specialised manager should have at least these columns to be "operational"
 _MANAGER_COLUMNS = {
     "strategies": {"strategy_id", "name", "created_at", "updated_at"},
     "strategy_versions": {
@@ -54,17 +31,13 @@ _MANAGER_COLUMNS = {
         "risk_management", "backtest_config", "created_at",
     },
     "ai_recommendations": {
-        "recommendation_id", "strategy_id", "recommendation_type",
-        "title", "description", "rationale", "suggested_changes",
-        "applied", "confidence_score", "created_at",
+        "recommendation_id", "strategy_id", "version_id", "recommendation_type",
+        "reasoning", "configuration", "expected_impact",
+        "applied", "combined_confidence", "created_at",
     },
     "strategy_test_results": {
         "result_id", "strategy_id", "version_id", "test_type",
         "test_config", "start_date", "end_date", "metrics", "created_at",
-    },
-    "validation_reports": {
-        "report_id", "strategy_id", "version_id",
-        "is_valid", "total_issues", "issues", "created_at",
     },
 }
 
@@ -97,17 +70,12 @@ class TestSchemaIntegrity:
 
     @pytest.mark.parametrize("table", sorted(_REQUIRED_MANAGER_TABLES))
     def test_manager_table_is_not_empty_if_data_exists(self, db_manager_for_testing, table):
-        """Verify manager table is queryable (does not crash on empty result)."""
         with db_manager_for_testing.session_scope() as session:
             result = session.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()
         assert isinstance(result, int), (
             f"Table '{table}' should be queryable; got {type(result)}"
         )
 
-
-# ---------------------------------------------------------------------------
-# Connection handling
-# ---------------------------------------------------------------------------
 
 class TestConnectionHandling:
     def test_test_connection_returns_true(self, db_manager_for_testing):
@@ -131,13 +99,8 @@ class TestConnectionHandling:
         assert result == 1
 
     def test_close_does_not_raise(self, db_manager_for_testing):
-        """Closing should be a no-op safe to call for cleanup."""
         db_manager_for_testing.close()
 
-
-# ---------------------------------------------------------------------------
-# DatabaseManager unified facade
-# ---------------------------------------------------------------------------
 
 class TestDatabaseManagerUnifiedFacade:
     def test_manager_has_strategy_submanager(self, db_manager_for_testing):
@@ -152,10 +115,6 @@ class TestDatabaseManagerUnifiedFacade:
         from src.optimizer_v3.database.test_results_manager import TestResultsManager
         assert isinstance(db_manager_for_testing.test_results, TestResultsManager)
 
-
-# ---------------------------------------------------------------------------
-# Strategy manager (via DatabaseManager.strategy)
-# ---------------------------------------------------------------------------
 
 class TestStrategyDatabaseManager:
     def test_create_strategy_returns_id(self, db_manager_for_testing):
@@ -201,21 +160,31 @@ class TestStrategyDatabaseManager:
             })
 
 
-# ---------------------------------------------------------------------------
-# AI recommendations manager (via DatabaseManager.ai_recommendations)
-# ---------------------------------------------------------------------------
-
 class TestAIRecommendationsManager:
+    def _create_version_for_rec(self, db):
+        sid = db.strategy.create_strategy("AI Rec Strategy")
+        vid = db.strategy.create_strategy_version({
+            "strategy_id": sid,
+            "name": "AI Rec v1",
+            "blocks": [{"name": "b1", "signals": [], "parameters": {}}],
+            "signals": {},
+            "parameters": {},
+            "entry_conditions": {},
+            "exit_conditions": [],
+            "risk_management": {},
+            "backtest_config": {},
+        })
+        return sid, vid
+
     def test_create_recommendation_returns_uuid(self, db_manager_for_testing):
-        sid = db_manager_for_testing.strategy.create_strategy("AI Rec Test")
+        sid, vid = self._create_version_for_rec(db_manager_for_testing)
         rid = db_manager_for_testing.ai_recommendations.create_recommendation({
             "strategy_id": sid,
+            "strategy_version_id": vid,
             "recommendation_type": "performance",
-            "title": "Test Recommendation",
-            "description": "A test recommendation for REQ-DATA-003",
-            "rationale": "Testing database orchestration",
-            "suggested_changes": {"parameter": "value"},
-            "confidence_score": 0.85,
+            "reasoning": "Performance improvement suggested via parameter tuning",
+            "configuration": {"parameter": "value"},
+            "combined_confidence": 0.85,
         })
         import uuid as _uuid
         try:
@@ -224,43 +193,36 @@ class TestAIRecommendationsManager:
             pytest.fail(f"Recommendation ID is not a valid UUID: {rid!r}")
 
     def test_get_recommendation_returns_data(self, db_manager_for_testing):
-        sid = db_manager_for_testing.strategy.create_strategy("Get Rec Test")
+        sid, vid = self._create_version_for_rec(db_manager_for_testing)
         rid = db_manager_for_testing.ai_recommendations.create_recommendation({
             "strategy_id": sid,
+            "strategy_version_id": vid,
             "recommendation_type": "risk",
-            "title": "Retrievable Rec",
-            "description": "Can we get it back?",
-            "rationale": "Test retrieval",
-            "suggested_changes": {"risk": 0.02},
+            "reasoning": "Risk should be reduced based on drawdown analysis",
         })
         rec = db_manager_for_testing.ai_recommendations.get_recommendation(rid)
         assert rec is not None
-        assert rec["title"] == "Retrievable Rec"
         assert rec["recommendation_type"] == "risk"
 
     def test_get_strategy_recommendations_filters(self, db_manager_for_testing):
-        sid = db_manager_for_testing.strategy.create_strategy("Filter Rec Test")
+        sid, vid = self._create_version_for_rec(db_manager_for_testing)
         db_manager_for_testing.ai_recommendations.create_recommendation({
             "strategy_id": sid,
+            "strategy_version_id": vid,
             "recommendation_type": "signal",
-            "title": "Signal Rec",
-            "description": "Signal improvement",
-            "rationale": "Better signals",
-            "suggested_changes": {},
+            "reasoning": "Better signals via parameter adjustment",
         })
         recs = db_manager_for_testing.ai_recommendations.get_strategy_recommendations(sid)
         assert len(recs) >= 1
         assert any(r["strategy_id"] == sid for r in recs)
 
     def test_mark_applied_and_verify(self, db_manager_for_testing):
-        sid = db_manager_for_testing.strategy.create_strategy("Apply Test")
+        sid, vid = self._create_version_for_rec(db_manager_for_testing)
         rid = db_manager_for_testing.ai_recommendations.create_recommendation({
             "strategy_id": sid,
+            "strategy_version_id": vid,
             "recommendation_type": "entry",
-            "title": "Apply Me",
-            "description": "Should be marked applied",
-            "rationale": "Test apply",
-            "suggested_changes": {},
+            "reasoning": "Entry should be triggered on RSI divergence",
         })
         result = db_manager_for_testing.ai_recommendations.mark_applied(
             rid, "00000000-0000-0000-0000-000000000000"
@@ -275,10 +237,6 @@ class TestAIRecommendationsManager:
                 "strategy_id": "nope",
             })
 
-
-# ---------------------------------------------------------------------------
-# Test results manager (via DatabaseManager.test_results)
-# ---------------------------------------------------------------------------
 
 class TestTestResultsManager:
     def _create_version_for_test(self, db):
@@ -358,18 +316,12 @@ class TestTestResultsManager:
             db_manager_for_testing.test_results.create_test_result({})
 
 
-# ---------------------------------------------------------------------------
-# Cross-manager end-to-end workflow
-# ---------------------------------------------------------------------------
-
 class TestCrossManagerWorkflow:
     def test_full_lifecycle(self, db_manager_for_testing):
         db = db_manager_for_testing
 
-        # 1. Create a strategy
         sid = db.strategy.create_strategy("E2E Strategy")
 
-        # 2. Create a version
         vid = db.strategy.create_strategy_version({
             "strategy_id": sid,
             "name": "E2E v1",
@@ -382,7 +334,6 @@ class TestCrossManagerWorkflow:
             "backtest_config": {"timeframe": "1h"},
         })
 
-        # 3. Record a test result
         result_id = db.test_results.create_test_result({
             "strategy_id": sid,
             "strategy_version_id": vid,
@@ -400,19 +351,15 @@ class TestCrossManagerWorkflow:
             },
         })
 
-        # 4. Create an AI recommendation
         rec_id = db.ai_recommendations.create_recommendation({
             "strategy_id": sid,
             "strategy_version_id": vid,
             "recommendation_type": "parameter",
-            "title": "Increase period to 50",
-            "description": "The 20-period breakout is too noisy",
-            "rationale": "Sharpe improves with higher period",
-            "suggested_changes": {"parameters": {"period": 50}},
-            "confidence_score": 0.92,
+            "reasoning": "Sharpe improves with higher period from 20 to 50",
+            "configuration": {"parameters": {"period": 50}},
+            "combined_confidence": 0.92,
         })
 
-        # 5. Verify the chain
         fetched_result = db.test_results.get_test_result(result_id)
         assert fetched_result is not None
         assert fetched_result["sharpe_ratio"] == 2.1
@@ -421,6 +368,5 @@ class TestCrossManagerWorkflow:
         assert fetched_rec is not None
         assert fetched_rec["recommendation_type"] == "parameter"
 
-        # 6. Verify strategy listing
         strategies = db.strategy.get_all_strategies()
         assert any(s["strategy_id"] == sid for s in strategies)

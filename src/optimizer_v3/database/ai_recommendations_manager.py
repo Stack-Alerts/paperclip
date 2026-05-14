@@ -81,7 +81,7 @@ class AIRecommendationsManager:
         from src.optimizer_v3.database.models import AIRecommendation
         
         # Validate required fields
-        required = ['strategy_id', 'recommendation_type', 'title', 'description', 'rationale', 'suggested_changes']
+        required = ['strategy_id', 'recommendation_type', 'reasoning']
         missing = [f for f in required if f not in recommendation_data]
         if missing:
             raise ValueError(f"Missing required fields: {', '.join(missing)}")
@@ -91,23 +91,17 @@ class AIRecommendationsManager:
         if recommendation_data['recommendation_type'] not in valid_types:
             raise ValueError(f"Invalid type. Must be one of: {', '.join(valid_types)}")
         
-        # Create ORM object - SQLAlchemy handles JSONB automatically
+        # Create ORM object — only set columns that exist in the current DB
+        # (title, description, rationale, suggested_changes, priority,
+        #  applied_version_id, applied_by are defined in the model but
+        #  the corresponding DB columns have not been migrated yet.)
         recommendation = AIRecommendation(
             strategy_id=recommendation_data['strategy_id'],
-            strategy_version_id=recommendation_data.get('strategy_version_id'),
             recommendation_type=recommendation_data['recommendation_type'],
-            title=recommendation_data['title'],
-            description=recommendation_data['description'],
-            rationale=recommendation_data['rationale'],
-            # JSONB fields - pass Python dicts directly
-            suggested_changes=recommendation_data['suggested_changes'],
+            reasoning=recommendation_data.get('reasoning', recommendation_data.get('rationale', '')),
+            configuration=recommendation_data.get('configuration'),
             expected_impact=recommendation_data.get('expected_impact', {}),
-            analysis_data=recommendation_data.get('analysis_data'),
-            # Other fields
-            confidence_score=recommendation_data.get('confidence_score', 0.5),
-            priority=recommendation_data.get('priority', 'medium'),
-            model_version=recommendation_data.get('model_version')
-            # recommendation_id, created_at handled by defaults
+            combined_confidence=recommendation_data.get('combined_confidence', recommendation_data.get('confidence_score', 0.5)),
         )
         
         try:
@@ -163,22 +157,22 @@ class AIRecommendationsManager:
                 'strategy_id': recommendation.strategy_id,
                 'strategy_version_id': str(recommendation.strategy_version_id) if recommendation.strategy_version_id else None,
                 'recommendation_type': recommendation.recommendation_type,
-                'title': recommendation.title,
-                'description': recommendation.description,
-                'rationale': recommendation.rationale,
+                'reasoning': recommendation.reasoning,
                 # JSONB fields - already Python objects
-                'suggested_changes': recommendation.suggested_changes,
+                'configuration': recommendation.configuration,
                 'expected_impact': recommendation.expected_impact,
-                'analysis_data': recommendation.analysis_data,
-                'actual_impact': recommendation.actual_impact,
+                'warnings': recommendation.warnings,
                 # Other fields
-                'confidence_score': recommendation.confidence_score,
-                'priority': recommendation.priority,
-                'model_version': recommendation.model_version,
+                'combined_confidence': recommendation.combined_confidence,
+                'block_name': recommendation.block_name,
+                'signal_name': recommendation.signal_name,
+                'parameter_name': recommendation.parameter_name,
+                'root_cause': recommendation.root_cause,
+                'ai_enhanced': recommendation.ai_enhanced,
                 'applied': recommendation.applied,
-                'applied_version_id': str(recommendation.applied_version_id) if recommendation.applied_version_id else None,
                 'applied_at': recommendation.applied_at,
-                'applied_by': recommendation.applied_by,
+                'metrics_before': recommendation.metrics_before,
+                'metrics_after': recommendation.metrics_after,
                 'created_at': recommendation.created_at
             }
             
@@ -235,20 +229,20 @@ class AIRecommendationsManager:
                     'strategy_id': rec.strategy_id,
                     'strategy_version_id': str(rec.strategy_version_id) if rec.strategy_version_id else None,
                     'recommendation_type': rec.recommendation_type,
-                    'title': rec.title,
-                    'description': rec.description,
-                    'rationale': rec.rationale,
-                    'suggested_changes': rec.suggested_changes,
+                    'reasoning': rec.reasoning,
+                    'configuration': rec.configuration,
                     'expected_impact': rec.expected_impact,
-                    'analysis_data': rec.analysis_data,
-                    'actual_impact': rec.actual_impact,
-                    'confidence_score': rec.confidence_score,
-                    'priority': rec.priority,
-                    'model_version': rec.model_version,
+                    'warnings': rec.warnings,
+                    'combined_confidence': rec.combined_confidence,
+                    'block_name': rec.block_name,
+                    'signal_name': rec.signal_name,
+                    'parameter_name': rec.parameter_name,
+                    'root_cause': rec.root_cause,
+                    'ai_enhanced': rec.ai_enhanced,
                     'applied': rec.applied,
-                    'applied_version_id': str(rec.applied_version_id) if rec.applied_version_id else None,
                     'applied_at': rec.applied_at,
-                    'applied_by': rec.applied_by,
+                    'metrics_before': rec.metrics_before,
+                    'metrics_after': rec.metrics_after,
                     'created_at': rec.created_at
                 }
                 result_list.append(rec_dict)
@@ -268,38 +262,43 @@ class AIRecommendationsManager:
     ) -> bool:
         """
         Mark recommendation as applied to a version using ORM
-        
+
         Args:
             recommendation_id: Recommendation UUID
-            applied_version_id: Version where recommendation was applied
-            applied_by: User who applied it
-            
+            applied_version_id: Version where recommendation was applied (stored in metrics_before JSONB for audit)
+            applied_by: User who applied it (ignored — column not in current schema)
+
         Returns:
             True if updated, False if not found
-            
+
         ORM Refactored: Sprint 1.6.1 Task 2.1.5
         """
         from src.optimizer_v3.database.models import AIRecommendation
-        
+
         try:
             recommendation = self.session.query(AIRecommendation).filter_by(
                 recommendation_id=recommendation_id
             ).first()
-            
+
             if not recommendation:
                 return False
-            
+
             # Update using ORM
             recommendation.applied = True
-            recommendation.applied_version_id = applied_version_id
             recommendation.applied_at = datetime.now(timezone.utc)
-            recommendation.applied_by = applied_by
-            
+
+            # Store applied metadata in configuration JSONB (columns not in current schema)
+            if recommendation.configuration is None:
+                recommendation.configuration = {}
+            recommendation.configuration['applied_version_id'] = applied_version_id
+            if applied_by:
+                recommendation.configuration['applied_by'] = applied_by
+
             self.session.commit()
-            
+
             self.logger.info(f"Marked recommendation {recommendation_id} as applied to {applied_version_id}")
             return True
-            
+
         except Exception as e:
             self.session.rollback()
             self.logger.error(f"Failed to mark recommendation {recommendation_id} as applied: {e}")
@@ -333,7 +332,7 @@ class AIRecommendationsManager:
                 return False
             
             # Update JSONB field - SQLAlchemy handles serialization
-            recommendation.actual_impact = actual_impact
+            recommendation.metrics_after = actual_impact
             
             self.session.commit()
             
@@ -381,20 +380,20 @@ class AIRecommendationsManager:
             'strategy_id': rec.strategy_id,
             'strategy_version_id': str(rec.strategy_version_id) if rec.strategy_version_id else None,
             'recommendation_type': rec.recommendation_type,
-            'title': rec.title,
-            'description': rec.description,
-            'rationale': rec.rationale,
-            'suggested_changes': rec.suggested_changes,
+            'reasoning': rec.reasoning,
+            'configuration': rec.configuration,
             'expected_impact': rec.expected_impact,
-            'analysis_data': rec.analysis_data,
-            'actual_impact': rec.actual_impact,
-            'confidence_score': rec.confidence_score,
-            'priority': rec.priority,
-            'model_version': rec.model_version,
+            'warnings': rec.warnings,
+            'combined_confidence': rec.combined_confidence,
+            'block_name': rec.block_name,
+            'signal_name': rec.signal_name,
+            'parameter_name': rec.parameter_name,
+            'root_cause': rec.root_cause,
+            'ai_enhanced': rec.ai_enhanced,
             'applied': rec.applied,
-            'applied_version_id': str(rec.applied_version_id) if rec.applied_version_id else None,
             'applied_at': rec.applied_at,
-            'applied_by': rec.applied_by,
+            'metrics_before': rec.metrics_before,
+            'metrics_after': rec.metrics_after,
             'created_at': rec.created_at
         }
     
@@ -418,9 +417,9 @@ class AIRecommendationsManager:
         try:
             recommendations = self.session.query(AIRecommendation).filter(
                 AIRecommendation.applied == False,
-                AIRecommendation.confidence_score >= min_confidence
+                AIRecommendation.combined_confidence >= min_confidence
             ).order_by(
-                AIRecommendation.confidence_score.desc(),
+                AIRecommendation.combined_confidence.desc(),
                 AIRecommendation.created_at.desc()
             ).all()
             
@@ -454,9 +453,9 @@ class AIRecommendationsManager:
             result = self.session.query(
                 func.count(AIRecommendation.recommendation_id).label('total_recommendations'),
                 func.count(case((AIRecommendation.applied == True, 1))).label('total_applied'),
-                func.count(case((AIRecommendation.actual_impact != None, 1))).label('total_measured'),
-                func.avg(AIRecommendation.confidence_score).label('avg_confidence'),
-                func.avg(case((AIRecommendation.applied == True, AIRecommendation.confidence_score))).label('avg_applied_confidence')
+                func.count(case((AIRecommendation.metrics_after != None, 1))).label('total_measured'),
+                func.avg(AIRecommendation.combined_confidence).label('avg_confidence'),
+                func.avg(case((AIRecommendation.applied == True, AIRecommendation.combined_confidence))).label('avg_applied_confidence')
             ).one()
             
             stats = {

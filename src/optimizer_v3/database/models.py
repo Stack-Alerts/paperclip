@@ -555,22 +555,19 @@ class AIRecommendation(Base):
     strategy_version_id = Column(
         UUID(as_uuid=True),
         ForeignKey('strategy_versions.version_id', ondelete='CASCADE'),
-        nullable=True  # May be null for strategy-level recommendations
+        nullable=False,
+        name='version_id',
     )
     strategy_version = Column(String(50))  # Display version string 'v1', 'v2', etc.
     
     # Recommendation details
     timestamp = Column(DateTime, nullable=False, server_default=func.now())
     recommendation_type = Column(String(50), nullable=False)  # ADD_BLOCK, ADJUST_PARAMETER, etc.
-    title = Column(String(500))
     block_name = Column(String(255))
     signal_name = Column(String(255))
     parameter_name = Column(String(255))
     configuration = Column(JSONB)
-    description = Column(Text)
     reasoning = Column(Text, nullable=False)
-    rationale = Column(Text)
-    suggested_changes = Column(JSONB)
     expected_impact = Column(JSONB)
     combined_confidence = Column(Float)
     root_cause = Column(Text)
@@ -578,13 +575,10 @@ class AIRecommendation(Base):
     
     # AI metadata
     ai_enhanced = Column(Boolean, default=False)
-    priority = Column(Integer)
     
     # Application tracking
     applied = Column(Boolean, default=False)
     applied_at = Column(DateTime)
-    applied_version_id = Column(UUID(as_uuid=True))  # Version where applied
-    applied_by = Column(String(100))
     metrics_before = Column(JSONB)
     metrics_after = Column(JSONB)
     
@@ -601,7 +595,7 @@ class AIRecommendation(Base):
     
     __table_args__ = (
         Index('idx_ai_recommendations_strategy', 'strategy_id'),
-        Index('idx_ai_recommendations_version', 'strategy_version_id'),
+        Index('idx_ai_recommendations_version', 'version_id'),
         Index('idx_ai_recommendations_timestamp', 'timestamp'),
         Index('idx_ai_recommendations_type', 'recommendation_type'),
         Index('idx_ai_recommendations_applied', 'applied'),

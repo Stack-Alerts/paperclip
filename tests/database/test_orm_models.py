@@ -175,7 +175,6 @@ class TestAIRecommendationModel:
         columns = {c.name for c in AIRecommendation.__table__.columns}
         assert 'applied' in columns
         assert 'applied_at' in columns
-        assert 'applied_version_id' in columns
         assert 'metrics_before' in columns
         assert 'metrics_after' in columns
 
