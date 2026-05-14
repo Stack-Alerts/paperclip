@@ -68,6 +68,7 @@ Pre-migration historical docs are preserved under [`archive/`](archive/).
 | [`runbook-touch-index-fr-worker.md`](runbook-touch-index-fr-worker.md) | Touch Index FR worker operations |
 | [`runbook-impact-gate-scan-done.md`](runbook-impact-gate-scan-done.md) | Impact Gate scan-done operations |
 | [`runbooks/key-rotation.md`](runbooks/key-rotation.md) | API key rotation procedure |
+| [`runbook-archive.md`](runbook-archive.md) | Archive operations — code/script archiving, doc archiving, artifact retention, log rotation, stale issue cleanup |
 
 ## Planning & Audits
 
