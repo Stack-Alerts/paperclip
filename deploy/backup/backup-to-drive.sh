@@ -16,61 +16,46 @@ source "${SCRIPT_DIR}/_rclone_pass.sh"
 
 RCLONE_CONFIG="${RCLONE_CONFIG:-$HOME/.config/rclone/rclone.conf}"
 
-LOCKFILE="/tmp/paperclip-backup.lock"
-exec 200>"$LOCKFILE"
-flock -n 200 || { echo "Another backup instance is running (lock held). Exiting."; exit 1; }
+# --- Helper: update deadman switch on auth failure --------------------------
+_update_deadman_on_auth_fail() {
+    local reason="${1:-unknown}"
+    local state_file="$HOME/.paperclip/backup_deadman_switch_state.json"
+    local now_utc
+    now_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    python3 -c "
+import json, os
+state_file = os.path.expanduser('$state_file')
+state = {}
+if os.path.exists(state_file):
+    try:
+        state = json.load(open(state_file))
+    except Exception:
+        pass
+state['last_auth_failure_utc'] = '$now_utc'
+state['last_auth_failure_reason'] = '${reason}'
+os.makedirs(os.path.dirname(state_file), exist_ok=True)
+json.dump(state, open(state_file, 'w'), indent=2)
+" 2>/dev/null || true
+    echo "  Deadman state updated (auth failure: ${reason})"
+}
 
-trap 'rm -rf "$TMPDIR"' EXIT
-TMPDIR=$(mktemp -d /tmp/paperclip-backup.XXXXXXXXXX)
-
-PAPERCLIP_HOME="$(cd "$(dirname "$0")/.." && pwd)"
-INSTANCE_DIR="${PAPERCLIP_HOME}/instances/default"
-BACKUPS_DIR="${INSTANCE_DIR}/data/backups"
-CONFIG_FILE="${INSTANCE_DIR}/config.json"
-INSTANCE_ENV="${INSTANCE_DIR}/.env"
-
+# ============================================================================
+# Pre-flight: OAuth health check (before flock — no lock needed)
+# ============================================================================
 NOW_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-YEAR=$(date -u +%Y)
-MONTH=$(date -u +%m)
-DAY=$(date -u +%d)
-HOURMIN=$(date -u +%H%M)
+DEADMAN_STATE_FILE="$HOME/.paperclip/backup_deadman_switch_state.json"
 
-# --- Resolve company ID ---------------------------------------------------
-COMPANY_ID="${PAPERCLIP_COMPANY_ID:-}"
-if [ -z "$COMPANY_ID" ] && [ -f "$INSTANCE_ENV" ]; then
-    COMPANY_ID=$(grep -E '^PAPERCLIP_COMPANY_ID=' "$INSTANCE_ENV" | cut -d= -f2- | tr -d "'\"" || true)
-fi
-if [ -z "$COMPANY_ID" ]; then
-    COMPANY_ID="unknown"
-fi
-
-# --- Paperclip version ----------------------------------------------------
-PAPERCLIP_VERSION="unknown"
-if [ -f "${PAPERCLIP_HOME}/package.json" ]; then
-    PAPERCLIP_VERSION=$(python3 -c "import json; print(json.load(open('${PAPERCLIP_HOME}/package.json')).get('version','unknown'))" 2>/dev/null || echo "unknown")
-fi
-
-echo "=========================================="
-echo "  Paperclip Backup to Google Drive"
-echo "=========================================="
-echo "  Timestamp:  ${NOW_UTC}"
-echo "  Company ID: ${COMPANY_ID}"
-echo "  Version:    ${PAPERCLIP_VERSION}"
-echo "  Hostname:   $(hostname)"
-echo ""
-
-# --- Pre-flight: OAuth health check ----------------------------------------
 echo "--- Pre-flight: OAuth health check ---"
 
 if ! command -v rclone &>/dev/null; then
     echo "ERROR: rclone is not installed."
     echo "Fix: sudo apt update && sudo apt install rclone"
+    _update_deadman_on_auth_fail "rclone_missing"
     exit 1
 fi
 echo "  rclone: $(rclone version 2>/dev/null | head -1)"
 
-export RCLONE_CONFIG
-cat > "$TMPDIR/oauth_health.py" << 'PYEOF'
+OAUTH_RESULT=$(python3 2>/dev/null << 'PYEOF'
 import os, sys, json
 from datetime import datetime, timezone
 
@@ -140,11 +125,11 @@ if secs_left is not None:
 parts.extend(warnings)
 print(" ".join(parts))
 PYEOF
-
-OAUTH_RESULT=$(python3 "$TMPDIR/oauth_health.py" 2>/dev/null)
+)
 
 if echo "$OAUTH_RESULT" | grep -q "^FATAL="; then
     echo "ERROR: rclone config file not found at ${RCLONE_CONFIG}."
+    _update_deadman_on_auth_fail "config_missing"
     exit 1
 fi
 
@@ -177,12 +162,12 @@ case "${OK_VAL:-}" in
             if [ "$EXP_SECS" -lt 0 ]; then
                 echo "  token: EXPIRED ($(( EXP_SECS * -1 / 60 ))m ago)"
             elif [ "$EXP_SECS" -lt 3600 ]; then
-                echo "  token: valid but EXPIRES in ${EXP_SECS}s (< 1h) — and no refresh_token"
+                echo "  token: valid but EXPIRES in ${EXP_SECS}s (< 1h) \u2014 and no refresh_token"
             else
-                echo "  token: valid (expires in ~$(( EXP_SECS / 60 ))m) — but no refresh_token"
+                echo "  token: valid (expires in ~$(( EXP_SECS / 60 ))m) \u2014 but no refresh_token"
             fi
         else
-            echo "  token: present — but no refresh_token"
+            echo "  token: present \u2014 but no refresh_token"
         fi
         echo "  refresh_token: MISSING (token cannot auto-refresh)"
         ;;
@@ -202,16 +187,21 @@ case "${OK_VAL:-}" in
         ;;
 esac
 
+_do_oauth_connectivity_check() {
+    if rclone lsd gdrive:Paperclip-Backups --config "$RCLONE_CONFIG" --ask-password=false </dev/null 2>/dev/null; then
+        return 0
+    elif [ "${IS_ENCRYPTED:-}" = "true" ]; then
+        if rclone lsd gdrive:Paperclip-Backups --config "$RCLONE_CONFIG" </dev/null 2>/dev/null; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
 echo "  connectivity check..."
 CONN_FAILED=false
-if rclone lsd gdrive:Paperclip-Backups --config "$RCLONE_CONFIG" --ask-password=false </dev/null 2>/dev/null; then
+if _do_oauth_connectivity_check; then
     echo "  connectivity: OK"
-elif [ "${IS_ENCRYPTED:-}" = "true" ]; then
-    if rclone lsd gdrive:Paperclip-Backups --config "$RCLONE_CONFIG" </dev/null 2>/dev/null; then
-        echo "  connectivity: OK"
-    else
-        CONN_FAILED=true
-    fi
 else
     CONN_FAILED=true
 fi
@@ -253,10 +243,54 @@ if $CONN_FAILED; then
     echo ""
     echo "Or see full instructions:"
     echo "  ~/.paperclip/scripts/rclone-headless-auth.sh --help"
+    _update_deadman_on_auth_fail "connectivity"
     exit 1
 fi
 
 echo "  OAuth health: PASS"
+echo 
+
+LOCKFILE="/tmp/paperclip-backup.lock"
+exec 200>"$LOCKFILE"
+flock -n 200 || { echo "Another backup instance is running (lock held). Exiting."; exit 1; }
+
+trap 'rm -rf "$TMPDIR"' EXIT
+TMPDIR=$(mktemp -d /tmp/paperclip-backup.XXXXXXXXXX)
+
+PAPERCLIP_HOME="$(cd "$(dirname "$0")/.." && pwd)"
+INSTANCE_DIR="${PAPERCLIP_HOME}/instances/default"
+BACKUPS_DIR="${INSTANCE_DIR}/data/backups"
+CONFIG_FILE="${INSTANCE_DIR}/config.json"
+INSTANCE_ENV="${INSTANCE_DIR}/.env"
+
+NOW_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+YEAR=$(date -u +%Y)
+MONTH=$(date -u +%m)
+DAY=$(date -u +%d)
+HOURMIN=$(date -u +%H%M)
+
+# --- Resolve company ID ---------------------------------------------------
+COMPANY_ID="${PAPERCLIP_COMPANY_ID:-}"
+if [ -z "$COMPANY_ID" ] && [ -f "$INSTANCE_ENV" ]; then
+    COMPANY_ID=$(grep -E '^PAPERCLIP_COMPANY_ID=' "$INSTANCE_ENV" | cut -d= -f2- | tr -d "'\"" || true)
+fi
+if [ -z "$COMPANY_ID" ]; then
+    COMPANY_ID="unknown"
+fi
+
+# --- Paperclip version ----------------------------------------------------
+PAPERCLIP_VERSION="unknown"
+if [ -f "${PAPERCLIP_HOME}/package.json" ]; then
+    PAPERCLIP_VERSION=$(python3 -c "import json; print(json.load(open('${PAPERCLIP_HOME}/package.json')).get('version','unknown'))" 2>/dev/null || echo "unknown")
+fi
+
+echo "=========================================="
+echo "  Paperclip Backup to Google Drive"
+echo "=========================================="
+echo "  Timestamp:  ${NOW_UTC}"
+echo "  Company ID: ${COMPANY_ID}"
+echo "  Version:    ${PAPERCLIP_VERSION}"
+echo "  Hostname:   $(hostname)"
 echo ""
 
 # --- Pick freshest database dump ------------------------------------------
