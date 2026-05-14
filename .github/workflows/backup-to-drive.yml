@@ -1,0 +1,69 @@
+name: Backup to Google Drive (4-Hour)
+
+on:
+  schedule:
+    - cron: '20 */4 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_health_check:
+        description: 'Skip pre-flight health check'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Offsite backup → Google Drive
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run backup health check
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.skip_health_check != 'true'
+        run: |
+          bash deploy/backup/backup-health-check.sh || true
+        continue-on-error: true
+
+      - name: Run backup to Google Drive
+        id: backup
+        run: |
+          bash deploy/backup/backup-to-drive.sh
+        timeout-minutes: 30
+
+      - name: Write step summary
+        if: always()
+        run: |
+          STATE_FILE="$HOME/.paperclip/instances/default/backup-state/last-success.json"
+          LOG_FILE="$HOME/.paperclip/instances/default/logs/backup-to-drive.log"
+          {
+            echo "## Backup to Google Drive"
+            echo ""
+            echo "**Trigger:** ${{ github.event_name }}"
+            if [ -f "$STATE_FILE" ]; then
+              echo ""
+              echo '```json'
+              cat "$STATE_FILE"
+              echo '```'
+            else
+              echo "**Status:** No success state recorded yet"
+            fi
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload backup log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-to-drive-log
+          path: ${{ env.HOME }}/.paperclip/instances/default/logs/backup-to-drive.log
+          retention-days: 14
+
+      - name: Upload backup state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-state
+          path: ${{ env.HOME }}/.paperclip/instances/default/backup-state/last-success.json
+          retention-days: 14
