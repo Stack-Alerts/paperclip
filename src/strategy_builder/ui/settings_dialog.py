@@ -47,9 +47,35 @@ from src.strategy_builder.ui.styles import (
 # ---------------------------------------------------------------------------
 
 _PROVIDER_INFO = {
+    "openrouter": "Aggregates multiple providers via OpenRouter API",
     "anthropic": "Default pricing: $3.00/M input \u00b7 $15.00/M output",
     "openai": "Default pricing: $5.00/M input \u00b7 $15.00/M output",
+    "deepseek": "Cost varies — see DeepSeek pricing page",
     "ollama": "Cost: Free (local inference)",
+}
+
+_PROVIDER_MODELS = {
+    "openrouter": [
+        "anthropic/claude-4.5-sonnet",
+        "anthropic/claude-opus-4-1",
+        "openai/gpt-4o",
+        "deepseek/deepseek-chat-v4",
+        "deepseek/deepseek-r1",
+    ],
+    "anthropic": [
+        "claude-sonnet-4-6",
+        "claude-opus-4-1",
+        "claude-haiku-3-5",
+    ],
+    "openai": [
+        "gpt-4o",
+        "gpt-4o-mini",
+        "gpt-4.1",
+    ],
+    "deepseek": [
+        "deepseek-chat",
+        "deepseek-reasoner",
+    ],
 }
 
 # ---------------------------------------------------------------------------
@@ -476,6 +502,8 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
         self._secret_widgets: dict[str, SecretFieldWidget] = {}
         # Plain text fields (non-secret)
         self._plain_fields: dict[str, QLineEdit] = {}
+        # Combo box fields (model dropdowns with curated lists)
+        self._combo_fields: dict[str, QComboBox] = {}
         # Admin section tab widget reference for hide/show
         self._admin_tab_index: int = -1
 
@@ -791,10 +819,11 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
         form.setSpacing(10)
         form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        # Provider selector
+        # Provider selector (order must match _provider_stack indices)
+        provider_names = ["openrouter", "anthropic", "openai", "deepseek", "ollama"]
         self._provider_combo = QComboBox()
-        self._provider_combo.addItems(["anthropic", "openai", "ollama"])
-        current = self._service.get_with_default("LLM_PROVIDER", "anthropic")
+        self._provider_combo.addItems(provider_names)
+        current = self._service.get_with_default("AI_PROVIDER", "openrouter")
         idx = self._provider_combo.findText(current)
         if idx >= 0:
             self._provider_combo.setCurrentIndex(idx)
@@ -805,7 +834,46 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
         self._provider_stack = QStackedWidget()
         self._provider_stack.setStyleSheet("background: transparent;")
 
-        # -- Anthropic page (index 0) --
+        # Helper: build editable model combo with curated list
+        def _model_combo(
+            key: str, default: str, models: list[str], tooltip: str,
+        ) -> QComboBox:
+            combo = QComboBox()
+            combo.setEditable(True)
+            combo.addItems(models)
+            current_val = self._service.get_with_default(key, default)
+            ci = combo.findText(current_val)
+            if ci >= 0:
+                combo.setCurrentIndex(ci)
+            else:
+                combo.setEditText(current_val)
+            combo.setFont(create_font(10))
+            combo.setToolTip(tooltip)
+            self._combo_fields[key] = combo
+            return combo
+
+        # -- OpenRouter page (index 0) --
+        or_page = QWidget()
+        or_form = QFormLayout(or_page)
+        or_form.setSpacing(8)
+        or_form.setContentsMargins(0, 0, 0, 0)
+        or_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        sec = SecretFieldWidget("OPENROUTER_API_KEY", self._service)
+        self._secret_widgets["OPENROUTER_API_KEY"] = sec
+        or_form.addRow(self._make_label("API Key:"), sec)
+
+        or_form.addRow(
+            self._make_label("Model:"),
+            _model_combo(
+                "AI_MODEL", "anthropic/claude-4.5-sonnet",
+                _PROVIDER_MODELS["openrouter"],
+                "OpenRouter model identifier with provider prefix (e.g. anthropic/claude-4.5-sonnet)",
+            ),
+        )
+        self._provider_stack.addWidget(or_page)
+
+        # -- Anthropic page (index 1) --
         anth_page = QWidget()
         anth_form = QFormLayout(anth_page)
         anth_form.setSpacing(8)
@@ -816,21 +884,17 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
         self._secret_widgets["ANTHROPIC_API_KEY"] = sec
         anth_form.addRow(self._make_label("API Key:"), sec)
 
-        self._plain_fields["ANTHROPIC_MODEL"] = QLineEdit()
-        self._plain_fields["ANTHROPIC_MODEL"].setText(
-            self._service.get_with_default("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+        anth_form.addRow(
+            self._make_label("Model:"),
+            _model_combo(
+                "ANTHROPIC_MODEL", "claude-sonnet-4-6",
+                _PROVIDER_MODELS["anthropic"],
+                "Anthropic Claude model ID (e.g. claude-sonnet-4-6, claude-opus-4-1)",
+            ),
         )
-        self._plain_fields["ANTHROPIC_MODEL"].setPlaceholderText("claude-sonnet-4-6")
-        self._plain_fields["ANTHROPIC_MODEL"].setStyleSheet(get_input_field_stylesheet())
-        self._plain_fields["ANTHROPIC_MODEL"].setFont(create_font(10))
-        self._plain_fields["ANTHROPIC_MODEL"].setToolTip(
-            "Anthropic Claude model ID (e.g. claude-sonnet-4-6, claude-opus-4-7, claude-haiku-4-5)"
-        )
-        anth_form.addRow(self._make_label("Model:"), self._plain_fields["ANTHROPIC_MODEL"])
-
         self._provider_stack.addWidget(anth_page)
 
-        # -- OpenAI page (index 1) --
+        # -- OpenAI page (index 2) --
         oai_page = QWidget()
         oai_form = QFormLayout(oai_page)
         oai_form.setSpacing(8)
@@ -841,21 +905,50 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
         self._secret_widgets["OPENAI_API_KEY"] = sec
         oai_form.addRow(self._make_label("API Key:"), sec)
 
-        self._plain_fields["OPENAI_MODEL"] = QLineEdit()
-        self._plain_fields["OPENAI_MODEL"].setText(
-            self._service.get_with_default("OPENAI_MODEL", "gpt-4o")
+        oai_form.addRow(
+            self._make_label("Model:"),
+            _model_combo(
+                "OPENAI_MODEL", "gpt-4o",
+                _PROVIDER_MODELS["openai"],
+                "OpenAI model ID (e.g. gpt-4o, gpt-4o-mini)",
+            ),
         )
-        self._plain_fields["OPENAI_MODEL"].setPlaceholderText("gpt-4o")
-        self._plain_fields["OPENAI_MODEL"].setStyleSheet(get_input_field_stylesheet())
-        self._plain_fields["OPENAI_MODEL"].setFont(create_font(10))
-        self._plain_fields["OPENAI_MODEL"].setToolTip(
-            "OpenAI model ID (e.g. gpt-4o, gpt-4o-mini)"
-        )
-        oai_form.addRow(self._make_label("Model:"), self._plain_fields["OPENAI_MODEL"])
-
         self._provider_stack.addWidget(oai_page)
 
-        # -- Ollama page (index 2) --
+        # -- DeepSeek page (index 3) --
+        ds_page = QWidget()
+        ds_form = QFormLayout(ds_page)
+        ds_form.setSpacing(8)
+        ds_form.setContentsMargins(0, 0, 0, 0)
+        ds_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        sec = SecretFieldWidget("DEEPSEEK_API_KEY", self._service)
+        self._secret_widgets["DEEPSEEK_API_KEY"] = sec
+        ds_form.addRow(self._make_label("API Key:"), sec)
+
+        self._plain_fields["DEEPSEEK_BASE_URL"] = QLineEdit()
+        self._plain_fields["DEEPSEEK_BASE_URL"].setText(
+            self._service.get_with_default("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+        )
+        self._plain_fields["DEEPSEEK_BASE_URL"].setPlaceholderText("https://api.deepseek.com")
+        self._plain_fields["DEEPSEEK_BASE_URL"].setStyleSheet(get_input_field_stylesheet())
+        self._plain_fields["DEEPSEEK_BASE_URL"].setFont(create_font(10))
+        self._plain_fields["DEEPSEEK_BASE_URL"].setToolTip(
+            "DeepSeek API base URL (e.g. https://api.deepseek.com)"
+        )
+        ds_form.addRow(self._make_label("Base URL:"), self._plain_fields["DEEPSEEK_BASE_URL"])
+
+        ds_form.addRow(
+            self._make_label("Model:"),
+            _model_combo(
+                "DEEPSEEK_MODEL", "deepseek-chat",
+                _PROVIDER_MODELS["deepseek"],
+                "DeepSeek model ID (e.g. deepseek-chat, deepseek-reasoner)",
+            ),
+        )
+        self._provider_stack.addWidget(ds_page)
+
+        # -- Ollama page (index 4) -- freeform text for local models
         ol_page = QWidget()
         ol_form = QFormLayout(ol_page)
         ol_form.setSpacing(8)
@@ -895,25 +988,6 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
         self._provider_info_label.setFont(create_font(9))
         self._provider_info_label.setStyleSheet(get_label_style("muted"))
         form.addRow("", self._provider_info_label)
-
-        # Separator before legacy model field
-        sep = QFrame()
-        sep.setFrameShape(QFrame.HLine)
-        sep.setStyleSheet(f"background-color: {COLORS['border']}; max-height: 1px;")
-        form.addRow("", sep)
-
-        # Legacy OpenRouter model (used by optimizer, separate from AI consultant)
-        self._plain_fields["AI_MODEL"] = QLineEdit()
-        self._plain_fields["AI_MODEL"].setText(
-            self._service.get_with_default("AI_MODEL", "anthropic/claude-4.5-sonnet")
-        )
-        self._plain_fields["AI_MODEL"].setPlaceholderText("anthropic/claude-4.5-sonnet")
-        self._plain_fields["AI_MODEL"].setStyleSheet(get_input_field_stylesheet())
-        self._plain_fields["AI_MODEL"].setFont(create_font(10))
-        self._plain_fields["AI_MODEL"].setToolTip(
-            "OpenRouter model identifier for optimizer (e.g. anthropic/claude-4.5-sonnet)"
-        )
-        form.addRow(self._make_label("Optimizer Model:"), self._plain_fields["AI_MODEL"])
 
         # Connect provider change handler and set initial info
         self._provider_combo.currentIndexChanged.connect(self._on_provider_changed)
@@ -1521,12 +1595,15 @@ class SettingsDialog(WindowGeometryMixin, QDialog):
 
         for key, field in self._plain_fields.items():
             user_values[key] = field.text().strip()
+        for key, combo in self._combo_fields.items():
+            user_values[key] = combo.currentText().strip()
 
         # User-editable keys (non-admin)
         _user_keys = {
             "OPENROUTER_API_KEY", "LAKEAPI_KEY", "LAKEAPI_SECRET",
-            "ANTHROPIC_API_KEY", "OPENAI_API_KEY",
-            "LLM_PROVIDER", "ANTHROPIC_MODEL", "OPENAI_MODEL",
+            "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY",
+            "AI_PROVIDER", "ANTHROPIC_MODEL", "OPENAI_MODEL",
+            "DEEPSEEK_BASE_URL", "DEEPSEEK_MODEL",
             "OLLAMA_BASE_URL", "OLLAMA_MODEL",
             "AI_MODEL", "ALERT_EMAIL",
             "LAKEAPI_REGION", "LAKEAPI_LIMIT_GB",
