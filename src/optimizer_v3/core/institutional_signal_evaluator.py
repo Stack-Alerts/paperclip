@@ -41,6 +41,8 @@ class SignalEvaluationResult:
     timing_violations: List[str]
     bar_index: int
     timestamp: datetime
+    direction_check_passed: bool = True
+    direction_check_reason: str = ""
 
 
 @dataclass
@@ -513,7 +515,9 @@ class InstitutionalSignalEvaluator:
                     exit_reason=exit_decision.reason,
                     timing_violations=violations,
                     bar_index=bar_index,
-                    timestamp=bar.ts_event
+                    timestamp=bar.ts_event,
+                    direction_check_passed=True,
+                    direction_check_reason=''
                 )
         
         # STEP 7: Check entry decision
@@ -531,6 +535,8 @@ class InstitutionalSignalEvaluator:
         should_enter = required_ok and confluence >= min_confluence
 
         # Direction consistency check: reject entry if signals conflict with strategy_type
+        direction_ok = True
+        direction_reason = ''
         if should_enter and self.direction_check_enabled:
             direction_ok, direction_reason = self._check_direction_consistency(all_signals)
             if not direction_ok:
@@ -573,7 +579,9 @@ class InstitutionalSignalEvaluator:
             exit_reason='',
             timing_violations=violations,
             bar_index=bar_index,
-            timestamp=bar.ts_event
+            timestamp=bar.ts_event,
+            direction_check_passed=direction_ok,
+            direction_check_reason=direction_reason
         )
     
     def _evaluate_building_blocks(

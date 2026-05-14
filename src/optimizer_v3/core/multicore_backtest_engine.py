@@ -41,12 +41,83 @@ import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from functools import partial
 import os
+import csv
 
 from nautilus_trader.model.data import Bar
 from nautilus_trader.model.objects import Price, Quantity
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+def write_trade_trace_csv(
+    trades: List[Dict],
+    filepath: str = ''
+) -> str:
+    """
+    Write per-trade audit CSV with full signal context (BTCAAAAA-25803).
+
+    Columns: entry_timestamp, exit_timestamp, side, entry_price, exit_price,
+    confluence_score, entry_signals, direction_check_passed,
+    direction_check_reason, pnl, pnl_pct, bars_held, exit_reason,
+    exit_condition_name.
+
+    Args:
+        trades: List of trade data dicts from the backtest engine.
+        filepath: Output path (default: auto-generated timestamped filename).
+
+    Returns:
+        str: Path to the written CSV file.
+    """
+    if not trades:
+        logger.info("No trades to write to trade trace CSV")
+        return ''
+
+    if not filepath:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filepath = f"trade_trace_{timestamp}.csv"
+
+    fieldnames = [
+        'entry_bar', 'exit_bar',
+        'entry_timestamp', 'exit_timestamp',
+        'side',
+        'entry_price', 'exit_price',
+        'confluence_score',
+        'entry_signals',
+        'direction_check_passed', 'direction_check_reason',
+        'pnl', 'pnl_pct',
+        'bars_held',
+        'exit_reason', 'exit_condition_name', 'exit_type',
+        'partial_exit', 'exit_percentage', 'status',
+        'position_size', 'partial_size',
+    ]
+
+    try:
+        with open(filepath, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
+            writer.writeheader()
+            for trade in trades:
+                row = dict(trade)
+                # Flatten entry_signals list to semicolon-separated string
+                signals = row.get('entry_signals', [])
+                if isinstance(signals, list):
+                    row['entry_signals'] = ';'.join(str(s) for s in signals)
+                else:
+                    row['entry_signals'] = str(signals) if signals else ''
+
+                # Format timestamps
+                for ts_key in ('entry_timestamp', 'exit_timestamp'):
+                    val = row.get(ts_key)
+                    if isinstance(val, datetime):
+                        row[ts_key] = val.isoformat()
+                writer.writerow(row)
+
+        logger.info("Trade trace CSV written: %s (%d trades)", filepath, len(trades))
+        return filepath
+    except Exception as e:
+        logger.error("Failed to write trade trace CSV: %s", e)
+        return ''
+
 
 @dataclass
 class ChunkData:
@@ -295,6 +366,11 @@ def evaluate_chunk(
                 # For SHORT: best_price tracks lowest (most profit)
                 # For LONG: best_price tracks highest (most profit)
                 evaluator.current_trade.best_price = entry_price
+                
+                # BTCAAAAA-25803: Store audit trail data for trade trace CSV
+                evaluator.current_trade.confluence_score = result.confluence_score
+                evaluator.current_trade.direction_check_passed = result.direction_check_passed
+                evaluator.current_trade.direction_check_reason = result.direction_check_reason
                 
                 # COLLECT ENTRY MESSAGES (same as single-core)
                 messages.append({
@@ -646,7 +722,12 @@ def evaluate_chunk(
                     'exit_percentage': result.exit_percentage,  # CRITICAL: Track actual % exited
                     'status': 'CLOSED' if is_full_exit else 'PARTIAL',  # CRITICAL FIX: Correct status
                     'position_size': position_size,  # ✅ FIX: Total position size in BTC
-                    'partial_size': partial_size      # ✅ FIX: This exit's size in BTC
+                    'partial_size': partial_size,      # ✅ FIX: This exit's size in BTC
+                    # BTCAAAAA-25803: Trade trace audit fields
+                    'confluence_score': getattr(evaluator.current_trade, 'confluence_score', 0),
+                    'entry_signals': getattr(evaluator.current_trade, 'entry_signals', []),
+                    'direction_check_passed': getattr(evaluator.current_trade, 'direction_check_passed', True),
+                    'direction_check_reason': getattr(evaluator.current_trade, 'direction_check_reason', '')
                 }
                 
                 trades.append(trade_data)
@@ -941,7 +1022,10 @@ class MulticoreBacktestEngine:
         )
         
         merged_results['metrics'] = metrics
-        
+
+        # BTCAAAAA-25803: Write per-trade trace CSV with full signal context
+        write_trade_trace_csv(merged_results.get('trades', []))
+
         if progress_callback:
             progress_callback(100, 100, "Multicore backtest complete!")
         
