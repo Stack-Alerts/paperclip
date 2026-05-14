@@ -169,7 +169,9 @@ class TestFindExistingAlert:
         mock_resp.json.return_value = [{"title": "Other issue", "id": "abc"}]
         mock_sess.get.return_value = mock_resp
         monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
-        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
         monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
         assert _find_existing_alert() is None
 
@@ -182,7 +184,9 @@ class TestFindExistingAlert:
         mock_resp.json.return_value = [existing]
         mock_sess.get.return_value = mock_resp
         monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
-        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
         monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
         assert _find_existing_alert() == existing
 
@@ -192,7 +196,9 @@ class TestFindExistingAlert:
         mock_sess = MagicMock()
         mock_sess.get.side_effect = ConnectionError("network down")
         monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
-        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
         monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
         assert _find_existing_alert() is None
 
@@ -214,7 +220,9 @@ class TestCreateAlert:
             mock_resp.json.return_value = post_return
             mock_sess.post.return_value = mock_resp
         monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
-        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
         monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
         return mock_sess
 
@@ -223,7 +231,9 @@ class TestCreateAlert:
 
         self._setup_mocks(monkeypatch)
         state = _make_fresh_state(15.0)
-        with patch("scripts.backup_deadman_switch._read_last_success", return_value=state):
+        with patch(
+            "scripts.backup_deadman_switch._read_last_success", return_value=state
+        ):
             result = _create_alert(age_hours=15.0, grace_hours=8, dry_run=True)
         assert result is True
         captured = capsys.readouterr().out
@@ -244,7 +254,9 @@ class TestCreateAlert:
     def test_creates_alert_when_no_backups_ever(self, monkeypatch):
         from scripts.backup_deadman_switch import _create_alert
 
-        with patch("scripts.backup_deadman_switch._read_last_success", return_value=None):
+        with patch(
+            "scripts.backup_deadman_switch._read_last_success", return_value=None
+        ):
             mock_sess = self._setup_mocks(
                 monkeypatch, post_return={"identifier": "BTCAAAAA-999", "id": "uuid-99"}
             )
@@ -259,7 +271,9 @@ class TestCreateAlert:
         mock_sess = MagicMock()
         mock_sess.post.side_effect = ConnectionError("network down")
         monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
-        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
         monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
         assert _create_alert(age_hours=15.0, grace_hours=8, dry_run=False) is False
 
@@ -272,15 +286,18 @@ class TestCreateAlert:
         )
         assert _create_alert(age_hours=15.0, grace_hours=8, dry_run=False) is False
 
-    def test_assigns_cto_agent(self, monkeypatch):
-        from scripts.backup_deadman_switch import _create_alert, CTO_AGENT_ID
+    def test_assigns_linux_specialist(self, monkeypatch):
+        from scripts.backup_deadman_switch import (
+            _create_alert,
+            LINUX_SPECIALIST_AGENT_ID,
+        )
 
         mock_sess = self._setup_mocks(
             monkeypatch, post_return={"identifier": "BTCAAAAA-999", "id": "uuid-99"}
         )
         _create_alert(age_hours=15.0, grace_hours=8, dry_run=False)
         payload = mock_sess.post.call_args[1]["json"]
-        assert payload["assigneeAgentId"] == CTO_AGENT_ID
+        assert payload["assigneeAgentId"] == LINUX_SPECIALIST_AGENT_ID
 
     def test_includes_destination_in_description(self, monkeypatch):
         from scripts.backup_deadman_switch import _create_alert
@@ -289,9 +306,99 @@ class TestCreateAlert:
             monkeypatch, post_return={"identifier": "BTCAAAAA-999", "id": "uuid-99"}
         )
         state = _make_fresh_state(15.0)
-        _create_alert(age_hours=15.0, grace_hours=8, dry_run=False, last_dest=state["destination"])
+        _create_alert(
+            age_hours=15.0, grace_hours=8, dry_run=False, last_dest=state["destination"]
+        )
         payload = mock_sess.post.call_args[1]["json"]
         assert "gdrive" in payload["description"]
+
+
+class TestCommentOnExistingAlert:
+    def _setup_mocks(self, monkeypatch, post_return=None):
+        mock_sess = MagicMock()
+        if post_return is not None:
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = post_return
+            mock_sess.post.return_value = mock_resp
+        monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
+        monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
+        return mock_sess
+
+    def test_comments_on_existing_alert_with_age(self, monkeypatch):
+        from scripts.backup_deadman_switch import _comment_on_existing_alert
+
+        mock_sess = self._setup_mocks(monkeypatch, post_return={"id": "comment-1"})
+        issue = {"identifier": "BTCAAAAA-999", "id": "uuid-99"}
+        result = _comment_on_existing_alert(
+            issue, age_hours=15.0, threshold=8.0, dry_run=False
+        )
+        assert result is True
+        assert mock_sess.post.call_count == 1
+        call_url = mock_sess.post.call_args[0][0]
+        assert "/comments" in call_url
+        payload = mock_sess.post.call_args[1]["json"]
+        assert "15.0h ago" in payload["body"]
+
+    def test_comments_with_missing_age(self, monkeypatch):
+        from scripts.backup_deadman_switch import _comment_on_existing_alert
+
+        mock_sess = self._setup_mocks(monkeypatch, post_return={"id": "comment-1"})
+        issue = {"identifier": "BTCAAAAA-999", "id": "uuid-99"}
+        result = _comment_on_existing_alert(
+            issue, age_hours=None, threshold=8.0, dry_run=False
+        )
+        assert result is True
+        payload = mock_sess.post.call_args[1]["json"]
+        assert "MISSING" in payload["body"]
+
+    def test_dry_run_does_not_post(self, monkeypatch, capsys):
+        from scripts.backup_deadman_switch import _comment_on_existing_alert
+
+        mock_sess = self._setup_mocks(monkeypatch)
+        issue = {"identifier": "BTCAAAAA-999", "id": "uuid-99"}
+        result = _comment_on_existing_alert(
+            issue, age_hours=15.0, threshold=8.0, dry_run=True
+        )
+        assert result is True
+        mock_sess.post.assert_not_called()
+        captured = capsys.readouterr().out
+        assert "BTCAAAAA-999" in captured
+
+    def test_returns_false_on_api_error(self, monkeypatch):
+        from scripts.backup_deadman_switch import _comment_on_existing_alert
+
+        mock_sess = MagicMock()
+        mock_sess.post.side_effect = ConnectionError("network down")
+        monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
+        monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
+        issue = {"identifier": "BTCAAAAA-999", "id": "uuid-99"}
+        assert (
+            _comment_on_existing_alert(
+                issue, age_hours=15.0, threshold=8.0, dry_run=False
+            )
+            is False
+        )
+
+    def test_returns_false_on_session_failure(self, monkeypatch):
+        from scripts.backup_deadman_switch import _comment_on_existing_alert
+
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._session",
+            lambda: (_ for _ in ()).throw(KeyError("missing env")),
+        )
+        issue = {"identifier": "BTCAAAAA-999"}
+        assert (
+            _comment_on_existing_alert(
+                issue, age_hours=15.0, threshold=8.0, dry_run=False
+            )
+            is False
+        )
 
 
 class TestRun:
@@ -304,9 +411,15 @@ class TestRun:
         sf = MagicMock()
         sf.exists.return_value = False
         monkeypatch.setattr("scripts.backup_deadman_switch.DEADMAN_STATE", sf)
-        monkeypatch.setattr("scripts.backup_deadman_switch._rotate_log_if_needed", MagicMock())
-        monkeypatch.setattr("scripts.backup_deadman_switch._save_self_state", MagicMock())
-        monkeypatch.setattr("scripts.backup_deadman_switch._load_self_state", lambda: {})
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._rotate_log_if_needed", MagicMock()
+        )
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._save_self_state", MagicMock()
+        )
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._load_self_state", lambda: {}
+        )
 
     def test_backup_current_returns_healthy(self, monkeypatch):
         from scripts.backup_deadman_switch import run
@@ -314,8 +427,10 @@ class TestRun:
         self._setup_env(monkeypatch)
         self._patch_state_and_rotate(monkeypatch)
         state = _make_fresh_state(2.0)
-        with patch("scripts.backup_deadman_switch._read_last_success", return_value=state):
-            result = run(grace_hours=8)
+        with patch(
+            "scripts.backup_deadman_switch._read_last_success", return_value=state
+        ):
+            result = run(grace_hours=4)
             assert result["status"] == "healthy"
             assert result["alert_fired"] is False
 
@@ -330,13 +445,20 @@ class TestRun:
         mock_resp.json.return_value = []
         mock_sess.get.return_value = mock_resp
         mock_post_resp = MagicMock()
-        mock_post_resp.json.return_value = {"identifier": "BTCAAAAA-999", "id": "uuid-99"}
+        mock_post_resp.json.return_value = {
+            "identifier": "BTCAAAAA-999",
+            "id": "uuid-99",
+        }
         mock_sess.post.return_value = mock_post_resp
         monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
-        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
         monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
-        with patch("scripts.backup_deadman_switch._read_last_success", return_value=state):
-            result = run(grace_hours=8)
+        with patch(
+            "scripts.backup_deadman_switch._read_last_success", return_value=state
+        ):
+            result = run(grace_hours=4)
             assert result["status"] == "alert"
             assert result["alert_fired"] is True
             assert mock_sess.post.call_count == 1
@@ -351,13 +473,20 @@ class TestRun:
         mock_resp.json.return_value = []
         mock_sess.get.return_value = mock_resp
         mock_post_resp = MagicMock()
-        mock_post_resp.json.return_value = {"identifier": "BTCAAAAA-999", "id": "uuid-99"}
+        mock_post_resp.json.return_value = {
+            "identifier": "BTCAAAAA-999",
+            "id": "uuid-99",
+        }
         mock_sess.post.return_value = mock_post_resp
         monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
-        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
         monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
-        with patch("scripts.backup_deadman_switch._read_last_success", return_value=None):
-            result = run(grace_hours=8)
+        with patch(
+            "scripts.backup_deadman_switch._read_last_success", return_value=None
+        ):
+            result = run(grace_hours=4)
             assert result["status"] == "alert"
             assert result["alert_fired"] is True
             assert mock_sess.post.call_count == 1
@@ -369,27 +498,46 @@ class TestRun:
         self._patch_state_and_rotate(monkeypatch)
         state = _make_fresh_state(20.0)
         mock_sess = MagicMock()
-        mock_resp = MagicMock()
-        mock_resp.json.return_value = [
-            {"title": "Backup dead-man triggered — existing", "id": "exist-1"}
+        # GET returns existing alert
+        get_resp = MagicMock()
+        get_resp.json.return_value = [
+            {
+                "title": "Backup dead-man triggered — existing",
+                "identifier": "exist-1",
+                "id": "exist-1",
+            }
         ]
-        mock_sess.get.return_value = mock_resp
+        mock_sess.get.return_value = get_resp
+        # POST to /comments endpoint
+        post_resp = MagicMock()
+        post_resp.json.return_value = {"id": "comment-1"}
+        mock_sess.post.return_value = post_resp
         monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
-        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
         monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
-        with patch("scripts.backup_deadman_switch._read_last_success", return_value=state):
-            result = run(grace_hours=8)
+        with patch(
+            "scripts.backup_deadman_switch._read_last_success", return_value=state
+        ):
+            result = run(grace_hours=4)
             assert result["alert_skipped"] is True
-            mock_sess.post.assert_not_called()
+            # Should have POSTed a comment, NOT created a new alert
+            post_calls = [
+                c for c in mock_sess.post.call_args_list if "/comments" in str(c[0][0])
+            ]
+            assert len(post_calls) == 1
 
     def test_grace_period_respected(self, monkeypatch):
         from scripts.backup_deadman_switch import run
 
         self._setup_env(monkeypatch)
         self._patch_state_and_rotate(monkeypatch)
-        state = _make_fresh_state(10.0)
-        with patch("scripts.backup_deadman_switch._read_last_success", return_value=state):
-            result = run(grace_hours=8)
+        state = _make_fresh_state(5.0)
+        with patch(
+            "scripts.backup_deadman_switch._read_last_success", return_value=state
+        ):
+            result = run(grace_hours=4)
             assert result["status"] == "healthy"
 
     def test_custom_grace_period(self, monkeypatch):
@@ -397,18 +545,25 @@ class TestRun:
 
         self._setup_env(monkeypatch)
         self._patch_state_and_rotate(monkeypatch)
-        state = _make_fresh_state(6.0)
+        state = _make_fresh_state(7.0)
         mock_sess = MagicMock()
         mock_resp = MagicMock()
         mock_resp.json.return_value = []
         mock_sess.get.return_value = mock_resp
         mock_post_resp = MagicMock()
-        mock_post_resp.json.return_value = {"identifier": "BTCAAAAA-999", "id": "uuid-99"}
+        mock_post_resp.json.return_value = {
+            "identifier": "BTCAAAAA-999",
+            "id": "uuid-99",
+        }
         mock_sess.post.return_value = mock_post_resp
         monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
-        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
         monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
-        with patch("scripts.backup_deadman_switch._read_last_success", return_value=state):
+        with patch(
+            "scripts.backup_deadman_switch._read_last_success", return_value=state
+        ):
             result = run(grace_hours=2)
             assert result["status"] == "alert"
             assert mock_sess.post.call_count == 1
@@ -419,10 +574,11 @@ class TestRun:
         self._setup_env(monkeypatch)
         self._patch_state_and_rotate(monkeypatch)
         state = _make_fresh_state(2.0)
-        with patch("scripts.backup_deadman_switch._read_last_success", return_value=state):
-            result = run(grace_hours=8)
-            assert result["backup_interval_hours"] == 4
-            assert result["threshold_hours"] == 12
+        with patch(
+            "scripts.backup_deadman_switch._read_last_success", return_value=state
+        ):
+            result = run(grace_hours=4)
+            assert result["threshold_hours"] == 8
             assert "self_total_runs" in result
 
     def test_returns_age_none_when_no_state(self, monkeypatch):
@@ -435,13 +591,20 @@ class TestRun:
         mock_resp.json.return_value = []
         mock_sess.get.return_value = mock_resp
         mock_post_resp = MagicMock()
-        mock_post_resp.json.return_value = {"identifier": "BTCAAAAA-999", "id": "uuid-99"}
+        mock_post_resp.json.return_value = {
+            "identifier": "BTCAAAAA-999",
+            "id": "uuid-99",
+        }
         mock_sess.post.return_value = mock_post_resp
         monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
-        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
         monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
-        with patch("scripts.backup_deadman_switch._read_last_success", return_value=None):
-            result = run(grace_hours=8)
+        with patch(
+            "scripts.backup_deadman_switch._read_last_success", return_value=None
+        ):
+            result = run(grace_hours=4)
             assert result["backup_age_hours"] is None
             assert result["alert_reason"] == "no_success_ever"
 
@@ -454,11 +617,15 @@ class TestRun:
             "scripts.backup_deadman_switch._session",
             lambda: (_ for _ in ()).throw(KeyError("missing env")),
         )
-        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
         monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
         state = _make_fresh_state(20.0)
-        with patch("scripts.backup_deadman_switch._read_last_success", return_value=state):
-            result = run(grace_hours=8)
+        with patch(
+            "scripts.backup_deadman_switch._read_last_success", return_value=state
+        ):
+            result = run(grace_hours=4)
             assert result["status"] == "auth_error"
             assert result["alert_reason"] == "overdue"
             assert result["alert_fired"] is False
@@ -473,8 +640,10 @@ class TestRun:
             lambda: (_ for _ in ()).throw(KeyError("missing env")),
         )
         state = _make_fresh_state(2.0)
-        with patch("scripts.backup_deadman_switch._read_last_success", return_value=state):
-            result = run(grace_hours=8)
+        with patch(
+            "scripts.backup_deadman_switch._read_last_success", return_value=state
+        ):
+            result = run(grace_hours=4)
             assert result["status"] == "healthy"
             assert result["alert_fired"] is False
 
@@ -486,10 +655,14 @@ class TestRun:
         mock_resp.json.return_value = {"identifier": "BTCAAAAA-999", "id": "uuid-99"}
         mock_sess.post.return_value = mock_resp
         monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
-        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
         monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
         _create_alert(
-            age_hours=15.0, grace_hours=8, dry_run=False,
+            age_hours=15.0,
+            grace_hours=8,
+            dry_run=False,
             last_dest="gdrive:custom/path",
         )
         payload = mock_sess.post.call_args[1]["json"]
@@ -503,7 +676,9 @@ class TestRun:
         mock_resp.json.return_value = {"identifier": "BTCAAAAA-999", "id": "uuid-99"}
         mock_sess.post.return_value = mock_resp
         monkeypatch.setattr("scripts.backup_deadman_switch._session", lambda: mock_sess)
-        monkeypatch.setattr("scripts.backup_deadman_switch._base", lambda: "https://api.test")
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._base", lambda: "https://api.test"
+        )
         monkeypatch.setattr("scripts.backup_deadman_switch._company", lambda: "test-co")
         _create_alert(age_hours=15.0, grace_hours=8, dry_run=False)
         payload = mock_sess.post.call_args[1]["json"]

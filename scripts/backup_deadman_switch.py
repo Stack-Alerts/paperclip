@@ -30,14 +30,21 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from touch_index.paperclip_client import _session, _base, _company
 
-BACKUP_STATE_FILE = Path.home() / ".paperclip" / "instances" / "default" / "backup-state" / "last-success.json"
+BACKUP_STATE_FILE = (
+    Path.home()
+    / ".paperclip"
+    / "instances"
+    / "default"
+    / "backup-state"
+    / "last-success.json"
+)
 BACKUP_INTERVAL_HOURS = 4
-DEFAULT_GRACE_HOURS = 8
+DEFAULT_GRACE_HOURS = 4
 DEADMAN_LOG = Path.home() / ".paperclip" / "backup_deadman_switch.log"
 DEADMAN_STATE = Path.home() / ".paperclip" / "backup_deadman_switch_state.json"
 MAX_LOG_BYTES = 1 * 1024 * 1024
 ALERT_SEARCH_QUERY = "Backup dead-man triggered"
-CTO_AGENT_ID = "41b5ede6-e209-40ba-b923-dc969c722e6d"
+LINUX_SPECIALIST_AGENT_ID = "a1d7dba5-6b71-4fff-86cb-8ee1734a35c5"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -171,7 +178,7 @@ def _create_alert(
     payload = {
         "title": title,
         "description": description,
-        "assigneeAgentId": CTO_AGENT_ID,
+        "assigneeAgentId": LINUX_SPECIALIST_AGENT_ID,
         "priority": "critical",
         "status": "todo",
     }
@@ -200,7 +207,58 @@ def _create_alert(
         return False
 
 
+def _comment_on_existing_alert(
+    issue: dict,
+    age_hours: float | None,
+    threshold: float,
+    dry_run: bool,
+) -> bool:
+    """Post a re-check comment on an existing dead-man alert."""
+    try:
+        sess = _session()
+        base_url = _base()
+        company_id = _company()
+    except (KeyError, OSError) as exc:
+        logger.error("Failed to init Paperclip session for commenting: %s", exc)
+        return False
+
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    issue_id = issue.get("identifier", issue.get("id", "?"))
+
+    if age_hours is None:
+        age_line = "- **Last success:** MISSING (no last-success.json)"
+    else:
+        age_line = f"- **Last success:** {age_hours:.1f}h ago"
+
+    body = (
+        f"**Dead-man re-check — {now_str}**\n\n"
+        f"- **Check time:** {now_str}\n"
+        f"{age_line}\n"
+        f"- **Threshold:** {threshold:.0f}h\n"
+        f"- **Status:** backup still overdue, existing alert remains open"
+    )
+
+    if dry_run:
+        logger.info("DRY RUN: would comment on alert %s", issue_id)
+        print(json.dumps({"issueId": issue_id, "body": body}, indent=2))  # noqa: T201
+        return True
+
+    try:
+        resp = sess.post(
+            f"{base_url}/api/issues/{issue_id}/comments",
+            json={"body": body},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        logger.info("Commented on existing alert %s", issue_id)
+        return True
+    except Exception as exc:
+        logger.error("Failed to comment on alert %s: %s", issue_id, exc)
+        return False
+
+
 def run(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = False) -> dict:
+
     _rotate_log_if_needed()
 
     prev = _load_self_state()
@@ -212,7 +270,9 @@ def run(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = False) -> dict:
         _session()
     except (KeyError, OSError):
         api_available = False
-        logger.error("Paperclip API session unavailable — alert creation will be skipped")
+        logger.error(
+            "Paperclip API session unavailable — alert creation will be skipped"
+        )
 
     state = _read_last_success()
     age_hours = _get_backup_age_hours(state) if state else None
@@ -243,9 +303,10 @@ def run(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = False) -> dict:
         existing = _find_existing_alert()
         if existing:
             logger.info(
-                "Existing alert %s already open — skipping duplicate creation",
+                "Existing alert %s already open — commenting with re-check status",
                 existing.get("identifier", existing["id"]),
             )
+            _comment_on_existing_alert(existing, age_hours, threshold, dry_run)
             alert_skipped = True
         else:
             last_dest = state.get("destination", "") if state else ""
@@ -254,11 +315,13 @@ def run(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = False) -> dict:
                 alert_fired = True
 
     now_utc = datetime.now(timezone.utc).isoformat()
-    _save_self_state({
-        "total_runs": prev_runs + 1,
-        "last_run_utc": now_utc,
-        "last_alert_utc": now_utc if alert_fired else prev.get("last_alert_utc"),
-    })
+    _save_self_state(
+        {
+            "total_runs": prev_runs + 1,
+            "last_run_utc": now_utc,
+            "last_alert_utc": now_utc if alert_fired else prev.get("last_alert_utc"),
+        }
+    )
 
     if not api_available and alert_reason:
         status = "auth_error"
@@ -278,6 +341,7 @@ def run(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = False) -> dict:
         "alert_fired": alert_fired,
         "alert_skipped": alert_skipped,
         "alert_reason": alert_reason or "none",
+        "commented": alert_skipped,
         "self_last_run_utc": now_utc,
         "self_prev_run_utc": prev_last,
         "self_total_runs": prev_runs + 1,

@@ -12,7 +12,7 @@ on:
       grace:
         description: 'Grace period in hours'
         required: false
-        default: '8'
+        default: '4'
 
 permissions:
   contents: read
