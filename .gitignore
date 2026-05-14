@@ -108,3 +108,9 @@ tests/integration/results/
 
 # Lake cache
 .lake_cache/
+
+# rclone config and password files (contain OAuth tokens)
+rclone.conf
+rclone-pass
+*.rclone.conf
+*.rclone-pass

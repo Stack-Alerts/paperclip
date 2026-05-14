@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+
+# --- Load rclone encryption password (if config is encrypted) ---
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+source "${SCRIPT_DIR}/_rclone_pass.sh"
+RCLONE_CONFIG="${RCLONE_CONFIG:-$HOME/.config/rclone/rclone.conf}"
+
 echo "=========================================="
 echo "  Paperclip Backup Pipeline Health Check"
 echo "=========================================="
@@ -15,7 +21,7 @@ fail(){ echo "  [FAIL]  $1"; ((FAILS++)) || true; }
 echo "--- rclone ---"
 if command -v rclone &>/dev/null; then
     ok "rclone installed ($(rclone version 2>/dev/null | head -1))"
-    if rclone lsd gdrive:Paperclip-Backups &>/dev/null; then
+    if rclone lsd gdrive:Paperclip-Backups --config "$RCLONE_CONFIG" &>/dev/null; then
         ok "gdrive remote authenticated"
     else
         fail "gdrive remote NOT authenticated (empty/missing/expired token)"
@@ -28,7 +34,7 @@ echo ""
 
 # 2. Paperclip DB backup freshness
 echo "--- Database Dumps ---"
-BACKUPS_DIR="/home/sirrus/.paperclip/instances/default/data/backups"
+BACKUPS_DIR="$HOME/.paperclip/instances/default/data/backups"
 if [ -d "$BACKUPS_DIR" ]; then
     COUNT=$(ls -1 "$BACKUPS_DIR"/paperclip-*.sql.gz 2>/dev/null | wc -l)
     if [ "$COUNT" -gt 0 ]; then
@@ -52,7 +58,7 @@ echo ""
 
 # 3. Last offsite backup
 echo "--- Offsite Backup Liveness ---"
-STATE_FILE="/home/sirrus/.paperclip/instances/default/backup-state/last-success.json"
+STATE_FILE="$HOME/.paperclip/instances/default/backup-state/last-success.json"
 if [ -f "$STATE_FILE" ]; then
     LAST=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('lastSuccess','unknown'))" 2>/dev/null || echo "parse-error")
     if [ "$LAST" != "parse-error" ] && [ "$LAST" != "unknown" ]; then
@@ -96,18 +102,18 @@ else
     echo "       Fix: systemctl --user enable --now paperclip-backup.timer"
 fi
 
-LINGER=$(loginctl show-user sirrus --property=Linger 2>/dev/null | cut -d= -f2 || echo "?")
+LINGER=$(loginctl show-user "$USER" --property=Linger 2>/dev/null | cut -d= -f2 || echo "?")
 if [ "$LINGER" = "yes" ]; then
     ok "user linger enabled (timers run when logged out)"
 else
     warn "user linger is '$LINGER' — timers stop on logout"
-    echo "       Fix: sudo loginctl enable-linger sirrus"
+    echo "       Fix: sudo loginctl enable-linger $USER"
 fi
 echo ""
 
 # 5. Dead-man switch
 echo "--- Dead-Man Switch ---"
-DEADMAN_STATE="/home/sirrus/.paperclip/backup_deadman_switch_state.json"
+DEADMAN_STATE="$HOME/.paperclip/backup_deadman_switch_state.json"
 if [ -f "$DEADMAN_STATE" ]; then
     RUNS=$(python3 -c "import json; print(json.load(open('$DEADMAN_STATE')).get('total_runs',0))" 2>/dev/null || echo "?")
     ok "dead-man switch: $RUNS runs"
@@ -115,7 +121,7 @@ else
     warn "dead-man switch state file missing (has never run?)"
 fi
 
-MONITOR_STATE="/home/sirrus/.paperclip/deadman_switch_monitor_state.json"
+MONITOR_STATE="$HOME/.paperclip/deadman_switch_monitor_state.json"
 if [ -f "$MONITOR_STATE" ]; then
     MON_RUNS=$(python3 -c "import json; print(json.load(open('$MONITOR_STATE')).get('total_runs',0))" 2>/dev/null || echo "?")
     ok "dead-man switch monitor (GH Actions): $MON_RUNS runs"
@@ -123,7 +129,7 @@ else
     warn "dead-man switch monitor (GH Actions) state missing"
 fi
 
-LOCAL_MONITOR_STATE="/home/sirrus/.paperclip/deadman_switch_local_monitor_state.json"
+LOCAL_MONITOR_STATE="$HOME/.paperclip/deadman_switch_local_monitor_state.json"
 if [ -f "$LOCAL_MONITOR_STATE" ]; then
     LOCAL_RUNS=$(python3 -c "import json; print(json.load(open('$LOCAL_MONITOR_STATE')).get('total_runs',0))" 2>/dev/null || echo "?")
     ok "dead-man switch monitor (local): $LOCAL_RUNS runs"
@@ -134,8 +140,8 @@ echo ""
 
 # 6. Google Drive destination
 echo "--- Google Drive ---"
-if rclone lsd gdrive:Paperclip-Backups &>/dev/null; then
-    DIR_COUNT=$(rclone lsd gdrive:Paperclip-Backups 2>/dev/null | wc -l)
+if rclone lsd gdrive:Paperclip-Backups --config "$RCLONE_CONFIG" &>/dev/null; then
+    DIR_COUNT=$(rclone lsd gdrive:Paperclip-Backups --config "$RCLONE_CONFIG" 2>/dev/null | wc -l)
     ok "gdrive:Paperclip-Backups accessible ($DIR_COUNT entries)"
 else
     fail "gdrive:Paperclip-Backups NOT accessible"

@@ -39,7 +39,8 @@ A dead-man's-switch within the PaperClip routine alerts if no backup has been cr
 | `/home/sirrus/.paperclip/instances/default/backup-state/last-success` | Timestamp of last successful backup |
 | `/home/sirrus/.paperclip/instances/default/backup-state/last-failure` | Timestamp + error of last failure |
 | `/home/sirrus/.paperclip/instances/default/data/backups/` | Local DB dump files |
-| `~/.config/rclone/rclone.conf` | rclone OAuth token (KEEP SECRET) |
+| `~/.config/rclone/rclone.conf` | rclone OAuth tokens (**encrypted at rest** via `rclone config encryption`) |
+| `~/.config/rclone/rclone-pass` | rclone config encryption password (chmod 600, outside repo) |
 
 ---
 

@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+
+# --- Load rclone encryption password (if config is encrypted) ---
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+source "${SCRIPT_DIR}/_rclone_pass.sh"
 #
 # backup-to-drive.sh — Paperclip offsite backup to Google Drive
 #
@@ -9,6 +13,8 @@ set -euo pipefail
 #
 # Locked with flock so the 4h cron and manual runs never collide.
 #
+
+RCLONE_CONFIG="${RCLONE_CONFIG:-$HOME/.config/rclone/rclone.conf}"
 
 LOCKFILE="/tmp/paperclip-backup.lock"
 exec 200>"$LOCKFILE"
@@ -53,10 +59,188 @@ echo "  Version:    ${PAPERCLIP_VERSION}"
 echo "  Hostname:   $(hostname)"
 echo ""
 
-# --- Pre-flight: verify rclone auth ----------------------------------------
-if ! rclone lsd gdrive:Paperclip-Backups &>/dev/null; then
-    echo "ERROR: rclone gdrive remote is not authenticated."
-    echo "The OAuth token is missing or expired."
+# --- Pre-flight: OAuth health check ----------------------------------------
+echo "--- Pre-flight: OAuth health check ---"
+
+if ! command -v rclone &>/dev/null; then
+    echo "ERROR: rclone is not installed."
+    echo "Fix: sudo apt update && sudo apt install rclone"
+    exit 1
+fi
+echo "  rclone: $(rclone version 2>/dev/null | head -1)"
+
+export RCLONE_CONFIG
+cat > "$TMPDIR/oauth_health.py" << 'PYEOF'
+import os, sys, json
+from datetime import datetime, timezone
+
+config_file = os.path.expanduser(os.environ.get("RCLONE_CONFIG", "~/.config/rclone/rclone.conf"))
+
+encrypted = False
+try:
+    with open(config_file, "r") as f:
+        head = f.read(512)
+    if "RCLONE_ENCRYPT_V0" in head or "Encrypted rclone configuration" in head:
+        encrypted = True
+except FileNotFoundError:
+    print("FATAL=no_config_file")
+    sys.exit(0)
+
+if encrypted:
+    print("OK=encrypted_config ENCRYPTED=true")
+    sys.exit(0)
+
+import configparser
+parser = configparser.ConfigParser()
+try:
+    parser.read(config_file)
+except Exception:
+    print("OK=config_parse_error")
+    sys.exit(0)
+
+if not parser.has_section("gdrive"):
+    print("OK=no_remote MISSING_REMOTE=true")
+    sys.exit(0)
+
+if not parser.has_option("gdrive", "token"):
+    print("OK=no_token MISSING_TOKEN=true")
+    sys.exit(0)
+
+raw = parser.get("gdrive", "token", raw=True)
+try:
+    t = json.loads(raw)
+except json.JSONDecodeError:
+    print("OK=parse_error UNPARSEABLE=true")
+    sys.exit(0)
+
+access_ok = bool(t.get("access_token", ""))
+refresh_ok = bool(t.get("refresh_token", ""))
+expiry_str = t.get("expiry", "")
+
+secs_left = None
+if expiry_str:
+    try:
+        exp = datetime.fromisoformat(expiry_str.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        secs_left = int((exp - now).total_seconds())
+    except:
+        pass
+
+status = "token_ok"
+warnings = []
+if not access_ok:
+    status = "no_access"
+if not refresh_ok:
+    status = "no_refresh"
+    warnings.append("MISSING_REFRESH=true")
+
+parts = [f"OK={status}"]
+if secs_left is not None:
+    parts.append(f"EXPIRY_SECS={secs_left}")
+parts.extend(warnings)
+print(" ".join(parts))
+PYEOF
+
+OAUTH_RESULT=$(python3 "$TMPDIR/oauth_health.py" 2>/dev/null)
+
+if echo "$OAUTH_RESULT" | grep -q "^FATAL="; then
+    echo "ERROR: rclone config file not found at ${RCLONE_CONFIG}."
+    exit 1
+fi
+
+OK_VAL=$(echo "$OAUTH_RESULT" | grep -oP '(?<=^| )OK=\K\S+')
+EXP_SECS=$(echo "$OAUTH_RESULT" | grep -oP '(?<=^| )EXPIRY_SECS=\K-?\d+')
+IS_ENCRYPTED=$(echo "$OAUTH_RESULT" | grep -oP 'ENCRYPTED=\K\S+')
+
+case "${OK_VAL:-}" in
+    encrypted_config)
+        echo "  config: encrypted (token details not inspectable)"
+        ;;
+    config_parse_error)
+        echo "  config: present but unparseable"
+        ;;
+    no_remote)
+        echo "  gdrive remote: NOT CONFIGURED"
+        ;;
+    no_token)
+        echo "  token: MISSING (no OAuth token in rclone config)"
+        ;;
+    parse_error)
+        echo "  token: PRESENT but unparseable JSON"
+        ;;
+    no_access)
+        echo "  token: PRESENT but access_token is empty"
+        echo "  refresh_token: MISSING"
+        ;;
+    no_refresh)
+        if [ -n "${EXP_SECS:-}" ] && [[ "${EXP_SECS:-}" =~ ^-?[0-9]+$ ]]; then
+            if [ "$EXP_SECS" -lt 0 ]; then
+                echo "  token: EXPIRED ($(( EXP_SECS * -1 / 60 ))m ago)"
+            elif [ "$EXP_SECS" -lt 3600 ]; then
+                echo "  token: valid but EXPIRES in ${EXP_SECS}s (< 1h) — and no refresh_token"
+            else
+                echo "  token: valid (expires in ~$(( EXP_SECS / 60 ))m) — but no refresh_token"
+            fi
+        else
+            echo "  token: present — but no refresh_token"
+        fi
+        echo "  refresh_token: MISSING (token cannot auto-refresh)"
+        ;;
+    token_ok)
+        if [ -n "${EXP_SECS:-}" ] && [[ "${EXP_SECS:-}" =~ ^-?[0-9]+$ ]]; then
+            if [ "$EXP_SECS" -lt 0 ]; then
+                echo "  token: EXPIRED ($(( EXP_SECS * -1 / 60 ))m ago)"
+            elif [ "$EXP_SECS" -lt 3600 ]; then
+                echo "  token: valid but EXPIRES in ${EXP_SECS}s (WARNING)"
+            else
+                echo "  token: valid (expires in ~$(( EXP_SECS / 60 ))m)"
+            fi
+        else
+            echo "  token: present (expiry time unknown)"
+        fi
+        echo "  refresh_token: present (auto-refresh available)"
+        ;;
+esac
+
+echo "  connectivity check..."
+CONN_FAILED=false
+if rclone lsd gdrive:Paperclip-Backups --config "$RCLONE_CONFIG" --ask-password=false </dev/null 2>/dev/null; then
+    echo "  connectivity: OK"
+elif [ "${IS_ENCRYPTED:-}" = "true" ]; then
+    if rclone lsd gdrive:Paperclip-Backups --config "$RCLONE_CONFIG" </dev/null 2>/dev/null; then
+        echo "  connectivity: OK"
+    else
+        CONN_FAILED=true
+    fi
+else
+    CONN_FAILED=true
+fi
+
+if $CONN_FAILED; then
+    echo "ERROR: Cannot access gdrive:Paperclip-Backups."
+    case "${OK_VAL:-}" in
+        encrypted_config)
+            echo "  Root cause: Encrypted rclone config without password in headless environment."
+            echo "  Either set RCLONE_CONFIG_PASS or use an unencrypted config."
+            ;;
+        no_remote)
+            echo "  Root cause: gdrive remote not configured in rclone."
+            echo "  Fix: ~/.paperclip/scripts/rclone-bootstrap.sh"
+            ;;
+        no_token)
+            echo "  Root cause: No OAuth token in rclone config."
+            ;;
+        no_access)
+            echo "  Root cause: Token has no access_token."
+            ;;
+        *)
+            if [ -n "${EXP_SECS:-}" ] && [[ "${EXP_SECS:-}" =~ ^-?[0-9]+$ ]] && [ "$EXP_SECS" -lt 0 ]; then
+                echo "  Root cause: Token is expired."
+            else
+                echo "  Root cause: Token may be invalid, revoked, or network issue."
+            fi
+            ;;
+    esac
     echo ""
     echo "To fix (headless server):"
     echo "  1. On a machine WITH a browser, run:"
@@ -71,7 +255,8 @@ if ! rclone lsd gdrive:Paperclip-Backups &>/dev/null; then
     echo "  ~/.paperclip/scripts/rclone-headless-auth.sh --help"
     exit 1
 fi
-echo "rclone auth check: OK"
+
+echo "  OAuth health: PASS"
 echo ""
 
 # --- Pick freshest database dump ------------------------------------------
@@ -221,10 +406,10 @@ echo ""
 echo "Uploading to: ${DEST}"
 echo ""
 
-rclone copy "$PAYLOAD_FILE" "$DEST/" --progress --verbose
-rclone copy "$TMPDIR/MANIFEST.json" "$DEST/" --progress --verbose
+rclone copy "$PAYLOAD_FILE" "$DEST/" --config "$RCLONE_CONFIG" --progress --verbose
+rclone copy "$TMPDIR/MANIFEST.json" "$DEST/" --config "$RCLONE_CONFIG" --progress --verbose
 if [ -n "$DUMP_FILENAME" ]; then
-    rclone copy "$TMPDIR/$DUMP_FILENAME" "$DEST/" --progress --verbose
+    rclone copy "$TMPDIR/$DUMP_FILENAME" "$DEST/" --config "$RCLONE_CONFIG" --progress --verbose
 fi
 
 echo ""

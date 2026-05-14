@@ -11,6 +11,7 @@ StandardError=append:/home/sirrus/.paperclip/instances/default/logs/backup-to-dr
 Environment=HOME=/home/sirrus
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:/home/sirrus/.local/bin
 Environment=PAPERCLIP_COMPANY_ID=73419cf3-bd37-4a7c-8782-311ccb47fced
+Environment=RCLONE_CONFIG=/home/sirrus/.config/rclone/rclone.conf
 
 [Install]
 WantedBy=default.target

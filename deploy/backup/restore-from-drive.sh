@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+
+# --- Load rclone encryption password (if config is encrypted) ---
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+source "${SCRIPT_DIR}/_rclone_pass.sh"
 #
 # restore-from-drive.sh — Restore Paperclip backup from Google Drive
 #
@@ -12,6 +16,8 @@ set -euo pipefail
 #   restore-from-drive.sh latest [dest-dir]           # restore most recent
 #   restore-from-drive.sh 2026/05/12/1008 [dest-dir]  # restore specific backup
 #
+
+RCLONE_CONFIG="${RCLONE_CONFIG:-$HOME/.config/rclone/rclone.conf}"
 
 LOCKFILE="/tmp/paperclip-restore.lock"
 exec 200>"$LOCKFILE"
@@ -50,7 +56,7 @@ usage() {
 list_backups() {
     echo "Fetching available backups from ${REMOTE_BASE}..."
     echo ""
-    if ! rclone lsd "$REMOTE_BASE" 2>/dev/null; then
+    if ! rclone lsd "$REMOTE_BASE" --config "$RCLONE_CONFIG" 2>/dev/null; then
         echo "No backups found or remote not accessible."
         echo "Ensure the 'gdrive' remote is configured (run rclone-bootstrap.sh)."
         exit 1
@@ -58,13 +64,13 @@ list_backups() {
 
     echo ""
     echo "Backup paths (YYYY/MM/DD/HHMM):"
-    rclone tree "$REMOTE_BASE" --depth 4 2>/dev/null || \
-    rclone ls "$REMOTE_BASE" --max-depth 4 2>/dev/null | awk '{print $2}' | sort -r | head -20
+    rclone tree "$REMOTE_BASE" --config "$RCLONE_CONFIG" --depth 4 2>/dev/null || \
+    rclone ls "$REMOTE_BASE" --config "$RCLONE_CONFIG" --max-depth 4 2>/dev/null | awk '{print $2}' | sort -r | head -20
 }
 
 find_latest() {
-    rclone ls "$REMOTE_BASE" --max-depth 4 &>/dev/null || return 1
-    rclone ls "$REMOTE_BASE" --max-depth 4 2>/dev/null | \
+    rclone ls "$REMOTE_BASE" --config "$RCLONE_CONFIG" --max-depth 4 &>/dev/null || return 1
+    rclone ls "$REMOTE_BASE" --config "$RCLONE_CONFIG" --max-depth 4 2>/dev/null | \
         awk '{print $2}' | grep -E '^[0-9]{4}/[0-9]{2}/[0-9]{2}/[0-9]{4}/$' | \
         sort -r | head -1
 }
@@ -80,7 +86,7 @@ download_backup() {
 
     mkdir -p "$dest_dir"
 
-    rclone copy "$full_remote" "$dest_dir" --progress --verbose
+    rclone copy "$full_remote" "$dest_dir" --config "$RCLONE_CONFIG" --progress --verbose
 
     echo ""
     echo "Downloaded files:"

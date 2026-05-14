@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+
+# --- Load rclone encryption password (if config is encrypted) ---
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+source "${SCRIPT_DIR}/_rclone_pass.sh"
 RCLONE_REMOTE="gdrive"
 RCLONE_DRIVE_SCOPE="drive.file"
 RCLONE_CONFIG_FILE="${RCLONE_CONFIG:-$HOME/.config/rclone/rclone.conf}"
@@ -27,7 +31,7 @@ fi
 
 MODE="${1:-}"
 
-if rclone listremotes 2>/dev/null | grep -q "^${RCLONE_REMOTE}:"; then
+if rclone listremotes --config "$RCLONE_CONFIG_FILE" 2>/dev/null | grep -q "^${RCLONE_REMOTE}:"; then
     echo "Remote '${RCLONE_REMOTE}' already configured."
     if [ "$MODE" = "--force" ]; then
         echo "Reconfiguring (--force)..."
@@ -38,12 +42,12 @@ if rclone listremotes 2>/dev/null | grep -q "^${RCLONE_REMOTE}:"; then
         echo "  ${PAPERCLIP_HOME}/scripts/rclone-headless-auth.sh"
         echo ""
         echo "Verifying remote..."
-        if rclone lsd "${RCLONE_REMOTE}:Paperclip-Backups" 2>/dev/null; then
+        if rclone lsd "${RCLONE_REMOTE}:Paperclip-Backups" --config "$RCLONE_CONFIG_FILE" 2>/dev/null; then
             echo "Remote '${RCLONE_REMOTE}' is working and authorized."
             exit 0
         else
             echo "Remote exists but token may be expired."
-            echo "Run: rclone config reconnect ${RCLONE_REMOTE}:"
+            echo "Run: rclone config reconnect ${RCLONE_REMOTE}: --config '${RCLONE_CONFIG_FILE}'"
             echo "Or use headless auth: ${PAPERCLIP_HOME}/scripts/rclone-headless-auth.sh"
             exit 1
         fi
@@ -90,16 +94,16 @@ rclone config create "$RCLONE_REMOTE" drive \
 
 echo ""
 echo "Step 2: Verifying remote..."
-if rclone about "$RCLONE_REMOTE": 2>/dev/null; then
+if rclone about "$RCLONE_REMOTE": --config "$RCLONE_CONFIG_FILE" 2>/dev/null; then
     echo "Remote '${RCLONE_REMOTE}' is working."
 else
     echo "(about check skipped -- expected for drive.file scope)"
-    rclone lsd "$RCLONE_REMOTE": 2>&1 || echo "(empty root is normal)"
+    rclone lsd "$RCLONE_REMOTE": --config "$RCLONE_CONFIG_FILE" 2>&1 || echo "(empty root is normal)"
 fi
 
 echo ""
 echo "Step 3: Creating Paperclip-Backups root..."
-rclone mkdir "$RCLONE_REMOTE":Paperclip-Backups 2>/dev/null || true
+rclone mkdir "$RCLONE_REMOTE":Paperclip-Backups --config "$RCLONE_CONFIG_FILE" 2>/dev/null || true
 echo "Done."
 
 echo ""

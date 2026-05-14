@@ -38,7 +38,7 @@ Copy that JSON token block. Then on THIS server, run:
 If you can reach this server's localhost via SSH tunnel:
     ssh -L 53682:127.0.0.1:53682 sirrus-serv
 Then run:
-    rclone config reconnect gdrive:
+    rclone config reconnect gdrive: --config "${CONFIG_FILE}"
 Open the URL in your browser; callback is forwarded to the server.
 
 --- Option C: restore from backup ---
@@ -89,7 +89,7 @@ case "${ACTION}" in
         ;;
     check)
         echo "Checking remote '${REMOTE}'..."
-        if rclone lsd "${REMOTE}:Paperclip-Backups" &>/dev/null; then
+        if rclone lsd "${REMOTE}:Paperclip-Backups" --config "$CONFIG_FILE" &>/dev/null; then
             echo "Remote '${REMOTE}' is authenticated and working."
             exit 0
         else
@@ -102,13 +102,13 @@ case "${ACTION}" in
         ;;
     verify)
         echo "Verifying remote '${REMOTE}'..."
-        if rclone lsd "${REMOTE}:Paperclip-Backups" &>/dev/null; then
+        if rclone lsd "${REMOTE}:Paperclip-Backups" --config "$CONFIG_FILE" &>/dev/null; then
             echo "Remote '${REMOTE}' is authenticated and working."
-            rclone mkdir "${REMOTE}:Paperclip-Backups" &>/dev/null || true
+            rclone mkdir "${REMOTE}:Paperclip-Backups" --config "$CONFIG_FILE" &>/dev/null || true
             exit 0
         else
             echo "ERROR: Remote verification failed."
-            echo "Run: rclone config reconnect ${REMOTE}:"
+            echo "Run: rclone config reconnect ${REMOTE}: --config '${CONFIG_FILE}'"
             echo "Or:  ~/.paperclip/scripts/rclone-headless-auth.sh --apply-token"
             exit 1
         fi
@@ -191,9 +191,9 @@ PYEOF
 
         echo ""
         echo "Verifying remote..."
-        if rclone lsd "${REMOTE}:Paperclip-Backups" &>/dev/null; then
+        if rclone lsd "${REMOTE}:Paperclip-Backups" --config "$CONFIG_FILE" &>/dev/null; then
             echo "Remote '${REMOTE}' is working and authenticated."
-            rclone mkdir "${REMOTE}:Paperclip-Backups" &>/dev/null || true
+            rclone mkdir "${REMOTE}:Paperclip-Backups" --config "$CONFIG_FILE" &>/dev/null || true
             echo ""
             echo "Backup pipeline is now operational."
             echo "To run a backup immediately: ~/.paperclip/scripts/backup-to-drive.sh"
@@ -203,8 +203,8 @@ PYEOF
             echo "The token may be invalid or expired."
             echo ""
             echo "Diagnostic commands:"
-            echo "  rclone config show ${REMOTE}"
-            echo "  rclone lsd ${REMOTE}: --verbose"
+            echo "  rclone config show ${REMOTE} --config '${CONFIG_FILE}'"
+            echo "  rclone lsd ${REMOTE}: --config '${CONFIG_FILE}' --verbose"
             echo ""
             if [ -f "${CONFIG_FILE}.bak" ]; then
                 echo "If needed, restore the previous config from backup:"
