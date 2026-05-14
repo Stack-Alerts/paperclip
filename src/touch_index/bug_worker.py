@@ -12,14 +12,24 @@ For each closed issue:
     setting closed_at from completedAt.
 
 The upsert is idempotent — safe to re-run on the same issues.
+
+Catch-up tracking
+-----------------
+``catch_up_eligible_bug_issues`` tracks issues that were attempted but
+yielded no source files (e.g. commits touching only docs/, .md, .sh, .json).
+These *unindexable* identifiers are persisted to a JSON tracker file so they
+are not re-processed on every 15-minute cycle.  Delete the tracker file to
+force a full re-attempt on the next catch-up run.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Sequence
 
 from sqlalchemy import text
@@ -30,6 +40,18 @@ from .git_extractor import get_all_referenced_issue_ids, get_files_for_issue
 from .paperclip_client import FDR_LABEL_ID, get_issue_by_id, get_issue_by_identifier
 
 logger = logging.getLogger(__name__)
+
+# Tracker for issues attempted by catch-up that yielded no source files,
+# preventing infinite re-processing every 15-minute cycle.
+_CATCHUP_UNINDEXABLE_PATH: Path = (
+    Path(__file__).parents[2] / "data" / "touch_index_catchup_unindexable.json"
+)
+
+
+def _set_catchup_tracker_path(path: Path) -> None:
+    """Override the tracker path (used by tests to isolate from disk state)."""
+    global _CATCHUP_UNINDEXABLE_PATH
+    _CATCHUP_UNINDEXABLE_PATH = path
 
 _UPSERT_SQL = text("""
     INSERT INTO touch_index_bug_files
@@ -234,6 +256,29 @@ if __name__ == "__main__":
     main()
 
 
+def _load_unindexable_ids() -> set[str]:
+    """Load identifiers previously marked as unindexable from the tracker file."""
+    if not _CATCHUP_UNINDEXABLE_PATH.exists():
+        return set()
+    try:
+        raw = _CATCHUP_UNINDEXABLE_PATH.read_text().strip()
+        if not raw:
+            return set()
+        return set(json.loads(raw))
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Could not load catch-up unindexable tracker: %s", exc)
+        return set()
+
+
+def _save_unindexable_ids(ids: set[str]) -> None:
+    """Persist unindexable identifiers to the tracker file."""
+    try:
+        _CATCHUP_UNINDEXABLE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _CATCHUP_UNINDEXABLE_PATH.write_text(json.dumps(sorted(ids), indent=2) + "\n")
+    except OSError as exc:
+        logger.warning("Could not save catch-up unindexable tracker: %s", exc)
+
+
 def catch_up_eligible_bug_issues(
     engine: Engine,
     *,
@@ -245,6 +290,10 @@ def catch_up_eligible_bug_issues(
     even though they were completed outside the worker's lookback window.
     This catch-up ensures those issues are indexed, keeping eligible coverage
     consistently above the quality threshold without requiring a full backfill.
+
+    Issues that were previously attempted but yielded no source files (e.g.
+    commits touching only docs/, .md, .sh, .json) are tracked and skipped on
+    subsequent runs to avoid infinite re-processing every 15-minute cycle.
     """
     all_git_ids = get_all_referenced_issue_ids()
     if not all_git_ids:
@@ -256,10 +305,18 @@ def catch_up_eligible_bug_issues(
         ).fetchall()
     indexed_in_db: set[str] = {str(r[0]) for r in indexed_rows}
 
+    unindexable = _load_unindexable_ids()
+    newly_unindexable: set[str] = set()
+
     results: list[BugIngestionResult] = []
     for identifier in sorted(all_git_ids):
         if identifier in indexed_in_db:
             logger.debug("Catch-up: %s already indexed -- skipping", identifier)
+            continue
+        if identifier in unindexable:
+            logger.debug(
+                "Catch-up: %s previously unindexable -- skipping", identifier
+            )
             continue
         try:
             issue = get_issue_by_identifier(identifier)
@@ -305,9 +362,27 @@ def catch_up_eligible_bug_issues(
                         dry_run=dry_run,
                         issue_status=full.get("status"),
                     )
+            if result.source == "none":
+                newly_unindexable.add(identifier)
+                logger.info(
+                    "Catch-up: %s yielded no source files -- "
+                    "recording as unindexable to skip future cycles",
+                    identifier,
+                )
             results.append(result)
         except Exception:
             logger.exception("Catch-up ingestion error for %s", identifier)
+
+    if newly_unindexable:
+        all_unindexable = unindexable | newly_unindexable
+        _save_unindexable_ids(all_unindexable)
+        logger.info(
+            "Catch-up: recorded %d newly unindexable issue(s) "
+            "(%d total tracked)",
+            len(newly_unindexable),
+            len(all_unindexable),
+        )
+
     if results:
         logger.info(
             "Catch-up complete: %d eligible issues processed, %d files indexed, %d skipped",
