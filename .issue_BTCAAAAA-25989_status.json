@@ -1,0 +1,31 @@
+{
+  "issue": "BTCAAAAA-25989",
+  "status": "done",
+  "timestamp": "2026-05-14T01:05:00Z",
+  "agent": "AutomationEngineer",
+  "action": "Blast Radius worker — detect fix→in_review and post report — implemented and verified",
+  "deliverables": [
+    "src/blast_radius/worker.py — polling worker + webhook entry point",
+    "src/blast_radius/generator.py — report generation + posting with done-guard",
+    "src/blast_radius/report.py — markdown rendering + touchedFiles extraction",
+    "src/blast_radius/query.py — Touch Index queries (FR impact, regressions, downstream)",
+    "src/blast_radius/__main__.py — unified CLI (worker, query, generate, serve)",
+    "scripts/run_blast_radius_worker.py — CI runner wrapper",
+    "scripts/blast_radius_monitor.py — worker health monitoring + alerting",
+    ".github/workflows/blast-radius-worker.yml — every 5 min poll + webhook handler",
+    ".github/workflows/blast-radius-monitor.yml — every 30 min health check",
+    "docs/runbook-blast-radius-worker.md — runbook with rollback, monitoring, troubleshooting",
+    "tests/test_blast_radius/ — 204 tests (64 worker) — all PASS"
+  ],
+  "verification": {
+    "tests": "204/204 PASS",
+    "worker_tests": "64/64 PASS",
+    "lint": "clean",
+    "dry_run": "Fetched 3 in_review issues, 0 fix transitions (expected — no fix-labeled issues in_review)",
+    "coverage": "worker.py 95%, generator.py 96%, query.py 100%, report.py 100%"
+  },
+  "related_issues": [
+    "BTCAAAAA-25990 — tighten transition-to-done guard (committed a35c15cb)",
+    "BTCAAAAA-25991 — transition guard verified (committed b5630227)"
+  ]
+}
