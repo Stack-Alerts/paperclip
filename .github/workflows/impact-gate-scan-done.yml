@@ -36,7 +36,7 @@ permissions:
 
 concurrency:
   group: impact-gate-scan-done
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   scan:
