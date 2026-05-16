@@ -85,21 +85,45 @@ _start_time: float = time.monotonic()
 _registry: Optional[Any] = None
 
 
-def configure(registry: Any) -> None:
-    """Inject the ITM StrategyRegistry for P2 write endpoints.
+def configure(registry: Any, orchestrator: Optional[Any] = None, publisher: Optional[Any] = None) -> None:
+    """Inject the ITM StrategyRegistry (and optionally orchestrator) for P2.
 
     Call this before ``APIServer.start()``::
 
         from src.api.app import configure
-        configure(registry=orchestrator.registry)
+        from src.api.event_publisher import EventPublisher
+
+        publisher = EventPublisher(make_sync_client())
+        registry = StrategyRegistry(
+            on_strategy_activated=publisher.on_strategy_changed,
+            on_strategy_paused=publisher.on_strategy_changed,
+            on_strategy_stopped=publisher.on_strategy_changed,
+        )
+        orchestrator = MultiStrategyOrchestrator(
+            config=...,
+            on_phase_event=publisher.on_phase_started,  # see note below
+        )
+        configure(registry=registry, orchestrator=orchestrator, publisher=publisher)
         server.start()
 
-    The registry's lifecycle callbacks (``on_strategy_activated``,
-    ``on_strategy_paused``, ``on_strategy_stopped``) must already be wired
-    to an ``EventPublisher`` so WS subscribers receive state changes.
+    When ``orchestrator`` and ``publisher`` are both provided, the orchestrator's
+    ``on_phase_event`` is wired so that ``PhaseStarted`` events call
+    ``publisher.on_phase_started`` and ``PhaseCompleted`` events call
+    ``publisher.on_phase_completed``, routing all phase telemetry to
+    ``WS /ws/cycle``.
     """
     global _registry
     _registry = registry
+
+    if orchestrator is not None and publisher is not None:
+        def _dispatch_phase_event(event: Any) -> None:
+            from src.itm.domain.events import PhaseStarted, PhaseCompleted
+            if isinstance(event, PhaseStarted):
+                publisher.on_phase_started(event)
+            elif isinstance(event, PhaseCompleted):
+                publisher.on_phase_completed(event)
+
+        orchestrator._on_phase_event = _dispatch_phase_event
 
 # Redis key constants (must stay in sync with RedisStateStore / EventPublisher)
 _KEY_SNAPSHOT = "itm:state:snapshot"

@@ -396,3 +396,137 @@ class TestLifecycleStateTransitions:
 
         orch.stop_strategy("lifecycle-test")
         assert orch.registry.get("lifecycle-test").is_stopped
+
+
+# ---------------------------------------------------------------------------
+# Test: Phase event instrumentation (P2 — BTCAAAAA-27736)
+# ---------------------------------------------------------------------------
+
+
+class TestPhaseEventInstrumentation:
+    """Verify PhaseStarted/PhaseCompleted events fire from the orchestrator."""
+
+    def _make_orch_with_collector(self):
+        """Return (orchestrator, collected_events list)."""
+        events = []
+        config = OrchestratorConfig(
+            total_capital=Decimal("50000"),
+            auto_activate_on_load=True,
+        )
+        orch = MultiStrategyOrchestrator(
+            config=config,
+            on_phase_event=events.append,
+        )
+        orch.load_from_sb_dict(REAL_SB_EXPORT)
+        return orch, events
+
+    def _make_signal(self, strategy_id="momentum-v1", strength=0.9):
+        return make_signal(strategy_id, strength=str(strength))
+
+    def test_submit_signal_emits_signal_received(self):
+        """signal_received PhaseStarted/PhaseCompleted fire on submit_signal."""
+        from src.itm.domain.events import PhaseStarted, PhaseCompleted
+        orch, events = self._make_orch_with_collector()
+
+        orch.submit_signal(self._make_signal())
+
+        phase_names = {type(e).__name__ + ":" + getattr(e, "phase_name", "") for e in events}
+        assert "PhaseStarted:signal_received" in phase_names
+        assert "PhaseCompleted:signal_received" in phase_names
+
+    def test_submit_signal_emits_signal_aggregation(self):
+        """signal_aggregation phase events fire during aggregator processing."""
+        from src.itm.domain.events import PhaseStarted, PhaseCompleted
+        orch, events = self._make_orch_with_collector()
+
+        orch.submit_signal(self._make_signal())
+
+        names = {type(e).__name__ + ":" + getattr(e, "phase_name", "") for e in events}
+        assert "PhaseStarted:signal_aggregation" in names
+        assert "PhaseCompleted:signal_aggregation" in names
+
+    def test_submit_signal_emits_decision_creation_on_accept(self):
+        """decision_creation fires when a Decision is produced."""
+        from src.itm.domain.events import PhaseStarted, PhaseCompleted
+        orch, events = self._make_orch_with_collector()
+
+        decision = orch.submit_signal(self._make_signal(strength=0.9))
+        assert decision is not None
+
+        names = {type(e).__name__ + ":" + getattr(e, "phase_name", "") for e in events}
+        assert "PhaseStarted:decision_creation" in names
+        assert "PhaseCompleted:decision_creation" in names
+
+    def test_no_decision_creation_event_when_signal_dropped(self):
+        """decision_creation does NOT fire for low-confidence signals that get dropped."""
+        from src.itm.domain.events import PhaseStarted
+        orch, events = self._make_orch_with_collector()
+
+        decision = orch.submit_signal(self._make_signal(strength=0.01))
+        assert decision is None
+
+        names = {getattr(e, "phase_name", "") for e in events if isinstance(e, PhaseStarted)}
+        assert "decision_creation" not in names
+
+    def test_validate_order_emits_strategy_validation(self):
+        """strategy_validation phase fires during validate_order."""
+        from src.itm.domain.events import PhaseStarted, PhaseCompleted
+        orch, events = self._make_orch_with_collector()
+
+        orch.validate_order("momentum-v1", Decimal("0.1"), Decimal("5000"))
+
+        names = {type(e).__name__ + ":" + getattr(e, "phase_name", "") for e in events}
+        assert "PhaseStarted:strategy_validation" in names
+        assert "PhaseCompleted:strategy_validation" in names
+
+    def test_validate_order_emits_capital_check(self):
+        """capital_check phase fires during validate_order."""
+        from src.itm.domain.events import PhaseStarted, PhaseCompleted
+        orch, events = self._make_orch_with_collector()
+
+        orch.validate_order("momentum-v1", Decimal("0.1"), Decimal("5000"))
+
+        names = {type(e).__name__ + ":" + getattr(e, "phase_name", "") for e in events}
+        assert "PhaseStarted:capital_check" in names
+        assert "PhaseCompleted:capital_check" in names
+
+    def test_validate_order_emits_risk_gate(self):
+        """risk_gate phase fires during validate_order."""
+        from src.itm.domain.events import PhaseStarted, PhaseCompleted
+        orch, events = self._make_orch_with_collector()
+
+        orch.validate_order("momentum-v1", Decimal("0.1"), Decimal("5000"))
+
+        names = {type(e).__name__ + ":" + getattr(e, "phase_name", "") for e in events}
+        assert "PhaseStarted:risk_gate" in names
+        assert "PhaseCompleted:risk_gate" in names
+
+    def test_phase_events_have_consistent_cycle_id(self):
+        """All phase events from one submit_signal call share the same cycle_id."""
+        orch, events = self._make_orch_with_collector()
+
+        orch.submit_signal(self._make_signal())
+
+        cycle_ids = {e.cycle_id for e in events}
+        assert len(cycle_ids) == 1, f"Expected single cycle_id, got: {cycle_ids}"
+
+    def test_phase_completed_has_duration_ms(self):
+        """PhaseCompleted events carry a non-negative duration_ms."""
+        from src.itm.domain.events import PhaseCompleted
+        orch, events = self._make_orch_with_collector()
+
+        orch.submit_signal(self._make_signal())
+
+        completed = [e for e in events if isinstance(e, PhaseCompleted)]
+        assert completed, "No PhaseCompleted events collected"
+        for ev in completed:
+            assert ev.duration_ms >= 0
+
+    def test_no_on_phase_event_no_crash(self):
+        """Orchestrator without on_phase_event callback works normally."""
+        config = OrchestratorConfig(total_capital=Decimal("50000"), auto_activate_on_load=True)
+        orch = MultiStrategyOrchestrator(config=config)
+        orch.load_from_sb_dict(REAL_SB_EXPORT)
+
+        decision = orch.submit_signal(self._make_signal())
+        assert decision is not None
