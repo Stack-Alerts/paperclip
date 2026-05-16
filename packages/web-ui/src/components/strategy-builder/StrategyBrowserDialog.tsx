@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { Strategy, StrategyStatus } from '@/lib/strategy-builder/types';
 import { InfoTooltip } from './InfoTooltip';

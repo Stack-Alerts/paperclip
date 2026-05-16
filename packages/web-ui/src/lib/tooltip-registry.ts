@@ -358,8 +358,8 @@ export function getTooltip(moduleId: string, fieldId: string): Tooltip | undefin
  * Returns all tooltips for a given module (flat array).
  */
 export function getModuleTooltips(moduleId: string): Tooltip[] {
-  const module = TOOLTIP_REGISTRY[moduleId];
-  return module ? Object.values(module) : [];
+  const reg = TOOLTIP_REGISTRY[moduleId];
+  return reg ? Object.values(reg) : [];
 }
 
 /**

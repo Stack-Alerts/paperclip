@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
-import { ValidationLevel, ValidationMessage } from '@/lib/strategy-builder/types';
+import { ValidationLevel } from '@/lib/strategy-builder/types';
 
 const LEVEL_COLORS: Record<ValidationLevel, string> = {
   error: 'text-red-400 bg-red-950',

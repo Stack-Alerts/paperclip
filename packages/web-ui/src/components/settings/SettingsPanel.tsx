@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { AppSettings, Setting } from '@/types';
+import { AppSettings } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,7 +37,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
 
   const handleSettingChange = useCallback(
-    (category: string, key: string, value: any) => {
+    (category: string, key: string, value: string | number | boolean) => {
       setLocalSettings((prev) => ({
         ...prev,
         [category]: {

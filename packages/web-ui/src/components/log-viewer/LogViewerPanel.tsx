@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { LogEntry, LogLevel, LogEventType } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,30 +52,19 @@ export const LogViewerPanel: React.FC<LogViewerPanelProps> = ({
   onExport,
   disabled = false,
 }) => {
-  const [filteredLogs, setFilteredLogs] = useState<LogEntry[]>(logs);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLevels, setSelectedLevels] = useState<Set<LogLevel>>(
     new Set(Object.values(LogLevel))
   );
-  const [selectedEvents, setSelectedEvents] = useState<Set<LogEventType>>(
+  const [selectedEvents] = useState<Set<LogEventType>>(
     new Set(Object.values(LogEventType))
   );
   const [autoScroll, setAutoScroll] = useState(true);
   const logEndRef = useRef<HTMLDivElement>(null);
 
-  // Filter logs based on search term and selected levels/events
-  useEffect(() => {
-    let filtered = logs;
-
-    // Filter by log level
-    filtered = filtered.filter((log) => selectedLevels.has(log.level));
-
-    // Filter by event type
-    filtered = filtered.filter((log) =>
-      !log.eventType || selectedEvents.has(log.eventType)
-    );
-
-    // Filter by search term
+  const filteredLogs = useMemo(() => {
+    let filtered = logs.filter((log) => selectedLevels.has(log.level));
+    filtered = filtered.filter((log) => !log.eventType || selectedEvents.has(log.eventType));
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter((log) =>
@@ -83,8 +72,7 @@ export const LogViewerPanel: React.FC<LogViewerPanelProps> = ({
         log.source?.toLowerCase().includes(term)
       );
     }
-
-    setFilteredLogs(filtered);
+    return filtered;
   }, [logs, searchTerm, selectedLevels, selectedEvents]);
 
   // Auto-scroll to latest logs
@@ -101,18 +89,6 @@ export const LogViewerPanel: React.FC<LogViewerPanelProps> = ({
         next.delete(level);
       } else {
         next.add(level);
-      }
-      return next;
-    });
-  }, []);
-
-  const toggleEventType = useCallback((event: LogEventType) => {
-    setSelectedEvents((prev) => {
-      const next = new Set(prev);
-      if (next.has(event)) {
-        next.delete(event);
-      } else {
-        next.add(event);
       }
       return next;
     });

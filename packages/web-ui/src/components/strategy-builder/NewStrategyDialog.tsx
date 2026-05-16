@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { InfoTooltip } from './InfoTooltip';
 
@@ -16,16 +16,6 @@ export function NewStrategyDialog({ open, onClose }: NewStrategyDialogProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
-
-  // Focus name on open
-  useEffect(() => {
-    if (open) {
-      setName('');
-      setDescription('');
-      setError(null);
-      setTimeout(() => nameRef.current?.focus(), 50);
-    }
-  }, [open]);
 
   const handleSubmit = useCallback(async () => {
     const trimmed = name.trim();
@@ -97,6 +87,7 @@ export function NewStrategyDialog({ open, onClose }: NewStrategyDialogProps) {
                 ref={nameRef}
                 id="new-strategy-name"
                 type="text"
+                autoFocus
                 value={name}
                 onChange={(e) => { setName(e.target.value); setError(null); }}
                 placeholder="e.g., MA_Crossover_RSI"

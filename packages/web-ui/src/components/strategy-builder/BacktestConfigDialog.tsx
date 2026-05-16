@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BacktestConfig } from '@/lib/strategy-builder/types';
 import { InfoTooltip } from './InfoTooltip';
@@ -32,15 +32,12 @@ function daysAgo(n: number) {
 export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProps) {
   const { currentStrategy, runBacktest, backTestInProgress, backTestProgress } = useStrategyStore();
 
-  const [config, setConfig] = useState<Omit<BacktestConfig, 'strategyId'>>(defaultConfig);
+  const [config, setConfig] = useState<Omit<BacktestConfig, 'strategyId'>>(() => ({
+    ...defaultConfig,
+    startDate: daysAgo(90),
+    endDate: today(),
+  }));
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open) {
-      setConfig({ ...defaultConfig, startDate: daysAgo(90), endDate: today() });
-      setError(null);
-    }
-  }, [open]);
 
   const patch = useCallback(<K extends keyof typeof config>(key: K, value: (typeof config)[K]) => {
     setConfig((prev) => ({ ...prev, [key]: value }));

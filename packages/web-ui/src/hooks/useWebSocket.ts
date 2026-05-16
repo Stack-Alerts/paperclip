@@ -9,6 +9,7 @@ export function useWebSocket<T>(url: string) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmounted = useRef(false);
+  const connectRef = useRef<() => void>(() => { /* populated by effect */ });
 
   const connect = useCallback(() => {
     if (unmounted.current) return;
@@ -37,18 +38,20 @@ export function useWebSocket<T>(url: string) {
       ws.onclose = () => {
         if (unmounted.current) return;
         setStatus('closed');
-        reconnectTimer.current = setTimeout(connect, 3000);
+        reconnectTimer.current = setTimeout(connectRef.current, 3000);
       };
     } catch {
       setStatus('error');
-      reconnectTimer.current = setTimeout(connect, 5000);
+      reconnectTimer.current = setTimeout(connectRef.current, 5000);
     }
   }, [url]);
 
   useEffect(() => {
+    connectRef.current = connect;
     unmounted.current = false;
-    connect();
+    const initTimer = setTimeout(connect, 0);
     return () => {
+      clearTimeout(initTimer);
       unmounted.current = true;
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       wsRef.current?.close();

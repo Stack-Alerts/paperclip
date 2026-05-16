@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { InfoTooltip } from './InfoTooltip';
 
 export interface ExitConditionConfig {
@@ -27,25 +27,13 @@ export function ExitConditionDialog({
   onSave,
   onClose,
 }: ExitConditionDialogProps) {
-  const [percentage, setPercentage] = useState(50);
-  const [exitMode, setExitMode] = useState<'ABSOLUTE' | 'FLEXIBLE'>('ABSOLUTE');
-  const [tpProximity, setTpProximity] = useState(2.0);
-  const [reversalTrigger, setReversalTrigger] = useState(0.5);
-  const [recheckEnabled, setRecheckEnabled] = useState(false);
-  const [recheckBarDelay, setRecheckBarDelay] = useState(3);
+  const [percentage, setPercentage] = useState(() => existingConfig?.percentage ?? 50);
+  const [exitMode, setExitMode] = useState<'ABSOLUTE' | 'FLEXIBLE'>(() => existingConfig?.exitMode ?? 'ABSOLUTE');
+  const [tpProximity, setTpProximity] = useState(() => existingConfig?.tpProximity ?? 2.0);
+  const [reversalTrigger, setReversalTrigger] = useState(() => existingConfig?.reversalTrigger ?? 0.5);
+  const [recheckEnabled, setRecheckEnabled] = useState(() => existingConfig?.recheckEnabled ?? false);
+  const [recheckBarDelay, setRecheckBarDelay] = useState(() => existingConfig?.recheckBarDelay ?? 3);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open && existingConfig) {
-      setPercentage(existingConfig.percentage);
-      setExitMode(existingConfig.exitMode);
-      setTpProximity(existingConfig.tpProximity ?? 2.0);
-      setReversalTrigger(existingConfig.reversalTrigger ?? 0.5);
-      setRecheckEnabled(existingConfig.recheckEnabled ?? false);
-      setRecheckBarDelay(existingConfig.recheckBarDelay ?? 3);
-      setError(null);
-    }
-  }, [open, existingConfig]);
 
   const handleSave = useCallback(() => {
     if (percentage < 1 || percentage > 100) {

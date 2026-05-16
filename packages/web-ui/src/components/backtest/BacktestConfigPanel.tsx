@@ -45,7 +45,7 @@ export const BacktestConfigPanel: React.FC<BacktestConfigPanelProps> = ({
 
   const [isRunning, setIsRunning] = useState(false);
 
-  const handleConfigChange = useCallback((field: keyof BacktestConfig, value: any) => {
+  const handleConfigChange = useCallback((field: keyof BacktestConfig, value: BacktestConfig[keyof BacktestConfig]) => {
     setConfig(prev => ({
       ...prev,
       [field]: value,

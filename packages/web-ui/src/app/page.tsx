@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { BacktestConfigPanel } from '@/components/backtest/BacktestConfigPanel';
 import { DataManagementPanel } from '@/components/data-management/DataManagementPanel';
 import { LogViewerPanel } from '@/components/log-viewer/LogViewerPanel';
@@ -9,7 +9,6 @@ import {
   LogLevel,
 } from '@/types';
 import type {
-  BacktestConfig,
   BacktestProgress,
   BacktestResult,
   DataSource,
@@ -32,7 +31,7 @@ export default function Dashboard() {
   const [backtestResult, setBacktestResult] = useState<BacktestResult | undefined>();
 
   // Data Management state
-  const [dataSources, setDataSources] = useState<DataSource[]>([
+  const [dataSources] = useState<DataSource[]>([
     {
       id: '1',
       name: 'Binance 15m',
@@ -92,7 +91,7 @@ export default function Dashboard() {
   });
 
   // Handlers
-  const handleBacktestStart = useCallback((config: BacktestConfig) => {
+  const handleBacktestStart = useCallback(() => {
     setBacktestProgress({
       currentCandle: 0,
       totalCandles: 1000,
