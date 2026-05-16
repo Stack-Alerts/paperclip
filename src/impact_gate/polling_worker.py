@@ -36,6 +36,7 @@ from touch_index.paperclip_client import (
     _company,
     _paginate,
     _parse_iso_ts,
+    fetch_issue_comments,
     get_issue_by_id,
     is_issue_done,
 )
@@ -52,6 +53,9 @@ FIX_LABELS: set[str] = {
 }
 
 PAPERCLIP_RUN_ID = os.environ.get("PAPERCLIP_RUN_ID", "")
+
+# Matches the header produced by _render_gate_comment — used to detect prior runs.
+_SCAN_DONE_RE = re.compile(r"^## Impact Gate — Scan Done", re.MULTILINE)
 
 
 def _run_headers() -> dict[str, str]:
@@ -76,6 +80,20 @@ def _fetch_done_fix_issues(lookback_minutes: int = 10) -> list[dict]:
     return [i for i in recent if _is_fix_issue(i)]
 
 
+def _has_scan_done_comment(issue_id: str) -> bool:
+    """Return True if the issue already has an Impact Gate scan-done comment.
+
+    Used to deduplicate: if a previous worker run already posted the report
+    we skip to avoid re-opening a done issue (BTCAAAAA-27486).
+    """
+    try:
+        comments = fetch_issue_comments(issue_id)
+        return any(_SCAN_DONE_RE.search(c.get("body", "")) for c in comments)
+    except Exception as exc:
+        log.warning("Could not check existing comments for %s: %s — proceeding", issue_id, exc)
+        return False
+
+
 def _post_comment(issue_id: str, body: str, dry_run: bool = False) -> bool:
     """Post a comment on the issue.  Returns True on success."""
     if dry_run:
@@ -83,18 +101,11 @@ def _post_comment(issue_id: str, body: str, dry_run: bool = False) -> bool:
         return True
 
     try:
-        if is_issue_done(issue_id):
-            # Done-guard: skip to avoid re-open loops (BTCAAAAA-25832)
-            pass  # posting comments on done issues is fine — we just don't transition
-    except Exception:
-        pass
-
-    try:
         with _board_session() as sess:
             sess.headers.update(_run_headers())
             resp = sess.post(
                 f"{_base()}/api/issues/{issue_id}/comments",
-                json={"body": body},
+                json={"body": body, "idempotencyKey": f"scan-done:{issue_id}"},
                 timeout=15,
             )
             resp.raise_for_status()
@@ -165,6 +176,14 @@ def process_issue(
         return {"issue": issue_id, "status": "not_found", "comment_posted": False}
 
     identifier = issue.get("identifier", issue_id)
+
+    # Skip done/cancelled issues that already have a scan-done comment to avoid
+    # re-opening them via a duplicate comment (BTCAAAAA-27486).
+    issue_status = issue.get("status", "")
+    if issue_status in ("done", "cancelled") and _has_scan_done_comment(issue_id):
+        log.info("[skip] %s already has a scan-done comment — skipping", identifier)
+        return {"issue": identifier, "status": "skipped_already_gated", "comment_posted": False}
+
     description = issue.get("description") or ""
 
     # Extract touched files

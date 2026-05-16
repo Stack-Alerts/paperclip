@@ -204,6 +204,7 @@ class TestScanFunction:
             "bypassed": 0,
             "error": 0,
             "skipped": 0,
+            "scanned": 0,
         }
 
     def test_scan_filters_fix_issues(self, monkeypatch):

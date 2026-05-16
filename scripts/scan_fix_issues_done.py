@@ -55,11 +55,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger("scan_fix_issues_done")
 
-# Regex to detect an Impact Gate comment in an issue's comment thread.
+# Regex to detect an Impact Gate result comment in an issue's comment thread.
 # Matches the markdown headers produced by worker._build_*_comment().
 _GATE_HEADER_RE = re.compile(
     r"^## Impact Gate:\s+(PASS|FAIL|BYPASSED|ERROR|SKIPPED)", re.MULTILINE
 )
+
+# Matches the polling worker's scan-done comment header (polling_worker._render_gate_comment).
+# Issues with this comment are already gated; treat them as "SCANNED" so they
+# are not retroactively re-gated and do not count as ungated (BTCAAAAA-27486).
+_SCAN_DONE_HEADER_RE = re.compile(r"^## Impact Gate — Scan Done", re.MULTILINE)
 
 
 def _check_gate_status(issue_id: str) -> str | None:
@@ -92,6 +97,8 @@ def _check_gate_status(issue_id: str) -> str | None:
         m = _GATE_HEADER_RE.search(body)
         if m:
             return m.group(1)
+        if _SCAN_DONE_HEADER_RE.search(body):
+            return "SCANNED"
     return None
 
 
@@ -205,6 +212,7 @@ def scan(
         "bypassed": 0,
         "error": 0,
         "skipped": 0,
+        "scanned": 0,
     }
     ungated: list[dict] = []
     gated_issues: list[dict] = []
@@ -217,6 +225,7 @@ def scan(
         "bypassed": 0,
         "error": 0,
         "skipped": 0,
+        "scanned": 0,
     }
     recent_ungated = 0
 
@@ -279,7 +288,7 @@ def scan(
     }
 
     logger.info(
-        "Scan complete: %d total, %d gated (PASS=%d FAIL=%d BYPASS=%d ERROR=%d SKIPPED=%d), %d ungated",
+        "Scan complete: %d total, %d gated (PASS=%d FAIL=%d BYPASS=%d ERROR=%d SKIPPED=%d SCANNED=%d), %d ungated",
         len(fix_issues),
         sum(gated.values()),
         gated.get("pass", 0),
@@ -287,6 +296,7 @@ def scan(
         gated.get("bypassed", 0),
         gated.get("error", 0),
         gated.get("skipped", 0),
+        gated.get("scanned", 0),
         len(ungated),
     )
 

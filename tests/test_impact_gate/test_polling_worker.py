@@ -12,6 +12,7 @@ from freezegun import freeze_time
 
 from impact_gate.polling_worker import (
     _fetch_done_fix_issues,
+    _has_scan_done_comment,
     _post_comment,
     _render_gate_comment,
     process_issue,
@@ -273,3 +274,113 @@ class TestRunOnce:
         assert result["gated"] == 1
         assert result["skipped"] == 1
         assert result["errors"] == 1
+
+
+# ---------------------------------------------------------------------------
+# TestHasScanDoneComment
+# ---------------------------------------------------------------------------
+
+
+class TestHasScanDoneComment:
+    @patch("impact_gate.polling_worker.fetch_issue_comments")
+    def test_returns_true_when_scan_done_comment_present(self, mock_fetch):
+        mock_fetch.return_value = [
+            {"id": "c1", "body": "## Impact Gate — Scan Done\n\nVerification complete."},
+        ]
+        assert _has_scan_done_comment("issue-123") is True
+
+    @patch("impact_gate.polling_worker.fetch_issue_comments")
+    def test_returns_false_when_no_scan_done_comment(self, mock_fetch):
+        mock_fetch.return_value = [
+            {"id": "c1", "body": "## Impact Gate: PASS\n\nAll tests passed."},
+            {"id": "c2", "body": "Just a regular comment."},
+        ]
+        assert _has_scan_done_comment("issue-123") is False
+
+    @patch("impact_gate.polling_worker.fetch_issue_comments")
+    def test_returns_false_when_no_comments(self, mock_fetch):
+        mock_fetch.return_value = []
+        assert _has_scan_done_comment("issue-123") is False
+
+    @patch("impact_gate.polling_worker.fetch_issue_comments")
+    def test_returns_false_on_fetch_error(self, mock_fetch):
+        mock_fetch.side_effect = Exception("API error")
+        assert _has_scan_done_comment("issue-123") is False
+
+
+# ---------------------------------------------------------------------------
+# TestProcessIssueIdempotency (BTCAAAAA-27486)
+# ---------------------------------------------------------------------------
+
+
+class TestProcessIssueIdempotency:
+    @patch("impact_gate.polling_worker.get_issue_by_id")
+    @patch("impact_gate.polling_worker._has_scan_done_comment")
+    def test_skips_done_issue_with_existing_scan_done_comment(
+        self, mock_has_comment, mock_get_issue
+    ):
+        issue = _make_issue(issue_id="abc", identifier="BTCAAAAA-27448", status="done")
+        mock_get_issue.return_value = issue
+        mock_has_comment.return_value = True
+
+        result = process_issue("abc")
+
+        assert result["status"] == "skipped_already_gated"
+        assert result["comment_posted"] is False
+        mock_has_comment.assert_called_once_with("abc")
+
+    @patch("impact_gate.polling_worker.get_issue_by_id")
+    @patch("impact_gate.polling_worker._has_scan_done_comment")
+    def test_skips_cancelled_issue_with_existing_scan_done_comment(
+        self, mock_has_comment, mock_get_issue
+    ):
+        issue = _make_issue(issue_id="abc", identifier="BTCAAAAA-111", status="cancelled")
+        mock_get_issue.return_value = issue
+        mock_has_comment.return_value = True
+
+        result = process_issue("abc")
+
+        assert result["status"] == "skipped_already_gated"
+        assert result["comment_posted"] is False
+
+    @patch("impact_gate.polling_worker.get_issue_by_id")
+    @patch("impact_gate.polling_worker._has_scan_done_comment")
+    @patch("impact_gate.polling_worker.extract_touched_files")
+    @patch("impact_gate.polling_worker.query_blast_radius")
+    @patch("impact_gate.polling_worker._post_comment")
+    def test_processes_done_issue_without_prior_scan_done_comment(
+        self, mock_post, mock_query, mock_extract, mock_has_comment, mock_get_issue
+    ):
+        issue = _make_issue(
+            issue_id="abc",
+            identifier="BTCAAAAA-999",
+            status="done",
+            description="touchedFiles: src/main.py",
+        )
+        mock_get_issue.return_value = issue
+        mock_has_comment.return_value = False
+        mock_extract.return_value = ["src/main.py"]
+
+        mock_data = MagicMock()
+        mock_data.fr_impact_set = []
+        mock_data.regression_set = []
+        mock_query.return_value = mock_data
+        mock_post.return_value = True
+
+        result = process_issue("abc")
+
+        assert result["status"] == "gated"
+        assert result["comment_posted"] is True
+        mock_post.assert_called_once()
+
+    @patch("impact_gate.polling_worker._board_session")
+    def test_post_comment_includes_idempotency_key(self, mock_session):
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_session.return_value.__enter__.return_value.post.return_value = mock_response
+
+        _post_comment("issue-xyz", "Test body")
+
+        call_kwargs = mock_session.return_value.__enter__.return_value.post.call_args
+        payload = call_kwargs[1]["json"] if call_kwargs[1] else call_kwargs[0][1]
+        assert payload.get("idempotencyKey") == "scan-done:issue-xyz"
