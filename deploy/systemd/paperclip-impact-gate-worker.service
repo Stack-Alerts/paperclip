@@ -1,0 +1,19 @@
+[Unit]
+Description=Paperclip Impact Gate Polling Worker (daemon mode)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/sirrus/miniconda3/bin/python3 /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/run_impact_gate_polling_worker.py --daemon --lookback-minutes 10 --poll-interval 300
+StandardOutput=journal
+StandardError=journal
+Restart=on-failure
+RestartSec=5
+Environment=HOME=/home/sirrus
+Environment=PYTHONPATH=/home/sirrus/projects/BTC-Trade-Engine-PaperClip/src
+EnvironmentFile=/home/sirrus/projects/BTC-Trade-Engine-PaperClip/.env
+WorkingDirectory=/home/sirrus/projects/BTC-Trade-Engine-PaperClip
+
+[Install]
+WantedBy=default.target
