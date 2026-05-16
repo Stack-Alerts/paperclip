@@ -153,10 +153,21 @@ def _is_source_file(path: str) -> bool:
         ".parquet",
         ".pkl",
     )
+    skip_path_components = (
+        ".next/",
+        "node_modules/",
+        ".cache/",
+        ".turbopack/",
+        ".turbo/",
+        "dist/",
+        "build/",
+    )
     if path.startswith("."):
         return False
     if any(path.startswith(p) for p in skip_prefixes):
         return False
     if any(path.endswith(s) for s in skip_suffixes):
+        return False
+    if any(f"/{p}" in path or path.startswith(p) for p in skip_path_components):
         return False
     return True
