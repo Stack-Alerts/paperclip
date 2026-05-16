@@ -53,9 +53,11 @@ class PerPhaseTimingChart(QWidget):
         super().__init__(parent)
         self._model = model
         self._hovered_phase: str | None = None
+        self._focused_phase_idx: int = -1  # -1 means no phase focused (keyboard nav)
         self._phase_rects: list[tuple[str, QRect, int]] = []  # (name, rect, duration_us)
         self.setMouseTracking(True)
         self.setMinimumHeight(PHASE_TIMING['chart_height'])
+        self.setFocusPolicy(Qt.StrongFocus)  # Accept keyboard focus
 
     def sizeHint(self) -> QSize:
         return QSize(400, PHASE_TIMING['chart_height'])
@@ -139,6 +141,11 @@ class PerPhaseTimingChart(QWidget):
                     f'{us_int}µs',
                 )
 
+            # Draw focus indicator (keyboard navigation)
+            if i == self._focused_phase_idx:
+                painter.setPen(QColor(COLORS['info']).lighter(150))
+                painter.drawRect(bar_rect.adjusted(-1, -1, 1, 1))
+
             self._phase_rects.append((name, bar_rect, int(duration_us)))
             cumulative_us += duration_us
 
@@ -164,7 +171,31 @@ class PerPhaseTimingChart(QWidget):
             self._hovered_phase = None
             self.update()
 
+    def keyPressEvent(self, event) -> None:
+        if event.key() in (Qt.Key_Right, Qt.Key_Down):
+            if self._phase_rects:
+                self._focused_phase_idx = (self._focused_phase_idx + 1) % len(self._phase_rects)
+                self._update_focused_phase_tooltip()
+                self.update()
+        elif event.key() in (Qt.Key_Left, Qt.Key_Up):
+            if self._phase_rects:
+                self._focused_phase_idx = (self._focused_phase_idx - 1) % len(self._phase_rects)
+                self._update_focused_phase_tooltip()
+                self.update()
+        elif event.key() in (Qt.Key_Return, Qt.Key_Space):
+            if 0 <= self._focused_phase_idx < len(self._phase_rects):
+                self._update_focused_phase_tooltip()
+        else:
+            super().keyPressEvent(event)
+
+    def _update_focused_phase_tooltip(self) -> None:
+        if 0 <= self._focused_phase_idx < len(self._phase_rects):
+            name, rect, duration_us = self._phase_rects[self._focused_phase_idx]
+            label = name.replace('_', ' ')
+            QToolTip.showText(self.mapToGlobal(rect.center()), f'{label}: {duration_us}µs', self)
+
     def resizeEvent(self, event) -> None:
+        self._focused_phase_idx = -1  # Reset focus on resize
         self.update()
         super().resizeEvent(event)
 
