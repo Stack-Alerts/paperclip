@@ -56,16 +56,14 @@ jobs:
           token: ${{ github.token }}
 
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
+        run: |
+          python3 --version
+          python3 -m pip install --upgrade pip
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install requests python-dotenv SQLAlchemy psycopg2-binary
+          python3 -m pip install -r requirements.txt
+          python3 -m pip install requests python-dotenv SQLAlchemy psycopg2-binary
 
       - name: Install system dependencies (Qt headless for impact gate tests)
         run: |
@@ -116,7 +114,7 @@ jobs:
               fi
             fi
           fi
-          python scripts/scan_fix_issues_done.py $FLAGS > /tmp/scan-output.json
+          python3 scripts/scan_fix_issues_done.py $FLAGS > /tmp/scan-output.json
           echo "scan_exit_code=$?" >> $GITHUB_OUTPUT
           UNGATED=$(python3 -c "import json; d=json.load(open('/tmp/scan-output.json')); print(d.get('ungated_count', 0))")
           echo "ungated_count=$UNGATED" >> $GITHUB_OUTPUT
@@ -170,7 +168,7 @@ jobs:
         env:
           PYTHONPATH: src
         run: |
-          python scripts/scan_done_alert.py \
+          python3 scripts/scan_done_alert.py \
             --scan-output /tmp/scan-output.json
       - name: Write data quality snapshot
         id: snapshot
