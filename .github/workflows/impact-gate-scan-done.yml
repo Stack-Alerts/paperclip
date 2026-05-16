@@ -31,6 +31,9 @@ on:
         required: false
         default: 'false'
 
+permissions:
+  contents: write
+
 concurrency:
   group: impact-gate-scan-done
   cancel-in-progress: false
