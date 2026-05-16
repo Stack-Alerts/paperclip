@@ -5,8 +5,10 @@ All external I/O (Paperclip API, Blast Radius) is mocked.
 
 from __future__ import annotations
 
+from datetime import datetime as datetime_cls, timezone
 from unittest.mock import patch, MagicMock
 import pytest
+from freezegun import freeze_time
 
 from impact_gate.polling_worker import (
     _fetch_done_fix_issues,
@@ -185,19 +187,22 @@ class TestProcessIssue:
 
 
 class TestFetchDoneFixIssues:
+    @freeze_time("2026-05-16T06:15:00Z")
     @patch("impact_gate.polling_worker._paginate")
     @patch("impact_gate.polling_worker._is_fix_issue")
     def test_fetch_done_fix_issues(self, mock_is_fix, mock_paginate):
+        # All three issues are recent (within 10m), but only 1 and 3 are fix issues
         issues = [
-            _make_issue(issue_id="1", completed_at="2026-05-16T06:05:00Z"),
-            _make_issue(issue_id="2", completed_at="2026-05-16T05:00:00Z"),
+            _make_issue(issue_id="1", completed_at="2026-05-16T06:10:00Z"),
+            _make_issue(issue_id="2", completed_at="2026-05-16T06:12:00Z"),
             _make_issue(
                 issue_id="3",
                 identifier="BTCAAAAA-100",
-                completed_at="2026-05-16T05:50:00Z",
+                completed_at="2026-05-16T06:08:00Z",
             ),
         ]
         mock_paginate.return_value = issues
+        # side_effect: issue1=True (fix), issue2=False (not a fix), issue3=True (fix)
         mock_is_fix.side_effect = [True, False, True]
 
         result = _fetch_done_fix_issues(lookback_minutes=10)
