@@ -215,7 +215,8 @@ def poll_cycle(
         # Run the full Impact Gate on the ungated issue
         logger.info("[gate] Running Impact Gate on %s", identifier)
         try:
-            gate_result = process_issue(issue_id, dry_run=dry_run)
+            # Force retroactive gating for done issues to bypass in_review check
+            gate_result = process_issue(issue_id, dry_run=dry_run, force=True)
             gate_status = gate_result.get("gate_status", "UNKNOWN")
 
             result = {
