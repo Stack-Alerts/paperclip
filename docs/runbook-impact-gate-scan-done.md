@@ -53,12 +53,13 @@ fatal: unable to access 'https://github.com/...': The requested URL returned err
 
 **Root Cause:** Self-hosted runner lacks proper GitHub credentials for repository write operations.
 
-**Fix:** Applied in commit `db47e2d6` (2026-05-16)
-- Changed to use `git config --global credential.helper "!gh auth git-credential"`
-- This leverages GitHub CLI's built-in credential system using `GH_TOKEN`
-- More reliable than manual URL token rewriting
+**Fix:** Applied in commit `15a970fb` (2026-05-16)
+- Changed from `${{ secrets.GITHUB_TOKEN }}` to `${{ github.token }}`
+- The standard `github.token` context variable is reliably injected by GitHub in all runners
+- `secrets.GITHUB_TOKEN` is not automatically available on self-hosted runners
+- Updated both the checkout action and the git push step
 
-**Verification:** Run a manual workflow dispatch and check logs.
+**Verification:** Run a manual workflow dispatch and check logs. The "Commit updated data quality snapshot and muted state" step should succeed.
 
 ### Symptom: Workflow Hangs on "Run Impact Gate scan-done" Step
 
