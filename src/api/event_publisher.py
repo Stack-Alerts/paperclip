@@ -208,3 +208,35 @@ class EventPublisher:
             )
         """
         self.publish(CH_STRATEGIES, _to_dict(entry))
+
+    def on_phase_started(self, event: Any) -> None:
+        """Callback for ``PhaseStarted`` events → itm:cycle.
+
+        Emit at the start of each of the 11 ITM phase boundaries so the B1
+        cycle monitor can show per-phase timing::
+
+            publisher.on_phase_started(PhaseStarted(
+                phase_name="risk_gate",
+                phase_index=4,
+                cycle_id=cycle_id,
+                strategy_id=strategy_id,
+            ))
+        """
+        self.publish(CH_CYCLE, _to_dict(event))
+
+    def on_phase_completed(self, event: Any) -> None:
+        """Callback for ``PhaseCompleted`` events → itm:cycle.
+
+        Emit at the end of each of the 11 ITM phase boundaries with the
+        measured ``duration_ms`` and ``outcome``::
+
+            publisher.on_phase_completed(PhaseCompleted(
+                phase_name="risk_gate",
+                phase_index=4,
+                cycle_id=cycle_id,
+                strategy_id=strategy_id,
+                duration_ms=1.23,
+                outcome="success",
+            ))
+        """
+        self.publish(CH_CYCLE, _to_dict(event))

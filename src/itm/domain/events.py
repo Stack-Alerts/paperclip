@@ -31,6 +31,10 @@ Risk:
 
 Alert:
     AlertRaised          — ITM raised an alert requiring operator attention
+
+Phase timing (P2):
+    PhaseStarted         — an ITM execution phase has begun
+    PhaseCompleted       — an ITM execution phase has finished
 """
 
 from __future__ import annotations
@@ -370,3 +374,87 @@ class AlertRaised(DomainEvent):
             raise ValueError("AlertRaised.source is required")
         if not self.message:
             raise ValueError("AlertRaised.message is required")
+
+
+# ---------------------------------------------------------------------------
+# Phase timing events (P2 — per-phase timing for B1 cycle monitor)
+# ---------------------------------------------------------------------------
+
+ITM_PHASES: tuple[str, ...] = (
+    "signal_received",        # Phase 1
+    "signal_aggregation",     # Phase 2
+    "strategy_validation",    # Phase 3
+    "capital_check",          # Phase 4
+    "risk_gate",              # Phase 5
+    "decision_creation",      # Phase 6
+    "order_creation",         # Phase 7
+    "exchange_submission",    # Phase 8
+    "order_state_machine",    # Phase 9
+    "bracket_manager",        # Phase 10
+    "performance_monitoring", # Phase 11
+)
+
+
+@dataclass(frozen=True)
+class PhaseStarted(DomainEvent):
+    """Fired when an ITM execution phase begins.
+
+    Attributes
+    ----------
+    phase_name:   one of the 11 ITM phase names from ``ITM_PHASES``
+    phase_index:  0-based index (0 = signal_received, 10 = performance_monitoring)
+    cycle_id:     UUID correlating all phase events in one signal-to-fill cycle
+    strategy_id:  strategy driving this cycle (None for system-wide phases)
+    """
+
+    phase_name: str = field(default="")
+    phase_index: int = field(default=0)
+    cycle_id: str = field(default_factory=_new_id)
+    strategy_id: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if not self.phase_name:
+            raise ValueError("PhaseStarted.phase_name is required")
+        if self.phase_name not in ITM_PHASES:
+            raise ValueError(
+                f"PhaseStarted.phase_name must be one of {ITM_PHASES}, "
+                f"got {self.phase_name!r}"
+            )
+
+
+@dataclass(frozen=True)
+class PhaseCompleted(DomainEvent):
+    """Fired when an ITM execution phase completes.
+
+    Attributes
+    ----------
+    phase_name:   one of the 11 ITM phase names from ``ITM_PHASES``
+    phase_index:  0-based index (0 = signal_received, 10 = performance_monitoring)
+    cycle_id:     UUID correlating all phase events in one signal-to-fill cycle
+    strategy_id:  strategy driving this cycle (None for system-wide phases)
+    duration_ms:  wall time for this phase in milliseconds
+    outcome:      'success' | 'skipped' | 'rejected' | 'error'
+    """
+
+    phase_name: str = field(default="")
+    phase_index: int = field(default=0)
+    cycle_id: str = field(default_factory=_new_id)
+    strategy_id: Optional[str] = None
+    duration_ms: float = field(default=0.0)
+    outcome: str = field(default="success")
+
+    _VALID_OUTCOMES = frozenset({"success", "skipped", "rejected", "error"})
+
+    def __post_init__(self) -> None:
+        if not self.phase_name:
+            raise ValueError("PhaseCompleted.phase_name is required")
+        if self.phase_name not in ITM_PHASES:
+            raise ValueError(
+                f"PhaseCompleted.phase_name must be one of {ITM_PHASES}, "
+                f"got {self.phase_name!r}"
+            )
+        if self.outcome not in self._VALID_OUTCOMES:
+            raise ValueError(
+                f"PhaseCompleted.outcome must be one of "
+                f"{sorted(self._VALID_OUTCOMES)}, got {self.outcome!r}"
+            )

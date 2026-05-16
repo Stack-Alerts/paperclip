@@ -186,3 +186,23 @@ class AlertModel(BaseModel):
     strategy_id: Optional[str]
     created_at: str
     resolved: bool = False
+
+
+# ---------------------------------------------------------------------------
+# P2: Strategy lifecycle control responses
+# ---------------------------------------------------------------------------
+
+
+class StrategyActionResponse(BaseModel):
+    strategy_id: str
+    previous_state: str
+    current_state: str
+    action: str  # "enabled" | "disabled"
+    timestamp: str
+
+
+class HaltResponse(BaseModel):
+    status: str  # "halted"
+    halted_count: int
+    halted_strategy_ids: list[str]
+    timestamp: str

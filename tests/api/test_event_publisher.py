@@ -300,3 +300,74 @@ class TestAdditivePattern:
 
         combined_on_decision({"action": "BUY"})
         assert len(calls) == 1, "existing callback must fire even when Redis is down"
+
+
+# ---------------------------------------------------------------------------
+# Phase event callbacks (P2 — BTE-TC-P2-002)
+# ---------------------------------------------------------------------------
+
+
+class TestPhaseCallbacks:
+    """on_phase_started and on_phase_completed both publish to itm:cycle."""
+
+    def test_on_phase_started_publishes_to_cycle(self, mock_redis):
+        from src.itm.domain.events import PhaseStarted
+
+        pub = EventPublisher(mock_redis)
+        evt = PhaseStarted(phase_name="risk_gate", phase_index=4, cycle_id="c-001")
+        pub.on_phase_started(evt)
+
+        mock_redis.publish.assert_called_once()
+        channel, payload = mock_redis.publish.call_args.args
+        assert channel == CH_CYCLE
+        data = json.loads(payload)
+        assert data["phase_name"] == "risk_gate"
+        assert data["phase_index"] == 4
+        assert data["cycle_id"] == "c-001"
+
+    def test_on_phase_completed_publishes_to_cycle(self, mock_redis):
+        from src.itm.domain.events import PhaseCompleted
+
+        pub = EventPublisher(mock_redis)
+        evt = PhaseCompleted(
+            phase_name="risk_gate",
+            phase_index=4,
+            cycle_id="c-001",
+            duration_ms=3.7,
+            outcome="success",
+        )
+        pub.on_phase_completed(evt)
+
+        mock_redis.publish.assert_called_once()
+        channel, payload = mock_redis.publish.call_args.args
+        assert channel == CH_CYCLE
+        data = json.loads(payload)
+        assert data["phase_name"] == "risk_gate"
+        assert data["duration_ms"] == pytest.approx(3.7)
+        assert data["outcome"] == "success"
+
+    def test_phase_started_and_completed_both_go_to_cycle(self, mock_redis):
+        from src.itm.domain.events import PhaseStarted, PhaseCompleted
+
+        pub = EventPublisher(mock_redis)
+        started = PhaseStarted(phase_name="order_creation", phase_index=6, cycle_id="c-42")
+        completed = PhaseCompleted(
+            phase_name="order_creation", phase_index=6, cycle_id="c-42",
+            duration_ms=10.0, outcome="success",
+        )
+        pub.on_phase_started(started)
+        pub.on_phase_completed(completed)
+
+        assert mock_redis.publish.call_count == 2
+        channels = [c.args[0] for c in mock_redis.publish.call_args_list]
+        assert all(ch == CH_CYCLE for ch in channels)
+
+    def test_phase_redis_error_swallowed(self, mock_redis):
+        from src.itm.domain.events import PhaseStarted
+
+        mock_redis.publish.side_effect = ConnectionError("redis down")
+        pub = EventPublisher(mock_redis)
+        # Must not raise
+        pub.on_phase_started(
+            PhaseStarted(phase_name="signal_received", phase_index=0)
+        )

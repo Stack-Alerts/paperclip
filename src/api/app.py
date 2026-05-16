@@ -1,7 +1,17 @@
 """
 BTC Trade Engine FastAPI Bridge
 ================================
-10 REST endpoints + 7 WebSocket domains.
+13 REST endpoints + 7 WebSocket domains.
+
+P1 (read-only, 10 endpoints):
+  GET  /health, /state/snapshot, /strategies, /strategies/{id},
+       /positions, /positions/{id}, /capital,
+       /decisions/recent, /signals/recent, /alerts/active
+
+P2 (write + lifecycle control, 3 endpoints):
+  POST /strategies/{id}/enable   — activate a PAUSED/LOADING strategy
+  POST /strategies/{id}/disable  — pause an ACTIVE strategy
+  POST /halt                     — emergency halt: pause ALL active strategies
 
 All endpoints and WebSocket upgrades require a valid RS256 JWT.
 REST endpoints use HTTP Bearer; WebSocket endpoints use ?token= query param.
@@ -18,6 +28,14 @@ Redis pub/sub channels (WebSocket fanout)
 itm:cycle         itm:capital      itm:positions
 itm:decisions     itm:signals      itm:alerts
 itm:strategies
+
+P2 registry injection
+---------------------
+Call ``configure(registry)`` before starting the server so the write
+endpoints can call StrategyRegistry directly.  The registry callbacks
+(``on_strategy_activated``, ``on_strategy_paused``) are expected to already
+be wired to an ``EventPublisher`` so WS subscribers receive state changes
+automatically.
 """
 
 from __future__ import annotations
@@ -26,6 +44,7 @@ import json
 import logging
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import redis.asyncio as aioredis
@@ -36,6 +55,7 @@ from .models import (
     AggregatedSignalModel,
     AlertModel,
     CapitalResponse,
+    HaltResponse,
     HealthResponse,
     PositionModel,
     PositionEntryModel,
@@ -44,6 +64,7 @@ from .models import (
     RiskSnapshotModel,
     CapitalStateModel,
     StateSnapshotResponse,
+    StrategyActionResponse,
     StrategyModel,
     TradeDecisionModel,
 )
@@ -52,11 +73,33 @@ from .redis_client import make_async_client
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Module-level async Redis client (shared across requests)
+# Module-level state
 # ---------------------------------------------------------------------------
 
 _redis: Optional[aioredis.Redis] = None
 _start_time: float = time.monotonic()
+
+# P2: StrategyRegistry injected via configure() before server.start()
+# Typed as Any to avoid importing ITM modules at module load time when
+# the registry is not used (e.g. in test environments that only test P1).
+_registry: Optional[Any] = None
+
+
+def configure(registry: Any) -> None:
+    """Inject the ITM StrategyRegistry for P2 write endpoints.
+
+    Call this before ``APIServer.start()``::
+
+        from src.api.app import configure
+        configure(registry=orchestrator.registry)
+        server.start()
+
+    The registry's lifecycle callbacks (``on_strategy_activated``,
+    ``on_strategy_paused``, ``on_strategy_stopped``) must already be wired
+    to an ``EventPublisher`` so WS subscribers receive state changes.
+    """
+    global _registry
+    _registry = registry
 
 # Redis key constants (must stay in sync with RedisStateStore / EventPublisher)
 _KEY_SNAPSHOT = "itm:state:snapshot"
@@ -497,6 +540,153 @@ async def active_alerts(_: dict = Depends(require_jwt)) -> list[AlertModel]:
         except (json.JSONDecodeError, KeyError) as exc:
             logger.warning("Skipping malformed alert: %s", exc)
     return alerts
+
+
+# ---------------------------------------------------------------------------
+# P2: Strategy enable/disable and emergency halt
+# ---------------------------------------------------------------------------
+
+
+def _registry_unavailable() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Strategy registry not available; call configure() before starting the server",
+    )
+
+
+def _strategy_not_found(strategy_id: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Strategy '{strategy_id}' not found in registry",
+    )
+
+
+@app.post(
+    "/strategies/{strategy_id}/enable",
+    response_model=StrategyActionResponse,
+    tags=["Strategies"],
+    summary="Enable (activate) a strategy",
+)
+async def enable_strategy(
+    strategy_id: str,
+    _: dict = Depends(require_jwt),
+) -> StrategyActionResponse:
+    """Transition a LOADING or PAUSED strategy to ACTIVE.
+
+    The registry's ``on_strategy_activated`` callback fires automatically,
+    which (when wired to ``EventPublisher``) broadcasts the state change on
+    ``WS /ws/strategies``.
+
+    Returns 404 if the strategy is not registered.
+    Returns 409 if the transition is not allowed (e.g. strategy is STOPPED).
+    Returns 503 if the registry has not been injected via ``configure()``.
+    """
+    if _registry is None:
+        raise _registry_unavailable()
+    entry = _registry.get(strategy_id)
+    if entry is None:
+        raise _strategy_not_found(strategy_id)
+    prev_state = entry.state.value
+    try:
+        entry = _registry.activate(strategy_id)
+    except Exception as exc:
+        if "StrategyRegistryError" in type(exc).__name__:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        logger.exception("Unexpected error activating strategy %r", strategy_id)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+    return StrategyActionResponse(
+        strategy_id=strategy_id,
+        previous_state=prev_state,
+        current_state=entry.state.value,
+        action="enabled",
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
+
+
+@app.post(
+    "/strategies/{strategy_id}/disable",
+    response_model=StrategyActionResponse,
+    tags=["Strategies"],
+    summary="Disable (pause) a strategy",
+)
+async def disable_strategy(
+    strategy_id: str,
+    _: dict = Depends(require_jwt),
+) -> StrategyActionResponse:
+    """Transition an ACTIVE strategy to PAUSED.
+
+    The registry's ``on_strategy_paused`` callback fires automatically,
+    which (when wired to ``EventPublisher``) broadcasts the state change on
+    ``WS /ws/strategies``.
+
+    Returns 404 if the strategy is not registered.
+    Returns 409 if the transition is not allowed (e.g. strategy is STOPPED).
+    Returns 503 if the registry has not been injected via ``configure()``.
+    """
+    if _registry is None:
+        raise _registry_unavailable()
+    entry = _registry.get(strategy_id)
+    if entry is None:
+        raise _strategy_not_found(strategy_id)
+    prev_state = entry.state.value
+    try:
+        entry = _registry.pause(strategy_id, reason="api:disabled")
+    except Exception as exc:
+        if "StrategyRegistryError" in type(exc).__name__:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+        logger.exception("Unexpected error pausing strategy %r", strategy_id)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+    return StrategyActionResponse(
+        strategy_id=strategy_id,
+        previous_state=prev_state,
+        current_state=entry.state.value,
+        action="disabled",
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
+
+
+@app.post(
+    "/halt",
+    response_model=HaltResponse,
+    tags=["System"],
+    summary="Emergency halt — pause all active strategies immediately",
+)
+async def emergency_halt(
+    _: dict = Depends(require_jwt),
+) -> HaltResponse:
+    """Pause every ACTIVE strategy atomically.
+
+    Each strategy is paused with reason ``"emergency_halt"``.  The registry's
+    ``on_strategy_paused`` callback fires per strategy, broadcasting state
+    changes on ``WS /ws/strategies``.
+
+    Already-paused or stopped strategies are skipped silently.
+
+    Returns 503 if the registry has not been injected via ``configure()``.
+    """
+    if _registry is None:
+        raise _registry_unavailable()
+
+    active = _registry.active_entries()
+    halted_ids: list[str] = []
+    for entry in active:
+        try:
+            _registry.pause(entry.strategy_id, reason="emergency_halt")
+            halted_ids.append(entry.strategy_id)
+        except Exception:
+            logger.exception("emergency_halt: failed to pause strategy %r", entry.strategy_id)
+
+    logger.warning(
+        "EMERGENCY HALT executed: %d strategies paused (%s)",
+        len(halted_ids),
+        halted_ids,
+    )
+    return HaltResponse(
+        status="halted",
+        halted_count=len(halted_ids),
+        halted_strategy_ids=halted_ids,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
 
 
 # ---------------------------------------------------------------------------
