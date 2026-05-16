@@ -1,0 +1,228 @@
+{
+  "schema_version": "2.0",
+  "last_updated": "2026-05-14T18:35:00Z",
+  "agent": "TestManager",
+  "agent_id": "d53906e4-5660-4a47-bef4-148a69979b20",
+  "issue": "BTCAAAAA-26751",
+  "facts": {
+    "bug_tracker_project": [
+      {
+        "id": "bugtracker-01",
+        "category": "bug_tracker_configuration",
+        "fact": "Bug Tracker project ID is 53c5b306-abee-41f8-939d-730736aabd3a. All bug issues must be created in this project.",
+        "source": "AGENTS.md Bug Tracker Project section",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "bugtracker-02",
+        "category": "bug_tracker_configuration",
+        "fact": "Bug report template requires: Summary, Steps to Reproduce, Expected Behavior, Actual Behavior, Severity, Affected Component, Discovered By, Discovery Context.",
+        "source": "AGENTS.md Bug Report Template section",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "bugtracker-03",
+        "category": "bug_tracker_configuration",
+        "fact": "Bug triage flow: TestManager receives bug → verifies completeness → classifies severity → assigns to CTO → comments with triage decision → tracks until resolved.",
+        "source": "AGENTS.md Bug Intake Process",
+        "date": "2026-05-08"
+      }
+    ],
+    "bug_triage_decisions": [
+      {
+        "id": "triage-01",
+        "category": "bug_severity_calibration",
+        "fact": "BTCAAAAA-116: debug print() statements in _apply_recheck_timing_fix() must be replaced with logger calls. Classified as MEDIUM severity — code quality issue, not a functional blocker. Assigned to CTO.",
+        "source": "BTCAAAAA-394 triage run",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "triage-02",
+        "category": "bug_severity_calibration",
+        "fact": "BTCAAAAA-389: Terminal output missing from Status window, AI progress bar stuck at 80%, tab not auto-switching. Classified as HIGH severity — key feature broken (UI feedback loop). Already assigned, left in blocked status.",
+        "source": "BTCAAAAA-394 triage run",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "triage-03",
+        "category": "bug_severity_calibration",
+        "fact": "BTCAAAAA-386: Maximize buttons issues on many windows. Classified as MEDIUM severity — degraded UX but not blocking core functionality. Already in_progress, left as-is.",
+        "source": "BTCAAAAA-394 triage run",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "triage-04",
+        "category": "bug_severity_calibration",
+        "fact": "BTCAAAAA-25595: Audit test fixture _and_block_config() missing strategy_type causing 5 direction-consistency failures. Classified as MEDIUM severity — test-only bug, no production impact. Assigned to CTO.",
+        "source": "BTCAAAAA-25595 triage",
+        "date": "2026-05-13"
+      },
+      {
+        "id": "triage-05",
+        "category": "bug_severity_calibration",
+        "fact": "BTCAAAAA-26662: Integration test failures in test_recheck_system.py — missing Qt imports + empty chain ValueError. Classified as MEDIUM severity — pre-existing test failures, not a regression. Assigned to CTO.",
+        "source": "BTCAAAAA-26662 triage",
+        "date": "2026-05-14"
+      }
+    ],
+    "agent_health_monitor": [
+      {
+        "id": "health-01",
+        "category": "agent_health_monitor_protocol",
+        "fact": "Agent Health Monitor routine runs every 30 minutes via cron (*/30 * * * * UTC). Created on 2026-05-08 via BTCAAAAA-482. Uses concurrencyPolicy: skip_if_active, catchUpPolicy: skip_missed.",
+        "source": "BTCAAAAA-482",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "health-02",
+        "category": "agent_health_monitor_protocol",
+        "fact": "Health Monitor 5-step protocol: (1) Check all agent statuses for errors, (2) Scan stalled in_progress issues (>30 min), (3) Scan long-blocked issues (>60 min), (4) Scan stale todo issues (>90 min), (5) Produce health digest comment.",
+        "source": "AGENTS.md Agent Health Monitor section",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "health-03",
+        "category": "agent_health_monitor_protocol",
+        "fact": "Budget monitoring: if budgetMonthlyCents is 0 → create issue for CEO. If spend > 80% → WARNING comment. If spend >= budget → CRITICAL issue for CEO.",
+        "source": "AGENTS.md Agent Health Monitor Step 1",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "health-04",
+        "category": "agent_health_monitor_protocol",
+        "fact": "Key agent IDs for health alerts: PlatformEngineer (58cd0e89) for adapter/env fixes, CTO (41b5ede6) for stalled engineering work, CEO (73e7ef43) for budget decisions.",
+        "source": "AGENTS.md Key Agent IDs for Health Alerts",
+        "date": "2026-05-08"
+      }
+    ],
+    "release_gate_process": [
+      {
+        "id": "release-01",
+        "category": "release_gate_ownership",
+        "fact": "TestManager owns release gate sign-off. No implementation task may be marked done without: (1) QAEngineer QA PASSED comment, (2) TestManager sign-off comment, (3) Merge gate for code PRs.",
+        "source": "AGENTS.md Release Gate Ownership",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "release-02",
+        "category": "release_gate_ownership",
+        "fact": "Atomic Verdict Rule (BTCAAAAA-1476): Sign-off comment and status PATCH are a single atomic operation. POST comment then PATCH status in same heartbeat. If either fails, roll back both.",
+        "source": "AGENTS.md Atomic Verdict Rule",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "release-03",
+        "category": "release_gate_ownership",
+        "fact": "Release gate sign-off template includes: Issue ID, QA Status (PASSED), Reviewed by (QAEngineer), Gate cleared (timestamp), Approved for (CEO/Board review), Status set to.",
+        "source": "AGENTS.md Release Gate Ownership",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "release-04",
+        "category": "release_gate_ownership",
+        "fact": "On each heartbeat, scan in_review issues. If QA child is done but no sign-off → post sign-off. If waiting >2 heartbeats with no QA child → flag CTO. If QA child in_progress >2 heartbeats → ping QAEngineer.",
+        "source": "AGENTS.md How to Monitor Release Gates",
+        "date": "2026-05-08"
+      }
+    ],
+    "content_qa_fact_check": [
+      {
+        "id": "contentqa-01",
+        "category": "content_qa_and_fact_checking",
+        "fact": "TestManager owns content-qa-process (BTCAAAAA-3225). Scans for copy-touch issues, routes fact-check requests per reviewer matrix, enforces COPY QA: PASSED gate before done.",
+        "source": "AGENTS.md Content QA / Copy-Accuracy Gate",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "contentqa-02",
+        "category": "content_qa_and_fact_checking",
+        "fact": "TestManager owns research-fact-check-pipeline (BTCAAAAA-22886). Fact-check required for: user-facing text, strategy claims, technical references, security claims, documentation.",
+        "source": "AGENTS.md Research Fact-Checking in QA Pipeline",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "contentqa-03",
+        "category": "content_qa_and_fact_checking",
+        "fact": "Researcher reviewer matrix: GeneralResearcher (df7b4035) for BTC/Nautilus, StrategyResearcher (e3fcab65) for strategy claims, SecurityAnalyst (840eb9ff) for security claims, TestManager (d53906e4) as default.",
+        "source": "AGENTS.md Researcher Reviewer Matrix",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "contentqa-04",
+        "category": "content_qa_and_fact_checking",
+        "fact": "Fact-check SLA: Standard review within 1 heartbeat, Expedited (blocking release) within same heartbeat, Disputed facts escalate to CTO.",
+        "source": "AGENTS.md Researcher Engagement SLA",
+        "date": "2026-05-08"
+      }
+    ],
+    "escalation_policies": [
+      {
+        "id": "escalation-01",
+        "category": "escalation_and_blocker_routing",
+        "fact": "Critical bugs (data loss, security, crash on launch) → immediately escalate to CEO and CTO. High bugs (key feature broken) → CTO with high priority, 1-2 sprints. Medium → CTO standard queue. Low → backlog.",
+        "source": "AGENTS.md Escalation Rules",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "escalation-02",
+        "category": "escalation_and_blocker_routing",
+        "fact": "Blocked-agent escalation: Never halt silently. Name blocker, identify unblocker via chainOfCommand, escalate in same heartbeat. GitHub → RepoSteward, Linux/X11 → LinuxSpecialist, routines → AutomationEngineer, DB schema → DatabaseAdministrator, UI on X11 → QAEngineer, docs → DocWriter, locked-module → CTO via BTCAAAAA-1479.",
+        "source": "AGENTS.md Blocked-agent escalation policy",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "escalation-03",
+        "category": "escalation_and_blocker_routing",
+        "fact": "Permission-escalation policy: Create child issue assigned to reportsTo, set original to blocked with blockedByIssueIds, @-mention superior. Escalate up chain until someone has authority. Never wait for human.",
+        "source": "AGENTS.md Permission-Escalation Policy",
+        "date": "2026-05-08"
+      }
+    ],
+    "bug_staleness_tracking": [
+      {
+        "id": "staleness-01",
+        "category": "bug_backlog_maintenance",
+        "fact": "On every heartbeat: retrieve full open bug backlog. For bugs in backlog/todo >2 heartbeats without CTO assignment → assign to CTO immediately. For bugs assigned to CTO in_progress/todo >3 heartbeats without comment → ask for update.",
+        "source": "AGENTS.md Bug Staleness section",
+        "date": "2026-05-08"
+      },
+      {
+        "id": "staleness-02",
+        "category": "bug_backlog_maintenance",
+        "fact": "Weekly Bug Digest every 5 heartbeats: summary of open bugs by severity, oldest open bugs, recently resolved, trends. Post to CEO as task comment.",
+        "source": "AGENTS.md Weekly Bug Digest",
+        "date": "2026-05-08"
+      }
+    ],
+    "test_management_patterns": [
+      {
+        "id": "test-01",
+        "category": "test_management_patterns",
+        "fact": "BTCAAAAA-868: Added test_daily_loss_limit_rejected to TestPreTradeValidation class in test_section_d_integration.py. Pattern: create orchestrator, load strategy with low max_daily_loss, record PnL loss to breach limit, assert validate_order() returns (False, reason) with DAILY_LOSS.",
+        "source": "BTCAAAAA-868",
+        "date": "2026-05-09"
+      },
+      {
+        "id": "test-02",
+        "category": "test_management_patterns",
+        "fact": "Integration test pattern for Qt tests: QT_QPA_PLATFORM=offscreen pytest. Common failure modes: missing Qt imports (QPushButton, QCheckBox, QSpinBox, QDialog), empty chain not raising ValueError.",
+        "source": "BTCAAAAA-26662",
+        "date": "2026-05-14"
+      },
+      {
+        "id": "test-03",
+        "category": "test_management_patterns",
+        "fact": "Audit test fixture pattern: _and_block_config() must include strategy_type to pass direction consistency checks. Missing strategy_type defaults to Bullish, causing mismatch with bearish signals.",
+        "source": "BTCAAAAA-25595",
+        "date": "2026-05-13"
+      }
+    ]
+  },
+  "domains_lens_summary": {
+    "bug_triage_discipline": "All bugs follow a consistent triage pipeline: intake → verify → classify → assign → track. Severity calibration is the key judgment call — test-only bugs are MEDIUM, UI feedback loop breaks are HIGH, data loss is CRITICAL.",
+    "health_monitor_automation": "Agent Health Monitor runs every 30 min via routine. The 5-step protocol is fully automated — no manual intervention needed unless alerts fire. Budget alerts route to CEO, error states to PlatformEngineer, stalled work to CTO.",
+    "release_gate_integrity": "Release gate is the final quality barrier. Three conditions must all be met: QAEngineer PASSED, TestManager sign-off, and (for code PRs) merge gate. The Atomic Verdict Rule ensures sign-off and status change are never decoupled.",
+    "content_qa_coverage": "Content QA and fact-checking cover all user-facing text, strategy claims, technical references, and security claims. Domain-specific reviewers handle specialized claims. Default reviewer is TestManager.",
+    "escalation_over_silence": "Never halt silently on a blocker. Every blocker gets a named unblocker, an escalation path, and a status update in the same heartbeat. Permission blockers climb the reportsTo chain until resolved."
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "agent": "UIEngineer",
+  "agent_id": "9113b321-771b-481d-8ae7-33765ed9b1f5",
+  "populated_at": "2026-05-14T20:30:00Z",
+  "categories": {
+    "stylesheet_protocol": [
+      {
+        "issue": "BTCAAAAA-26189",
+        "fact": "Stepper ribbon refactored to enforce styles.py protocol: removed all inline setStyleSheet() with hardcoded hex colors, replaced inline QFont() with create_font(), replaced setCursor(Qt.PointingHandCursor) with set_hand_cursor(). Added get_stepper_button_style() and get_stepper_arrow_style() helpers to styles.py with 4 states: error/completed/active/pending.",
+        "date": "2026-05-14"
+      },
+      {
+        "issue": "BTCAAAAA-26670",
+        "fact": "Added setObjectName to all key widgets in BlockConfigItem and StrategyBlocksPanel for Qt testability (pytest-qt targeting) and stylesheet targeting. 17 object names added across position_label, block_name_label, logic_badge, signals_label, up_button, down_button, remove_button, signals_widget, blocks_scroll_area, blocks_container, empty_label, strategy_exit_section, strategy_exits_container.",
+        "date": "2026-05-14"
+      }
+    ],
+    "qt_thread_safety": [
+      {
+        "issue": "BTCAAAAA-26379",
+        "fact": "Replaced QThread with QThreadPool+QRunnable in LogViewerWindow to eliminate SIGABRT crash. QThread cleanup in closeEvent also required (BTCAAAAA-26364). Key pattern: use QThreadPool for worker threads, not raw QThread, to avoid Qt thread lifecycle issues.",
+        "date": "2026-05-13"
+      },
+      {
+        "issue": "9ba41746",
+        "fact": "Added sip.isdeleted() guard to _update_display() to prevent RuntimeError on window close. This is a recurring pattern needed whenever a slot may fire after the widget is destroyed.",
+        "date": "2026-05-13"
+      }
+    ],
+    "log_viewer_performance": [
+      {
+        "issue": "BTCAAAAA-26199",
+        "fact": "Log viewer freeze fixed by switching from QTextEdit to QPlainTextEdit, adding QSyntaxHighlighter for line classification, implementing lazy loading with line caps, and moving file I/O to background thread. Pre-classified line filtering added in BTCAAAAA-26451.",
+        "date": "2026-05-13"
+      },
+      {
+        "issue": "BTCAAAAA-26467",
+        "fact": "Toggle-all filter updates batched to prevent redundant per-checkbox tab refreshes in block search panel. Performance optimization for filter preset save/load.",
+        "date": "2026-05-14"
+      }
+    ],
+    "window_geometry": [
+      {
+        "issue": "BTCAAAAA-26202",
+        "fact": "Window maximize state desync fixed by moving setWindowState(WindowMaximized) to after super().showEvent(). WindowGeometryMixin with changeEvent override added (BTCAAAAA-26161) to fix maximize button second-click behavior.",
+        "date": "2026-05-13"
+      },
+      {
+        "issue": "BTCAAAAA-637/638/530/475",
+        "fact": "Multi-monitor window geometry persistence fixed: screenAt() fallback for None screen, maximized_screen_name honored when saved_pos is not None, showMaximized timer delay increased to 50ms, deep fix for Qt window state desync after drag.",
+        "date": "2026-05-12"
+      }
+    ],
+    "ai_provider_integration": [
+      {
+        "issue": "BTCAAAAA-26143",
+        "fact": "Added OpenRouter and DeepSeek AI providers with curated model dropdowns in Settings dialog. AI_PROVIDER combo registered on save (BTCAAAAA-26185). Settings tests updated for combo-based model fields.",
+        "date": "2026-05-13"
+      },
+      {
+        "issue": "BTCAAAAA-26431",
+        "fact": "Budget-threshold-based LLM provider switching automation. DeepSeek/OpenRouter providers with multi-provider cost tracking CLI (BTCAAAAA-26430).",
+        "date": "2026-05-14"
+      }
+    ],
+    "nautilus_integration": [
+      {
+        "issue": "BTCAAAAA-747",
+        "fact": "NautilusCodeGenerator production module implemented with builder UI hook. ValidationReportWindow restored as primary step 1 Validate UI with Generate Code button (BTCAAAAA-25636).",
+        "date": "2026-05-12"
+      },
+      {
+        "issue": "BTCAAAAA-749",
+        "fact": "Quick Preview button added \u2014 runs 30-day background backtest with metrics popup. end_date floored to midnight UTC to prevent date boundary issues (BTCAAAAA-26132).",
+        "date": "2026-05-12"
+      }
+    ],
+    "calibration_and_caching": [
+      {
+        "issue": "BTCAAAAA-1096",
+        "fact": "Calibration cache with fingerprint-based skip implemented. Fingerprint persisted to disk across restarts (BTCAAAAA-1092). Cache preserved across backtest window close/reopen (BTCAAAAA-640).",
+        "date": "2026-05-11"
+      }
+    ],
+    "utc_timestamp_compliance": [
+      {
+        "issue": "BTCAAAAA-872/866/795/994",
+        "fact": "Systematic fix of tz-naive vs tz-aware datetime mismatches across data_update_modal.py, unified_manager.py, backtest_config_panel.py, and Quick Preview. All timestamps now use UTC.",
+        "date": "2026-05-11"
+      }
+    ],
+    "strategy_builder_restoration": [
+      {
+        "issue": "BTCAAAAA-26634",
+        "fact": "Full strategy builder module (src/strategy_builder/, src/optimizer_v3/, src/data_manager/, src/utils/) restored from main branch after branch merge. 164 files, 86,970 lines of code.",
+        "date": "2026-05-14"
+      }
+    ],
+    "impact_gate_and_workers": [
+      {
+        "issue": "BTCAAAAA-26663",
+        "fact": "Impact Gate worker implemented \u2014 scans done fix issues for quality gate. Includes process_issue, muted state, comment builder functions (BTCAAAAA-26692). Backfill_null_closed_at added to bug-close ingestion worker (BTCAAAAA-26708).",
+        "date": "2026-05-14"
+      },
+      {
+        "issue": "BTCAAAAA-26676",
+        "fact": "Backup Dead-Man-Switch Monitor implemented with full test suite and docs. Hourly auto-retry for muted ERROR entries, stale threshold bumped to 15min (BTCAAAAA-26623).",
+        "date": "2026-05-14"
+      },
+      {
+        "issue": "BTCAAAAA-26640",
+        "fact": "Touch Index bug-close ingestion worker with full test suite. FR ingestion worker with systemd units, setup script, runbook (BTCAAAAA-26667). 477/477 tests passing.",
+        "date": "2026-05-14"
+      }
+    ],
+    "impact_gate_pipeline": [
+      {
+        "issue": "BTCAAAAA-27316",
+        "fact": "Impact Gate scan-done pipeline verified: 127/127 done fix issues gated at 100% coverage. Pipeline uses 3 GitHub Actions workflows (scan-done every 5 min, health-check every 10 min, worker on dispatch). Key scripts: scan_fix_issues_done.py, impact_gate_scan_health.py, impact_gate_runner.py. Core module at src/impact_gate/worker.py. Data quality snapshots at data_quality_impact_gate_*.json. Health check validates snapshot freshness (<15min), coverage (>90%), error rate (<35%), fail rate (<35%). On-disk verification on 2026-05-16 confirmed HEALTHY status with 0% error rate, 0% fail rate, 0 ungated.",
+        "date": "2026-05-16"
+      },
+      {
+        "issue": "BTCAAAAA-27327",
+        "fact": "Fixed 4 production issues in Impact Gate scan-done pipeline: (1) untracked snapshot files not committed \u2014 added git ls-files fallback, (2) lock file leaked from _unlock_muted_state \u2014 added lock_path.unlink(), (3) missing [skip ci] in auto-commit messages, (4) inconsistent coverage formulas \u2014 unified to read coverage_pct from scan output JSON. Verified: commit 4efd6e11, 184/184 tests, 100% coverage, 0 ungated.",
+        "date": "2026-05-16"
+      }
+    ]
+  },
+  "summary": {
+    "total_facts": 20,
+    "categories_covered": 11,
+    "date_range": "2026-05-11 to 2026-05-14",
+    "key_patterns": [
+      "Stylesheet protocol enforcement \u2014 all style values from styles.py, zero hardcoded values in components",
+      "QThreadPool over raw QThread for worker threads to prevent SIGABRT crashes",
+      "sip.isdeleted() guards on all slots that may fire after widget destruction",
+      "UTC-only timestamp policy across all data and UI layers",
+      "Multi-monitor window geometry with screenAt() fallback",
+      "Background I/O for file operations to prevent UI thread blocking",
+      "setObjectName on all widgets for pytest-qt testability"
+    ]
+  }
+}

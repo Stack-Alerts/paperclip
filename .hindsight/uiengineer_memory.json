@@ -1,0 +1,115 @@
+{
+  "agent": "UIEngineer",
+  "timestamp": "2026-05-14T18:31:05.523603",
+  "issue": "BTCAAAAA-26734",
+  "facts": [
+    {
+      "category": "stylesheet_protocol",
+      "fact": "BTCAAAAA-26189: Refactored stepper_ribbon.py to enforce styles.py protocol \u2014 removed all inline setStyleSheet() with hardcoded hex colors, replaced inline QFont() with create_font(), replaced setCursor() with set_hand_cursor(). Added get_stepper_button_style() and get_stepper_arrow_style() to styles.py.",
+      "commit": "37695774",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "stylesheet_protocol",
+      "fact": "Styles.py is the single source of truth for all UI styling. Enforcement command: grep for setStyleSheet|QFont|#[0-9A-Fa-f]|padding:|margin:|color: in component files must return 0. Note: current grep is overly broad \u2014 matches f-string color refs like color: {COLORS['x']} which are valid.",
+      "commit": "N/A",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "log_viewer",
+      "fact": "BTCAAAAA-26199: Log viewer freeze fixed by replacing QTextEdit with QPlainTextEdit + QSyntaxHighlighter for lazy rendering. Added lazy tab loading (content on first activation), capped at 100 files for All Logs tab and 5,000 lines per file. Refactored EVENT_PATTERNS to use color keys from styles.py COLORS dict.",
+      "commit": "a0c394ae",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "log_viewer",
+      "fact": "BTCAAAAA-26451: Added FreezeDetector watchdog (daemon thread captures main-thread stack trace when Qt event loop blocked >4s), BackgroundContentLoader (QRunnable for off-thread log I/O), LineClassification + ContentCache (pre-compile regex once, classify on load for O(1) filter toggles). Removed sync rglob/stat from _on_view_current_log.",
+      "commit": "5048df12, 45cc6618",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "log_viewer",
+      "fact": "BTCAAAAA-26393: Log viewer plugin evaluation \u2014 ADOPT community plugin for agent monitoring (simple use case), BUILD from scratch for trade log viewing (needs Nautilus event classification, high-contrast dark theme, lazy loading). UIEngineer endorsed ADOPT+BUILD recommendation with WCAG/theming/SDK-fs findings.",
+      "commit": "f688348e, 06e6a4e6",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "qt_testability",
+      "fact": "BTCAAAAA-26670: Added setObjectName to all key widgets in BlockConfigItem and StrategyBlocksPanel for Qt testability and stylesheet targeting. Widgets: position_label, block_name_label, logic_badge, signals_label, up_button, down_button, remove_button, signals_widget, blocks_scroll_area, blocks_container, empty_label, strategy_exit_section, strategy_exits_container.",
+      "commit": "e45b695b",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "qt_testability",
+      "fact": "BTCAAAAA-26209: Added 4 tests for strategy browser close paths (reject, accept, rapid open/close, native closeEvent) \u2014 all previously at risk of RuntimeError when timer callbacks or signal chains accessed deleted Qt C++ widget objects.",
+      "commit": "26d78f07",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "settings_dialog",
+      "fact": "BTCAAAAA-26185: Registered self._provider_combo in _combo_fields so AI_PROVIDER selection is persisted on save. Updated settings tests for QComboBox API (editable combo for model fields).",
+      "commit": "2a00716b",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "quick_preview",
+      "fact": "BTCAAAAA-26132: Fixed _on_quick_preview() end_date to floor to midnight UTC (replace hour=0, minute=0, second=0, microsecond=0) so the 30-day preview data window doesn't slide by wall-clock time on every invocation.",
+      "commit": "04b9587d",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "window_geometry",
+      "fact": "WindowGeometryMixin in styles.py provides correct Qt5 window geometry/state persistence for multi-monitor setups. Saves pos, size, maximized flag, screen name, and maximized screen name as separate QSettings keys. Avoids saveGeometry()/restoreGeometry() entirely due to Qt5 maximized-state desync bug.",
+      "commit": "styles.py:1714-2310",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "window_geometry",
+      "fact": "BTCAAAAA-637: Maximized-window screen fix \u2014 saves maximized_screen_name so a window maximized on screen 4 re-opens maximized on screen 4, not screen 1.",
+      "commit": "styles.py:1758-1765",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "window_geometry",
+      "fact": "BTCAAAAA-638: Screen position regression fix \u2014 after rect-intersection fails for all screens, fall back to screenAt(saved_pos) point-based lookup. Also saves pos_screen_name independently of intersection threshold.",
+      "commit": "styles.py:1744-1756",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "window_geometry",
+      "fact": "BTCAAAAA-26161/BTCAAAAA-26162: changeEvent handler tracks WindowStateChange transitions (maximize/restore) and immediately updates QSettings to prevent desync between Qt/WM state and saved settings. Fixes 'second-click re-maximize' bug.",
+      "commit": "styles.py:2174-2236",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "window_geometry",
+      "fact": "BTCAAAAA-26202: showEvent calls setWindowState(WindowMaximized) AFTER super().showEvent() so the WM receives the maximize request on an already-mapped window, keeping Qt and WM state in sync.",
+      "commit": "styles.py:2238-2309",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "restoration",
+      "fact": "BTCAAAAA-26634: Restored scripts/launch_strategy_builder.py and src/strategy_builder/ dependencies from main after they were deleted by stale-code cleanup.",
+      "commit": "4b4ebea4",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "architecture",
+      "fact": "UI thread must never be blocked by I/O \u2014 use QRunnable (BackgroundContentLoader) for log file reading, QThread for heavy computation. FreezeDetector watchdog captures main-thread stack traces when event loop blocked >4s.",
+      "commit": "5048df12",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "architecture",
+      "fact": "Styles.py provides create_font() and create_monospace_font() helpers \u2014 all component files must use these instead of inline QFont(). styles.py also provides set_hand_cursor() and apply_hand_cursor_to_buttons() for consistent cursor UX.",
+      "commit": "styles.py:1234-1357",
+      "date": "2026-05-14"
+    },
+    {
+      "category": "architecture",
+      "fact": "UI component files still have 155 hardcoded hex color violations and 10 inline QFont() usages (backtest_config_panel.py, block_search_panel.py, custom_title_bar.py, data_update_modal.py, strategy_blocks_panel.py). These need refactoring to use styles.py helpers.",
+      "commit": "N/A (audit)",
+      "date": "2026-05-14"
+    }
+  ]
+}

@@ -40,6 +40,22 @@ from impact_gate_runner import run as run_impact_gate
 
 log = logging.getLogger(__name__)
 
+
+# Lazy imports for muted state management (avoid circular dependency during init).
+# These are defined in scan_fix_issues_done.py and imported on-demand.
+def _get_muted_state_functions():
+    """Import muted state functions from scan_fix_issues_done, handling circular dependency."""
+    try:
+        from scan_fix_issues_done import (
+            _load_muted_state,
+            save_muted_gate_result,
+            purge_muted_entries,
+            _MUTED_STATE_PATH,
+        )
+        return _load_muted_state, save_muted_gate_result, purge_muted_entries, _MUTED_STATE_PATH
+    except (ImportError, ModuleNotFoundError):
+        return None, None, None, None
+
 BYPASS_LABEL = "impact-gate-bypass"
 
 COMPANY_PREFIX = "BTCAAAAA"
@@ -393,8 +409,9 @@ def process_issue(
         """Persist muted gate result so future scans skip this issue."""
         if mute:
             try:
-                from scan_fix_issues_done import save_muted_gate_result
-                save_muted_gate_result(issue_id, status)
+                _, save_result, _, _ = _get_muted_state_functions()
+                if save_result:
+                    save_result(issue_id, status)
             except Exception:
                 pass
 
