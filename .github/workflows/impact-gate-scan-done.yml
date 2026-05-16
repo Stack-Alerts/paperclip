@@ -68,7 +68,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-xkb1 \
-            xvfb libgl1-mesa-glvnd
+            xvfb libgl1 libglib2.0-0 || true
 
       - name: Ensure data directory exists
         run: mkdir -p data
