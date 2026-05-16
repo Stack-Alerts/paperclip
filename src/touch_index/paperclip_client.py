@@ -116,6 +116,12 @@ def _board_session() -> requests.Session:
 
 
 def _base() -> str:
+    # Prefer local listen address (injected by harness) over the API URL
+    # which may point to a stale cloudflare tunnel.
+    host = os.environ.get("PAPERCLIP_LISTEN_HOST")
+    port = os.environ.get("PAPERCLIP_LISTEN_PORT")
+    if host and port:
+        return f"http://{host}:{port}"
     return os.environ["PAPERCLIP_API_URL"]
 
 
