@@ -920,7 +920,7 @@ class TestScanDoneIssues:
         result = scan_done_issues()
         assert result == expected
         assert len(calls) == 1
-        assert calls[0] == {"days_back": None, "dry_run": False, "retroactive": False}
+        assert calls[0] == {"days_back": None, "dry_run": False, "retroactive": False, "retry_errors": False, "retry_fails": False}
 
     def test_passes_days_back(self, monkeypatch):
         import scan_fix_issues_done
