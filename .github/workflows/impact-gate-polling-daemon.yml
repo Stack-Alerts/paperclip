@@ -6,10 +6,6 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
-      poll_interval:
-        description: 'Seconds between poll cycles (default: 300 = 5 min)'
-        required: false
-        default: '300'
       lookback_minutes:
         description: 'Minutes back to look for recently done issues (default: 10)'
         required: false
@@ -67,20 +63,17 @@ jobs:
         run: |
           FLAGS="--initial-scan"
 
-          # Use provided inputs or defaults
+          # Use provided inputs or defaults (applies to --initial-scan lookback window)
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
               FLAGS="$FLAGS --dry-run"
-            fi
-            if [ -n "${{ github.event.inputs.poll_interval }}" ]; then
-              FLAGS="$FLAGS --poll-interval ${{ github.event.inputs.poll_interval }}"
             fi
             if [ -n "${{ github.event.inputs.lookback_minutes }}" ]; then
               FLAGS="$FLAGS --lookback-minutes ${{ github.event.inputs.lookback_minutes }}"
             fi
           else
-            # Default for scheduled runs: standard 5-min poll
-            FLAGS="$FLAGS --poll-interval 300 --lookback-minutes 10"
+            # Default for scheduled runs: scan last 10 minutes for recently done issues
+            FLAGS="$FLAGS --lookback-minutes 10"
           fi
 
           python scripts/impact_gate_polling_daemon.py $FLAGS > /tmp/poll-output.json
