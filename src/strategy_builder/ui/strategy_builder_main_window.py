@@ -1582,6 +1582,15 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
             # Track report for stepper update when window closes
             self._last_validation_report = report
 
+            # Set validation_passed immediately so Test Optimize is accessible
+            # while the report window is still open — do not wait for window close.
+            if report.is_valid:
+                self.validation_passed = True
+                self.orchestrator.config_engine.config.validation_status = 'passed'
+                self.stepper.mark_step_complete(1)
+                self._update_status('Strategy validated successfully')
+                self._save_validation_status_to_db('Pass')
+
             def _on_validation_fix_applied_from_window(fix_type: str, fix_data: dict):
                 """Update cached report and delegate to existing fix handler."""
                 if self.validation_window:
