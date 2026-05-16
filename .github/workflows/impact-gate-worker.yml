@@ -28,7 +28,7 @@ concurrency:
 jobs:
   worker:
     name: Run Impact Gate on in_review fix issues
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     env:
       PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
@@ -43,9 +43,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+        run: python3 --version
 
       - name: Install dependencies
         run: |
@@ -55,7 +53,7 @@ jobs:
 
       - name: Install system dependencies (Qt headless for impact gate tests)
         run: |
-          sudo apt-get update -qq
+          sudo apt-get update || true -qq
           sudo apt-get install -y --no-install-recommends \
             libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-xkb1 \

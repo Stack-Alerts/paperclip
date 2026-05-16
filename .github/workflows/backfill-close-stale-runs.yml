@@ -21,15 +21,13 @@ on:
 jobs:
   close-stale:
     name: Close stale in_progress runs and issues
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+        run: python3 --version
 
       - name: Install dependencies
         run: pip install -r requirements.txt

@@ -37,7 +37,7 @@ concurrency:
 jobs:
   signoff:
     name: Process lock exception sign-off
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     env:
       PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
@@ -50,9 +50,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+        run: python3 --version
 
       - name: Install dependencies
         run: |

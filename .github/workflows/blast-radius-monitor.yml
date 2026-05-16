@@ -25,7 +25,7 @@ concurrency:
 jobs:
   monitor:
     name: Health-check Blast Radius worker output
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     env:
       PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
@@ -37,9 +37,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+        run: python3 --version
 
       - name: Install dependencies
         run: |

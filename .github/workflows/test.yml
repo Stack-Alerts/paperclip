@@ -17,7 +17,7 @@ env:
 jobs:
   test:
     name: pytest + coverage gate
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     # PostgreSQL service for ITM state store real-database tests (BTCAAAAA-450)
     services:
@@ -39,13 +39,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+        run: python3 --version
 
       - name: Install system dependencies (Qt headless)
         run: |
-          sudo apt-get update -qq
+          sudo apt-get update || true -qq
           sudo apt-get install -y --no-install-recommends \
             libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-xkb1 \
@@ -108,15 +106,13 @@ jobs:
 
   integration-real-data:
     name: Real-data regression (BTCAAAAA-745)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+        run: python3 --version
 
       - name: Install dependencies
         run: |
@@ -131,19 +127,17 @@ jobs:
 
   canary-smoke:
     name: Canary trade-execution (BTCAAAAA-1476)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+        run: python3 --version
 
       - name: Install system dependencies (Qt headless)
         run: |
-          sudo apt-get update -qq
+          sudo apt-get update || true -qq
           sudo apt-get install -y --no-install-recommends \
             libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-xkb1 \

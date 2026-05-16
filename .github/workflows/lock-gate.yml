@@ -9,7 +9,7 @@ on:
 jobs:
   lock-gate:
     name: Module lock gate
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     env:
       PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
@@ -22,9 +22,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+        run: python3 --version
 
       - name: Install dependencies
         run: |
