@@ -21,7 +21,7 @@ permissions:
 jobs:
   monitor:
     name: Watch backup dead-man's-switch liveness
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
