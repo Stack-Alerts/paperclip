@@ -44,6 +44,7 @@ ALERT_SEARCH_QUERY = "rclone OAuth health alert"
 CTO_AGENT_ID = "41b5ede6-e209-40ba-b923-dc969c722e6d"
 
 EXPIRY_WARN_HOURS = 6
+ALERT_COOLDOWN_HOURS = 2  # suppress new alerts if one was fired within this window
 
 logging.basicConfig(
     level=logging.INFO,
@@ -172,21 +173,37 @@ def _check_token_health(token_dict: dict) -> dict:
 
 
 def _check_connectivity() -> bool:
-    """Run a live rclone connectivity check against the GDrive remote directory."""
+    """Run a live rclone connectivity check against the GDrive remote directory.
+
+    Retries once on network timeout to avoid false positives from transient glitches.
+    Uses ``--ask-password=false`` so rclone never prompts interactively.
+    """
     password = _read_rclone_pass()
     env = os.environ.copy()
     if password:
         env["RCLONE_CONFIG_PASS"] = password
 
-    try:
-        result = subprocess.run(
-            ["rclone", "lsd", RCLONE_REMOTE_DIR, "--config", str(RCLONE_CONFIG)],
-            capture_output=True, text=True, timeout=30, env=env,
-        )
-        return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-        logger.error("rclone connectivity check failed: %s", exc)
-        return False
+    cmd = [
+        "rclone", "lsd", RCLONE_REMOTE_DIR,
+        "--config", str(RCLONE_CONFIG),
+        "--ask-password=false",
+    ]
+    for attempt in range(2):
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=45, env=env)
+            if result.returncode == 0:
+                return True
+            logger.warning(
+                "rclone connectivity check returned non-zero (attempt %d): %s",
+                attempt + 1, (result.stderr or "").strip()[:200],
+            )
+        except subprocess.TimeoutExpired:
+            logger.warning("rclone connectivity check timed out after 45s (attempt %d)", attempt + 1)
+        except FileNotFoundError as exc:
+            logger.error("rclone not found: %s", exc)
+            return False
+    logger.error("rclone connectivity check failed after 2 attempts")
+    return False
 
 
 def _load_self_state() -> dict:
@@ -429,17 +446,37 @@ def run(dry_run: bool = False) -> dict:
                 detail = f"{detail} and rclone cannot reach GDrive"
 
     if alert_reason and status == "alert":
-        existing = _find_existing_alert()
-        if existing:
-            logger.info(
-                "Existing alert %s already open — skipping duplicate creation",
-                existing.get("identifier", existing["id"]),
-            )
-            alert_skipped = True
-        else:
-            ok = _create_alert(failure_reason, detail, token_health, dry_run)
-            if ok:
-                alert_fired = True
+        # State-based cooldown: if we fired an alert within ALERT_COOLDOWN_HOURS, skip even
+        # if the previous alert was already resolved — prevents duplicate storms after transient
+        # network timeouts where each resolved alert immediately triggers a new one.
+        last_alert_str = prev.get("last_alert_utc")
+        in_cooldown = False
+        if last_alert_str:
+            try:
+                last_alert_dt = datetime.fromisoformat(last_alert_str)
+                secs_since = (datetime.now(timezone.utc) - last_alert_dt).total_seconds()
+                if secs_since < ALERT_COOLDOWN_HOURS * 3600:
+                    logger.info(
+                        "Alert cooldown active — last alert was %.0fm ago (cooldown: %dh), skipping",
+                        secs_since / 60, ALERT_COOLDOWN_HOURS,
+                    )
+                    in_cooldown = True
+                    alert_skipped = True
+            except (ValueError, TypeError):
+                pass
+
+        if not in_cooldown:
+            existing = _find_existing_alert()
+            if existing:
+                logger.info(
+                    "Existing alert %s already open — skipping duplicate creation",
+                    existing.get("identifier", existing["id"]),
+                )
+                alert_skipped = True
+            else:
+                ok = _create_alert(failure_reason, detail, token_health, dry_run)
+                if ok:
+                    alert_fired = True
     elif alert_reason and status == "warn":
         logger.warning("Token health warning (non-critical): %s — %s", alert_reason, detail)
 
