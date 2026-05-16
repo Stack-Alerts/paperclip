@@ -38,7 +38,7 @@ concurrency:
 jobs:
   scan:
     name: Scan done fix issues for Impact Gate coverage
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     env:
       PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
