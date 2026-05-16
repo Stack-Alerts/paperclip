@@ -105,7 +105,7 @@ export interface Setting<T = string> {
   value: T;
   type: 'text' | 'number' | 'select' | 'toggle' | 'password';
   description?: string;
-  options?: { label: string; value: string | number | boolean }[];
+  options?: { label: string; value: string | number }[];
   required?: boolean;
   masked?: boolean;
 }

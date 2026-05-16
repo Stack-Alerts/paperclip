@@ -246,4 +246,7 @@ jobs:
           fi
           git add .impact_gate_muted_state.json
           git commit --allow-empty -m "chore(impact-gate): update scan-done data quality snapshot"
+          # Retry push with rebase to handle concurrent workflow runs at 5-min intervals
+          git fetch origin main
+          git rebase origin/main
           git push

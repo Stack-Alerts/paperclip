@@ -45,7 +45,8 @@ export const BacktestConfigPanel: React.FC<BacktestConfigPanelProps> = ({
 
   const [isRunning, setIsRunning] = useState(false);
 
-  const handleConfigChange = useCallback((field: keyof BacktestConfig, value: BacktestConfig[keyof BacktestConfig]) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleConfigChange = useCallback((field: keyof BacktestConfig, value: any) => {
     setConfig(prev => ({
       ...prev,
       [field]: value,

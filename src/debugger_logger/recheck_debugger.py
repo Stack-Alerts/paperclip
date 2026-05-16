@@ -93,7 +93,12 @@ class RecheckDebugger:
             block_name: Name of the block
             signal_name: Name of the signal
             recheck_chain: List of RECHECK configurations in chain
+            
+        Raises:
+            ValueError: If recheck_chain is empty
         """
+        if not recheck_chain:
+            raise ValueError("recheck_chain must not be empty")
         chain_id = f"{block_name}::{signal_name}"
         timestamp = datetime.now().isoformat()
         

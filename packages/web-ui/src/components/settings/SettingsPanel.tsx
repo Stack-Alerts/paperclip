@@ -37,7 +37,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
 
   const handleSettingChange = useCallback(
-    (category: string, key: string, value: string | number | boolean) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (category: string, key: string, value: any) => {
       setLocalSettings((prev) => ({
         ...prev,
         [category]: {
