@@ -233,11 +233,11 @@ jobs:
       - name: Commit updated data quality snapshot and muted state
         if: steps.diff.outputs.changed == 'true'
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global url."https://github-actions:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+          git config --global credential.helper "!gh auth git-credential"
           SNAPSHOT="${{ steps.diff.outputs.snapshot_file }}"
           if [ -n "$SNAPSHOT" ]; then
             git add "$SNAPSHOT"
