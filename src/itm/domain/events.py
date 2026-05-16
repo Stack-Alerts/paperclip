@@ -28,6 +28,9 @@ Signal / decision:
 Risk:
     RiskLimitBreached    — a risk parameter was violated
     CapitalStateChanged  — capital allocation/release changed CapitalState
+
+Alert:
+    AlertRaised          — ITM raised an alert requiring operator attention
 """
 
 from __future__ import annotations
@@ -333,3 +336,37 @@ class CapitalStateChanged(DomainEvent):
                 f"CapitalStateChanged.change_type must be one of "
                 f"{sorted(self._VALID_CHANGE_TYPES)}, got {self.change_type!r}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Alert events
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class AlertRaised(DomainEvent):
+    """Fired when ITM raises an alert requiring operator attention."""
+
+    alert_id: str = field(default_factory=_new_id)
+    severity: str = field(default="")       # CRITICAL | WARNING | INFO
+    source: str = field(default="")         # e.g. 'PositionVerification', 'CapitalGovernor'
+    message: str = field(default="")        # human-readable alert text
+    strategy_id: Optional[str] = None
+    position_id: Optional[str] = None
+    raised_at: datetime = field(default_factory=_now_utc)
+    auto_dismiss: bool = False              # False for CRITICAL — must be manually dismissed
+
+    _VALID_SEVERITIES = frozenset({"CRITICAL", "WARNING", "INFO"})
+
+    def __post_init__(self) -> None:
+        if not self.severity:
+            raise ValueError("AlertRaised.severity is required")
+        if self.severity not in self._VALID_SEVERITIES:
+            raise ValueError(
+                f"AlertRaised.severity must be one of "
+                f"{sorted(self._VALID_SEVERITIES)}, got {self.severity!r}"
+            )
+        if not self.source:
+            raise ValueError("AlertRaised.source is required")
+        if not self.message:
+            raise ValueError("AlertRaised.message is required")
