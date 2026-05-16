@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { StrategyBuilder } from '@/components/strategy-builder/StrategyBuilder';
@@ -7,7 +8,7 @@ jest.mock('@/hooks/useStrategyStore', () => ({
   useStrategyStore: jest.fn(),
 }));
 
-import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
+import { useStrategyStore } from '@/hooks/useStrategyStore';
 
 const mockUseStrategyStore = useStrategyStore as jest.MockedFunction<typeof useStrategyStore>;
 

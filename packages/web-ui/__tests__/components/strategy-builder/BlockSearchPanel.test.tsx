@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BlockSearchPanel } from '@/components/strategy-builder/BlockSearchPanel';
@@ -8,7 +9,7 @@ jest.mock('@/hooks/useStrategyStore', () => ({
   useStrategyStore: jest.fn(),
 }));
 
-import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
+import { useStrategyStore } from '@/hooks/useStrategyStore';
 
 const mockStore = useStrategyStore as jest.MockedFunction<typeof useStrategyStore>;
 
