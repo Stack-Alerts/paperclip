@@ -392,6 +392,54 @@ CHECKBOX_STYLES = {
     'error': f"QCheckBox {{ color: {COLORS['error']}; background: transparent; }}",
 }
 
+# Phase timing and event buffering constants
+PHASE_TIMING = {
+    'event_buffer_capacity': 20,  # Ring buffer capacity for phase events
+    'microsecond_precision': True,  # Compute durations in microseconds
+    'table_row_height': 30,  # QTableView row height in pixels
+    'table_header_height': 35,  # QTableView header height in pixels
+    'fallback_timeout_ms': 5000,  # ms without phase events before reverting to aggregate view
+    'min_events_to_activate': 3,  # min phase events buffered before switching to per-phase view
+    'chart_height': 220,  # PerPhaseTimingChart widget minimum height in pixels
+    'label_width': 120,  # Phase name label column width in pixels
+}
+
+# Phase timing table column configuration
+PHASE_TIMING_TABLE_COLUMNS = [
+    {'name': 'Phase', 'width': 160},
+    {'name': 'Duration (ms)', 'width': 130},
+    {'name': 'Outcome', 'width': 110},
+]
+
+# Per-phase color coding for 11 ITM phases (dark-theme readable)
+PHASE_COLORS: dict[str, str] = {
+    'signal_received':        '#4ECDC4',
+    'signal_aggregation':     '#45B7D1',
+    'strategy_validation':    '#96CEB4',
+    'capital_check':          '#88D8B0',
+    'risk_gate':              '#FFEAA7',
+    'decision_creation':      '#DDA0DD',
+    'order_creation':         '#FFB347',
+    'exchange_submission':    '#FF6B6B',
+    'order_state_machine':    '#C7CEEA',
+    'bracket_manager':        '#B5EAD7',
+    'performance_monitoring': '#FF9FF3',
+}
+
+# Font family constant (Segoe UI for Windows/cross-platform compatibility)
+FONT_FAMILY = 'Segoe UI'
+
+# DecisionCycleMonitor component styles
+DECISION_CYCLE_MONITOR_STYLES = {
+    'title_font_size': 11,
+    'title_font_bold': True,
+    'badge_font_size': 8,
+    'badge_padding': '2px 6px',
+    'badge_border_radius': 4,
+    'stat_label_font_size': 9,
+    'fallback_note_italic': True,
+}
+
 # Tab widget styling (stepper-like appearance)
 TAB_WIDGET_STYLESHEET = f"""
     QTabWidget::pane {{
@@ -650,6 +698,110 @@ def get_panel_title_stylesheet() -> str:
 def get_column_title_stylesheet() -> str:
     """Get stylesheet for column/section titles in the Strategy Browser detail panel."""
     return f"color: {COLORS['panel_title']}; padding-bottom: 8px;"
+
+
+def get_decision_cycle_monitor_title_stylesheet() -> str:
+    """Get stylesheet for DecisionCycleMonitor title label."""
+    return f"color: {COLORS['panel_title']};"
+
+
+def get_decision_cycle_monitor_mode_badge_stylesheet(mode: str = 'aggregate') -> str:
+    """Get stylesheet for DecisionCycleMonitor mode badge (AGGREGATE/PER-PHASE).
+
+    Args:
+        mode: 'aggregate' or 'per_phase'
+
+    Returns:
+        CSS style string for mode badge
+    """
+    if mode == 'per_phase':
+        color = COLORS['success']
+        border_color = COLORS['success']
+    else:
+        color = COLORS['text_muted']
+        border_color = COLORS['border']
+
+    return f"color: {color}; padding: 2px 6px; border: 1px solid {border_color}; border-radius: 4px;"
+
+
+def get_decision_cycle_monitor_separator_stylesheet() -> str:
+    """Get stylesheet for DecisionCycleMonitor separator line."""
+    return f"color: {COLORS['border']};"
+
+
+def get_decision_cycle_monitor_stat_label_stylesheet() -> str:
+    """Get stylesheet for DecisionCycleMonitor stat label."""
+    return f"color: {COLORS['text_primary']};"
+
+
+def get_decision_cycle_monitor_fallback_note_stylesheet() -> str:
+    """Get stylesheet for DecisionCycleMonitor fallback note (italic)."""
+    return f"color: {COLORS['text_muted']}; font-style: italic;"
+
+
+# ===========================
+# Font Factory Functions
+# ===========================
+
+def create_font(family: str = FONT_FAMILY, size: int = 10, bold: bool = False, italic: bool = False):
+    """Create a QFont with standardized properties.
+
+    Args:
+        family: Font family name (default: FONT_FAMILY)
+        size: Font size in points (default: 10)
+        bold: Whether font should be bold (default: False)
+        italic: Whether font should be italic (default: False)
+
+    Returns:
+        Configured QFont instance
+    """
+    from PyQt5.QtGui import QFont
+    font = QFont(family, size)
+    font.setBold(bold)
+    font.setItalic(italic)
+    return font
+
+
+def get_decision_cycle_monitor_title_font():
+    """Get font for DecisionCycleMonitor title."""
+    size = DECISION_CYCLE_MONITOR_STYLES['title_font_size']
+    bold = DECISION_CYCLE_MONITOR_STYLES['title_font_bold']
+    return create_font(size=size, bold=bold)
+
+
+def get_decision_cycle_monitor_badge_font():
+    """Get font for DecisionCycleMonitor mode badge."""
+    size = DECISION_CYCLE_MONITOR_STYLES['badge_font_size']
+    return create_font(size=size)
+
+
+def get_decision_cycle_monitor_stat_label_font():
+    """Get font for DecisionCycleMonitor stat labels."""
+    size = DECISION_CYCLE_MONITOR_STYLES['stat_label_font_size']
+    return create_font(size=size)
+
+
+def get_per_phase_timing_chart_label_font():
+    """Get font for PerPhaseTimingChart phase labels."""
+    return create_font(size=9)
+
+
+def get_per_phase_timing_chart_value_font():
+    """Get font for PerPhaseTimingChart value labels."""
+    return create_font(size=8)
+
+
+def get_phase_timing_data_model_font(bold: bool = False, size: int = 10):
+    """Get font for PhaseTimingDataModel table cells.
+
+    Args:
+        bold: Whether font should be bold (default: False)
+        size: Font size in points (default: 10)
+
+    Returns:
+        Configured QFont instance
+    """
+    return create_font(size=size, bold=bold)
 
 
 def get_groupbox_header_stylesheet() -> str:

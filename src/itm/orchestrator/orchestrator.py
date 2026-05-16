@@ -44,18 +44,56 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
+import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Callable, Optional
+from typing import Callable, Iterator, Optional
 
 from ..domain.entities import Decision, Instrument, Signal
+from ..domain.events import ITM_PHASES, PhaseCompleted, PhaseStarted
 from .capital_allocator import CapitalAllocator
 from .performance_monitor import PerformanceMonitor, StrategyMetrics
 from .registry import StrategyEntry, StrategyLifecycleState, StrategyRegistry
 from .sb_contract import SBExportImporter, StrategyConfig
 
 logger = logging.getLogger(__name__)
+
+_PHASE_INDEX = {name: idx for idx, name in enumerate(ITM_PHASES)}
+
+
+@contextmanager
+def _phase_span(
+    name: str,
+    cycle_id: str,
+    strategy_id: Optional[str],
+    on_phase_event: Optional[Callable],
+) -> Iterator[None]:
+    """Emit PhaseStarted / PhaseCompleted around a code block."""
+    if on_phase_event is None:
+        yield
+        return
+    idx = _PHASE_INDEX[name]
+    on_phase_event(PhaseStarted(phase_name=name, phase_index=idx, cycle_id=cycle_id, strategy_id=strategy_id))
+    t0 = time.monotonic()
+    outcome = "success"
+    try:
+        yield
+    except Exception:
+        outcome = "error"
+        raise
+    finally:
+        duration_ms = (time.monotonic() - t0) * 1000
+        on_phase_event(PhaseCompleted(
+            phase_name=name,
+            phase_index=idx,
+            cycle_id=cycle_id,
+            strategy_id=strategy_id,
+            duration_ms=duration_ms,
+            outcome=outcome,
+        ))
 
 # ---------------------------------------------------------------------------
 # Institutional risk constants (must match agent AGENTS.md specification)
@@ -128,8 +166,10 @@ class MultiStrategyOrchestrator:
         self,
         config: OrchestratorConfig,
         on_decision: Optional[Callable[[Decision], None]] = None,
+        on_phase_event: Optional[Callable] = None,
     ) -> None:
         self._config = config
+        self._on_phase_event = on_phase_event
         self._lock = threading.RLock()
 
         # Initialise sub-components
@@ -241,7 +281,21 @@ class MultiStrategyOrchestrator:
         Decision | None
             Decision if accepted, None if dropped.
         """
-        return self._aggregator.submit_signal(signal)
+        cycle_id = str(uuid.uuid4())
+        sid = signal.source_strategy
+
+        with _phase_span("signal_received", cycle_id, sid, self._on_phase_event):
+            pass  # receipt is instantaneous; span records the wall time
+
+        decision: Optional[Decision] = None
+        with _phase_span("signal_aggregation", cycle_id, sid, self._on_phase_event):
+            decision = self._aggregator.submit_signal(signal)
+
+        if decision is not None:
+            with _phase_span("decision_creation", cycle_id, sid, self._on_phase_event):
+                pass  # decision was already built inside the aggregator
+
+        return decision
 
     # ------------------------------------------------------------------ #
     # Pre-trade order validation (risk gate)                               #
@@ -273,68 +327,75 @@ class MultiStrategyOrchestrator:
             ``(True, None)`` if all checks pass.
             ``(False, reason_string)`` if any check fails.
         """
-        # 1. Leverage check
-        if leverage > MAX_LEVERAGE:
-            reason = (
-                f"{OrderRejectionReason.LEVERAGE_EXCEEDED}: "
-                f"requested {leverage} > max {MAX_LEVERAGE}"
-            )
-            logger.error("Order rejected: %s strategy=%r", reason, strategy_id)
-            return False, reason
+        cycle_id = str(uuid.uuid4())
+        ope = self._on_phase_event
 
-        # 2. Position size — upper bound
-        if quantity > MAX_POSITION_SIZE:
-            reason = (
-                f"{OrderRejectionReason.QUANTITY_TOO_LARGE}: "
-                f"{quantity} BTC > MAX {MAX_POSITION_SIZE} BTC"
-            )
-            logger.error("Order rejected: %s strategy=%r", reason, strategy_id)
-            return False, reason
+        # strategy_validation phase (phase 3)
+        with _phase_span("strategy_validation", cycle_id, strategy_id, ope):
+            # 1. Leverage check
+            if leverage > MAX_LEVERAGE:
+                reason = (
+                    f"{OrderRejectionReason.LEVERAGE_EXCEEDED}: "
+                    f"requested {leverage} > max {MAX_LEVERAGE}"
+                )
+                logger.error("Order rejected: %s strategy=%r", reason, strategy_id)
+                return False, reason
 
-        # 3. Position size — lower bound
-        if quantity < MIN_POSITION_SIZE:
-            reason = (
-                f"{OrderRejectionReason.QUANTITY_TOO_SMALL}: "
-                f"{quantity} BTC < MIN {MIN_POSITION_SIZE} BTC"
-            )
-            logger.error("Order rejected: %s strategy=%r", reason, strategy_id)
-            return False, reason
+            # 2. Position size — upper bound
+            if quantity > MAX_POSITION_SIZE:
+                reason = (
+                    f"{OrderRejectionReason.QUANTITY_TOO_LARGE}: "
+                    f"{quantity} BTC > MAX {MAX_POSITION_SIZE} BTC"
+                )
+                logger.error("Order rejected: %s strategy=%r", reason, strategy_id)
+                return False, reason
 
-        # 4. Strategy must be ACTIVE
-        entry = self._registry.get(strategy_id)
-        if entry is None or not entry.is_active:
-            state = entry.state.value if entry else "not_registered"
-            reason = f"{OrderRejectionReason.STRATEGY_NOT_ACTIVE}: state={state}"
-            logger.error("Order rejected: %s strategy=%r", reason, strategy_id)
-            return False, reason
+            # 3. Position size — lower bound
+            if quantity < MIN_POSITION_SIZE:
+                reason = (
+                    f"{OrderRejectionReason.QUANTITY_TOO_SMALL}: "
+                    f"{quantity} BTC < MIN {MIN_POSITION_SIZE} BTC"
+                )
+                logger.error("Order rejected: %s strategy=%r", reason, strategy_id)
+                return False, reason
 
-        # 5. Capital check
-        if not self._capital.can_allocate(strategy_id, capital_required):
-            slice_ = self._capital.get_slice(strategy_id)
-            available = slice_.available_capital if slice_ else Decimal("0")
-            reason = (
-                f"{OrderRejectionReason.INSUFFICIENT_CAPITAL}: "
-                f"need {capital_required} USDT, only {available} available"
-            )
-            logger.error("Order rejected: %s strategy=%r", reason, strategy_id)
-            return False, reason
+            # 4. Strategy must be ACTIVE
+            entry = self._registry.get(strategy_id)
+            if entry is None or not entry.is_active:
+                state = entry.state.value if entry else "not_registered"
+                reason = f"{OrderRejectionReason.STRATEGY_NOT_ACTIVE}: state={state}"
+                logger.error("Order rejected: %s strategy=%r", reason, strategy_id)
+                return False, reason
 
-        # 6. Daily loss limit
-        metrics = self._monitor.get_metrics(strategy_id)
-        if metrics is not None:
-            config = self._registry.get(strategy_id)
-            if config is not None:
-                daily_loss = -metrics.daily_pnl
-                max_loss = config.config.risk.max_daily_loss
-                if daily_loss >= max_loss:
-                    reason = (
-                        f"{OrderRejectionReason.DAILY_LOSS_LIMIT}: "
-                        f"daily_loss={daily_loss} >= limit={max_loss} USDT"
-                    )
-                    logger.error(
-                        "Order rejected: %s strategy=%r", reason, strategy_id
-                    )
-                    return False, reason
+        # capital_check phase (phase 4)
+        with _phase_span("capital_check", cycle_id, strategy_id, ope):
+            if not self._capital.can_allocate(strategy_id, capital_required):
+                slice_ = self._capital.get_slice(strategy_id)
+                available = slice_.available_capital if slice_ else Decimal("0")
+                reason = (
+                    f"{OrderRejectionReason.INSUFFICIENT_CAPITAL}: "
+                    f"need {capital_required} USDT, only {available} available"
+                )
+                logger.error("Order rejected: %s strategy=%r", reason, strategy_id)
+                return False, reason
+
+        # risk_gate phase (phase 5) — daily loss limit
+        with _phase_span("risk_gate", cycle_id, strategy_id, ope):
+            metrics = self._monitor.get_metrics(strategy_id)
+            if metrics is not None:
+                config = self._registry.get(strategy_id)
+                if config is not None:
+                    daily_loss = -metrics.daily_pnl
+                    max_loss = config.config.risk.max_daily_loss
+                    if daily_loss >= max_loss:
+                        reason = (
+                            f"{OrderRejectionReason.DAILY_LOSS_LIMIT}: "
+                            f"daily_loss={daily_loss} >= limit={max_loss} USDT"
+                        )
+                        logger.error(
+                            "Order rejected: %s strategy=%r", reason, strategy_id
+                        )
+                        return False, reason
 
         logger.info(
             "Pre-trade checks PASSED: strategy=%r qty=%s capital=%s",

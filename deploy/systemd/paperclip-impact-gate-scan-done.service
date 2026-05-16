@@ -1,11 +1,11 @@
 [Unit]
-Description=Paperclip Impact Gate Scan-Done Worker (5-min polling daemon)
+Description=Paperclip Impact Gate Scan-Done (5-min polling daemon — full gate)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/home/sirrus/miniconda3/bin/python3 /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/run_impact_gate_polling_worker.py
+ExecStart=/home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/run_impact_gate_polling_daemon.sh --initial-scan
 StandardOutput=journal
 StandardError=journal
 StandardInput=null

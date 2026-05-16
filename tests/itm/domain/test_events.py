@@ -23,6 +23,9 @@ from src.itm.domain.entities import (
 )
 from src.itm.domain.events import (
     DomainEvent,
+    ITM_PHASES,
+    PhaseCompleted,
+    PhaseStarted,
     TradeOpened,
     TradeFilled,
     TradePartialFill,
@@ -367,3 +370,114 @@ class TestCapitalStateChanged:
     def test_missing_capital_state_raises(self):
         with pytest.raises(ValueError, match="capital_state"):
             CapitalStateChanged(change_type="allocate", amount=Decimal("1000"))
+
+
+# ---------------------------------------------------------------------------
+# Phase events (P2)
+# ---------------------------------------------------------------------------
+
+
+class TestITMPhases:
+    def test_phases_tuple_has_11_entries(self):
+        assert len(ITM_PHASES) == 11
+
+    def test_phases_expected_names(self):
+        expected = {
+            "signal_received", "signal_aggregation", "strategy_validation",
+            "capital_check", "risk_gate", "decision_creation",
+            "order_creation", "exchange_submission", "order_state_machine",
+            "bracket_manager", "performance_monitoring",
+        }
+        assert set(ITM_PHASES) == expected
+
+    def test_phases_ordered_correctly(self):
+        assert ITM_PHASES[0] == "signal_received"
+        assert ITM_PHASES[-1] == "performance_monitoring"
+
+
+class TestPhaseStarted:
+    def test_happy_path(self):
+        evt = PhaseStarted(
+            phase_name="risk_gate",
+            phase_index=4,
+            cycle_id="cycle-001",
+            strategy_id="strat-xyz",
+        )
+        assert evt.phase_name == "risk_gate"
+        assert evt.phase_index == 4
+        assert evt.cycle_id == "cycle-001"
+        assert evt.strategy_id == "strat-xyz"
+        assert evt.event_type == "PhaseStarted"
+
+    def test_auto_ids_generated(self):
+        e1 = PhaseStarted(phase_name="risk_gate", phase_index=4)
+        e2 = PhaseStarted(phase_name="risk_gate", phase_index=4)
+        assert e1.event_id != e2.event_id
+        assert e1.cycle_id != e2.cycle_id
+
+    def test_strategy_id_optional(self):
+        evt = PhaseStarted(phase_name="signal_received", phase_index=0)
+        assert evt.strategy_id is None
+
+    def test_missing_phase_name_raises(self):
+        with pytest.raises(ValueError, match="phase_name"):
+            PhaseStarted(phase_name="", phase_index=0)
+
+    def test_invalid_phase_name_raises(self):
+        with pytest.raises(ValueError, match="phase_name"):
+            PhaseStarted(phase_name="not_a_real_phase", phase_index=0)
+
+    def test_is_frozen(self):
+        evt = PhaseStarted(phase_name="risk_gate", phase_index=4)
+        with pytest.raises((AttributeError, TypeError)):
+            evt.phase_name = "mutated"  # type: ignore[misc]
+
+    @pytest.mark.parametrize("phase_name,idx", list(enumerate(ITM_PHASES)))
+    def test_all_11_phases_valid(self, phase_name, idx):
+        # parametrize yields (index, name) — swap for construction
+        name = idx  # actually the phase name string after enumerate
+        i = phase_name  # index
+        evt = PhaseStarted(phase_name=name, phase_index=i)
+        assert evt.phase_name == name
+
+
+class TestPhaseCompleted:
+    def test_happy_path(self):
+        evt = PhaseCompleted(
+            phase_name="risk_gate",
+            phase_index=4,
+            cycle_id="cycle-001",
+            strategy_id="strat-xyz",
+            duration_ms=2.5,
+            outcome="success",
+        )
+        assert evt.phase_name == "risk_gate"
+        assert evt.duration_ms == 2.5
+        assert evt.outcome == "success"
+        assert evt.event_type == "PhaseCompleted"
+
+    def test_default_outcome_is_success(self):
+        evt = PhaseCompleted(phase_name="risk_gate", phase_index=4)
+        assert evt.outcome == "success"
+
+    @pytest.mark.parametrize("outcome", ["success", "skipped", "rejected", "error"])
+    def test_valid_outcomes(self, outcome):
+        evt = PhaseCompleted(phase_name="risk_gate", phase_index=4, outcome=outcome)
+        assert evt.outcome == outcome
+
+    def test_invalid_outcome_raises(self):
+        with pytest.raises(ValueError, match="outcome"):
+            PhaseCompleted(phase_name="risk_gate", phase_index=4, outcome="unknown")
+
+    def test_missing_phase_name_raises(self):
+        with pytest.raises(ValueError, match="phase_name"):
+            PhaseCompleted(phase_name="", phase_index=0)
+
+    def test_invalid_phase_name_raises(self):
+        with pytest.raises(ValueError, match="phase_name"):
+            PhaseCompleted(phase_name="not_a_real_phase", phase_index=0)
+
+    def test_is_frozen(self):
+        evt = PhaseCompleted(phase_name="risk_gate", phase_index=4)
+        with pytest.raises((AttributeError, TypeError)):
+            evt.outcome = "mutated"  # type: ignore[misc]

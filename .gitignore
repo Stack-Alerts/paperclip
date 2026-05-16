@@ -143,3 +143,6 @@ config/optimizer_001_01_hod_rejection.yaml
 config/optimizer_001_hod_rejection.yaml
 config/optimizer_002_lod_rejection.yaml
 config/optimizer_003_hod_continuation.yaml
+
+# Impact Gate auto-generated state
+.impact_gate_muted_state.json
