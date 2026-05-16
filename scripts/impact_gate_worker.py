@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -37,7 +38,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).parent / ".." / ".env")
+# Only load .env if running locally (not in CI where env vars are pre-set)
+if not os.environ.get("PAPERCLIP_API_URL"):
+    load_dotenv(Path(__file__).parent / ".." / ".env")
 
 from impact_gate.worker import process_issue
 

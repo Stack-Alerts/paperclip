@@ -37,9 +37,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import os
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# Only load .env if running locally (not in CI where env vars are pre-set)
+if not os.environ.get("PAPERCLIP_API_URL"):
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from touch_index.paperclip_client import (
     _paginate,
