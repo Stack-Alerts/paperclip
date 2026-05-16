@@ -11,10 +11,15 @@ from typing import Optional
 import logging
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QVariant
-from PyQt5.QtGui import QColor, QFont
+from PyQt5.QtGui import QColor
 
 from .phase_event_buffer import PhaseEvent, PhaseEventBuffer
-from .styles import COLORS, PHASE_TIMING, PHASE_TIMING_TABLE_COLUMNS
+from .styles import (
+    COLORS,
+    PHASE_TIMING,
+    PHASE_TIMING_TABLE_COLUMNS,
+    get_phase_timing_data_model_font,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -112,11 +117,8 @@ class PhaseTimingDataModel(QAbstractTableModel):
                 return QVariant(QColor(COLORS['bg_light']))
 
         elif role == Qt.FontRole:
-            font = QFont()
-            font.setPointSize(10)
-            if col == 0:
-                font.setBold(True)
-            return QVariant(font)
+            is_bold = col == 0
+            return QVariant(get_phase_timing_data_model_font(bold=is_bold, size=10))
 
         return QVariant()
 
@@ -133,10 +135,7 @@ class PhaseTimingDataModel(QAbstractTableModel):
             elif role == Qt.ForegroundRole:
                 return QVariant(QColor(COLORS['panel_title']))
             elif role == Qt.FontRole:
-                font = QFont()
-                font.setPointSize(10)
-                font.setBold(True)
-                return QVariant(font)
+                return QVariant(get_phase_timing_data_model_font(bold=True, size=10))
 
         return QVariant()
 

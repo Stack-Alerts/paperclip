@@ -13,11 +13,17 @@ Dimensions: styles.PHASE_TIMING['chart_height'], styles.PHASE_TIMING['label_widt
 from __future__ import annotations
 
 from PyQt5.QtCore import Qt, QRect, QSize
-from PyQt5.QtGui import QColor, QFont, QPainter
+from PyQt5.QtGui import QColor, QPainter
 from PyQt5.QtWidgets import QWidget, QToolTip
 
 from .phase_timing_data_model import PhaseTimingDataModel
-from .styles import COLORS, PHASE_COLORS, PHASE_TIMING
+from .styles import (
+    COLORS,
+    PHASE_COLORS,
+    PHASE_TIMING,
+    get_per_phase_timing_chart_label_font,
+    get_per_phase_timing_chart_value_font,
+)
 
 
 class PerPhaseTimingChart(QWidget):
@@ -99,13 +105,13 @@ class PerPhaseTimingChart(QWidget):
         for i, phase in enumerate(phases):
             duration_us = phase['duration_ms'] * 1000
             name = phase['name']
-            color_hex = PHASE_COLORS.get(name, COLORS.get('accent', '#4ECDC4'))
+            color_hex = PHASE_COLORS.get(name, COLORS['info'])
 
             bar_y = chart_y + i * (bar_h + self._BAR_GAP)
 
             # Phase label — left column, vertically centred
             label_rect = QRect(pad, bar_y, label_w - 6, bar_h)
-            painter.setFont(QFont('Segoe UI', 9))
+            painter.setFont(get_per_phase_timing_chart_label_font())
             painter.setPen(QColor(COLORS['text_primary']))
             label_text = name.replace('_', ' ')
             painter.drawText(label_rect, Qt.AlignVCenter | Qt.AlignLeft, label_text)
@@ -124,7 +130,7 @@ class PerPhaseTimingChart(QWidget):
 
             # Inline µs label when bar is wide enough
             if bar_w >= 44:
-                painter.setFont(QFont('Segoe UI', 8))
+                painter.setFont(get_per_phase_timing_chart_value_font())
                 painter.setPen(Qt.black)
                 us_int = int(duration_us)
                 painter.drawText(
@@ -168,13 +174,13 @@ class PerPhaseTimingChart(QWidget):
 
     def _draw_empty(self, painter: QPainter) -> None:
         painter.setPen(QColor(COLORS['text_secondary']))
-        painter.setFont(QFont('Segoe UI', 9))
+        painter.setFont(get_per_phase_timing_chart_label_font())
         painter.drawText(self.rect(), Qt.AlignCenter, 'No phase data')
 
     def _draw_x_axis(
         self, painter: QPainter, x: int, y: int, w: int, total_us: float
     ) -> None:
-        painter.setFont(QFont('Segoe UI', 8))
+        painter.setFont(get_per_phase_timing_chart_value_font())
         painter.setPen(QColor(COLORS['text_secondary']))
         for i in range(self._TICK_COUNT + 1):
             tick_x = x + int(i / self._TICK_COUNT * w)

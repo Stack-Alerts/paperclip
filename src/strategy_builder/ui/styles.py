@@ -426,6 +426,20 @@ PHASE_COLORS: dict[str, str] = {
     'performance_monitoring': '#FF9FF3',
 }
 
+# Font family constant (Segoe UI for Windows/cross-platform compatibility)
+FONT_FAMILY = 'Segoe UI'
+
+# DecisionCycleMonitor component styles
+DECISION_CYCLE_MONITOR_STYLES = {
+    'title_font_size': 11,
+    'title_font_bold': True,
+    'badge_font_size': 8,
+    'badge_padding': '2px 6px',
+    'badge_border_radius': 4,
+    'stat_label_font_size': 9,
+    'fallback_note_italic': True,
+}
+
 # Tab widget styling (stepper-like appearance)
 TAB_WIDGET_STYLESHEET = f"""
     QTabWidget::pane {{
@@ -684,6 +698,110 @@ def get_panel_title_stylesheet() -> str:
 def get_column_title_stylesheet() -> str:
     """Get stylesheet for column/section titles in the Strategy Browser detail panel."""
     return f"color: {COLORS['panel_title']}; padding-bottom: 8px;"
+
+
+def get_decision_cycle_monitor_title_stylesheet() -> str:
+    """Get stylesheet for DecisionCycleMonitor title label."""
+    return f"color: {COLORS['panel_title']};"
+
+
+def get_decision_cycle_monitor_mode_badge_stylesheet(mode: str = 'aggregate') -> str:
+    """Get stylesheet for DecisionCycleMonitor mode badge (AGGREGATE/PER-PHASE).
+
+    Args:
+        mode: 'aggregate' or 'per_phase'
+
+    Returns:
+        CSS style string for mode badge
+    """
+    if mode == 'per_phase':
+        color = COLORS['success']
+        border_color = COLORS['success']
+    else:
+        color = COLORS['text_muted']
+        border_color = COLORS['border']
+
+    return f"color: {color}; padding: 2px 6px; border: 1px solid {border_color}; border-radius: 4px;"
+
+
+def get_decision_cycle_monitor_separator_stylesheet() -> str:
+    """Get stylesheet for DecisionCycleMonitor separator line."""
+    return f"color: {COLORS['border']};"
+
+
+def get_decision_cycle_monitor_stat_label_stylesheet() -> str:
+    """Get stylesheet for DecisionCycleMonitor stat label."""
+    return f"color: {COLORS['text_primary']};"
+
+
+def get_decision_cycle_monitor_fallback_note_stylesheet() -> str:
+    """Get stylesheet for DecisionCycleMonitor fallback note (italic)."""
+    return f"color: {COLORS['text_muted']}; font-style: italic;"
+
+
+# ===========================
+# Font Factory Functions
+# ===========================
+
+def create_font(family: str = FONT_FAMILY, size: int = 10, bold: bool = False, italic: bool = False):
+    """Create a QFont with standardized properties.
+
+    Args:
+        family: Font family name (default: FONT_FAMILY)
+        size: Font size in points (default: 10)
+        bold: Whether font should be bold (default: False)
+        italic: Whether font should be italic (default: False)
+
+    Returns:
+        Configured QFont instance
+    """
+    from PyQt5.QtGui import QFont
+    font = QFont(family, size)
+    font.setBold(bold)
+    font.setItalic(italic)
+    return font
+
+
+def get_decision_cycle_monitor_title_font():
+    """Get font for DecisionCycleMonitor title."""
+    size = DECISION_CYCLE_MONITOR_STYLES['title_font_size']
+    bold = DECISION_CYCLE_MONITOR_STYLES['title_font_bold']
+    return create_font(size=size, bold=bold)
+
+
+def get_decision_cycle_monitor_badge_font():
+    """Get font for DecisionCycleMonitor mode badge."""
+    size = DECISION_CYCLE_MONITOR_STYLES['badge_font_size']
+    return create_font(size=size)
+
+
+def get_decision_cycle_monitor_stat_label_font():
+    """Get font for DecisionCycleMonitor stat labels."""
+    size = DECISION_CYCLE_MONITOR_STYLES['stat_label_font_size']
+    return create_font(size=size)
+
+
+def get_per_phase_timing_chart_label_font():
+    """Get font for PerPhaseTimingChart phase labels."""
+    return create_font(size=9)
+
+
+def get_per_phase_timing_chart_value_font():
+    """Get font for PerPhaseTimingChart value labels."""
+    return create_font(size=8)
+
+
+def get_phase_timing_data_model_font(bold: bool = False, size: int = 10):
+    """Get font for PhaseTimingDataModel table cells.
+
+    Args:
+        bold: Whether font should be bold (default: False)
+        size: Font size in points (default: 10)
+
+    Returns:
+        Configured QFont instance
+    """
+    return create_font(size=size, bold=bold)
 
 
 def get_groupbox_header_stylesheet() -> str:

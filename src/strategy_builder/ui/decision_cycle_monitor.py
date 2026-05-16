@@ -25,7 +25,6 @@ import time
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QColor, QFont
 from PyQt5.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -38,7 +37,17 @@ from PyQt5.QtWidgets import (
 from .phase_event_buffer import PhaseEvent, PhaseEventBuffer
 from .phase_timing_data_model import PhaseTimingDataModel
 from .per_phase_timing_chart import PerPhaseTimingChart
-from .styles import COLORS, PHASE_TIMING
+from .styles import (
+    PHASE_TIMING,
+    get_decision_cycle_monitor_title_stylesheet,
+    get_decision_cycle_monitor_mode_badge_stylesheet,
+    get_decision_cycle_monitor_separator_stylesheet,
+    get_decision_cycle_monitor_stat_label_stylesheet,
+    get_decision_cycle_monitor_fallback_note_stylesheet,
+    get_decision_cycle_monitor_title_font,
+    get_decision_cycle_monitor_badge_font,
+    get_decision_cycle_monitor_stat_label_font,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -104,22 +113,19 @@ class DecisionCycleMonitor(QWidget):
         # Header row
         header = QHBoxLayout()
         title = QLabel("B1 — Cycle Monitor")
-        title.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        title.setStyleSheet(f"color: {COLORS['panel_title']};")
+        title.setFont(get_decision_cycle_monitor_title_font())
+        title.setStyleSheet(get_decision_cycle_monitor_title_stylesheet())
         header.addWidget(title)
         header.addStretch()
         self._mode_badge = QLabel("AGGREGATE")
-        self._mode_badge.setFont(QFont("Segoe UI", 8))
-        self._mode_badge.setStyleSheet(
-            f"color: {COLORS['text_muted']}; padding: 2px 6px;"
-            f"border: 1px solid {COLORS['border']}; border-radius: 4px;"
-        )
+        self._mode_badge.setFont(get_decision_cycle_monitor_badge_font())
+        self._mode_badge.setStyleSheet(get_decision_cycle_monitor_mode_badge_stylesheet())
         header.addWidget(self._mode_badge)
         root.addLayout(header)
 
         separator = QFrame()
         separator.setFrameShape(QFrame.HLine)
-        separator.setStyleSheet(f"color: {COLORS['border']};")
+        separator.setStyleSheet(get_decision_cycle_monitor_separator_stylesheet())
         root.addWidget(separator)
 
         # Stacked widget: page 0 = aggregate, page 1 = per-phase
@@ -139,7 +145,7 @@ class DecisionCycleMonitor(QWidget):
         self._agg_checkpoint = _stat_label("Checkpoint Seq")
         self._agg_cycle_id = _stat_label("Cycle ID")
         self._agg_fallback_note = QLabel("Aggregate timing only — phase events not yet received")
-        self._agg_fallback_note.setStyleSheet(f"color: {COLORS['text_muted']}; font-style: italic;")
+        self._agg_fallback_note.setStyleSheet(get_decision_cycle_monitor_fallback_note_stylesheet())
         self._agg_fallback_note.setVisible(False)
 
         layout.addWidget(self._agg_bar_close)
@@ -195,10 +201,7 @@ class DecisionCycleMonitor(QWidget):
         self._phase_view_enabled = True
         self._stack.setCurrentIndex(_PAGE_PER_PHASE)
         self._mode_badge.setText("PER-PHASE")
-        self._mode_badge.setStyleSheet(
-            f"color: {COLORS['success']}; padding: 2px 6px;"
-            f"border: 1px solid {COLORS['success']}; border-radius: 4px;"
-        )
+        self._mode_badge.setStyleSheet(get_decision_cycle_monitor_mode_badge_stylesheet('per_phase'))
         logger.debug("DecisionCycleMonitor: switched to per-phase view")
 
     def _switch_to_aggregate_view(self) -> None:
@@ -207,10 +210,7 @@ class DecisionCycleMonitor(QWidget):
         self._phase_view_enabled = False
         self._stack.setCurrentIndex(_PAGE_AGGREGATE)
         self._mode_badge.setText("AGGREGATE")
-        self._mode_badge.setStyleSheet(
-            f"color: {COLORS['text_muted']}; padding: 2px 6px;"
-            f"border: 1px solid {COLORS['border']}; border-radius: 4px;"
-        )
+        self._mode_badge.setStyleSheet(get_decision_cycle_monitor_mode_badge_stylesheet())
         self._agg_fallback_note.setVisible(True)
         logger.debug("DecisionCycleMonitor: fell back to aggregate view")
 
@@ -238,8 +238,8 @@ class DecisionCycleMonitor(QWidget):
 
 def _stat_label(placeholder: str) -> QLabel:
     lbl = QLabel(f"{placeholder}: —")
-    lbl.setFont(QFont("Segoe UI", 9))
-    lbl.setStyleSheet(f"color: {COLORS['text_primary']};")
+    lbl.setFont(get_decision_cycle_monitor_stat_label_font())
+    lbl.setStyleSheet(get_decision_cycle_monitor_stat_label_stylesheet())
     return lbl
 
 
