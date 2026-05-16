@@ -174,41 +174,39 @@ class TestPhaseTimingDataModel:
         buffer = PhaseEventBuffer()
         model = PhaseTimingDataModel(buffer)
         assert model.rowCount() == 0
-        assert model.columnCount() == 4
+        assert model.columnCount() == 3  # Phase, Duration(ms), Outcome
 
     def test_model_column_count(self, qapp):
         """Test model has correct column count."""
         buffer = PhaseEventBuffer()
         model = PhaseTimingDataModel(buffer)
-        assert model.columnCount() == 4
+        assert model.columnCount() == 3
 
     def test_model_computes_single_phase(self, qapp):
-        """Test model computes duration for a single phase."""
+        """Test model reads duration_ms and outcome from PhaseCompleted raw_data."""
         buffer = PhaseEventBuffer()
         buffer.append(PhaseEvent('setup', 'started', 1000, {}))
-        buffer.append(PhaseEvent('setup', 'completed', 5000, {}))
+        buffer.append(PhaseEvent('setup', 'completed', 5000,
+                                  {'duration_ms': 4.0, 'outcome': 'success'}))
 
         model = PhaseTimingDataModel(buffer)
         assert model.rowCount() == 1
 
-        # Check phase data
         phases = model.get_phase_data()
         assert len(phases) == 1
         assert phases[0]['name'] == 'setup'
-        assert phases[0]['started_us'] == 1000
-        assert phases[0]['completed_us'] == 5000
-        assert phases[0]['duration_us'] == 4000
+        assert phases[0]['duration_ms'] == 4.0
+        assert phases[0]['outcome'] == 'success'
 
     def test_model_computes_multiple_phases(self, qapp):
-        """Test model computes durations for multiple phases."""
+        """Test model reads durations for multiple phases from raw_data."""
         buffer = PhaseEventBuffer()
-        # Phase 1: setup (1000-3000, duration 2000)
         buffer.append(PhaseEvent('setup', 'started', 1000, {}))
-        buffer.append(PhaseEvent('setup', 'completed', 3000, {}))
-
-        # Phase 2: execute (5000-8000, duration 3000)
+        buffer.append(PhaseEvent('setup', 'completed', 3000,
+                                  {'duration_ms': 2.0, 'outcome': 'success'}))
         buffer.append(PhaseEvent('execute', 'started', 5000, {}))
-        buffer.append(PhaseEvent('execute', 'completed', 8000, {}))
+        buffer.append(PhaseEvent('execute', 'completed', 8000,
+                                  {'duration_ms': 3.0, 'outcome': 'success'}))
 
         model = PhaseTimingDataModel(buffer)
         assert model.rowCount() == 2
@@ -216,38 +214,43 @@ class TestPhaseTimingDataModel:
         phases = model.get_phase_data()
         assert len(phases) == 2
         assert phases[0]['name'] == 'execute'  # Sorted alphabetically
-        assert phases[0]['duration_us'] == 3000
+        assert phases[0]['duration_ms'] == 3.0
         assert phases[1]['name'] == 'setup'
-        assert phases[1]['duration_us'] == 2000
+        assert phases[1]['duration_ms'] == 2.0
 
     def test_model_ignores_incomplete_phases(self, qapp):
-        """Test model ignores phases with only started or only completed."""
+        """Test model ignores phases with only started (no completed event)."""
         buffer = PhaseEventBuffer()
         buffer.append(PhaseEvent('phase1', 'started', 1000, {}))
         buffer.append(PhaseEvent('phase2', 'started', 2000, {}))
-        buffer.append(PhaseEvent('phase2', 'completed', 4000, {}))
-        buffer.append(PhaseEvent('phase3', 'completed', 5000, {}))
+        buffer.append(PhaseEvent('phase2', 'completed', 4000,
+                                  {'duration_ms': 2.0, 'outcome': 'success'}))
+        # phase3 has completed but no started — still shown (backend provides duration)
+        buffer.append(PhaseEvent('phase3', 'completed', 5000,
+                                  {'duration_ms': 1.0, 'outcome': 'skipped'}))
 
         model = PhaseTimingDataModel(buffer)
-        # Only phase2 is complete
-        assert model.rowCount() == 1
-        assert model.get_phase_data()[0]['name'] == 'phase2'
+        # phase1 only has started — excluded. phase2 and phase3 have completed — included.
+        assert model.rowCount() == 2
+        names = {p['name'] for p in model.get_phase_data()}
+        assert 'phase2' in names
+        assert 'phase3' in names
+        assert 'phase1' not in names
 
     def test_model_data_display_role(self, qapp):
         """Test model returns correct data for display."""
         buffer = PhaseEventBuffer()
         buffer.append(PhaseEvent('phase1', 'started', 1000000, {}))
-        buffer.append(PhaseEvent('phase1', 'completed', 1005000, {}))
+        buffer.append(PhaseEvent('phase1', 'completed', 1005000,
+                                  {'duration_ms': 5.0, 'outcome': 'success'}))
 
         model = PhaseTimingDataModel(buffer)
 
-        # Verify phase data is correct
         phases = model.get_phase_data()
         assert len(phases) == 1
         assert phases[0]['name'] == 'phase1'
-        assert phases[0]['started_us'] == 1000000
-        assert phases[0]['completed_us'] == 1005000
-        assert phases[0]['duration_us'] == 5000
+        assert phases[0]['duration_ms'] == 5.0
+        assert phases[0]['outcome'] == 'success'
 
     def test_model_update_from_buffer(self, qapp):
         """Test updating model after buffer changes."""
@@ -256,11 +259,12 @@ class TestPhaseTimingDataModel:
         assert model.rowCount() == 0
 
         buffer.append(PhaseEvent('phase1', 'started', 1000, {}))
-        buffer.append(PhaseEvent('phase1', 'completed', 5000, {}))
+        buffer.append(PhaseEvent('phase1', 'completed', 5000,
+                                  {'duration_ms': 4.0, 'outcome': 'success'}))
         model.update_from_buffer()
 
         assert model.rowCount() == 1
-        assert model.get_phase_data()[0]['duration_us'] == 4000
+        assert model.get_phase_data()[0]['duration_ms'] == 4.0
 
     def test_model_add_event(self, qapp):
         """Test adding events directly to model."""
@@ -268,10 +272,11 @@ class TestPhaseTimingDataModel:
         model = PhaseTimingDataModel(buffer)
 
         model.add_event(PhaseEvent('phase1', 'started', 1000, {}))
-        model.add_event(PhaseEvent('phase1', 'completed', 5000, {}))
+        model.add_event(PhaseEvent('phase1', 'completed', 5000,
+                                    {'duration_ms': 4.0, 'outcome': 'success'}))
 
         assert model.rowCount() == 1
-        assert model.get_phase_data()[0]['duration_us'] == 4000
+        assert model.get_phase_data()[0]['duration_ms'] == 4.0
 
     def test_model_clear(self, qapp):
         """Test clearing the model."""
@@ -279,7 +284,8 @@ class TestPhaseTimingDataModel:
         model = PhaseTimingDataModel(buffer)
 
         model.add_event(PhaseEvent('phase1', 'started', 1000, {}))
-        model.add_event(PhaseEvent('phase1', 'completed', 5000, {}))
+        model.add_event(PhaseEvent('phase1', 'completed', 5000,
+                                    {'duration_ms': 4.0, 'outcome': 'success'}))
         assert model.rowCount() == 1
 
         model.clear()
@@ -287,29 +293,27 @@ class TestPhaseTimingDataModel:
         assert len(buffer) == 0
 
     def test_model_zero_duration_phase(self, qapp):
-        """Test handling of phases with zero or negative duration."""
+        """Test handling of phases with zero duration (backend reports 0ms)."""
         buffer = PhaseEventBuffer()
-        # Same start and complete timestamp
         buffer.append(PhaseEvent('phase1', 'started', 1000, {}))
-        buffer.append(PhaseEvent('phase1', 'completed', 1000, {}))
+        buffer.append(PhaseEvent('phase1', 'completed', 1000,
+                                  {'duration_ms': 0.0, 'outcome': 'success'}))
 
         model = PhaseTimingDataModel(buffer)
         assert model.rowCount() == 1
-        assert model.get_phase_data()[0]['duration_us'] == 0
+        assert model.get_phase_data()[0]['duration_ms'] == 0.0
 
     def test_model_header_data(self, qapp):
         """Test model returns correct header data."""
         buffer = PhaseEventBuffer()
         model = PhaseTimingDataModel(buffer)
 
-        # Check column headers
         headers = []
-        for col in range(4):
-            index = model.index(-1, col)
+        for col in range(3):
             header = model.headerData(col, 2, 3)  # Qt.Horizontal, Qt.DisplayRole
             headers.append(str(header))
 
-        assert len(headers) == 4
+        assert len(headers) == 3
 
     def test_model_integration_with_buffer_overflow(self, qapp):
         """Test model correctly recomputes after buffer overflow."""

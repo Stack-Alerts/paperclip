@@ -400,6 +400,8 @@ PHASE_TIMING = {
     'table_header_height': 35,  # QTableView header height in pixels
     'fallback_timeout_ms': 5000,  # ms without phase events before reverting to aggregate view
     'min_events_to_activate': 3,  # min phase events buffered before switching to per-phase view
+    'chart_height': 220,  # PerPhaseTimingChart widget minimum height in pixels
+    'label_width': 120,  # Phase name label column width in pixels
 }
 
 # Phase timing table column configuration
