@@ -75,6 +75,7 @@ def upgrade() -> None:
             bug_identifier TEXT        NOT NULL,
             source         TEXT        NOT NULL DEFAULT 'unknown',
             closed_at      TIMESTAMPTZ,
+            updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
             PRIMARY KEY (id)
         );
     """))

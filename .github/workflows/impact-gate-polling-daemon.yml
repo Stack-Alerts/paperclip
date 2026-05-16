@@ -1,0 +1,122 @@
+name: Impact Gate Polling Daemon
+
+on:
+  schedule:
+    # Every 5 minutes — run full Impact Gate on done fix issues
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      poll_interval:
+        description: 'Seconds between poll cycles (default: 300 = 5 min)'
+        required: false
+        default: '300'
+      lookback_minutes:
+        description: 'Minutes back to look for recently done issues (default: 10)'
+        required: false
+        default: '10'
+      dry_run:
+        description: 'Dry run (log results only — no comments or transitions)'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: impact-gate-polling-daemon
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    name: Poll for done fix issues and run Impact Gate
+    runs-on: self-hosted
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_BOARD_API_KEY: ${{ secrets.PAPERCLIP_BOARD_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+      PYTHONPATH: src
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        run: python3 --version
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install requests python-dotenv SQLAlchemy psycopg2-binary
+
+      - name: Install system dependencies (Qt headless for impact gate tests)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-xkb1 \
+            xvfb libgl1 libglib2.0-0 || true
+
+      - name: Ensure data directory exists
+        run: mkdir -p data
+
+      - name: Run Impact Gate polling daemon
+        id: poll
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          FLAGS="--initial-scan"
+
+          # Use provided inputs or defaults
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+              FLAGS="$FLAGS --dry-run"
+            fi
+            if [ -n "${{ github.event.inputs.poll_interval }}" ]; then
+              FLAGS="$FLAGS --poll-interval ${{ github.event.inputs.poll_interval }}"
+            fi
+            if [ -n "${{ github.event.inputs.lookback_minutes }}" ]; then
+              FLAGS="$FLAGS --lookback-minutes ${{ github.event.inputs.lookback_minutes }}"
+            fi
+          else
+            # Default for scheduled runs: standard 5-min poll
+            FLAGS="$FLAGS --poll-interval 300 --lookback-minutes 10"
+          fi
+
+          python scripts/impact_gate_polling_daemon.py $FLAGS > /tmp/poll-output.json
+          echo "poll_exit_code=$?" >> "$GITHUB_OUTPUT"
+          cat /tmp/poll-output.json
+
+      - name: Upload poll output artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: impact-gate-poll-output
+          path: /tmp/poll-output.json
+          retention-days: 30
+
+      - name: Write step summary
+        if: always()
+        run: |
+          if [ -f /tmp/poll-output.json ]; then
+            python3 >> $GITHUB_STEP_SUMMARY << 'PYEOF'
+          import json
+          with open('/tmp/poll-output.json') as f:
+              data = json.load(f)
+          print(f'## Impact Gate Polling Daemon')
+          print(f'')
+          print(f'| Metric | Value |')
+          print(f'|---|---|')
+          print(f'| Timestamp | {data.get("timestamp", "?")} |')
+          print(f'| Issues Found | {data.get("issues_found", 0)} |')
+          print(f'| Gated | {data.get("gated", 0)} |')
+          print(f'| Skipped | {data.get("skipped", 0)} |')
+          print(f'| Errors | {data.get("errors", 0)} |')
+          if data.get('errors', 0) > 0:
+              print(f'')
+              print(f'### Errors')
+              for r in data.get('results', []):
+                  if r.get('action') == 'error':
+                      print(f'- {r.get("issue")}: {r.get("error")}')
+          PYEOF
+          fi

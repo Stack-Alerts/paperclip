@@ -1,0 +1,29 @@
+[Unit]
+Description=Impact Gate Polling Daemon — 5-min Impact Gate coverage verification
+Documentation=file://%h/.paperclip/impact_gate/daemon.log
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/projects/BTC-Trade-Engine-PaperClip
+ExecStart=%h/.venv/bin/python scripts/impact_gate_polling_daemon.py \
+    --poll-interval 300 \
+    --lookback-minutes 10
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=impact-gate-daemon
+User=%u
+Environment="PYTHONUNBUFFERED=1"
+Environment="PAPERCLIP_API_URL=${PAPERCLIP_API_URL}"
+Environment="PAPERCLIP_API_KEY=${PAPERCLIP_API_KEY}"
+Environment="PAPERCLIP_BOARD_API_KEY=${PAPERCLIP_BOARD_API_KEY}"
+Environment="PAPERCLIP_COMPANY_ID=${PAPERCLIP_COMPANY_ID}"
+
+# Timeouts and watchdog
+StartLimitInterval=600
+StartLimitBurst=3
+
+[Install]
+WantedBy=default.target
