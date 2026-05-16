@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ValidationPanel } from '@/components/ValidationPanel';
-import { Providers } from '@/components/Providers';
+import { ValidationPanel } from '@/components/strategy-builder/ValidationPanel';
+import { Providers } from '@/components/strategy-builder/Providers';
 import { ValidationLevel } from '@/lib/strategy-builder/types';
 
 jest.mock('@/hooks/useStrategyStore', () => ({

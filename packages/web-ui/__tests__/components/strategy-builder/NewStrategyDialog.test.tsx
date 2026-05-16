@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { NewStrategyDialog } from '@/components/NewStrategyDialog';
-import { Providers } from '@/components/Providers';
+import { NewStrategyDialog } from '@/components/strategy-builder/NewStrategyDialog';
+import { Providers } from '@/components/strategy-builder/Providers';
 
 jest.mock('@/hooks/useStrategyStore', () => ({
   useStrategyStore: jest.fn(),

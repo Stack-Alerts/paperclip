@@ -113,6 +113,7 @@ export function B1DecisionCycleMonitor({ wsBaseUrl }: Props) {
                       {PHASE_LABELS[p]}
                     </span>
                   </Tooltip>
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   <ProgressBar value={pct} color={TREMOR_COLOR[p] as any} className="flex-1" />
                   <span className="text-xs font-mono text-zinc-300 w-12 text-right">{ms} ms</span>
                 </div>

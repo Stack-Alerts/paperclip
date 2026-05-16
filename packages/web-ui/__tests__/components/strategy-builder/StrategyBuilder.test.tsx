@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { StrategyBuilder } from '@/components/StrategyBuilder';
-import { Providers } from '@/components/Providers';
+import { StrategyBuilder } from '@/components/strategy-builder/StrategyBuilder';
+import { Providers } from '@/components/strategy-builder/Providers';
 
 jest.mock('@/hooks/useStrategyStore', () => ({
   useStrategyStore: jest.fn(),

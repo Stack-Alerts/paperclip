@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { StrategyBuilderPageWrapper } from '@/components/StrategyBuilderPage';
-import { Providers } from '@/components/Providers';
+import { StrategyBuilderPageWrapper } from '@/components/strategy-builder/StrategyBuilderPage';
+import { Providers } from '@/components/strategy-builder/Providers';
 
 jest.mock('next/navigation', () => ({
   useSearchParams: jest.fn().mockReturnValue({ get: () => null }),

@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { StepperRibbon } from '@/components/StepperRibbon';
-import { Providers } from '@/components/Providers';
+import { StepperRibbon } from '@/components/strategy-builder/StepperRibbon';
+import { Providers } from '@/components/strategy-builder/Providers';
 
 function renderRibbon(props = {}) {
   const defaults = { currentStep: 0, onStepClick: jest.fn() };

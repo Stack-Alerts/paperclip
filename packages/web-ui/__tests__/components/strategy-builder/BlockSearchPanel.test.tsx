@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { BlockSearchPanel } from '@/components/BlockSearchPanel';
-import { Providers } from '@/components/Providers';
+import { BlockSearchPanel } from '@/components/strategy-builder/BlockSearchPanel';
+import { Providers } from '@/components/strategy-builder/Providers';
 import { BlockType } from '@/lib/strategy-builder/types';
 
 jest.mock('@/hooks/useStrategyStore', () => ({

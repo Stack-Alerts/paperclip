@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BacktestConfigDialog } from '@/components/BacktestConfigDialog';
-import { Providers } from '@/components/Providers';
+import { BacktestConfigDialog } from '@/components/strategy-builder/BacktestConfigDialog';
+import { Providers } from '@/components/strategy-builder/Providers';
 import { StrategyStatus } from '@/lib/strategy-builder/types';
 
 jest.mock('@/hooks/useStrategyStore', () => ({
