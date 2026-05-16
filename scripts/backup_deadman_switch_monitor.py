@@ -36,7 +36,9 @@ from touch_index.paperclip_client import _session, _base, _company
 
 MONITOR_LOG = Path.home() / ".paperclip" / "backup_deadman_switch_monitor.log"
 MONITOR_STATE = Path.home() / ".paperclip" / "backup_deadman_switch_monitor_state.json"
-PRIMARY_MONITOR_STATE = Path.home() / ".paperclip" / "deadman_switch_monitor_state.json"
+# Local watchdog state (deadman_switch_local_monitor.py, runs every 15 min via systemd).
+# Used as gh-CLI fallback when GitHub API is unreachable.
+PRIMARY_MONITOR_STATE = Path.home() / ".paperclip" / "deadman_switch_local_monitor_state.json"
 MAX_LOG_BYTES = 1 * 1024 * 1024
 
 TARGET_WORKFLOW = "deadman-switch-monitor.yml"
