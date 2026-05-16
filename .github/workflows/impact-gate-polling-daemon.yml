@@ -47,11 +47,11 @@ jobs:
 
       - name: Install system dependencies (Qt headless for impact gate tests)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          sudo -n apt-get update 2>/dev/null || true
+          sudo -n apt-get install -y --no-install-recommends \
             libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-xkb1 \
-            xvfb libgl1 libglib2.0-0 || true
+            xvfb libgl1 libglib2.0-0 2>/dev/null || true
 
       - name: Ensure data directory exists
         run: mkdir -p data
