@@ -392,6 +392,38 @@ CHECKBOX_STYLES = {
     'error': f"QCheckBox {{ color: {COLORS['error']}; background: transparent; }}",
 }
 
+# Phase timing and event buffering constants
+PHASE_TIMING = {
+    'event_buffer_capacity': 20,  # Ring buffer capacity for phase events
+    'microsecond_precision': True,  # Compute durations in microseconds
+    'table_row_height': 30,  # QTableView row height in pixels
+    'table_header_height': 35,  # QTableView header height in pixels
+    'fallback_timeout_ms': 5000,  # ms without phase events before reverting to aggregate view
+    'min_events_to_activate': 3,  # min phase events buffered before switching to per-phase view
+}
+
+# Phase timing table column configuration
+PHASE_TIMING_TABLE_COLUMNS = [
+    {'name': 'Phase', 'width': 160},
+    {'name': 'Duration (ms)', 'width': 130},
+    {'name': 'Outcome', 'width': 110},
+]
+
+# Per-phase color coding for 11 ITM phases (dark-theme readable)
+PHASE_COLORS: dict[str, str] = {
+    'signal_received':        '#4ECDC4',
+    'signal_aggregation':     '#45B7D1',
+    'strategy_validation':    '#96CEB4',
+    'capital_check':          '#88D8B0',
+    'risk_gate':              '#FFEAA7',
+    'decision_creation':      '#DDA0DD',
+    'order_creation':         '#FFB347',
+    'exchange_submission':    '#FF6B6B',
+    'order_state_machine':    '#C7CEEA',
+    'bracket_manager':        '#B5EAD7',
+    'performance_monitoring': '#FF9FF3',
+}
+
 # Tab widget styling (stepper-like appearance)
 TAB_WIDGET_STYLESHEET = f"""
     QTabWidget::pane {{

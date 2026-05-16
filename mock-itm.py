@@ -157,12 +157,59 @@ def _build_alert() -> dict:
     }
 
 
+_ITM_PHASES = (
+    "signal_received",
+    "signal_aggregation",
+    "strategy_validation",
+    "capital_check",
+    "risk_gate",
+    "decision_creation",
+    "order_creation",
+    "exchange_submission",
+    "order_state_machine",
+    "bracket_manager",
+    "performance_monitoring",
+)
+
+_OUTCOMES = ("success", "success", "success", "success", "success",
+             "success", "success", "success", "success", "skipped", "success")
+
+
 def _build_cycle_event() -> dict:
     return {
         "cycle_id": str(uuid.uuid4()),
         "bar_close_utc": _now(),
         "checkpoint_seq": int(time.monotonic() * 1000) % 1_000_000,
     }
+
+
+def _build_phase_events(cycle_id: str) -> list[dict]:
+    """Return synthetic PhaseStarted + PhaseCompleted events for all 11 phases."""
+    import random
+    events = []
+    for idx, (phase, outcome) in enumerate(zip(_ITM_PHASES, _OUTCOMES)):
+        events.append({
+            "event_type": "PhaseStarted",
+            "event_id": str(uuid.uuid4()),
+            "occurred_at": _now(),
+            "phase_name": phase,
+            "phase_index": idx,
+            "cycle_id": cycle_id,
+            "strategy_id": "mock-strategy-001",
+        })
+        duration_ms = round(random.uniform(0.05, 5.0), 3)
+        events.append({
+            "event_type": "PhaseCompleted",
+            "event_id": str(uuid.uuid4()),
+            "occurred_at": _now(),
+            "phase_name": phase,
+            "phase_index": idx,
+            "cycle_id": cycle_id,
+            "strategy_id": "mock-strategy-001",
+            "duration_ms": duration_ms,
+            "outcome": outcome,
+        })
+    return events
 
 
 def main() -> None:
@@ -216,8 +263,12 @@ def main() -> None:
             r.publish("itm:alerts", json.dumps(alert))
             r.publish("itm:strategies", json.dumps(list(snap["strategies"].values())))
 
+            # P2: publish 11-phase PhaseStarted/PhaseCompleted events on itm:cycle
+            for phase_ev in _build_phase_events(cycle_ev["cycle_id"]):
+                r.publish("itm:cycle", json.dumps(phase_ev))
+
             cycle += 1
-            print(f"[mock-itm] cycle={cycle} seq={snap['checkpoint_seq']}", flush=True)
+            print(f"[mock-itm] cycle={cycle} seq={snap['checkpoint_seq']} phases=22", flush=True)
             time.sleep(args.interval)
 
         except KeyboardInterrupt:
