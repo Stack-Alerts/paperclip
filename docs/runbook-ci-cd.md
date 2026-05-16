@@ -13,7 +13,7 @@ The system runs **17 GitHub Actions workflows** organized into three tiers:
 | Tier | Trigger | Workflows |
 |------|---------|-----------|
 | **Gate** | Every PR/push to main | `lint.yml`, `test.yml`, `lock-gate.yml`, `freeze-lift-evidence.yml` |
-| **Worker** | Scheduled + webhook | `blast-radius-worker.yml`, `touch-index-bug-worker.yml`, `touch-index-fr-worker.yml`, `impact-gate-worker.yml`, `impact-gate-scan-done.yml` |
+| **Worker** | Scheduled + webhook | `blast-radius-worker.yml`, `touch-index-bug-worker.yml`, `touch-index-fr-worker.yml`, `impact-gate-worker.yml`, `impact-gate-polling-daemon.yml`, `impact-gate-scan-done.yml` |
 | **Infrastructure** | Scheduled | `dep-graph-refresh.yml`, `lock-gate-nightly-alert.yml`, `backfill-close-stale-runs.yml`, `opencode-watchdog.yml`, `apply-branch-protection.yml`, `lock-exception-signoff.yml` |
 
 ---
@@ -89,13 +89,35 @@ The system runs **17 GitHub Actions workflows** organized into three tiers:
 - **Scripts:** `scripts/impact_gate_worker.py` / `scripts/run_impact_gate_worker.py`
 - **Dependencies:** Qt headless system packages for UI smoke tests
 
-### 3.5 Impact Gate Scan-Done (`impact-gate-scan-done.yml`)
+### 3.5 Impact Gate Polling Daemon (`impact-gate-polling-daemon.yml`)
 
 - **Schedule:** Every 5 minutes
-- **Purpose:** Retroactively gate recently-done fix/bug issues
+- **Trigger:** Scheduled `cron: '*/5 * * * *'` or manual `workflow_dispatch`
+- **Purpose:** Full Impact Gate verification on done fix/bug issues — ensures 100% regression test coverage
+- **Script:** `scripts/impact_gate_polling_daemon.py`
+- **Flow:**
+  - Scans for fix/bug issues transitioned to `done` status (lookback window: 10 min)
+  - Checks if each issue already has an Impact Gate result comment
+  - Runs FULL Impact Gate (FR acceptance + regression tests) on ungated issues
+  - Posts detailed result comments and transitions issues based on outcomes
+  - On PASS: issue stays in `done`, moves to production
+  - On FAIL: reverts issue to `in_progress`, creates blocking sub-issues
+- **Inputs:** `--lookback-minutes` (default 10), `--dry-run`, `--initial-scan`
+- **Output:** JSON summary to stdout + GitHub Actions artifacts
+- **Reference:** [Impact Gate Polling Daemon Guide](IMPACT_GATE_POLLING_DAEMON.md)
+
+### 3.6 Impact Gate Scan-Done (`impact-gate-scan-done.yml`)
+
+- **Schedule:** Every 5 minutes
+- **Purpose:** Verify Impact Gate coverage on done fix/bug issues (diagnostic/reporting)
 - **Script:** `scripts/scan_fix_issues_done.py`
-- **Output:** Writes `data_quality_impact_gate_{date}.json` snapshot
-- **Alerting:** Creates alert Paperclip issue for ungated issues via `scripts/scan_done_alert.py`
+- **Outputs:**
+  - `data_quality_impact_gate_{date}.json` — daily data quality snapshot
+  - Alert Paperclip issue (if ungated issues found)
+- **Modes:**
+  - Scheduled (7-day lookback) with hourly error retry on boundaries
+  - Manual (customizable window, retroactive gating, muted state management)
+- **Alerting:** `scripts/scan_done_alert.py` creates alert for ungated coverage gaps
 
 ---
 
