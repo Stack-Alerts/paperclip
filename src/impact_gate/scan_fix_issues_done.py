@@ -51,6 +51,9 @@ _STATE_PATH = Path(
     )
 )
 
+# Exported for lazy import by worker.py (to avoid circular dependency)
+_MUTED_STATE_PATH = _STATE_PATH
+
 
 def _load_muted_results() -> dict[str, str]:
     """Load persisted muted gate results.
@@ -69,6 +72,10 @@ def _load_muted_results() -> dict[str, str]:
     return {}
 
 
+# Alias for worker.py lazy import compatibility
+_load_muted_state = _load_muted_results
+
+
 def _save_muted_results(results: dict[str, str]) -> None:
     """Persist muted gate results."""
     _STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -81,6 +88,28 @@ def save_muted_gate_result(issue_id: str, status: str) -> None:
     results[issue_id] = status
     _save_muted_results(results)
     log.debug("Saved muted gate result for %s: %s", issue_id, status)
+
+
+def purge_muted_entries(status: str | None = None) -> int:
+    """Purge muted cache entries.
+
+    If status is provided, removes all entries with that status.
+    If status is None, clears the entire cache.
+
+    Returns the number of entries removed.
+    """
+    results = _load_muted_results()
+    before_count = len(results)
+
+    if status is None:
+        results.clear()
+    else:
+        results = {k: v for k, v in results.items() if v != status}
+
+    _save_muted_results(results)
+    removed = before_count - len(results)
+    log.debug("Purged %d muted entries (status=%s)", removed, status)
+    return removed
 
 
 def _is_fix_issue(issue: dict) -> bool:
