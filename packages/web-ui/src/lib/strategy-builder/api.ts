@@ -1,5 +1,5 @@
 // Typed fetch wrapper for REST endpoints
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8765';
 
 export interface RequestOptions extends RequestInit {
   query?: Record<string, string | number>;
@@ -157,4 +157,17 @@ export async function getBacktestResults(id: string, runId: string) {
 
 export async function deployStrategy(id: string) {
   return post(`/strategies/${id}/deploy`, {});
+}
+
+// P2: Strategy control endpoints
+export async function enableStrategy(id: string) {
+  return post(`/strategies/${id}/enable`, {});
+}
+
+export async function disableStrategy(id: string) {
+  return post(`/strategies/${id}/disable`, {});
+}
+
+export async function emergencyHalt(): Promise<{ halted: number; strategy_ids: string[] }> {
+  return post('/halt', {}) as Promise<{ halted: number; strategy_ids: string[] }>;
 }

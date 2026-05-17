@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { Strategy, StrategyStatus } from '@/lib/strategy-builder/types';
 import { InfoTooltip } from './InfoTooltip';
+import { enableStrategy, disableStrategy } from '@/lib/strategy-builder/api';
 
 const STATUS_COLORS: Record<StrategyStatus, string> = {
   draft: 'text-gray-400',
@@ -24,6 +25,41 @@ export function StrategyBrowserDialog({ open, onSelect, onClose }: StrategyBrows
   const [searchText, setSearchText] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'updated' | 'status'>('updated');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [controlling, setControlling] = useState(false);
+  const [controlMsg, setControlMsg] = useState<string | null>(null);
+
+  const selectedStrategy = useMemo(
+    () => strategyList.find((s) => s.id === selectedId) ?? null,
+    [strategyList, selectedId],
+  );
+
+  const handleEnable = useCallback(async () => {
+    if (!selectedId) return;
+    setControlling(true);
+    setControlMsg(null);
+    try {
+      await enableStrategy(selectedId);
+      setControlMsg('Strategy enabled');
+    } catch {
+      setControlMsg('Enable failed');
+    } finally {
+      setControlling(false);
+    }
+  }, [selectedId]);
+
+  const handleDisable = useCallback(async () => {
+    if (!selectedId) return;
+    setControlling(true);
+    setControlMsg(null);
+    try {
+      await disableStrategy(selectedId);
+      setControlMsg('Strategy disabled');
+    } catch {
+      setControlMsg('Disable failed');
+    } finally {
+      setControlling(false);
+    }
+  }, [selectedId]);
 
   const filtered = useMemo(() => {
     let result = [...strategyList];
@@ -148,24 +184,53 @@ export function StrategyBrowserDialog({ open, onSelect, onClose }: StrategyBrows
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-zinc-800 flex-shrink-0">
-          <InfoTooltip id="strategy-browser-cancel-btn">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium transition-colors"
-            >
-              Cancel
-            </button>
-          </InfoTooltip>
-          <InfoTooltip id="strategy-browser-select-btn">
-            <button
-              onClick={handleSelect}
-              disabled={!selectedId}
-              className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium disabled:opacity-50 transition-colors"
-            >
-              Load Strategy
-            </button>
-          </InfoTooltip>
+        <div className="flex items-center justify-between gap-2 px-6 py-4 border-t border-zinc-800 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            {selectedStrategy?.status === StrategyStatus.ACTIVE ? (
+              <InfoTooltip id="strategy-browser-disable-btn">
+                <button
+                  onClick={handleDisable}
+                  disabled={controlling}
+                  className="px-4 py-2 rounded bg-amber-700 hover:bg-amber-600 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+                >
+                  {controlling ? 'Working…' : 'Disable Strategy'}
+                </button>
+              </InfoTooltip>
+            ) : selectedStrategy && [StrategyStatus.VALID, StrategyStatus.BACKTESTED].includes(selectedStrategy.status) ? (
+              <InfoTooltip id="strategy-browser-enable-btn">
+                <button
+                  onClick={handleEnable}
+                  disabled={controlling}
+                  className="px-4 py-2 rounded bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+                >
+                  {controlling ? 'Working…' : 'Enable Strategy'}
+                </button>
+              </InfoTooltip>
+            ) : null}
+            {controlMsg && (
+              <span className="text-xs text-zinc-400">{controlMsg}</span>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <InfoTooltip id="strategy-browser-cancel-btn">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+            </InfoTooltip>
+            <InfoTooltip id="strategy-browser-select-btn">
+              <button
+                onClick={handleSelect}
+                disabled={!selectedId}
+                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+              >
+                Load Strategy
+              </button>
+            </InfoTooltip>
+          </div>
         </div>
       </div>
     </div>
