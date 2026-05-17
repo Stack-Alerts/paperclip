@@ -19,13 +19,20 @@ export const AdminPinDialog: React.FC<AdminPinDialogProps> = ({
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [error, setError] = useState('');
+  const [prevOpen, setPrevOpen] = useState(open);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  if (prevOpen !== open && open) {
+    setPrevOpen(open);
+    setPin('');
+    setConfirmPin('');
+    setError('');
+  } else if (prevOpen !== open) {
+    setPrevOpen(open);
+  }
 
   useEffect(() => {
     if (open) {
-      setPin('');
-      setConfirmPin('');
-      setError('');
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);

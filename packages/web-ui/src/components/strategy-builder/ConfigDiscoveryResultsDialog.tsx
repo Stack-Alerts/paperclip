@@ -47,6 +47,30 @@ const BADGE_ICONS: Record<string, string> = {
 
 type SortKey = keyof DiscoveryScenario;
 
+function ColHeader({
+  label,
+  sortK,
+  sortKey,
+  sortAsc,
+  onSort,
+}: {
+  label: string;
+  sortK: SortKey;
+  sortKey: SortKey;
+  sortAsc: boolean;
+  onSort: (k: SortKey) => void;
+}) {
+  return (
+    <th
+      onClick={() => onSort(sortK)}
+      className="px-3 py-2 text-left text-xs font-semibold text-zinc-400 cursor-pointer select-none hover:text-zinc-200 whitespace-nowrap"
+    >
+      {label}
+      {sortKey === sortK ? (sortAsc ? ' ▲' : ' ▼') : ''}
+    </th>
+  );
+}
+
 export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialogProps> = ({
   open,
   results,
@@ -87,16 +111,6 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
 
   if (!open) return null;
 
-  const ColHeader = ({ label, sortK }: { label: string; sortK: SortKey }) => (
-    <th
-      onClick={() => handleSort(sortK)}
-      className="px-3 py-2 text-left text-xs font-semibold text-zinc-400 cursor-pointer select-none hover:text-zinc-200 whitespace-nowrap"
-    >
-      {label}
-      {sortKey === sortK ? (sortAsc ? ' ▲' : ' ▼') : ''}
-    </th>
-  );
-
   const selected = selectedIdx !== null ? filtered[selectedIdx] : null;
 
   return (
@@ -135,20 +149,20 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
           <table className="w-full text-sm border-collapse">
             <thead className="bg-zinc-800 sticky top-0 z-10">
               <tr>
-                <ColHeader label="Rank" sortK="rank" />
+                <ColHeader label="Rank" sortK="rank" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
                 <th className="px-3 py-2 text-left text-xs font-semibold text-zinc-400">Badge</th>
-                <ColHeader label="Scenario" sortK="scenario" />
-                <ColHeader label="Trades" sortK="trades" />
-                <ColHeader label="Win%" sortK="winRate" />
-                <ColHeader label="Total PnL" sortK="totalPnl" />
-                <ColHeader label="Avg PnL" sortK="avgPnl" />
-                <ColHeader label="Sharpe" sortK="sharpe" />
-                <ColHeader label="TP1" sortK="tp1" />
-                <ColHeader label="TP2" sortK="tp2" />
-                <ColHeader label="TP3" sortK="tp3" />
-                <ColHeader label="SL" sortK="sl" />
-                <ColHeader label="MaxDD" sortK="maxDd" />
-                <ColHeader label="Type" sortK="type" />
+                <ColHeader label="Scenario" sortK="scenario" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                <ColHeader label="Trades" sortK="trades" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                <ColHeader label="Win%" sortK="winRate" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                <ColHeader label="Total PnL" sortK="totalPnl" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                <ColHeader label="Avg PnL" sortK="avgPnl" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                <ColHeader label="Sharpe" sortK="sharpe" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                <ColHeader label="TP1" sortK="tp1" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                <ColHeader label="TP2" sortK="tp2" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                <ColHeader label="TP3" sortK="tp3" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                <ColHeader label="SL" sortK="sl" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                <ColHeader label="MaxDD" sortK="maxDd" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                <ColHeader label="Type" sortK="type" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">

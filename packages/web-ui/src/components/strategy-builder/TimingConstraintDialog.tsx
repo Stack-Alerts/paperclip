@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 
 export interface TimingConstraint {
   enabled: boolean;
@@ -30,18 +30,22 @@ export const TimingConstraintDialog: React.FC<TimingConstraintDialogProps> = ({
   const [enabled, setEnabled] = useState(false);
   const [candleCount, setCandleCount] = useState(3);
   const [referenceId, setReferenceId] = useState('');
+  const [prevOpen, setPrevOpen] = useState(open);
 
-  useEffect(() => {
-    if (open && currentConstraint) {
+  if (prevOpen !== open && open) {
+    setPrevOpen(open);
+    if (currentConstraint) {
       setEnabled(currentConstraint.enabled);
       setCandleCount(currentConstraint.candleCount);
       setReferenceId(currentConstraint.referenceId);
-    } else if (open) {
+    } else {
       setEnabled(false);
       setCandleCount(3);
       setReferenceId(availableReferences[0]?.referenceId ?? '');
     }
-  }, [open, currentConstraint, availableReferences]);
+  } else if (prevOpen !== open) {
+    setPrevOpen(open);
+  }
 
   const handleSave = useCallback(() => {
     onSave({ enabled, candleCount, referenceId });

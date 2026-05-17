@@ -11,7 +11,6 @@ import {
   Settings,
   Layers,
   Menu,
-  X,
   ChevronLeft,
 } from 'lucide-react';
 

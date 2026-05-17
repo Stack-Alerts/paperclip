@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { X, Eye, EyeOff, Shield, ShieldAlert } from 'lucide-react';
 import { AdminPinDialog } from './AdminPinDialog';
 
@@ -27,15 +27,22 @@ const PROVIDER_MODELS: Record<string, string[]> = {
   ollama: ['llama3', 'mistral', 'codellama'],
 };
 
+function maskStored(storageKey: string): string {
+  if (typeof window === 'undefined') return '';
+  const stored = localStorage.getItem(storageKey);
+  return stored ? `${'•'.repeat(Math.min(stored.length, 20))}` : '';
+}
+
 function SecretField({ label, storageKey }: { label: string; storageKey: string }) {
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(() => maskStored(storageKey));
+  const [prevStorageKey, setPrevStorageKey] = useState(storageKey);
   const [showing, setShowing] = useState(false);
   const [editing, setEditing] = useState(false);
 
-  useEffect(() => {
-    const stored = localStorage.getItem(storageKey);
-    setValue(stored ? `${'•'.repeat(Math.min(stored.length, 20))}` : '');
-  }, [storageKey]);
+  if (prevStorageKey !== storageKey) {
+    setPrevStorageKey(storageKey);
+    setValue(maskStored(storageKey));
+  }
 
   const handleSave = useCallback(() => {
     if (value && !value.startsWith('•')) {

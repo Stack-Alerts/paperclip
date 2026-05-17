@@ -32,10 +32,10 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
   result,
 }) => {
   const [startDate, setStartDate] = useState(
-    gapStartDate ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    () => gapStartDate ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   );
   const [endDate, setEndDate] = useState(
-    cutoffDate ?? new Date().toISOString().slice(0, 10)
+    () => cutoffDate ?? new Date().toISOString().slice(0, 10)
   );
 
   const handleUpdate = useCallback(async () => {
