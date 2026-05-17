@@ -521,6 +521,7 @@ def run_monitor(
             results = execute_recovery(scenario, issue, config, recovery_state, dry_run)
             summary["actions_taken"].extend(results)
 
+    recovery_state["last_run_at"] = now.isoformat()
     save_recovery_state(recovery_state)
 
     total_actions = len(summary["actions_taken"])
@@ -555,6 +556,7 @@ def cmd_matches(args: argparse.Namespace) -> None:
         live_runs = fetch_live_runs()
     except Exception as exc:
         logger.error("Failed to fetch data: %s", exc)
+        print(json.dumps([{"error": str(exc)}]))
         sys.exit(1)
 
     scenarios = config.get("recovery_scenarios", [])
