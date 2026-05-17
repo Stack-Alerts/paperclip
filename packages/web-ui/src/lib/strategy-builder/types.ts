@@ -275,3 +275,26 @@ export interface BacktestConfigModalProps {
   onClose: () => void;
   onBacktestStart?: (config: BacktestConfig) => void;
 }
+
+// Service layer type contracts (Phase 2 wiring targets)
+export interface PhaseTimingDataModel {
+  phaseId: string;
+  phaseName: string;
+  startTimestamp: number;
+  endTimestamp: number | null;
+  durationMs: number | null;
+  candleCount: number;
+  signalCount: number;
+  metadata: Record<string, unknown>;
+}
+
+export interface PhaseEventBuffer {
+  phaseId: string;
+  events: Array<{
+    timestamp: number;
+    eventType: string;
+    payload: Record<string, unknown>;
+  }>;
+  maxBufferSize: number;
+  overflowPolicy: 'drop_oldest' | 'drop_newest' | 'error';
+}

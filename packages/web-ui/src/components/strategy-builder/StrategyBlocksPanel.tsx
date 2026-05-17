@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { Block, BlockType } from '@/lib/strategy-builder/types';
 import { InfoTooltip } from './InfoTooltip';
+import { TimingConstraintDialog, TimingConstraint } from './TimingConstraintDialog';
 
 const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   [BlockType.ENTRY_CONDITION]: 'Entry Condition',
@@ -34,6 +35,8 @@ interface BlockItemProps {
   onDelete: (index: number) => void;
   onMoveUp: (index: number) => void;
   onMoveDown: (index: number) => void;
+  onDuplicate: (index: number) => void;
+  onTimingConstraint: (index: number) => void;
 }
 
 function BlockItem({
@@ -45,9 +48,12 @@ function BlockItem({
   onDelete,
   onMoveUp,
   onMoveDown,
+  onDuplicate,
+  onTimingConstraint,
 }: BlockItemProps) {
   const accent = TYPE_ACCENT[block.type] ?? 'border-l-zinc-600';
   const typeLabel = BLOCK_TYPE_LABELS[block.type] ?? block.type;
+  const hasTimingConstraint = !!(block.data?.timingConstraint as TimingConstraint | undefined)?.enabled;
 
   return (
     <div
@@ -65,8 +71,11 @@ function BlockItem({
           <div className="text-sm font-semibold text-zinc-100 truncate">
             {typeLabel}
           </div>
-          <div className="text-xs text-zinc-400 mt-0.5 truncate">
-            ID: {block.id.slice(0, 8)}…
+          <div className="text-xs text-zinc-400 mt-0.5 flex items-center gap-2">
+            <span>ID: {block.id.slice(0, 8)}…</span>
+            {hasTimingConstraint && (
+              <span className="text-blue-400">⏱ timing</span>
+            )}
           </div>
         </div>
 
@@ -92,6 +101,30 @@ function BlockItem({
               ▾
             </button>
           </InfoTooltip>
+          <InfoTooltip id={`duplicate-block-${block.id}`}>
+            <button
+              onClick={() => onDuplicate(index)}
+              className="px-2 py-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 text-xs transition-colors"
+              aria-label="Duplicate block"
+              title="Duplicate"
+            >
+              ⧉
+            </button>
+          </InfoTooltip>
+          <InfoTooltip id={`timing-block-${block.id}`}>
+            <button
+              onClick={() => onTimingConstraint(index)}
+              className={`px-2 py-1 rounded text-xs transition-colors ${
+                hasTimingConstraint
+                  ? 'text-blue-400 hover:bg-blue-900'
+                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700'
+              }`}
+              aria-label="Timing constraint"
+              title="Timing Constraint"
+            >
+              ⏱
+            </button>
+          </InfoTooltip>
           <InfoTooltip id={`delete-block-${block.id}`}>
             <button
               onClick={() => onDelete(index)}
@@ -108,10 +141,12 @@ function BlockItem({
 }
 
 export function StrategyBlocksPanel() {
-  const { currentStrategy, selectedBlockIndex, selectBlock, deleteBlock, reorderBlocks } =
+  const { currentStrategy, selectedBlockIndex, selectBlock, deleteBlock, reorderBlocks, addBlock, updateBlock } =
     useStrategyStore();
 
   const blocks: Block[] = currentStrategy?.blocks ?? [];
+
+  const [timingDialogIndex, setTimingDialogIndex] = useState<number | null>(null);
 
   const handleMoveUp = useCallback(
     (index: number) => {
@@ -126,6 +161,40 @@ export function StrategyBlocksPanel() {
     },
     [blocks.length, reorderBlocks],
   );
+
+  const handleDuplicate = useCallback(
+    (index: number) => {
+      const source = blocks[index];
+      if (!source) return;
+      addBlock(source.type, index + 1);
+      // Copy source data to the newly inserted block
+      updateBlock(index + 1, { ...source.data });
+    },
+    [blocks, addBlock, updateBlock],
+  );
+
+  const handleTimingConstraint = useCallback((index: number) => {
+    setTimingDialogIndex(index);
+  }, []);
+
+  const handleTimingConstraintSave = useCallback(
+    (constraint: TimingConstraint) => {
+      if (timingDialogIndex === null) return;
+      const block = blocks[timingDialogIndex];
+      if (!block) return;
+      updateBlock(timingDialogIndex, { ...block.data, timingConstraint: constraint });
+      setTimingDialogIndex(null);
+    },
+    [timingDialogIndex, blocks, updateBlock],
+  );
+
+  const timingBlock = timingDialogIndex !== null ? blocks[timingDialogIndex] : null;
+  const availableReferences = blocks
+    .filter((_, i) => i !== timingDialogIndex)
+    .map((b) => ({
+      displayName: `#${b.index + 1} ${BLOCK_TYPE_LABELS[b.type] ?? b.type}`,
+      referenceId: b.id,
+    }));
 
   return (
     <div className="flex flex-col h-full bg-zinc-950">
@@ -155,10 +224,25 @@ export function StrategyBlocksPanel() {
               onDelete={deleteBlock}
               onMoveUp={handleMoveUp}
               onMoveDown={handleMoveDown}
+              onDuplicate={handleDuplicate}
+              onTimingConstraint={handleTimingConstraint}
             />
           ))
         )}
       </div>
+
+      {/* Timing Constraint Dialog */}
+      {timingDialogIndex !== null && timingBlock && (
+        <TimingConstraintDialog
+          open={true}
+          blockName={`Block #${timingDialogIndex + 1}`}
+          signalName={BLOCK_TYPE_LABELS[timingBlock.type] ?? timingBlock.type}
+          availableReferences={availableReferences}
+          currentConstraint={(timingBlock.data?.timingConstraint as TimingConstraint | undefined) ?? null}
+          onSave={handleTimingConstraintSave}
+          onCancel={() => setTimingDialogIndex(null)}
+        />
+      )}
     </div>
   );
 }

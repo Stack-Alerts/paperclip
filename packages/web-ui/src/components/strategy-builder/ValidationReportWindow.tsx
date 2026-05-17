@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { ValidationLevel } from '@/lib/strategy-builder/types';
+import { AutoFixConfirmDialog } from './AutoFixConfirmDialog';
 
 const LEVEL_COLORS: Record<ValidationLevel, string> = {
   error: 'text-red-400 bg-red-950',
@@ -16,7 +17,8 @@ export interface ValidationReportWindowProps {
 }
 
 export function ValidationReportWindow({ open, onClose }: ValidationReportWindowProps) {
-  const { validationMessages, isValidating, validateStrategy } = useStrategyStore();
+  const { validationMessages, isValidating, validateStrategy, clearValidation, currentStrategy } = useStrategyStore();
+  const [showAutoFix, setShowAutoFix] = useState(false);
 
   const grouped = useMemo(() => {
     const errors = validationMessages.filter((m) => m.level === ValidationLevel.ERROR);
@@ -27,6 +29,29 @@ export function ValidationReportWindow({ open, onClose }: ValidationReportWindow
 
   const total = validationMessages.length;
   const critical = grouped.errors.length > 0;
+
+  const autoFixableCount = grouped.warnings.length + grouped.errors.length;
+
+  const beforeState = useMemo(() => ({
+    errors: grouped.errors.length,
+    warnings: grouped.warnings.length,
+    infos: grouped.infos.length,
+    blocks: currentStrategy?.blocks.length ?? 0,
+  }), [grouped, currentStrategy]);
+
+  const afterState = useMemo(() => ({
+    errors: 0,
+    warnings: 0,
+    infos: grouped.infos.length,
+    blocks: currentStrategy?.blocks.length ?? 0,
+    action: 'Re-validate after clearing flagged messages',
+  }), [grouped.infos.length, currentStrategy]);
+
+  const handleAutoFixConfirm = useCallback(async () => {
+    setShowAutoFix(false);
+    clearValidation();
+    await validateStrategy().catch(console.error);
+  }, [clearValidation, validateStrategy]);
 
   if (!open) return null;
 
@@ -49,7 +74,7 @@ export function ValidationReportWindow({ open, onClose }: ValidationReportWindow
         </div>
 
         {/* Summary bar */}
-        <div className="px-6 py-3 border-b border-zinc-800 flex gap-4 bg-zinc-800/30 flex-shrink-0">
+        <div className="px-6 py-3 border-b border-zinc-800 flex gap-4 bg-zinc-800/30 flex-shrink-0 flex-wrap items-center">
           <div className="text-xs">
             <span className="text-red-400 font-medium">{grouped.errors.length} error{grouped.errors.length !== 1 ? 's' : ''}</span>
           </div>
@@ -60,6 +85,15 @@ export function ValidationReportWindow({ open, onClose }: ValidationReportWindow
             <span className="text-blue-400">{grouped.infos.length} info</span>
           </div>
           <div className="flex-1" />
+          {autoFixableCount > 0 && (
+            <button
+              onClick={() => setShowAutoFix(true)}
+              disabled={isValidating}
+              className="px-3 py-1 rounded bg-amber-700 hover:bg-amber-600 text-white text-xs font-medium disabled:opacity-50 transition-colors"
+            >
+              🔧 Auto-Fix ({autoFixableCount})
+            </button>
+          )}
           <button
             onClick={() => validateStrategy().catch(console.error)}
             disabled={isValidating}
@@ -137,6 +171,18 @@ export function ValidationReportWindow({ open, onClose }: ValidationReportWindow
           </button>
         </div>
       </div>
+
+      {/* Auto-fix confirmation dialog */}
+      <AutoFixConfirmDialog
+        open={showAutoFix}
+        fixType="Validation Auto-Fix"
+        fixDescription={`Clear ${autoFixableCount} flagged message${autoFixableCount !== 1 ? 's' : ''} and re-run validation to check the current strategy state.`}
+        beforeState={beforeState}
+        afterState={afterState}
+        impactAnalysis="Clears the current validation result set and re-runs full strategy validation. No blocks will be modified. This is safe to run at any time."
+        onConfirm={handleAutoFixConfirm}
+        onCancel={() => setShowAutoFix(false)}
+      />
     </div>
   );
 }

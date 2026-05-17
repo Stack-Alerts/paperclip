@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { Strategy, StrategyStatus } from '@/lib/strategy-builder/types';
 import { InfoTooltip } from './InfoTooltip';
-import { enableStrategy, disableStrategy } from '@/lib/strategy-builder/api';
+import { enableStrategy, disableStrategy, deleteStrategy, createStrategy, listStrategies } from '@/lib/strategy-builder/api';
 
 const STATUS_COLORS: Record<StrategyStatus, string> = {
   draft: 'text-gray-400',
@@ -27,10 +27,23 @@ export function StrategyBrowserDialog({ open, onSelect, onClose }: StrategyBrows
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [controlling, setControlling] = useState(false);
   const [controlMsg, setControlMsg] = useState<string | null>(null);
+  const [localList, setLocalList] = useState<typeof strategyList | null>(null);
+
+  const displayList = localList ?? strategyList;
+
+  const refreshList = useCallback(async () => {
+    try {
+      const updated = await listStrategies();
+      setLocalList(updated as typeof strategyList);
+    } catch {
+      // fall back to store list on error
+      setLocalList(null);
+    }
+  }, []);
 
   const selectedStrategy = useMemo(
-    () => strategyList.find((s) => s.id === selectedId) ?? null,
-    [strategyList, selectedId],
+    () => displayList.find((s) => s.id === selectedId) ?? null,
+    [displayList, selectedId],
   );
 
   const handleEnable = useCallback(async () => {
@@ -61,8 +74,44 @@ export function StrategyBrowserDialog({ open, onSelect, onClose }: StrategyBrows
     }
   }, [selectedId]);
 
+  const handleDelete = useCallback(async () => {
+    if (!selectedId) return;
+    const strategy = displayList.find((s) => s.id === selectedId);
+    if (!strategy) return;
+    if (!confirm(`Delete "${strategy.name}"? This cannot be undone.`)) return;
+    setControlling(true);
+    setControlMsg(null);
+    try {
+      await deleteStrategy(selectedId);
+      setSelectedId(null);
+      setControlMsg('Strategy deleted');
+      await refreshList();
+    } catch {
+      setControlMsg('Delete failed');
+    } finally {
+      setControlling(false);
+    }
+  }, [selectedId, displayList, refreshList]);
+
+  const handleDuplicate = useCallback(async () => {
+    if (!selectedId) return;
+    const strategy = displayList.find((s) => s.id === selectedId);
+    if (!strategy) return;
+    setControlling(true);
+    setControlMsg(null);
+    try {
+      await createStrategy({ name: `${strategy.name} (copy)`, description: strategy.description ?? '' });
+      setControlMsg('Strategy duplicated');
+      await refreshList();
+    } catch {
+      setControlMsg('Duplicate failed');
+    } finally {
+      setControlling(false);
+    }
+  }, [selectedId, displayList, refreshList]);
+
   const filtered = useMemo(() => {
-    let result = [...strategyList];
+    let result = [...displayList];
 
     if (searchText) {
       const q = searchText.toLowerCase();
@@ -77,10 +126,10 @@ export function StrategyBrowserDialog({ open, onSelect, onClose }: StrategyBrows
     else if (sortBy === 'status') result.sort((a, b) => a.status.localeCompare(b.status));
 
     return result;
-  }, [strategyList, searchText, sortBy]);
+  }, [displayList, searchText, sortBy]);
 
   const handleSelect = useCallback(() => {
-    const selected = strategyList.find((s) => s.id === selectedId);
+    const selected = displayList.find((s) => s.id === selectedId);
     if (selected) {
       onSelect(selected);
       onClose();
@@ -207,7 +256,29 @@ export function StrategyBrowserDialog({ open, onSelect, onClose }: StrategyBrows
                 </button>
               </InfoTooltip>
             ) : null}
-            {controlMsg && (
+            {selectedId && (
+            <>
+              <InfoTooltip id="strategy-browser-duplicate-btn">
+                <button
+                  onClick={handleDuplicate}
+                  disabled={controlling}
+                  className="px-3 py-2 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium disabled:opacity-50 transition-colors"
+                >
+                  ⧉ Duplicate
+                </button>
+              </InfoTooltip>
+              <InfoTooltip id="strategy-browser-delete-btn">
+                <button
+                  onClick={handleDelete}
+                  disabled={controlling}
+                  className="px-3 py-2 rounded bg-red-800 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+                >
+                  🗑 Delete
+                </button>
+              </InfoTooltip>
+            </>
+          )}
+          {controlMsg && (
               <span className="text-xs text-zinc-400">{controlMsg}</span>
             )}
           </div>
