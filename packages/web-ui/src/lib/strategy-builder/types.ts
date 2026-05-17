@@ -139,6 +139,42 @@ export interface BacktestConfig {
   timeframe?: string;
 }
 
+export interface AdaptiveSLConfig {
+  enabled: boolean;
+  delayEnabled: boolean;
+  delayBars: number;
+  emergencySlPct: number;
+  volatilityLookback: number;
+  volatilityMultiplier: number;
+  minSlPct: number;
+  maxSlPct: number;
+  useStructureSl: boolean;
+}
+
+export interface BacktestConfigFull extends BacktestConfig {
+  mode: 'historical' | 'live_replay';
+  tpslMode: string;
+  slAdjustmentMode: string;
+  adaptiveSLPreset: string;
+  adaptiveSL: AdaptiveSLConfig;
+  riskPerTradePct: number;
+  minRiskRewardRatio: number;
+  maxBarsHeld: number;
+}
+
+export interface BacktestStatusMessage {
+  message: string;
+  level: 'INFO' | 'SYSTEM' | 'ERROR';
+  timestamp: string;
+}
+
+export interface TpSlAdjustments {
+  TP1: number;
+  TP2: number;
+  TP3: number;
+  SL: number;
+}
+
 // Backtest execution result
 export interface BacktestResult {
   id: string;
@@ -178,6 +214,8 @@ export interface Trade {
   pnl: number;
   pnlPercentage: number;
   bars: number;
+  exitType?: string;
+  status?: 'open' | 'closed';
 }
 
 // UI State for panels and modals

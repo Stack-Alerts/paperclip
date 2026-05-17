@@ -11,6 +11,7 @@ import {
   ValidationMessage,
   ValidationLevel,
   BacktestConfig,
+  BacktestConfigFull,
   BacktestResult,
   StrategySettings,
 } from '@/lib/strategy-builder/types';
@@ -45,7 +46,7 @@ interface StrategyStoreState {
   updateBlock: (index: number, data: BlockData) => void;
   reorderBlocks: (fromIdx: number, toIdx: number) => void;
   validateStrategy: () => Promise<void>;
-  runBacktest: (config: BacktestConfig) => Promise<BacktestResult>;
+  runBacktest: (config: BacktestConfig | BacktestConfigFull) => Promise<BacktestResult>;
   loadBlockLibrary: () => Promise<void>;
   clearValidation: () => void;
   selectBlock: (index: number | null) => void;
@@ -292,7 +293,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   },
 
   // Run backtest
-  runBacktest: async (config: BacktestConfig) => {
+  runBacktest: async (config: BacktestConfig | BacktestConfigFull) => {
     set({ backTestInProgress: true, backTestProgress: 0 });
     try {
       const result = await api.post<BacktestResult>(
