@@ -105,7 +105,6 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     isLoadingStrategy,
     strategyError,
     loadStrategy,
-    createStrategy,
     loadBlockLibrary,
     saveStrategy,
     runBacktest,
@@ -114,15 +113,11 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     backTestInProgress,
   } = useStrategyStore();
 
-  // Data loading on mount / strategyId change
-  const hasLoaded = useRef(false);
+  // Load specific strategy by URL param; block library always loaded on mount.
+  // Default strategy is pre-initialized in the Zustand store so no createStrategy() needed here.
   useEffect(() => {
-    if (hasLoaded.current) return;
-    hasLoaded.current = true;
     if (strategyId) {
       loadStrategy(strategyId).catch(console.error);
-    } else if (!currentStrategy) {
-      createStrategy('New_Strategy', '').catch(console.error);
     }
     loadBlockLibrary().catch(console.error);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

@@ -58,6 +58,19 @@ function makeDefaultStrategy(name: string, description = ''): Strategy {
   } as unknown as Strategy;
 }
 
+// Eagerly initialize the current strategy so the UI never shows "No strategy loaded" on first render.
+// On server (SSR) this returns null; on client it loads the most recent saved strategy or creates a fresh default.
+function initCurrentStrategy(): { current: Strategy | null; list: Strategy[] } {
+  if (typeof window === 'undefined') return { current: null, list: [] };
+  const saved = loadFromStorage();
+  if (saved.length > 0) return { current: saved[saved.length - 1], list: saved };
+  const fresh = makeDefaultStrategy('New_Strategy');
+  saveToStorage([fresh]);
+  return { current: fresh, list: [fresh] };
+}
+
+const { current: _initStrategy, list: _initList } = initCurrentStrategy();
+
 interface StrategyStoreState {
   // Strategy data
   currentStrategy: Strategy | null;
@@ -97,9 +110,9 @@ interface StrategyStoreState {
 }
 
 export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
-  // Initial state — load strategy list from localStorage immediately
-  currentStrategy: null,
-  strategyList: loadFromStorage(),
+  // Initial state — eagerly initialize so UI never flashes "No strategy loaded"
+  currentStrategy: _initStrategy,
+  strategyList: _initList,
   isLoadingStrategy: false,
   strategyError: null,
   blockLibrary: [],
