@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { Block, BlockType } from '@/lib/strategy-builder/types';
 import { TimingConstraintDialog, TimingConstraint } from './TimingConstraintDialog';
@@ -26,6 +26,7 @@ const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
 interface BlockSignal {
   name: string;
   description?: string;
+  logic?: string;
   recheckEnabled?: boolean;
   recheck_config?: { enabled: boolean; bar_delay?: number; mode?: string };
   timing_constraint?: { reference_signal: string; max_candles: number } | null;
@@ -45,6 +46,21 @@ interface BlockCardProps {
   onToggleRecheck: (blockIndex: number, signalIndex: number) => void;
 }
 
+const TEAL_BTN: React.CSSProperties = {
+  background: '#0d7377',
+  color: '#ffffff',
+  border: '1px solid #14a0a5',
+  width: 28,
+  height: 28,
+  borderRadius: 4,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 13,
+  cursor: 'pointer',
+  flexShrink: 0,
+};
+
 function BlockCard({
   block,
   index,
@@ -60,26 +76,27 @@ function BlockCard({
   const signals = (block.data.signals as BlockSignal[] | undefined) ?? [];
   const isExit = block.type === BlockType.EXIT_CONDITION || logic === 'EXIT';
 
-  const badgeClass = isExit
-    ? 'bg-red-900/60 text-red-300 border-red-700'
+  // Desktop-matching badge styles
+  const badgeStyle: React.CSSProperties = isExit
+    ? { background: 'rgba(153,27,27,0.6)', color: '#FCA5A5', border: '1px solid #7F1D1D' }
     : logic === 'OR'
-    ? 'bg-blue-900/60 text-blue-300 border-blue-700'
-    : 'bg-emerald-900/60 text-emerald-300 border-emerald-700';
+    ? { background: '#007a51', color: '#ffffff', border: '1px solid #005a3c' }
+    : { background: '#2a5eb8', color: '#ffffff', border: '1px solid #1a4a9a' };
 
   const badgeLabel = isExit ? 'EXIT' : logic === 'OR' ? 'OPTIONAL' : 'REQUIRED';
 
-  const leftAccent = isExit
-    ? 'border-l-red-600'
-    : logic === 'OR'
-    ? 'border-l-blue-600'
-    : 'border-l-emerald-600';
+  // Left accent color matching badge
+  const leftBorderColor = isExit ? '#DC2626' : logic === 'OR' ? '#3B82F6' : '#2a5eb8';
 
   return (
-    <div className={`rounded border border-[#3C4149] border-l-4 ${leftAccent} mb-3`} style={{ background: '#1E2128' }}>
+    <div
+      className="rounded border border-[#3C4149] mb-3"
+      style={{ background: '#1E2128', borderLeft: `4px solid ${leftBorderColor}` }}
+    >
       {/* Header row */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#3C4149]/60">
-        {/* Block number */}
-        <span className="text-sm font-bold text-blue-400 w-7 flex-shrink-0">
+        {/* Block position number — desktop blue */}
+        <span className="text-sm font-bold w-7 flex-shrink-0" style={{ color: '#2a5eb8' }}>
           #{index + 1}
         </span>
 
@@ -88,8 +105,8 @@ function BlockCard({
           {blockName}
         </span>
 
-        {/* Logic badge */}
-        <span className={`text-xs px-1.5 py-0.5 rounded border font-mono flex-shrink-0 ${badgeClass}`}>
+        {/* Logic badge — desktop colors */}
+        <span className="text-xs px-1.5 py-0.5 rounded font-mono flex-shrink-0" style={badgeStyle}>
           {badgeLabel}
         </span>
 
@@ -118,30 +135,67 @@ function BlockCard({
 
       {/* Signals section */}
       {signals.length > 0 && (
-        <div className="px-3 py-2 space-y-1.5 border-b border-[#3C4149]/60">
+        <div className="px-3 py-2 space-y-2 border-b border-[#3C4149]/60">
           <div className="text-xs font-medium mb-1" style={{ color: '#9AA0A6' }}>Signals:</div>
           {signals.map((sig, si) => {
+            const sigLogic = (sig.logic as string | undefined) ?? logic;
             const hasRecheck = sig.recheckEnabled || sig.recheck_config?.enabled;
             const hasTiming = !!sig.timing_constraint;
+            const logicColor = sigLogic === 'OR' ? '#60A5FA' : '#4ADE80';
+
             return (
-              <div key={si} className="flex items-center gap-2 text-xs">
-                <span className="flex-1 truncate" style={{ color: '#9AA0A6' }} title={sig.name}>
-                  {si + 1}. {formatSignalName(sig.name)}
+              <div key={si} className="flex items-start gap-2 text-xs">
+                {/* Per-signal AND/OR logic label */}
+                <span
+                  className="font-mono font-semibold flex-shrink-0 mt-0.5 select-none"
+                  style={{ color: logicColor, minWidth: 32 }}
+                >
+                  [{sigLogic}]
+                </span>
+
+                {/* Signal name + inline timing */}
+                <div className="flex-1 min-w-0">
+                  <span style={{ color: '#E8EAED' }}>
+                    {si + 1}. {formatSignalName(sig.name)}
+                  </span>
                   {hasTiming && (
-                    <span className="text-amber-400 ml-1">
-                      ⏱ within {sig.timing_constraint?.max_candles} bars
+                    <span className="ml-2" style={{ color: '#FFA500' }}>
+                      ⏱ within {sig.timing_constraint?.max_candles} candles
+                      {sig.timing_constraint?.reference_signal
+                        ? ` of ${sig.timing_constraint.reference_signal}`
+                        : ''}
                     </span>
                   )}
-                </span>
+                </div>
+
+                {/* Recheck area */}
                 {hasRecheck ? (
-                  <span
-                    className="text-emerald-400 text-xs px-1.5 py-0.5 rounded bg-emerald-900/40 border border-emerald-800 cursor-pointer hover:bg-emerald-900/60 transition-colors flex-shrink-0"
-                    title="Recheck configured — click to toggle off"
-                    onClick={() => onToggleRecheck(index, si)}
-                  >
-                    ✓ Recheck
-                  </span>
+                  /* Recheck IS configured — show teal Config / Duplicate / Remove buttons */
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => onToggleRecheck(index, si)}
+                      title="Configure recheck"
+                      style={TEAL_BTN}
+                    >
+                      ⚙
+                    </button>
+                    <button
+                      title="Duplicate signal"
+                      style={TEAL_BTN}
+                      onClick={() => {/* duplicate not yet wired */}}
+                    >
+                      ⎘
+                    </button>
+                    <button
+                      onClick={() => onToggleRecheck(index, si)}
+                      title="Remove recheck"
+                      style={TEAL_BTN}
+                    >
+                      ✕
+                    </button>
+                  </div>
                 ) : (
+                  /* Recheck NOT configured — show enable button */
                   <button
                     onClick={() => onToggleRecheck(index, si)}
                     title="Enable recheck on delayed candles"
@@ -163,16 +217,18 @@ function BlockCard({
         </div>
       )}
 
-      {/* Action row: Config + Remove */}
+      {/* Action row: Config (blocks #2+ only) + Remove */}
       <div className="flex items-center gap-2 px-3 py-2">
-        <button
-          onClick={() => onConfig(index)}
-          title="Configure timing constraint for this block"
-          className="text-xs px-2.5 py-1 rounded border hover:bg-[#3C4149] hover:text-[#E8EAED] transition-colors"
-          style={{ borderColor: '#3C4149', background: '#2A2F3A', color: '#A0AEC0' }}
-        >
-          ⚙ Config
-        </button>
+        {index > 0 && (
+          <button
+            onClick={() => onConfig(index)}
+            title="Configure timing constraint between this block and the previous"
+            className="text-xs px-2.5 py-1 rounded border hover:bg-[#3C4149] hover:text-[#E8EAED] transition-colors"
+            style={{ borderColor: '#3C4149', background: '#2A2F3A', color: '#A0AEC0' }}
+          >
+            ⚙ Config
+          </button>
+        )}
         <button
           onClick={() => onRemove(index)}
           title="Remove this block from strategy"
@@ -341,7 +397,7 @@ export function StrategyBlocksPanel() {
       </div>
 
       {/* Block list (scrollable, main area) */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0" style={{ scrollbarWidth: 'thin', scrollbarColor: '#3C4149 transparent' }}>
         {mainBlockCount === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center gap-2">
             <div className="text-3xl opacity-20">📦</div>

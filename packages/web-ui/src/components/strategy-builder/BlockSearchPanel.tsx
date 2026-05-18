@@ -456,7 +456,7 @@ export function BlockSearchPanel() {
       </div>
 
       {/* Block list — flat, sorted */}
-      <div className="flex-1 overflow-y-auto px-3 py-3" style={{ background: '#15191E' }}>
+      <div className="flex-1 overflow-y-auto px-3 py-3" style={{ background: '#15191E', scrollbarWidth: 'thin', scrollbarColor: '#3C4149 transparent' }}>
         {isLoadingLibrary ? (
           <div className="flex flex-col items-center justify-center py-10 gap-2">
             <div className="w-6 h-6 border-2 border-zinc-600 border-t-sky-400 rounded-full animate-spin" />

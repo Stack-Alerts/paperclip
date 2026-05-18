@@ -181,21 +181,21 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
         ))}
         {stats && (
           <>
-            <span className="mx-0.5" style={{ color: '#6B7280' }}>|</span>
-            <span style={{ color: '#9AA0A6' }}>Required:</span>
-            <span className={`font-bold ${stats.required > 0 ? 'text-emerald-400' : ''}`} style={stats.required === 0 ? { color: '#9AA0A6' } : undefined}>{stats.required}</span>
-            <span style={{ color: '#6B7280' }}>|</span>
-            <span style={{ color: '#9AA0A6' }}>Optional:</span>
-            <span className={`font-bold ${stats.optional > 0 ? 'text-blue-400' : ''}`} style={stats.optional === 0 ? { color: '#9AA0A6' } : undefined}>{stats.optional}</span>
-            <span style={{ color: '#6B7280' }}>|</span>
-            <span style={{ color: '#9AA0A6' }}>Rechecked:</span>
-            <span className={`font-bold ${stats.rechecked > 0 ? 'text-amber-400' : ''}`} style={stats.rechecked === 0 ? { color: '#9AA0A6' } : undefined}>{stats.rechecked}</span>
-            <span style={{ color: '#6B7280' }}>|</span>
-            <span style={{ color: '#9AA0A6' }}>Exit Conditions:</span>
-            <span className={`font-bold ${stats.exits > 0 ? 'text-red-400' : ''}`} style={stats.exits === 0 ? { color: '#9AA0A6' } : undefined}>{stats.exits}</span>
-            <span style={{ color: '#6B7280' }}>|</span>
-            <span style={{ color: '#9AA0A6' }}>Time Constraint:</span>
-            <span className={`font-bold ${stats.timeConstrained > 0 ? 'text-emerald-400' : ''}`} style={stats.timeConstrained === 0 ? { color: '#9AA0A6' } : undefined}>
+            <span className="mx-0.5" style={{ color: '#9AA0A6' }}>|</span>
+            <span style={{ color: '#A0AEC0' }}>Required:</span>
+            <span className="font-bold" style={{ color: '#10B981' }}>{stats.required}</span>
+            <span style={{ color: '#9AA0A6' }}>|</span>
+            <span style={{ color: '#A0AEC0' }}>Optional:</span>
+            <span className="font-bold" style={{ color: '#2070FF' }}>{stats.optional}</span>
+            <span style={{ color: '#9AA0A6' }}>|</span>
+            <span style={{ color: '#A0AEC0' }}>Rechecked:</span>
+            <span className="font-bold" style={{ color: '#FFA500' }}>{stats.rechecked}</span>
+            <span style={{ color: '#9AA0A6' }}>|</span>
+            <span style={{ color: '#A0AEC0' }}>Exit Conditions:</span>
+            <span className="font-bold" style={{ color: '#C35252' }}>{stats.exits}</span>
+            <span style={{ color: '#9AA0A6' }}>|</span>
+            <span style={{ color: '#A0AEC0' }}>Time Constraint:</span>
+            <span className="font-bold" style={{ color: '#E8EAED' }}>
               {stats.timeConstrained > 0 ? 'Yes' : 'No'}
             </span>
           </>
