@@ -15,6 +15,34 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
   [BlockType.POSITION_SIZING]:  'Position Sizing',
 };
 
+// Signal-type classification mirrors the desktop block_registry_adapter logic.
+// EVENT  — pattern/event-driven triggers (e.g. double-top completion, BOS break)
+// SIGNAL — indicator crossovers and oscillator-based signals (e.g. MACD, EMA cross)
+// CONTEXT — continuous state providers always active in background (e.g. sessions, Fibonacci levels)
+// HYBRID — blocks that combine event detection with continuous state (e.g. ICT, Wyckoff)
+const EVENT_CATS   = new Set(['PATTERNS', 'MARKET_STRUCTURE', 'PRICE_ACTION']);
+const SIGNAL_CATS  = new Set(['OSCILLATORS', 'MOVING_AVERAGES', 'VOLATILITY']);
+const CONTEXT_CATS = new Set(['SESSIONS', 'FIBONACCI', 'PRICE_LEVELS']);
+
+function computeSignalType(category: string): 'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' {
+  const cat = category.toUpperCase();
+  if (EVENT_CATS.has(cat))   return 'EVENT';
+  if (SIGNAL_CATS.has(cat))  return 'SIGNAL';
+  if (CONTEXT_CATS.has(cat)) return 'CONTEXT';
+  return 'HYBRID';
+}
+
+const SIGNAL_TYPE_TOOLTIPS: Record<string, string> = {
+  EVENT:
+    'EVENT blocks detect discrete, selective market occurrences — chart patterns, structural breaks, or volume events that fire only when their condition is met. They are ideal as primary triggers because they mark specific actionable moments (e.g. Cup & Handle breakout, Break of Structure).',
+  SIGNAL:
+    'SIGNAL blocks are oscillator- and indicator-based confirmations that generate directional bias from momentum, trend, or volatility data. They run continuously and produce scored outputs (e.g. MACD crossover, RSI, Bollinger width). Use them to qualify or filter EVENT triggers.',
+  CONTEXT:
+    'CONTEXT blocks provide persistent market-state awareness that runs in the background at all times. They do not generate individual trade triggers; instead they describe the current environment (e.g. active Fibonacci zones, session type, key price levels) so other blocks can interpret their signals correctly.',
+  HYBRID:
+    'HYBRID blocks combine event-detection with continuous state tracking. They fire specific signals AND maintain background context simultaneously (e.g. ICT / SMC concepts, Wyckoff phases, Elliott Wave count). Useful when a single analysis framework handles both role.',
+};
+
 // ui_visible=false signals are hidden in Standard mode (matches desktop app behaviour).
 // Advanced mode shows all signals including ui_visible=false for debugging/exploration.
 
@@ -191,6 +219,7 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
       {visibleSignals.length > 0 && (
         <button
           onClick={() => setSignalsOpen(v => !v)}
+          title={`${signalsOpen ? 'Collapse' : 'Expand'} the signal list for "${definition.name}". Each signal is a specific named output this block can emit during backtesting and live trading. You can select individual signals to add granular control over which outputs trigger strategy entries or exits. Unchecked signals are not included when you click Add AND / Add OR / Add Exit. Signal occurrence counts show how often each signal fired over the last 180 days of BTC data.`}
           className="w-full px-5 py-2.5 text-left text-sm font-bold bg-[#2D3748] border-t border-[#374151] hover:bg-[#374151] hover:border-sky-400 transition-colors"
           style={{ color: '#A0AEC0' }}
         >
@@ -252,21 +281,21 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
             <button
               onClick={() => handleAdd('AND')}
               className="flex-1 text-xs py-1.5 rounded border border-emerald-800 bg-emerald-900/40 hover:bg-emerald-900/70 text-emerald-300 font-medium transition-colors"
-              title={`Add "${definition.name}" as required (AND)`}
+              title={`Add "${definition.name}" as AND (Required) — this block's selected signals must ALL fire for the strategy entry condition to be met. AND logic enforces strict confirmation: every signal you add with AND logic must be present simultaneously. Use AND for your highest-conviction conditions where you will not enter a trade unless this specific block confirms. In Standard mode, signals from the same block+AND slot are merged into a single card.`}
             >
               ➕ Add as AND (Required)
             </button>
             <button
               onClick={() => handleAdd('OR')}
               className="flex-1 text-xs py-1.5 rounded border border-blue-800 bg-blue-900/30 hover:bg-blue-900/60 text-blue-300 font-medium transition-colors"
-              title={`Add "${definition.name}" as optional (OR)`}
+              title={`Add "${definition.name}" as OR (Optional) — this block's selected signals can satisfy the entry condition when any one of them fires, even if other blocks do not confirm. OR logic broadens your entry criteria: the strategy enters when this block OR any other OR-logic block fires. Use OR for supporting confluence conditions that strengthen but do not gate the trade setup.`}
             >
               ➕ Add as OR (Optional)
             </button>
             <button
               onClick={handleAddExit}
               className="flex-1 text-xs py-1.5 rounded border border-red-800 bg-red-900/30 hover:bg-red-900/60 text-red-300 font-medium transition-colors"
-              title={`Configure "${definition.name}" as exit condition`}
+              title={`Configure "${definition.name}" as Exit Condition — opens the Exit Condition dialog where you set the exit percentage, exit mode (ABSOLUTE or FLEXIBLE), and binding level (Strategy / Block / Signal). ABSOLUTE exits close the position at a fixed profit or loss percentage. FLEXIBLE exits use TP proximity and reversal trigger thresholds for dynamic position management. Binding level controls which scope of the strategy this exit applies to.`}
             >
               ➕ Add as Exit
             </button>
@@ -298,7 +327,7 @@ export function BlockSearchPanel() {
 
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedType, setSelectedType] = useState<BlockType | 'all'>('all');
+  const [selectedType, setSelectedType] = useState<'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all'>('all');
   const [advancedMode, setAdvancedMode] = useState(false);
 
   // Exit condition dialog
@@ -339,7 +368,7 @@ export function BlockSearchPanel() {
     if (!preset) return;
     setSearchText(preset.search);
     setSelectedCategory(preset.category);
-    setSelectedType(preset.type as BlockType | 'all');
+    setSelectedType(preset.type as 'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all');
   }, [presets, selectedPreset]);
 
   const handleDeletePreset = useCallback(() => {
@@ -350,17 +379,25 @@ export function BlockSearchPanel() {
     setSelectedPreset('');
   }, [presets, selectedPreset]);
 
-  // Filtered blocks — flat, sorted by category then name
+  // Filtered blocks — flat, sorted by category then name.
+  // Search supports comma-separated terms: "50, asia, hod" matches blocks containing ANY term.
   const filteredBlocks = useMemo(() => {
-    const q = searchText.toLowerCase();
+    const terms = searchText
+      .split(',')
+      .map(t => t.trim().toLowerCase())
+      .filter(Boolean);
     return blockLibrary
       .filter(b => {
-        const matchSearch = !q ||
+        const matchSearch = terms.length === 0 || terms.some(q =>
           b.name.toLowerCase().includes(q) ||
           b.description.toLowerCase().includes(q) ||
-          (b.signals ?? []).some(s => s.name.toLowerCase().includes(q));
+          (b.signals ?? []).some(s =>
+            s.name.toLowerCase().includes(q) ||
+            (s.description ?? '').toLowerCase().includes(q)
+          )
+        );
         const matchCat = selectedCategory === 'all' || b.category === selectedCategory;
-        const matchType = selectedType === 'all' || b.type === selectedType;
+        const matchType = selectedType === 'all' || computeSignalType(b.category) === selectedType;
         return matchSearch && matchCat && matchType;
       })
       .sort((a, b) => {
@@ -380,13 +417,14 @@ export function BlockSearchPanel() {
     }));
   }, [blockCategories, blockLibrary]);
 
-  // Show only types that actually exist in the library — matches desktop client
-  // (hardcoding all 7 enum types shows empty results for most selections)
+  // Signal types are computed from category — same logic as the desktop block_registry_adapter.
+  // Only show types that have at least one block in the current library.
   const allTypes = useMemo(() => {
-    const seen = new Set(blockLibrary.map(b => b.type));
-    return [...seen].sort().map(t => ({
+    const seen = new Set(blockLibrary.map(b => computeSignalType(b.category)));
+    return (['CONTEXT', 'EVENT', 'HYBRID', 'SIGNAL'] as const).filter(t => seen.has(t)).map(t => ({
       value: t,
-      label: BLOCK_TYPE_LABELS[t] ?? t.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+      label: t.charAt(0) + t.slice(1).toLowerCase(),
+      tooltip: SIGNAL_TYPE_TOOLTIPS[t],
     }));
   }, [blockLibrary]);
 
@@ -482,7 +520,7 @@ export function BlockSearchPanel() {
         <div className="flex items-center" style={{ border: '1px solid #3C4149', borderRadius: 4, overflow: 'hidden' }}>
           <button
             onClick={() => setAdvancedMode(false)}
-            title="Standard mode: each block can only be added once per signal"
+            title="Standard mode — each block definition can appear only once per logic slot (AND or OR) in your strategy. When you click Add AND or Add OR, signals from the same block are merged into the existing card rather than creating a duplicate. This is the recommended mode for most strategies because it keeps the strategy board clean and prevents redundant evaluations. Signals already added to the strategy are greyed out in the library."
             className="text-xs px-2.5 py-1 transition-colors"
             style={!advancedMode
               ? { background: '#1a3a4a', color: '#38bdf8', fontWeight: 600 }
@@ -492,7 +530,7 @@ export function BlockSearchPanel() {
           </button>
           <button
             onClick={() => setAdvancedMode(true)}
-            title="Advanced mode: allows adding the same building block multiple times with different configurations"
+            title="Advanced mode — removes the deduplication constraint and allows the same building block to be added multiple times, each with a different signal selection, weight, or logic role. Use this when building layered or ensemble strategies that intentionally stack the same indicator at different parameter levels (e.g. two separate EMA blocks with different period settings). All signals remain selectable regardless of prior additions."
             className="text-xs px-2.5 py-1 transition-colors border-l border-[#3C4149]"
             style={advancedMode
               ? { background: '#1a3a4a', color: '#38bdf8', fontWeight: 600 }
@@ -510,9 +548,10 @@ export function BlockSearchPanel() {
           <span className="text-xs flex-shrink-0 text-right" style={{ color: '#9AA0A6', width: 68 }}>🔍 Search:</span>
           <input
             type="text"
-            placeholder="Search by block name, description, or signal…"
+            placeholder="Search name, signal, description… or stack with commas: 50, asia, hod"
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
+            title="Full-text search across block names, signal names, and descriptions. Stack multiple independent search terms using commas — the panel returns blocks that match ANY of the terms. Example: typing '50, asia, hod' returns all blocks that mention '50', OR 'asia', OR 'hod' in their name, signals, or description. This lets you quickly build a broad candidate list from memory-based terms without knowing exact block names."
             className="flex-1 px-2.5 py-1.5 rounded border text-xs focus:outline-none"
             style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
           />
@@ -524,7 +563,7 @@ export function BlockSearchPanel() {
           <select
             value={selectedCategory}
             onChange={e => setSelectedCategory(e.target.value)}
-            title="Filter by category"
+            title="Filter by analytical category — narrows the library to blocks that share the same market analysis domain. Categories group blocks by the price phenomenon they analyse (e.g. PATTERNS = classical chart formations, OSCILLATORS = momentum-based indicators, SESSIONS = time-of-day context). Use category filters when you know the analysis domain you want to cover in your strategy."
             className="flex-[2] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
             style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
           >
@@ -535,32 +574,38 @@ export function BlockSearchPanel() {
           </select>
           <select
             value={selectedType}
-            onChange={e => setSelectedType(e.target.value as BlockType | 'all')}
-            title="Filter by block type"
+            onChange={e => setSelectedType(e.target.value as 'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all')}
+            title={selectedType === 'all'
+              ? 'Filter by block execution type — controls how a block participates in your strategy. EVENT: fires once when a discrete market event occurs (e.g. pattern completion). SIGNAL: indicator-based confirmation that runs continuously. CONTEXT: always-active background state (e.g. session, Fibonacci zone). HYBRID: combines event and context roles. Hover each option for a detailed definition.'
+              : SIGNAL_TYPE_TOOLTIPS[selectedType]}
             className="flex-[1.5] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
             style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
           >
             <option value="all">All Types</option>
-            {allTypes.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
+            {allTypes.map(({ value, label, tooltip }) => (
+              <option key={value} value={value} title={tooltip}>{label}</option>
             ))}
           </select>
           <select
             value={selectedPreset}
             onChange={e => setSelectedPreset(e.target.value)}
+            title="Filter presets — saved combinations of search text, category, and type filters. Presets let you instantly restore a specific view of the library that you use repeatedly. Select a preset here, then click 📂 to apply it to the current filters."
             className="flex-1 min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
             style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}
           >
             <option value="">— Preset —</option>
             {presets.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
           </select>
-          <button onClick={handleSavePreset} title="Save current filter as preset"
+          <button onClick={handleSavePreset}
+            title="Save preset — captures the current search text, category, and type filter as a named preset you can reload later. Useful for frequently used filter combinations (e.g. 'Bullish patterns only', 'ICT context blocks')."
             className="text-xs px-1.5 py-1 rounded border flex-shrink-0 hover:opacity-80"
             style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>💾</button>
-          <button onClick={handleLoadPreset} disabled={!selectedPreset} title="Load selected preset"
+          <button onClick={handleLoadPreset} disabled={!selectedPreset}
+            title="Load preset — applies the saved search text, category, and type filter from the selected preset, overwriting the current filter state. Select a preset in the dropdown first, then click here to activate it."
             className="text-xs px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
             style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>📂</button>
-          <button onClick={handleDeletePreset} disabled={!selectedPreset} title="Delete selected preset"
+          <button onClick={handleDeletePreset} disabled={!selectedPreset}
+            title="Delete preset — permanently removes the selected preset from local storage. This action cannot be undone. Select the preset in the dropdown first, then click here to delete it."
             className="text-xs px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
             style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>🗑</button>
         </div>
