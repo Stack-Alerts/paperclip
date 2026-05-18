@@ -36,7 +36,7 @@ function PresetChip({ label, onClick }: { label: string; onClick: () => void }) 
       type="button"
       onClick={onClick}
       className="text-xs px-2 py-0.5 rounded transition-colors hover:opacity-80 flex-shrink-0"
-      style={{ background: '#244647', color: '#9AA0A6', border: '1px solid #2D5A5B' }}
+      style={{ background: 'var(--accent-teal-dark)', color: 'var(--text-secondary)', border: '1px solid var(--accent-teal-mid)' }}
     >
       {label}
     </button>
@@ -60,7 +60,7 @@ const BINDING_OPTIONS = [
     value: 'SIGNAL' as const,
     label: 'SIGNAL - Apply to specific signal positions',
     desc: '└─ Granular exit for specific signal only',
-    color: '#3B82F6',
+    color: 'var(--accent-blue)',
   },
 ];
 
@@ -69,13 +69,13 @@ const MODE_OPTIONS = [
     value: 'ABSOLUTE' as const,
     label: 'ABSOLUTE - Exit Immediately',
     desc: '└─ Executes partial exit as soon as signal fires',
-    color: '#E8EAED',
+    color: 'var(--text-primary)',
   },
   {
     value: 'FLEXIBLE' as const,
     label: 'FLEXIBLE - TP-Aware Exit',
     desc: '└─ Defers exit if price moving toward TP; fires on reversal',
-    color: '#3B82F6',
+    color: 'var(--accent-blue)',
   },
 ];
 
@@ -158,27 +158,27 @@ export function ExitConditionDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div
         className="rounded border shadow-2xl flex flex-col"
-        style={{ background: '#1E2128', borderColor: '#3C4149', width: 680, maxHeight: '90vh' }}
+        style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)', width: 680, maxHeight: '90vh' }}
       >
         {/* Title bar */}
         <div
           className="flex items-center justify-between px-4 py-2 border-b rounded-t flex-shrink-0"
-          style={{ background: '#2A2F3A', borderColor: '#3C4149' }}
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
         >
-          <span className="text-sm font-semibold" style={{ color: '#E8EAED' }}>Configure Exit Condition</span>
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Configure Exit Condition</span>
           <div className="flex items-center gap-1">
-            <span className="w-5 h-5 rounded text-xs flex items-center justify-center" style={{ background: '#3C4149', color: '#9AA0A6' }}>─</span>
-            <span className="w-5 h-5 rounded text-xs flex items-center justify-center" style={{ background: '#3C4149', color: '#9AA0A6' }}>□</span>
+            <span className="w-5 h-5 rounded text-xs flex items-center justify-center" style={{ background: 'var(--border)', color: 'var(--text-secondary)' }}>─</span>
+            <span className="w-5 h-5 rounded text-xs flex items-center justify-center" style={{ background: 'var(--border)', color: 'var(--text-secondary)' }}>□</span>
             <button
               onClick={onCancel}
               className="w-5 h-5 rounded text-xs flex items-center justify-center hover:opacity-80"
-              style={{ background: '#5C2020', color: '#FCA5A5' }}
+              style={{ background: 'var(--accent-red-dark)', color: '#FCA5A5' }}
             >✕</button>
           </div>
         </div>
 
         {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#3C4149 transparent' }}>
+        <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--border) transparent' }}>
           <div className="px-4 py-4 space-y-4">
             {/* Dialog header */}
             <div className="text-sm font-bold" style={{ color: '#3B9CC0' }}>
@@ -187,8 +187,8 @@ export function ExitConditionDialog({
 
             {/* Exit Binding Level — hidden in edit mode */}
             {!isEditMode && (
-              <section className="border rounded p-3 space-y-2" style={{ borderColor: '#3C4149' }}>
-                <div className="text-xs font-semibold" style={{ color: '#E8EAED' }}>Exit Binding Level</div>
+              <section className="border rounded p-3 space-y-2" style={{ borderColor: 'var(--border)' }}>
+                <div className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Exit Binding Level</div>
                 {BINDING_OPTIONS.map(opt => (
                   <div key={opt.value}>
                     <div
@@ -197,7 +197,7 @@ export function ExitConditionDialog({
                     >
                       <div
                         className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0"
-                        style={{ borderColor: bindingLevel === opt.value ? opt.color : '#6B7280' }}
+                        style={{ borderColor: bindingLevel === opt.value ? opt.color : 'var(--text-muted)' }}
                       >
                         {bindingLevel === opt.value && (
                           <div className="w-2 h-2 rounded-full" style={{ background: opt.color }} />
@@ -205,12 +205,12 @@ export function ExitConditionDialog({
                       </div>
                       <span
                         className="text-sm font-semibold"
-                        style={{ color: bindingLevel === opt.value ? opt.color : '#9AA0A6' }}
+                        style={{ color: bindingLevel === opt.value ? opt.color : 'var(--text-secondary)' }}
                       >
                         {opt.label}
                       </span>
                     </div>
-                    <div className="ml-6 text-xs" style={{ color: '#6B7280' }}>{opt.desc}</div>
+                    <div className="ml-6 text-xs" style={{ color: 'var(--text-muted)' }}>{opt.desc}</div>
 
                     {opt.value === 'BLOCK' && bindingLevel === 'BLOCK' && (availableBlocks ?? []).length > 0 && (
                       <div className="ml-6 mt-1.5">
@@ -218,7 +218,7 @@ export function ExitConditionDialog({
                           value={selectedBlockName}
                           onChange={e => setSelectedBlockName(e.target.value)}
                           className="w-full px-2 py-1.5 rounded border text-xs focus:outline-none"
-                          style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+                          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
                         >
                           <option value="">Select block…</option>
                           {(availableBlocks ?? []).map(b => (
@@ -234,7 +234,7 @@ export function ExitConditionDialog({
                           value={selectedSignalKey}
                           onChange={e => setSelectedSignalKey(e.target.value)}
                           className="w-full px-2 py-1.5 rounded border text-xs focus:outline-none"
-                          style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+                          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
                         >
                           <option value="">Select signal…</option>
                           {allSignalOptions.map(o => (
@@ -249,10 +249,10 @@ export function ExitConditionDialog({
             )}
 
             {/* Exit Percentage */}
-            <section className="border rounded p-3" style={{ borderColor: '#3C4149' }}>
-              <div className="text-xs font-semibold mb-2" style={{ color: '#E8EAED' }}>Exit Percentage</div>
+            <section className="border rounded p-3" style={{ borderColor: 'var(--border)' }}>
+              <div className="text-xs font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Exit Percentage</div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs flex-shrink-0" style={{ color: '#9AA0A6' }}>Close % of Position:</span>
+                <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>Close % of Position:</span>
                 <input
                   type="number"
                   min={1}
@@ -262,7 +262,7 @@ export function ExitConditionDialog({
                     setPercentage(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))
                   }
                   className="w-16 px-2 py-1 rounded border text-sm text-center focus:outline-none"
-                  style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+                  style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
                 />
                 {[10, 15, 20, 25, 50, 75, 100].map(p => (
                   <PresetChip key={p} label={`${p}%`} onClick={() => setPercentage(p)} />
@@ -271,14 +271,14 @@ export function ExitConditionDialog({
             </section>
 
             {/* Exit Mode */}
-            <section className="border rounded p-3 space-y-2" style={{ borderColor: '#3C4149' }}>
-              <div className="text-xs font-semibold" style={{ color: '#E8EAED' }}>Exit Mode</div>
+            <section className="border rounded p-3 space-y-2" style={{ borderColor: 'var(--border)' }}>
+              <div className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Exit Mode</div>
               {MODE_OPTIONS.map(opt => (
                 <div key={opt.value}>
                   <div className="flex items-center gap-2 cursor-pointer" onClick={() => setExitMode(opt.value)}>
                     <div
                       className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0"
-                      style={{ borderColor: exitMode === opt.value ? opt.color : '#6B7280' }}
+                      style={{ borderColor: exitMode === opt.value ? opt.color : 'var(--text-muted)' }}
                     >
                       {exitMode === opt.value && (
                         <div className="w-2 h-2 rounded-full" style={{ background: opt.color }} />
@@ -286,12 +286,12 @@ export function ExitConditionDialog({
                     </div>
                     <span
                       className="text-sm font-semibold"
-                      style={{ color: exitMode === opt.value ? opt.color : '#9AA0A6' }}
+                      style={{ color: exitMode === opt.value ? opt.color : 'var(--text-secondary)' }}
                     >
                       {opt.label}
                     </span>
                   </div>
-                  <div className="ml-6 text-xs" style={{ color: '#6B7280' }}>{opt.desc}</div>
+                  <div className="ml-6 text-xs" style={{ color: 'var(--text-muted)' }}>{opt.desc}</div>
                 </div>
               ))}
             </section>
@@ -300,15 +300,15 @@ export function ExitConditionDialog({
             {exitMode === 'FLEXIBLE' && (
               <section
                 className="border rounded p-3 space-y-3"
-                style={{ borderColor: '#3B82F6', background: 'rgba(59,130,246,0.05)' }}
+                style={{ borderColor: 'var(--accent-blue)', background: 'color-mix(in srgb, var(--accent-blue) 5%, transparent)' }}
               >
-                <div className="text-xs font-semibold" style={{ color: '#3B82F6' }}>
+                <div className="text-xs font-semibold" style={{ color: 'var(--accent-blue)' }}>
                   FLEXIBLE Mode Parameters
                 </div>
 
                 {/* TP Proximity */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs w-40 flex-shrink-0" style={{ color: '#9AA0A6' }}>
+                  <span className="text-xs w-40 flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
                     TP Proximity Threshold:
                   </span>
                   <input
@@ -323,9 +323,9 @@ export function ExitConditionDialog({
                       )
                     }
                     className="w-20 px-2 py-1 rounded border text-sm text-center focus:outline-none"
-                    style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+                    style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
                   />
-                  <span className="text-xs" style={{ color: '#9AA0A6' }}>%</span>
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>%</span>
                   {[0.25, 0.5, 1.0, 1.5, 2.0].map(v => (
                     <PresetChip key={v} label={`${v}%`} onClick={() => setTpProximity(v)} />
                   ))}
@@ -333,7 +333,7 @@ export function ExitConditionDialog({
 
                 {/* Reversal Trigger */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs w-40 flex-shrink-0" style={{ color: '#9AA0A6' }}>
+                  <span className="text-xs w-40 flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
                     Reversal Trigger:
                   </span>
                   <input
@@ -343,9 +343,9 @@ export function ExitConditionDialog({
                     value={reversal}
                     onChange={e => setReversal(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))}
                     className="w-20 px-2 py-1 rounded border text-sm text-center focus:outline-none"
-                    style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+                    style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
                   />
-                  <span className="text-xs" style={{ color: '#9AA0A6' }}>%</span>
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>%</span>
                   {[1, 2, 3, 4, 5, 6, 7, 8].map(v => (
                     <PresetChip key={v} label={`${v}%`} onClick={() => setReversal(v)} />
                   ))}
@@ -354,8 +354,8 @@ export function ExitConditionDialog({
             )}
 
             {/* RECHECK Validation */}
-            <section className="border rounded p-3" style={{ borderColor: '#3C4149' }}>
-              <div className="text-xs font-semibold mb-2" style={{ color: '#E8EAED' }}>RECHECK Validation</div>
+            <section className="border rounded p-3" style={{ borderColor: 'var(--border)' }}>
+              <div className="text-xs font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>RECHECK Validation</div>
               <div
                 className="flex items-center gap-2 cursor-pointer"
                 onClick={() => setRecheckEnabled(v => !v)}
@@ -363,22 +363,22 @@ export function ExitConditionDialog({
                 <div
                   className="w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0"
                   style={{
-                    borderColor: recheckEnabled ? '#10B981' : '#6B7280',
-                    background: recheckEnabled ? '#10B981' : 'transparent',
+                    borderColor: recheckEnabled ? 'var(--accent-green)' : 'var(--text-muted)',
+                    background: recheckEnabled ? 'var(--accent-green)' : 'transparent',
                   }}
                 >
                   {recheckEnabled && (
                     <span className="text-white leading-none" style={{ fontSize: 10, fontWeight: 700 }}>✓</span>
                   )}
                 </div>
-                <span className="text-sm" style={{ color: recheckEnabled ? '#E8EAED' : '#9AA0A6' }}>
+                <span className="text-sm" style={{ color: recheckEnabled ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
                   Enable RECHECK for this exit condition
                 </span>
               </div>
 
               {recheckEnabled && (
                 <div className="flex items-center gap-2 flex-wrap mt-2 ml-6">
-                  <span className="text-xs flex-shrink-0" style={{ color: '#9AA0A6' }}>Bar Delay:</span>
+                  <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>Bar Delay:</span>
                   <input
                     type="number"
                     min={1}
@@ -386,7 +386,7 @@ export function ExitConditionDialog({
                     value={recheckDelay}
                     onChange={e => setRecheckDelay(Math.max(1, parseInt(e.target.value) || 1))}
                     className="w-16 px-2 py-1 rounded border text-sm text-center focus:outline-none"
-                    style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+                    style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
                   />
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(v => (
                     <PresetChip key={v} label={String(v)} onClick={() => setRecheckDelay(v)} />
@@ -398,18 +398,18 @@ export function ExitConditionDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex border-t rounded-b overflow-hidden flex-shrink-0" style={{ borderColor: '#3C4149' }}>
+        <div className="flex border-t rounded-b overflow-hidden flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
           <button
             onClick={onCancel}
             className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
-            style={{ background: '#C35252', color: '#ffffff' }}
+            style={{ background: 'var(--accent-red)', color: '#ffffff' }}
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
-            style={{ background: '#10B981', color: '#ffffff' }}
+            style={{ background: 'var(--accent-green)', color: '#ffffff' }}
           >
             {isEditMode ? 'Update Exit Condition' : 'Add Exit Condition'}
           </button>

@@ -245,8 +245,8 @@ function SavePresetModal({ open, onSave, onCancel }: SavePresetModalProps) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="rounded-lg shadow-2xl border p-5 w-80" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: '#A0AEC0' }}>Save Filter Preset</h3>
+      <div className="rounded-lg shadow-2xl border p-5 w-80" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-dim)' }}>Save Filter Preset</h3>
         <input
           autoFocus
           type="text"
@@ -255,13 +255,13 @@ function SavePresetModal({ open, onSave, onCancel }: SavePresetModalProps) {
           onChange={e => setValue(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && value.trim()) onSave(value.trim()); if (e.key === 'Escape') onCancel(); }}
           className="w-full px-2.5 py-1.5 rounded border text-sm focus:outline-none mb-4"
-          style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
         />
         <div className="flex justify-end gap-2">
           <button
             onClick={onCancel}
             className="text-xs px-3 py-1.5 rounded border transition-colors"
-            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#9AA0A6' }}
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
           >
             Cancel
           </button>
@@ -269,7 +269,7 @@ function SavePresetModal({ open, onSave, onCancel }: SavePresetModalProps) {
             onClick={() => { if (value.trim()) onSave(value.trim()); }}
             disabled={!value.trim()}
             className="text-xs px-3 py-1.5 rounded border transition-colors disabled:opacity-40"
-            style={{ background: '#1a3a4a', borderColor: '#0ea5e9', color: '#38bdf8' }}
+            style={{ background: 'var(--accent-blue-dark)', borderColor: 'var(--accent-sky-bright)', color: 'var(--accent-sky)' }}
           >
             Save
           </button>
@@ -354,17 +354,17 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
       ref={itemRef}
       className="rounded border mb-1.5 transition-all duration-300"
       style={{
-        background: isHighlighted ? 'rgba(14,165,233,0.07)' : '#1E2128',
-        borderColor: isHighlighted ? '#0ea5e9' : '#3C4149',
+        background: isHighlighted ? 'color-mix(in srgb, var(--accent-sky-bright) 7%, transparent)' : 'var(--bg-panel)',
+        borderColor: isHighlighted ? 'var(--accent-sky-bright)' : 'var(--border)',
         boxShadow: isHighlighted ? '0 0 0 2px rgba(14,165,233,0.25)' : undefined,
       }}
     >
       {/* Block name + meta */}
       <div className="px-3 pt-2.5 pb-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-semibold leading-tight" style={{ color: '#A0AEC0' }}>{definition.name}</span>
+          <span className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-dim)' }}>{definition.name}</span>
         </div>
-        <div className="text-xs mt-0.5 ml-6" style={{ color: '#9AA0A6' }}>
+        <div className="text-xs mt-0.5 ml-6" style={{ color: 'var(--text-secondary)' }}>
           Category: {definition.category}
           {typeLabel && ` | Type: ${typeLabel}`}
           {weight != null && ` | Weight: ${weight} points`}
@@ -376,8 +376,8 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
         <RichTooltip content={TT_SHOW_SIGNALS}>
           <button
             onClick={() => setSignalsOpen(v => !v)}
-            className="w-full px-5 py-2.5 text-left text-sm font-bold bg-[#2D3748] border-t border-[#374151] hover:bg-[#374151] hover:border-sky-400 transition-colors"
-            style={{ color: '#A0AEC0' }}
+            className="w-full px-5 py-2.5 text-left text-sm font-bold bg-[var(--border-subtle)] border-t border-[var(--bg-hover)] hover:bg-[var(--bg-hover)] hover:border-sky-400 transition-colors"
+            style={{ color: 'var(--text-dim)' }}
           >
             {signalsOpen ? `▼ Hide Signals (${visibleSignals.length})` : `▶ Show Signals (${visibleSignals.length})`}
           </button>
@@ -386,7 +386,7 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
 
       {/* Expanded: signals list + add buttons */}
       {signalsOpen && visibleSignals.length > 0 && (
-        <div className="px-3 pb-2 bg-[#15191E]">
+        <div className="px-3 pb-2 bg-[var(--bg-deep)]">
           {/* Header */}
           <p className="text-xs font-semibold text-sky-400 pt-2 pb-1">Select signals to add:</p>
 
@@ -403,10 +403,10 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
                       checked={isChecked}
                       disabled={isAdded}
                       onChange={() => !isAdded && toggleSignal(sig.name)}
-                      className="mt-0.5 flex-shrink-0 appearance-none w-3.5 h-3.5 rounded-sm border border-[#5A6070] cursor-pointer disabled:opacity-50"
+                      className="mt-0.5 flex-shrink-0 appearance-none w-3.5 h-3.5 rounded-sm border border-[var(--text-faintest)] cursor-pointer disabled:opacity-50"
                       style={isChecked ? {
-                        background: '#0ea5e9',
-                        borderColor: '#0ea5e9',
+                        background: 'var(--accent-sky-bright)',
+                        borderColor: 'var(--accent-sky-bright)',
                         backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='white'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e\")",
                         backgroundSize: '100% 100%',
                       } : { background: 'transparent' }}
@@ -414,17 +414,17 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
                     <div className="min-w-0">
                       <span
                         className={`text-xs font-semibold ${isAdded ? 'line-through' : ''}`}
-                        style={{ color: isAdded ? '#6B7280' : '#9AA0A6' }}
+                        style={{ color: isAdded ? 'var(--text-muted)' : 'var(--text-secondary)' }}
                       >
                         {formatSignalName(sig.name)}
                       </span>
                       {sig.occurrences != null && (
-                        <span className="font-normal text-xs ml-1.5" style={{ color: '#6B7280' }}>
+                        <span className="font-normal text-xs ml-1.5" style={{ color: 'var(--text-muted)' }}>
                           ({sig.occurrences.toLocaleString()} found, {sig.occurrence_percentage != null ? sig.occurrence_percentage.toFixed(1) : '?'}%)
                         </span>
                       )}
                       {sig.description ? (
-                        <div className="text-xs mt-0.5 italic leading-relaxed" style={{ color: '#9AA0A6' }}>{sig.description}</div>
+                        <div className="text-xs mt-0.5 italic leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{sig.description}</div>
                       ) : null}
                     </div>
                   </label>
@@ -461,7 +461,7 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
             </RichTooltip>
           </div>
 
-          <p className="text-xs italic mt-2" style={{ color: '#6B7280' }}>
+          <p className="text-xs italic mt-2" style={{ color: 'var(--text-muted)' }}>
             Note: Signal counts based on last 180 days of BTC data
           </p>
         </div>
@@ -677,20 +677,20 @@ export function BlockSearchPanel() {
   );
 
   return (
-    <div className="flex flex-col h-full border-l border-[#3C4149]" style={{ background: '#15191E' }}>
+    <div className="flex flex-col h-full border-l border-[var(--border)]" style={{ background: 'var(--bg-deep)' }}>
       {/* Panel header with Standard / Advanced toggle */}
-      <div className="px-4 py-2 border-b border-[#3C4149] flex-shrink-0 flex items-center justify-between" style={{ background: '#1E2128' }}>
-        <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#A0AEC0' }}>
+      <div className="px-4 py-2 border-b border-[var(--border)] flex-shrink-0 flex items-center justify-between" style={{ background: 'var(--bg-panel)' }}>
+        <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dim)' }}>
           Available Building Blocks
         </h2>
-        <div className="flex items-center" style={{ border: '1px solid #3C4149', borderRadius: 4, overflow: 'hidden' }}>
+        <div className="flex items-center" style={{ border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
           <RichTooltip content={TT_STANDARD}>
             <button
               onClick={() => setAdvancedMode(false)}
               className="text-xs px-2.5 py-1 transition-colors"
               style={!advancedMode
-                ? { background: '#1a3a4a', color: '#38bdf8', fontWeight: 600 }
-                : { background: '#2A2F3A', color: '#6B7280' }}
+                ? { background: 'var(--accent-blue-dark)', color: 'var(--accent-sky)', fontWeight: 600 }
+                : { background: 'var(--bg-card)', color: 'var(--text-muted)' }}
             >
               Standard
             </button>
@@ -698,10 +698,10 @@ export function BlockSearchPanel() {
           <RichTooltip content={TT_ADVANCED}>
             <button
               onClick={() => setAdvancedMode(true)}
-              className="text-xs px-2.5 py-1 transition-colors border-l border-[#3C4149]"
+              className="text-xs px-2.5 py-1 transition-colors border-l border-[var(--border)]"
               style={advancedMode
-                ? { background: '#1a3a4a', color: '#38bdf8', fontWeight: 600 }
-                : { background: '#2A2F3A', color: '#6B7280' }}
+                ? { background: 'var(--accent-blue-dark)', color: 'var(--accent-sky)', fontWeight: 600 }
+                : { background: 'var(--bg-card)', color: 'var(--text-muted)' }}
             >
               Advanced
             </button>
@@ -710,7 +710,7 @@ export function BlockSearchPanel() {
       </div>
 
       {/* Search + Filters — 2 rows, labels fixed-width so inputs align */}
-      <div className="px-3 pt-3 pb-2 space-y-1.5 flex-shrink-0 border-b border-[#3C4149]" style={{ background: '#1E2128' }}>
+      <div className="px-3 pt-3 pb-2 space-y-1.5 flex-shrink-0 border-b border-[var(--border)]" style={{ background: 'var(--bg-panel)' }}>
         {/* Row 1: Search */}
         <div className="flex items-center gap-2">
           <span className="text-xs flex-shrink-0 text-right" style={{ color: '#9AA0A6', width: 68 }}>🔍 Search:</span>
@@ -721,7 +721,7 @@ export function BlockSearchPanel() {
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
               className="flex-1 px-2.5 py-1.5 rounded border text-xs focus:outline-none"
-              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
             />
           </RichTooltip>
         </div>
@@ -734,7 +734,7 @@ export function BlockSearchPanel() {
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
               className="flex-[1.5] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
-              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
             >
               <option value="all">All Categories</option>
               {allCategories.map(c => (
@@ -747,7 +747,7 @@ export function BlockSearchPanel() {
               value={selectedType}
               onChange={e => setSelectedType(e.target.value as 'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all')}
               className="flex-[0.75] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
-              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
             >
               <option value="all">All Types</option>
               {allTypes.map(({ value, label }) => (
@@ -760,7 +760,7 @@ export function BlockSearchPanel() {
               value={selectedPreset}
               onChange={e => setSelectedPreset(e.target.value)}
               className="flex-[3] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
-              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}
             >
               <option value="">— Preset —</option>
               {presets.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
@@ -769,30 +769,30 @@ export function BlockSearchPanel() {
           <RichTooltip content={TT_PRESET_SAVE}>
             <button onClick={handleSavePreset}
               className="text-xs px-1.5 py-1 rounded border flex-shrink-0 hover:opacity-80"
-              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>💾</button>
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}>💾</button>
           </RichTooltip>
           <RichTooltip content={TT_PRESET_LOAD}>
             <button onClick={handleLoadPreset} disabled={!selectedPreset}
               className="text-xs px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
-              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>📂</button>
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}>📂</button>
           </RichTooltip>
           <RichTooltip content={TT_PRESET_DELETE}>
             <button onClick={handleDeletePreset} disabled={!selectedPreset}
               className="text-xs px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
-              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>🗑</button>
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}>🗑</button>
           </RichTooltip>
         </div>
       </div>
 
       {/* Block list — flat, sorted */}
-      <div className="flex-1 overflow-y-auto px-3 py-3" style={{ background: '#15191E', scrollbarWidth: 'thin', scrollbarColor: '#3C4149 transparent' }}>
+      <div className="flex-1 overflow-y-auto px-3 py-3" style={{ background: 'var(--bg-deep)', scrollbarWidth: 'thin', scrollbarColor: 'var(--border) transparent' }}>
         {isLoadingLibrary ? (
           <div className="flex flex-col items-center justify-center py-10 gap-2">
             <div className="w-6 h-6 border-2 border-zinc-600 border-t-sky-400 rounded-full animate-spin" />
-            <p className="text-xs" style={{ color: '#9AA0A6' }}>Loading block library…</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Loading block library…</p>
           </div>
         ) : filteredBlocks.length === 0 ? (
-          <p className="text-xs text-center py-8" style={{ color: '#9AA0A6' }}>No blocks match the current filters</p>
+          <p className="text-xs text-center py-8" style={{ color: 'var(--text-secondary)' }}>No blocks match the current filters</p>
         ) : (
           filteredBlocks.map(block => (
             <BlockItem
@@ -809,12 +809,12 @@ export function BlockSearchPanel() {
       </div>
 
       {/* Footer count */}
-      <div className="px-3 py-2 border-t border-[#3C4149] flex-shrink-0 flex items-center justify-between" style={{ background: '#1E2128' }}>
-        <p className="text-xs" style={{ color: '#9AA0A6' }}>
+      <div className="px-3 py-2 border-t border-[var(--border)] flex-shrink-0 flex items-center justify-between" style={{ background: 'var(--bg-panel)' }}>
+        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
           {filteredBlocks.length} / {blockLibrary.length} blocks
         </p>
         {currentStrategy && (
-          <p className="text-xs" style={{ color: '#6B7280' }}>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {currentStrategy.blocks.length} in strategy
           </p>
         )}

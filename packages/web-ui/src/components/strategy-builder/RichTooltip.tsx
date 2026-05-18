@@ -51,9 +51,9 @@ function TooltipPopup({ content, triggerRect }: { content: TooltipContent; trigg
         top: pos.top,
         opacity: pos.opacity,
         transition: 'opacity 0.08s ease',
-        background: '#0D1117',
-        border: '1px solid #2D3748',
-        color: '#E2E8F0',
+        background: 'var(--tooltip-bg)',
+        border: '1px solid var(--tooltip-border)',
+        color: 'var(--tooltip-text)',
         borderRadius: 6,
         padding: '10px 14px',
         fontSize: 13,
@@ -64,7 +64,7 @@ function TooltipPopup({ content, triggerRect }: { content: TooltipContent; trigg
     >
       {/* Title */}
       <div style={{
-        color: '#A8BBCA',
+        color: 'var(--tooltip-title)',
         fontWeight: 700,
         fontSize: 14,
         marginBottom: content.body || hasSections ? 5 : 0,
@@ -75,7 +75,7 @@ function TooltipPopup({ content, triggerRect }: { content: TooltipContent; trigg
 
       {/* Body */}
       {content.body && (
-        <div style={{ color: '#7A8F9E', marginBottom: hasSections ? 7 : 0 }}>
+        <div style={{ color: 'var(--tooltip-body)', marginBottom: hasSections ? 7 : 0 }}>
           {content.body}
         </div>
       )}
@@ -84,16 +84,16 @@ function TooltipPopup({ content, triggerRect }: { content: TooltipContent; trigg
       {content.sections?.map((sec, i) => (
         <div key={i} style={{ marginTop: i === 0 ? 0 : 7 }}>
           {sec.header && (
-            <div style={{ color: '#6E8494', fontWeight: 600, marginBottom: 3 }}>
+            <div style={{ color: 'var(--tooltip-header)', fontWeight: 600, marginBottom: 3 }}>
               {sec.header}
             </div>
           )}
           {sec.items.map((item, j) => (
             <div
               key={j}
-              style={{ color: '#7A8F9E', display: 'flex', gap: 5, alignItems: 'flex-start', marginBottom: 2 }}
+              style={{ color: 'var(--tooltip-body)', display: 'flex', gap: 5, alignItems: 'flex-start', marginBottom: 2 }}
             >
-              <span style={{ color: '#4A5E6A', flexShrink: 0, marginTop: 1 }}>•</span>
+              <span style={{ color: 'var(--tooltip-bullet)', flexShrink: 0, marginTop: 1 }}>•</span>
               <span>{item}</span>
             </div>
           ))}

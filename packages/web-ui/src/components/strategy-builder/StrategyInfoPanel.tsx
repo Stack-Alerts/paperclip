@@ -240,11 +240,11 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
 
   if (!currentStrategy) {
     return (
-      <div className="px-4 py-3 space-y-2" style={{ background: '#1E2128' }}>
-        <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#9AA0A6' }}>
+      <div className="px-4 py-3 space-y-2" style={{ background: 'var(--bg-panel)' }}>
+        <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
           💡 Strategy Information
         </div>
-        <div className="text-xs italic" style={{ color: '#6B7280' }}>No strategy loaded</div>
+        <div className="text-xs italic" style={{ color: 'var(--text-muted)' }}>No strategy loaded</div>
       </div>
     );
   }
@@ -252,15 +252,15 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
   const currentType = (currentStrategy.strategyType as string | undefined) ?? 'Bullish';
 
   return (
-    <div className="px-4 py-3 space-y-2.5" style={{ background: '#1E2128' }}>
+    <div className="px-4 py-3 space-y-2.5" style={{ background: 'var(--bg-panel)' }}>
       {/* Section header */}
-      <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#9AA0A6' }}>
+      <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
         💡 Strategy Information
       </div>
 
       {/* Strategy Name */}
       <div className="space-y-1">
-        <label className="text-xs" style={{ color: '#9AA0A6' }}>Strategy Name:</label>
+        <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>Strategy Name:</label>
         <RichTooltip content={TT_STRATEGY_NAME}>
           <input
             type="text"
@@ -270,16 +270,16 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
             placeholder="e.g., Example_MA_Crossover"
             maxLength={100}
             className="w-full px-2 py-1.5 rounded border text-sm focus:outline-none"
-            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
           />
         </RichTooltip>
       </div>
 
       {/* Description (auto-generated, read-only) */}
       <div className="space-y-1">
-        <label className="text-xs" style={{ color: '#9AA0A6' }}>
+        <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>
           Description:
-          {descLabel && <span className="ml-1 font-normal" style={{ color: '#6B7280' }}>{descLabel}.</span>}
+          {descLabel && <span className="ml-1 font-normal" style={{ color: 'var(--text-muted)' }}>{descLabel}.</span>}
         </label>
         <RichTooltip content={TT_DESCRIPTION}>
           <textarea
@@ -288,11 +288,11 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
             readOnly
             className="w-full px-2 py-1.5 rounded border text-xs resize-none focus:outline-none leading-relaxed cursor-default select-none"
             style={{
-              background: 'rgba(42,47,58,0.4)',
-              borderColor: 'rgba(60,65,73,0.6)',
-              color: '#9AA0A6',
+              background: 'color-mix(in srgb, var(--bg-card) 40%, transparent)',
+              borderColor: 'color-mix(in srgb, var(--border) 60%, transparent)',
+              color: 'var(--text-secondary)',
               scrollbarWidth: 'thin' as const,
-              scrollbarColor: '#3C4149 #1E2128',
+              scrollbarColor: 'var(--border) var(--bg-panel)',
             }}
           />
         </RichTooltip>
@@ -300,7 +300,7 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
 
       {/* Strategy Type + Meta stats — no-wrap; clips rather than wraps when panel is narrow */}
       <div className="flex items-center gap-2 text-xs overflow-hidden" style={{ flexWrap: 'nowrap' }}>
-        <span className="flex-shrink-0" style={{ color: '#9AA0A6' }}>Strategy Type:</span>
+        <span className="flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>Strategy Type:</span>
         {(['Bullish', 'Bearish'] as const).map(type => (
           <RichTooltip key={type} content={type === 'Bullish' ? TT_BULLISH : TT_BEARISH}>
             <button
@@ -312,7 +312,7 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
                     : 'bg-red-900 text-red-300 border-red-700'
                   : 'border-[#3C4149] hover:border-[#9AA0A6] hover:text-[#A0AEC0]'
               }`}
-              style={currentType !== type ? { background: '#2A2F3A', color: '#9AA0A6' } : undefined}
+              style={currentType !== type ? { background: 'var(--bg-card)', color: 'var(--text-secondary)' } : undefined}
             >
               {type}
             </button>
@@ -320,25 +320,25 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
         ))}
         {stats && (
           <>
-            <span className="mx-0.5" style={{ color: '#9AA0A6' }}>|</span>
+            <span className="mx-0.5" style={{ color: 'var(--text-secondary)' }}>|</span>
             <RichTooltip content={TT_STAT_REQUIRED}>
-              <span style={{ color: '#A0AEC0', cursor: 'default' }}>Required: <span className="font-bold" style={{ color: '#10B981' }}>{stats.required}</span></span>
+              <span style={{ color: 'var(--text-dim)', cursor: 'default' }}>Required: <span className="font-bold" style={{ color: 'var(--accent-green)' }}>{stats.required}</span></span>
             </RichTooltip>
-            <span style={{ color: '#9AA0A6' }}>|</span>
+            <span style={{ color: 'var(--text-secondary)' }}>|</span>
             <RichTooltip content={TT_STAT_OPTIONAL}>
-              <span style={{ color: '#A0AEC0', cursor: 'default' }}>Optional: <span className="font-bold" style={{ color: '#2070FF' }}>{stats.optional}</span></span>
+              <span style={{ color: 'var(--text-dim)', cursor: 'default' }}>Optional: <span className="font-bold" style={{ color: 'var(--accent-blue-alt)' }}>{stats.optional}</span></span>
             </RichTooltip>
-            <span style={{ color: '#9AA0A6' }}>|</span>
+            <span style={{ color: 'var(--text-secondary)' }}>|</span>
             <RichTooltip content={TT_STAT_RECHECKED}>
-              <span style={{ color: '#A0AEC0', cursor: 'default' }}>Rechecked: <span className="font-bold" style={{ color: '#FFA500' }}>{stats.rechecked}</span></span>
+              <span style={{ color: 'var(--text-dim)', cursor: 'default' }}>Rechecked: <span className="font-bold" style={{ color: 'var(--accent-orange)' }}>{stats.rechecked}</span></span>
             </RichTooltip>
-            <span style={{ color: '#9AA0A6' }}>|</span>
+            <span style={{ color: 'var(--text-secondary)' }}>|</span>
             <RichTooltip content={TT_STAT_EXITS}>
-              <span style={{ color: '#A0AEC0', cursor: 'default' }}>Exit Conditions: <span className="font-bold" style={{ color: '#C35252' }}>{stats.exits}</span></span>
+              <span style={{ color: 'var(--text-dim)', cursor: 'default' }}>Exit Conditions: <span className="font-bold" style={{ color: 'var(--accent-red)' }}>{stats.exits}</span></span>
             </RichTooltip>
-            <span style={{ color: '#9AA0A6' }}>|</span>
+            <span style={{ color: 'var(--text-secondary)' }}>|</span>
             <RichTooltip content={TT_STAT_TIMING}>
-              <span style={{ color: '#A0AEC0', cursor: 'default' }}>Time Constraint: <span className="font-bold" style={{ color: '#E8EAED' }}>{stats.timeConstrained > 0 ? 'Yes' : 'No'}</span></span>
+              <span style={{ color: 'var(--text-dim)', cursor: 'default' }}>Time Constraint: <span className="font-bold" style={{ color: '#E8EAED' }}>{stats.timeConstrained > 0 ? 'Yes' : 'No'}</span></span>
             </RichTooltip>
           </>
         )}

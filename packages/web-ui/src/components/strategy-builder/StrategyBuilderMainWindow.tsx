@@ -19,6 +19,7 @@ import * as api from '@/lib/strategy-builder/api';
 import type { BacktestResult, BacktestConfig, Strategy } from '@/lib/strategy-builder/types';
 import { RichTooltip, TooltipContent } from './RichTooltip';
 import { useTooltipSettings } from './TooltipSettingsContext';
+import { ThemeSelector } from './ThemeSelector';
 
 type DialogKey =
   | 'newStrategy'
@@ -370,14 +371,14 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // -------------------------------------------------------------------------
   if (isLoadingStrategy) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ background: '#15191E' }}>
-        <div className="text-sm" style={{ color: '#9AA0A6' }}>Loading strategy…</div>
+      <div className="flex items-center justify-center h-full" style={{ background: 'var(--bg-deep)' }}>
+        <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>Loading strategy…</div>
       </div>
     );
   }
   if (strategyError) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ background: '#15191E' }}>
+      <div className="flex items-center justify-center h-full" style={{ background: 'var(--bg-deep)' }}>
         <div className="text-red-400 text-sm">Error: {strategyError}</div>
       </div>
     );
@@ -388,10 +389,10 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       className="flex flex-col h-full select-none"
       onKeyDown={handleKeyDown}
       tabIndex={-1}
-      style={{ outline: 'none', background: '#0F1117' }}
+      style={{ outline: 'none', background: 'var(--bg-base)' }}
     >
       {/* ── Window title / Menu Bar ─────────────────────────────────────── */}
-      <div className="flex items-center gap-0.5 border-b px-2 py-1 flex-shrink-0" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
+      <div className="flex items-center gap-0.5 border-b px-2 py-1 flex-shrink-0" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         <MenuDropdown
           label="File"
           items={[
@@ -437,16 +438,16 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 
         {/* Strategy name + dirty indicator */}
         {mounted && currentStrategy && (
-          <span className="ml-auto text-xs truncate max-w-xs pr-2" style={{ color: '#9AA0A6' }}>
+          <span className="ml-auto text-xs truncate max-w-xs pr-2" style={{ color: 'var(--text-secondary)' }}>
             BTC Trade Engine — Strategy Builder —{' '}
-            <span style={{ color: '#E8EAED' }}>{currentStrategy.name}</span>
+            <span style={{ color: 'var(--text-primary)' }}>{currentStrategy.name}</span>
             {isModified && <span className="text-amber-400 ml-1" title="Unsaved changes">●</span>}
           </span>
         )}
       </div>
 
       {/* ── Toolbar + Stepper (3-column: left tools | center stepper | right spacer) ── */}
-      <div className="flex items-center border-b px-3 py-1.5 flex-shrink-0" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
+      <div className="flex items-center border-b px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         {/* Left: toolbar buttons */}
         <div className="flex items-center gap-1">
           <ToolbarButton label="New"  tooltip={TT_NEW}  onClick={() => open('newStrategy')} />
@@ -457,7 +458,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             onClick={handleSave}
             active={mounted && isModified}
           />
-          <div className="w-px h-5 mx-1 flex-shrink-0" style={{ background: '#3C4149' }} />
+          <div className="w-px h-5 mx-1 flex-shrink-0" style={{ background: 'var(--border)' }} />
           <ToolbarButton
             label={backTestInProgress ? '▶ Running…' : '▶ Quick Preview'}
             tooltip={TT_QUICK_PREVIEW}
@@ -475,14 +476,16 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             inline
           />
         </div>
-        {/* Right: tooltip settings control — muted to blend with toolbar chrome */}
-        <div className="flex items-center gap-1.5 flex-shrink-0 text-xs" style={{ minWidth: 200, justifyContent: 'flex-end', color: '#4B5563' }}>
+        {/* Right: theme selector + tooltip settings — muted to blend with toolbar chrome */}
+        <div className="flex items-center gap-3 flex-shrink-0 text-xs" style={{ minWidth: 260, justifyContent: 'flex-end', color: 'var(--text-faint)' }}>
+          <ThemeSelector />
+          <div className="w-px h-4" style={{ background: 'var(--border)' }} />
           <label className="flex items-center gap-1 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={tooltipSettings.enabled}
               onChange={e => updateTooltipSettings({ enabled: e.target.checked })}
-              style={{ accentColor: '#5A6472', width: 11, height: 11 }}
+              style={{ accentColor: 'var(--toolbar-accent)', width: 11, height: 11 }}
             />
             Tooltips
           </label>
@@ -495,7 +498,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
                 step={100}
                 value={tooltipSettings.delayMs}
                 onChange={e => updateTooltipSettings({ delayMs: Number(e.target.value) })}
-                style={{ width: 54, accentColor: '#5A6472', cursor: 'pointer', opacity: 0.75 }}
+                style={{ width: 54, accentColor: 'var(--toolbar-accent)', cursor: 'pointer', opacity: 0.75 }}
               />
               <span style={{ minWidth: 24, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                 {(tooltipSettings.delayMs / 1000).toFixed(1)}s
@@ -510,10 +513,10 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         {/* LEFT PANEL: Strategy Info + Blocks */}
         <div
           className="flex flex-col overflow-hidden border-r"
-          style={{ width: `${leftPercent}%`, borderColor: '#3C4149' }}
+          style={{ width: `${leftPercent}%`, borderColor: 'var(--border)' }}
         >
           {/* Section 1: Strategy Information (compact top) */}
-          <div className="flex-shrink-0 border-b" style={{ borderColor: '#3C4149' }}>
+          <div className="flex-shrink-0 border-b" style={{ borderColor: 'var(--border)' }}>
             <StrategyInfoPanel compact />
           </div>
 
@@ -525,11 +528,11 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 
         {/* Drag handle */}
         <div
-          className="w-2 bg-[#2A2F3A] hover:bg-blue-700 transition-colors cursor-col-resize flex-shrink-0 flex flex-col items-center justify-center gap-0.5"
+          className="w-2 bg-[var(--bg-card)] hover:bg-blue-700 transition-colors cursor-col-resize flex-shrink-0 flex flex-col items-center justify-center gap-0.5"
           onMouseDown={() => { isDragging.current = true; }}
         >
           {[0, 1, 2].map(i => (
-            <div key={i} className="w-0.5 h-3 bg-[#3C4149] rounded-full" />
+            <div key={i} className="w-0.5 h-3 bg-[var(--border)] rounded-full" />
           ))}
         </div>
 
@@ -540,8 +543,8 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       </div>
 
       {/* ── Status Bar ──────────────────────────────────────────────────── */}
-      <div className="h-6 border-t px-3 flex items-center flex-shrink-0" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
-        <span className="text-xs" style={{ color: '#9AA0A6' }}>{statusText}</span>
+      <div className="h-6 border-t px-3 flex items-center flex-shrink-0" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+        <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{statusText}</span>
       </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────────────── */}
@@ -686,12 +689,12 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, tooltip, onClick, 
       disabled={disabled}
       className={`px-2.5 py-1 text-xs rounded transition-colors border ${
         disabled
-          ? 'text-[#6B7280] bg-[#1E2128] border-[#3C4149] cursor-not-allowed'
+          ? 'text-[var(--text-muted)] bg-[var(--bg-panel)] border-[var(--border)] cursor-not-allowed'
           : accent
           ? 'text-white bg-blue-700 border-blue-600 hover:bg-blue-600 font-medium'
           : active
-          ? 'text-amber-300 bg-[#2A2F3A] border-[#3C4149] hover:bg-[#3C4149]'
-          : 'text-[#A0AEC0] bg-[#2A2F3A] border-[#3C4149] hover:bg-[#3C4149] hover:text-[#E8EAED]'
+          ? 'text-amber-300 bg-[var(--bg-card)] border-[var(--border)] hover:bg-[var(--border)]'
+          : 'text-[var(--text-dim)] bg-[var(--bg-card)] border-[var(--border)] hover:bg-[var(--border)] hover:text-[var(--text-primary)]'
       }`}
     >
       {label}
@@ -716,24 +719,24 @@ const MenuDropdown: React.FC<{ label: string; items: MenuItem[] }> = ({ label, i
       <button
         onClick={() => setOpen(v => !v)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        className="px-3 py-1 text-sm text-[#A0AEC0] hover:text-[#E8EAED] hover:bg-[#2A2F3A] rounded transition-colors"
+        className="px-3 py-1 text-sm text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] rounded transition-colors"
       >
         {label}
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-0.5 border rounded shadow-xl z-50 min-w-max" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
+        <div className="absolute top-full left-0 mt-0.5 border rounded shadow-xl z-50 min-w-max" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
           {items.map((item, i) =>
             item.label === '—' ? (
-              <div key={i} className="border-t my-0.5" style={{ borderColor: '#3C4149' }} />
+              <div key={i} className="border-t my-0.5" style={{ borderColor: 'var(--border)' }} />
             ) : (
               <button
                 key={i}
                 onClick={() => { setOpen(false); item.onClick(); }}
-                className="flex items-center justify-between w-full px-4 py-1.5 text-sm text-[#E8EAED] hover:bg-[#2A2F3A] transition-colors text-left gap-8 whitespace-nowrap"
+                className="flex items-center justify-between w-full px-4 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition-colors text-left gap-8 whitespace-nowrap"
               >
                 <span>{item.label}</span>
                 {item.shortcut && (
-                  <span className="text-xs text-[#6B7280]">{item.shortcut}</span>
+                  <span className="text-xs text-[var(--text-muted)]">{item.shortcut}</span>
                 )}
               </button>
             )
