@@ -55,6 +55,25 @@ export interface Strategy {
   createdAt: string;
   updatedAt: string;
   backtestResults?: BacktestResult[];
+  versionId?: string;
+  versionNumber?: number;
+  published?: boolean;
+  testCount?: number;
+  strategyType?: string;
+  validationStatus?: 'Pass' | 'Fail' | 'Un-Validated';
+  versions?: StrategyVersion[];
+}
+
+// Strategy version snapshot for history/rollback
+export interface StrategyVersion {
+  id: string;
+  strategyId: string;
+  versionNumber: number;
+  createdAt: string;
+  author?: string;
+  description?: string;
+  isLatest: boolean;
+  changesSummary?: string;
 }
 
 // Strategy-level settings and configuration
@@ -222,6 +241,7 @@ export interface BacktestResult {
   maxDrawdown: number;
   sharpeRatio: number;
   sortino_ratio: number;
+  calmar_ratio?: number;
   profitFactor: number;
   averageWin: number;
   averageLoss: number;
