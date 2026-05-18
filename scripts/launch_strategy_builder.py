@@ -16,6 +16,7 @@ import logging
 import os
 from pathlib import Path
 from PyQt5.QtWidgets import QApplication
+from PyQt5.QtGui import QPalette, QColor
 
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -50,6 +51,31 @@ def main():
     """Launch the Strategy Builder application."""
     # Create Qt application
     app = QApplication(sys.argv)
+
+    # Apply Fusion style + dark QPalette before any window is created.
+    # Fusion provides consistent cross-platform rendering independent of the
+    # system GTK/Breeze theme — without this, Qt uses the native platform
+    # theme (light on most Linux distros) and the dark stylesheet applied to
+    # individual windows cannot fully override the application-level palette,
+    # causing a full light-mode render on cold start after a server restart.
+    app.setStyle('Fusion')
+    dark_palette = QPalette()
+    dark_palette.setColor(QPalette.Window,          QColor('#0A0E15'))
+    dark_palette.setColor(QPalette.WindowText,      QColor('#E8EAED'))
+    dark_palette.setColor(QPalette.Base,            QColor('#151C26'))
+    dark_palette.setColor(QPalette.AlternateBase,   QColor('#12171F'))
+    dark_palette.setColor(QPalette.ToolTipBase,     QColor('#253241'))
+    dark_palette.setColor(QPalette.ToolTipText,     QColor('#E8EAED'))
+    dark_palette.setColor(QPalette.Text,            QColor('#E8EAED'))
+    dark_palette.setColor(QPalette.Button,          QColor('#2A3139'))
+    dark_palette.setColor(QPalette.ButtonText,      QColor('#E8EAED'))
+    dark_palette.setColor(QPalette.BrightText,      QColor('#FFFFFF'))
+    dark_palette.setColor(QPalette.Link,            QColor('#2070FF'))
+    dark_palette.setColor(QPalette.Highlight,       QColor('#2070FF'))
+    dark_palette.setColor(QPalette.HighlightedText, QColor('#FFFFFF'))
+    dark_palette.setColor(QPalette.Disabled, QPalette.Text,       QColor('#6B7280'))
+    dark_palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor('#6B7280'))
+    app.setPalette(dark_palette)
 
     # Set application metadata
     app.setApplicationName("Strategy Builder")
