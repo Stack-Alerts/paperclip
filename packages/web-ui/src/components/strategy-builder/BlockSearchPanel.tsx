@@ -322,30 +322,52 @@ export function BlockSearchPanel() {
     return [...cats].sort().map(c => ({ id: c, name: c }));
   }, [blockCategories, blockLibrary]);
 
-  // Add block to strategy
+  // Add block to strategy.
+  // Standard mode: signals from the same block definition + logic are merged
+  //   into the existing block card rather than creating a duplicate card.
+  // Advanced mode: always creates a new separate block card (allows duplicates).
   const handleAdd = useCallback(
     (definition: BlockDefinition, logic: 'AND' | 'OR' | 'EXIT', selectedSignals: string[]) => {
       const state = useStrategyStore.getState();
-      const position = state.currentStrategy?.blocks.length ?? 0;
-      const blockType = logic === 'EXIT' ? BlockType.EXIT_CONDITION : definition.type;
-      addBlock(blockType, position);
       const allSignals = definition.signals ?? [];
       const signalsToAdd = selectedSignals.length > 0
         ? allSignals.filter(s => selectedSignals.includes(s.name))
         : allSignals;
+      const newSignalData = signalsToAdd.map(s => ({
+        name: s.name,
+        description: s.description ?? '',
+        recheckEnabled: false,
+      }));
+
+      if (!advancedMode) {
+        // Look for an existing block with the same definition + logic
+        const currentBlocks = state.currentStrategy?.blocks ?? [];
+        const existingIdx = currentBlocks.findIndex(
+          b =>
+            (b.data as Record<string, unknown>).definitionId === definition.id &&
+            (b.data as Record<string, unknown>).logic === logic
+        );
+        if (existingIdx >= 0) {
+          const existingSignals =
+            ((currentBlocks[existingIdx].data as Record<string, unknown>).signals as Array<Record<string, unknown>>) ?? [];
+          updateBlock(existingIdx, { signals: [...existingSignals, ...newSignalData] });
+          return;
+        }
+      }
+
+      // Create a new block
+      const position = state.currentStrategy?.blocks.length ?? 0;
+      const blockType = logic === 'EXIT' ? BlockType.EXIT_CONDITION : definition.type;
+      addBlock(blockType, position);
       updateBlock(position, {
         name: definition.name,
         definitionId: definition.id,
         category: definition.category,
-        logic: logic,
-        signals: signalsToAdd.map(s => ({
-          name: s.name,
-          description: s.description ?? '',
-          recheckEnabled: false,
-        })),
+        logic,
+        signals: newSignalData,
       });
     },
-    [addBlock, updateBlock]
+    [addBlock, updateBlock, advancedMode]
   );
 
   return (
