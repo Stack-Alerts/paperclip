@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BlockDefinition, BlockType } from '@/lib/strategy-builder/types';
+import { ExitConditionDialog, ExitConditionConfig, AvailableBlock } from './ExitConditionDialog';
 
 const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   [BlockType.ENTRY_CONDITION]:  'ENTRY',
@@ -99,11 +100,12 @@ function SavePresetModal({ open, onSave, onCancel }: SavePresetModalProps) {
 // ─────────────────────────────────────────────
 interface BlockItemProps {
   definition: BlockDefinition;
-  onAdd: (def: BlockDefinition, logic: 'AND' | 'OR' | 'EXIT', selectedSignals: string[]) => void;
+  onAdd: (def: BlockDefinition, logic: 'AND' | 'OR', selectedSignals: string[]) => void;
+  onAddExit: (def: BlockDefinition, selectedSignals: string[]) => void;
   advancedMode: boolean;
 }
 
-function BlockItem({ definition, onAdd, advancedMode }: BlockItemProps) {
+function BlockItem({ definition, onAdd, onAddExit, advancedMode }: BlockItemProps) {
   const [signalsOpen, setSignalsOpen] = useState(false);
   const [checkedSignals, setCheckedSignals] = useState<Set<string>>(new Set());
   const [addedSignals, setAddedSignals] = useState<Set<string>>(new Set());
@@ -125,10 +127,8 @@ function BlockItem({ definition, onAdd, advancedMode }: BlockItemProps) {
     });
   };
 
-  const handleAdd = (logic: 'AND' | 'OR' | 'EXIT') => {
+  const handleAdd = (logic: 'AND' | 'OR') => {
     const selected = checkedSignals.size > 0 ? [...checkedSignals] : visibleSignals.map(s => s.name);
-    // Standard mode: track added signals so they grey out (prevent accidental duplicates).
-    // Advanced mode: skip tracking so the same block can be added again with different config.
     if (!advancedMode) {
       setAddedSignals(prev => {
         const next = new Set(prev);
@@ -138,6 +138,12 @@ function BlockItem({ definition, onAdd, advancedMode }: BlockItemProps) {
     }
     setCheckedSignals(new Set());
     onAdd(definition, logic, selected);
+  };
+
+  const handleAddExit = () => {
+    const selected = checkedSignals.size > 0 ? [...checkedSignals] : visibleSignals.map(s => s.name);
+    setCheckedSignals(new Set());
+    onAddExit(definition, selected);
   };
 
   return (
@@ -225,9 +231,9 @@ function BlockItem({ definition, onAdd, advancedMode }: BlockItemProps) {
               ➕ Add as OR (Optional)
             </button>
             <button
-              onClick={() => handleAdd('EXIT')}
+              onClick={handleAddExit}
               className="flex-1 text-xs py-1.5 rounded border border-red-800 bg-red-900/30 hover:bg-red-900/60 text-red-300 font-medium transition-colors"
-              title={`Add "${definition.name}" as exit condition`}
+              title={`Configure "${definition.name}" as exit condition`}
             >
               ➕ Add as Exit
             </button>
@@ -259,6 +265,12 @@ export function BlockSearchPanel() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedType, setSelectedType] = useState<BlockType | 'all'>('all');
   const [advancedMode, setAdvancedMode] = useState(false);
+
+  // Exit condition dialog
+  const [exitPending, setExitPending] = useState<{
+    definition: BlockDefinition;
+    selectedSignals: string[];
+  } | null>(null);
 
   // Presets
   const [presets, setPresets] = useState<FilterPreset[]>([]);
@@ -327,7 +339,7 @@ export function BlockSearchPanel() {
   //   into the existing block card rather than creating a duplicate card.
   // Advanced mode: always creates a new separate block card (allows duplicates).
   const handleAdd = useCallback(
-    (definition: BlockDefinition, logic: 'AND' | 'OR' | 'EXIT', selectedSignals: string[]) => {
+    (definition: BlockDefinition, logic: 'AND' | 'OR', selectedSignals: string[]) => {
       const state = useStrategyStore.getState();
       const allSignals = definition.signals ?? [];
       const signalsToAdd = selectedSignals.length > 0
@@ -340,7 +352,6 @@ export function BlockSearchPanel() {
       }));
 
       if (!advancedMode) {
-        // Look for an existing block with the same definition + logic
         const currentBlocks = state.currentStrategy?.blocks ?? [];
         const existingIdx = currentBlocks.findIndex(
           b =>
@@ -355,10 +366,8 @@ export function BlockSearchPanel() {
         }
       }
 
-      // Create a new block
       const position = state.currentStrategy?.blocks.length ?? 0;
-      const blockType = logic === 'EXIT' ? BlockType.EXIT_CONDITION : definition.type;
-      addBlock(blockType, position);
+      addBlock(definition.type, position);
       updateBlock(position, {
         name: definition.name,
         definitionId: definition.id,
@@ -368,6 +377,43 @@ export function BlockSearchPanel() {
       });
     },
     [addBlock, updateBlock, advancedMode]
+  );
+
+  const handleAddExit = useCallback(
+    (definition: BlockDefinition, selectedSignals: string[]) => {
+      setExitPending({ definition, selectedSignals });
+    },
+    []
+  );
+
+  const handleExitSave = useCallback(
+    (config: ExitConditionConfig) => {
+      if (!exitPending) return;
+      const { definition, selectedSignals } = exitPending;
+      const state = useStrategyStore.getState();
+      const allSignals = definition.signals ?? [];
+      const signalsToAdd = selectedSignals.length > 0
+        ? allSignals.filter(s => selectedSignals.includes(s.name))
+        : allSignals;
+      const newSignalData = signalsToAdd.map(s => ({
+        name: s.name,
+        description: s.description ?? '',
+        recheckEnabled: false,
+      }));
+
+      const position = state.currentStrategy?.blocks.length ?? 0;
+      addBlock(BlockType.EXIT_CONDITION, position);
+      updateBlock(position, {
+        name: definition.name,
+        definitionId: definition.id,
+        category: definition.category,
+        logic: 'EXIT',
+        signals: newSignalData,
+        exitConfig: config,
+      });
+      setExitPending(null);
+    },
+    [exitPending, addBlock, updateBlock]
   );
 
   return (
@@ -491,7 +537,7 @@ export function BlockSearchPanel() {
           <p className="text-xs text-center py-8" style={{ color: '#9AA0A6' }}>No blocks match the current filters</p>
         ) : (
           filteredBlocks.map(block => (
-            <BlockItem key={block.id} definition={block} onAdd={handleAdd} advancedMode={advancedMode} />
+            <BlockItem key={block.id} definition={block} onAdd={handleAdd} onAddExit={handleAddExit} advancedMode={advancedMode} />
           ))
         )}
       </div>
@@ -513,6 +559,29 @@ export function BlockSearchPanel() {
         onSave={handleConfirmSavePreset}
         onCancel={() => setSaveModalOpen(false)}
       />
+
+      {exitPending && (() => {
+        const stratBlocks = currentStrategy?.blocks ?? [];
+        const availableBlocks: AvailableBlock[] = stratBlocks
+          .filter(b => b.type !== BlockType.EXIT_CONDITION && (b.data as Record<string, unknown>).logic !== 'EXIT')
+          .map(b => ({
+            id: b.id,
+            name: (b.data as Record<string, unknown>).name as string ?? b.id,
+            signals: ((b.data as Record<string, unknown>).signals as Array<{ name: string }> | undefined ?? []).map(s => s.name),
+          }));
+        const signalName = exitPending.selectedSignals.length === 1
+          ? exitPending.selectedSignals[0]
+          : exitPending.definition.name;
+        return (
+          <ExitConditionDialog
+            open={true}
+            signalName={signalName}
+            availableBlocks={availableBlocks}
+            onSave={handleExitSave}
+            onCancel={() => setExitPending(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

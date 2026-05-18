@@ -354,7 +354,7 @@ function ExitConditionsSection({ blocks, onRemove }: ExitConditionsSectionProps)
     <div className="border-t flex-shrink-0" style={{ borderColor: '#3C4149' }}>
       <div className="px-4 py-2 flex items-center justify-between" style={{ background: 'rgba(30,33,40,0.6)' }}>
         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#9AA0A6' }}>
-          Strategy Exit Conditions
+          🔴 Strategy Exit Conditions
         </span>
         <span className="text-xs" style={{ color: '#6B7280' }}>{exitBlocks.length} exit block{exitBlocks.length !== 1 ? 's' : ''}</span>
       </div>
@@ -364,30 +364,55 @@ function ExitConditionsSection({ blocks, onRemove }: ExitConditionsSectionProps)
             No exit conditions configured. Add exit blocks from the library on the right.
           </p>
         ) : (
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {exitBlocks.map(({ block, globalIndex }) => {
               const name = (block.data.name as string | undefined) || 'Exit Condition';
               const signals = (block.data.signals as BlockSignal[] | undefined) ?? [];
+              const cfg = block.data.exitConfig as {
+                percentage?: number;
+                exitMode?: string;
+                bindingLevel?: string;
+                recheckEnabled?: boolean;
+                recheckBarDelay?: number;
+              } | undefined;
+              const pct = cfg?.percentage != null ? `${Math.round(cfg.percentage * 100)}%` : '50%';
+              const mode = cfg?.exitMode ?? 'ABSOLUTE';
+              const binding = cfg?.bindingLevel ?? 'STRATEGY';
               return (
                 <div
                   key={block.id}
-                  className="flex items-center justify-between text-xs py-1.5 px-2 rounded border border-red-900/40"
+                  className="rounded border border-red-900/40 px-3 py-2"
                   style={{ background: 'rgba(42,47,58,0.6)' }}
                 >
-                  <div className="flex-1 min-w-0">
-                    <span className="text-red-300 font-medium">{name}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-red-300 font-semibold text-xs truncate">🔴 {name}</span>
+                    <button
+                      onClick={() => onRemove(globalIndex)}
+                      className="hover:text-red-400 flex-shrink-0 text-xs"
+                      style={{ color: '#6B7280' }}
+                      title="Remove exit condition"
+                    >✕</button>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap text-xs" style={{ color: '#9AA0A6' }}>
+                    <span>
+                      <span style={{ color: '#6B7280' }}>Binding:</span>{' '}
+                      <span className="font-semibold" style={{ color: '#F59E0B' }}>{binding}</span>
+                    </span>
+                    <span>
+                      <span style={{ color: '#6B7280' }}>Exit:</span>{' '}
+                      <span className="font-semibold" style={{ color: '#10B981' }}>{pct}</span>
+                    </span>
+                    <span>
+                      <span style={{ color: '#6B7280' }}>Mode:</span>{' '}
+                      <span className="font-semibold" style={{ color: mode === 'FLEXIBLE' ? '#3B82F6' : '#E8EAED' }}>{mode}</span>
+                    </span>
+                    {cfg?.recheckEnabled && (
+                      <span style={{ color: '#14a0a5' }}>RECHECK: {cfg.recheckBarDelay ?? 3} bars</span>
+                    )}
                     {signals.length > 0 && (
-                      <span className="ml-2" style={{ color: '#6B7280' }}>({signals.length} signal{signals.length !== 1 ? 's' : ''})</span>
+                      <span style={{ color: '#6B7280' }}>({signals.length} signal{signals.length !== 1 ? 's' : ''})</span>
                     )}
                   </div>
-                  <button
-                    onClick={() => onRemove(globalIndex)}
-                    className="hover:text-red-400 ml-2 flex-shrink-0"
-                    style={{ color: '#6B7280' }}
-                    title="Remove exit condition"
-                  >
-                    ✕
-                  </button>
                 </div>
               );
             })}

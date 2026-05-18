@@ -1,227 +1,424 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { InfoTooltip } from './InfoTooltip';
+import React, { useState, useEffect } from 'react';
 
 export interface ExitConditionConfig {
-  percentage: number;
+  signalName: string;
+  percentage: number;            // stored 0.01–1.0 (e.g. 50% → 0.5)
   exitMode: 'ABSOLUTE' | 'FLEXIBLE';
-  tpProximity?: number;
-  reversalTrigger?: number;
-  recheckEnabled?: boolean;
-  recheckBarDelay?: number;
+  bindingLevel: 'STRATEGY' | 'BLOCK' | 'SIGNAL';
+  tpProximityThreshold: number;  // 0.25–10.0 (%)
+  reversalTrigger: number;       // stored 0.1–1.0 (e.g. 5% → 0.5)
+  recheckEnabled: boolean;
+  recheckBarDelay: number;
+  blockName?: string;
+  parentSignalName?: string;
+}
+
+export interface AvailableBlock {
+  id: string;
+  name: string;
+  signals: string[];
 }
 
 export interface ExitConditionDialogProps {
   open: boolean;
-  signalName?: string;
-  existingConfig?: ExitConditionConfig;
+  signalName: string;
+  availableBlocks: AvailableBlock[];
+  existing?: ExitConditionConfig;
   onSave: (config: ExitConditionConfig) => void;
-  onClose: () => void;
+  onCancel: () => void;
 }
+
+function PresetChip({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-xs px-2 py-0.5 rounded transition-colors hover:opacity-80 flex-shrink-0"
+      style={{ background: '#244647', color: '#9AA0A6', border: '1px solid #2D5A5B' }}
+    >
+      {label}
+    </button>
+  );
+}
+
+const BINDING_OPTIONS = [
+  {
+    value: 'STRATEGY' as const,
+    label: 'STRATEGY - Apply to all positions',
+    desc: '└─ Global exit for entire strategy',
+    color: '#DC2626',
+  },
+  {
+    value: 'BLOCK' as const,
+    label: 'BLOCK - Apply to specific block positions',
+    desc: '└─ Exit only for positions from specific block',
+    color: '#F59E0B',
+  },
+  {
+    value: 'SIGNAL' as const,
+    label: 'SIGNAL - Apply to specific signal positions',
+    desc: '└─ Granular exit for specific signal only',
+    color: '#3B82F6',
+  },
+];
+
+const MODE_OPTIONS = [
+  {
+    value: 'ABSOLUTE' as const,
+    label: 'ABSOLUTE - Exit Immediately',
+    desc: '└─ Executes partial exit as soon as signal fires',
+    color: '#E8EAED',
+  },
+  {
+    value: 'FLEXIBLE' as const,
+    label: 'FLEXIBLE - TP-Aware Exit',
+    desc: '└─ Defers exit if price moving toward TP; fires on reversal',
+    color: '#3B82F6',
+  },
+];
 
 export function ExitConditionDialog({
   open,
   signalName,
-  existingConfig,
+  availableBlocks,
+  existing,
   onSave,
-  onClose,
+  onCancel,
 }: ExitConditionDialogProps) {
-  const [percentage, setPercentage] = useState(() => existingConfig?.percentage ?? 50);
-  const [exitMode, setExitMode] = useState<'ABSOLUTE' | 'FLEXIBLE'>(() => existingConfig?.exitMode ?? 'ABSOLUTE');
-  const [tpProximity, setTpProximity] = useState(() => existingConfig?.tpProximity ?? 2.0);
-  const [reversalTrigger, setReversalTrigger] = useState(() => existingConfig?.reversalTrigger ?? 0.5);
-  const [recheckEnabled, setRecheckEnabled] = useState(() => existingConfig?.recheckEnabled ?? false);
-  const [recheckBarDelay, setRecheckBarDelay] = useState(() => existingConfig?.recheckBarDelay ?? 3);
-  const [error, setError] = useState<string | null>(null);
+  const isEditMode = !!existing;
 
-  const handleSave = useCallback(() => {
-    if (percentage < 1 || percentage > 100) {
-      setError('Percentage must be between 1 and 100.');
-      return;
+  const [bindingLevel, setBindingLevel] = useState<'STRATEGY' | 'BLOCK' | 'SIGNAL'>('STRATEGY');
+  const [selectedBlockName, setSelectedBlockName] = useState('');
+  const [selectedSignalKey, setSelectedSignalKey] = useState('');
+  const [percentage, setPercentage] = useState(50);
+  const [exitMode, setExitMode] = useState<'ABSOLUTE' | 'FLEXIBLE'>('ABSOLUTE');
+  const [tpProximity, setTpProximity] = useState(2.0);
+  const [reversal, setReversal] = useState(5);   // display 1–10, maps to 0.1–1.0 stored
+  const [recheckEnabled, setRecheckEnabled] = useState(false);
+  const [recheckDelay, setRecheckDelay] = useState(3);
+
+  useEffect(() => {
+    if (!open) return;
+    if (existing) {
+      setBindingLevel(existing.bindingLevel);
+      setSelectedBlockName(existing.blockName ?? '');
+      setSelectedSignalKey(
+        existing.blockName && existing.parentSignalName
+          ? `${existing.blockName}::${existing.parentSignalName}`
+          : ''
+      );
+      setPercentage(Math.round(existing.percentage * 100));
+      setExitMode(existing.exitMode);
+      setTpProximity(existing.tpProximityThreshold);
+      setReversal(Math.round(existing.reversalTrigger * 10));
+      setRecheckEnabled(existing.recheckEnabled);
+      setRecheckDelay(existing.recheckBarDelay);
+    } else {
+      setBindingLevel('STRATEGY');
+      setSelectedBlockName('');
+      setSelectedSignalKey('');
+      setPercentage(50);
+      setExitMode('ABSOLUTE');
+      setTpProximity(2.0);
+      setReversal(5);
+      setRecheckEnabled(false);
+      setRecheckDelay(3);
     }
-    setError(null);
-    onSave({
-      percentage,
-      exitMode,
-      tpProximity,
-      reversalTrigger,
-      recheckEnabled,
-      recheckBarDelay,
-    });
-    onClose();
-  }, [percentage, exitMode, tpProximity, reversalTrigger, recheckEnabled, recheckBarDelay, onSave, onClose]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    },
-    [onClose],
-  );
+  }, [open, existing]);
 
   if (!open) return null;
 
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="exit-condition-title"
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      onKeyDown={handleKeyDown}
-    >
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+  // Flat list of block→signal pairs for SIGNAL binding selector
+  const allSignalOptions: { key: string; label: string }[] = [];
+  for (const b of availableBlocks) {
+    for (const sig of b.signals) {
+      allSignalOptions.push({ key: `${b.name}::${sig}`, label: `${b.name} → ${sig}` });
+    }
+  }
 
-      <div className="relative w-full max-w-lg rounded-lg border border-zinc-700 bg-zinc-900 shadow-2xl mx-4">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-          <h2 id="exit-condition-title" className="text-base font-semibold text-zinc-50">
-            🚪 Exit Condition
-            {signalName && <span className="text-zinc-400 ml-2 font-normal">({signalName})</span>}
-          </h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 text-lg" aria-label="Close dialog">
-            ✕
-          </button>
+  const handleSave = () => {
+    const config: ExitConditionConfig = {
+      signalName,
+      percentage: percentage / 100,
+      exitMode,
+      bindingLevel,
+      tpProximityThreshold: tpProximity,
+      reversalTrigger: reversal / 10,
+      recheckEnabled,
+      recheckBarDelay: recheckDelay,
+    };
+    if (bindingLevel === 'BLOCK' && selectedBlockName) {
+      config.blockName = selectedBlockName;
+    }
+    if (bindingLevel === 'SIGNAL' && selectedSignalKey.includes('::')) {
+      const idx = selectedSignalKey.indexOf('::');
+      config.blockName = selectedSignalKey.slice(0, idx);
+      config.parentSignalName = selectedSignalKey.slice(idx + 2);
+    }
+    onSave(config);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div
+        className="rounded border shadow-2xl flex flex-col"
+        style={{ background: '#1E2128', borderColor: '#3C4149', width: 580, maxHeight: '90vh' }}
+      >
+        {/* Title bar */}
+        <div
+          className="flex items-center justify-between px-4 py-2 border-b rounded-t flex-shrink-0"
+          style={{ background: '#2A2F3A', borderColor: '#3C4149' }}
+        >
+          <span className="text-sm font-semibold" style={{ color: '#E8EAED' }}>Configure Exit Condition</span>
+          <div className="flex items-center gap-1">
+            <span className="w-5 h-5 rounded text-xs flex items-center justify-center" style={{ background: '#3C4149', color: '#9AA0A6' }}>─</span>
+            <span className="w-5 h-5 rounded text-xs flex items-center justify-center" style={{ background: '#3C4149', color: '#9AA0A6' }}>□</span>
+            <button
+              onClick={onCancel}
+              className="w-5 h-5 rounded text-xs flex items-center justify-center hover:opacity-80"
+              style={{ background: '#5C2020', color: '#FCA5A5' }}
+            >✕</button>
+          </div>
         </div>
 
-        {/* Body */}
-        <div className="px-6 py-5 space-y-5">
-          {/* Percentage */}
-          <div className="space-y-1.5">
-            <label htmlFor="exit-percentage" className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
-              Exit Percentage (%) <span className="text-red-400">*</span>
-            </label>
-            <InfoTooltip id="exit-percentage-input">
-              <input
-                id="exit-percentage"
-                type="number"
-                min={1}
-                max={100}
-                value={percentage}
-                onChange={(e) => { setPercentage(parseFloat(e.target.value)); setError(null); }}
-                className={`w-full px-3 py-2 rounded bg-zinc-800 border text-sm text-zinc-100 focus:outline-none ${
-                  error ? 'border-red-600 focus:border-red-500' : 'border-zinc-700 focus:border-zinc-500'
-                }`}
-              />
-            </InfoTooltip>
-            <p className="text-xs text-zinc-500">Percentage of position to exit (1–100%)</p>
-            {error && <p className="text-xs text-red-400">{error}</p>}
-          </div>
-
-          {/* Exit Mode */}
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide">Exit Mode</p>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="exit-mode"
-                  checked={exitMode === 'ABSOLUTE'}
-                  onChange={() => setExitMode('ABSOLUTE')}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm text-zinc-100">ABSOLUTE</span>
-              </label>
-              <p className="text-xs text-zinc-500 ml-6">Exit immediately at fixed price</p>
-
-              <label className="flex items-center gap-2 cursor-pointer mt-3">
-                <input
-                  type="radio"
-                  name="exit-mode"
-                  checked={exitMode === 'FLEXIBLE'}
-                  onChange={() => setExitMode('FLEXIBLE')}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm text-zinc-100">FLEXIBLE</span>
-              </label>
-              <p className="text-xs text-zinc-500 ml-6">Dynamic exit based on market conditions</p>
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#3C4149 transparent' }}>
+          <div className="px-4 py-4 space-y-4">
+            {/* Dialog header */}
+            <div className="text-sm font-bold" style={{ color: '#3B9CC0' }}>
+              ⚙ Configure EXIT: {signalName}
             </div>
-          </div>
 
-          {/* Flexible Mode Parameters */}
-          {exitMode === 'FLEXIBLE' && (
-            <div className="rounded border border-zinc-700 bg-zinc-800/50 p-3 space-y-3">
-              <div className="space-y-1.5">
-                <label htmlFor="tp-proximity" className="text-xs text-zinc-400 font-medium">
-                  TP Proximity (%)
-                </label>
-                <InfoTooltip id="exit-tp-proximity">
+            {/* Exit Binding Level — hidden in edit mode */}
+            {!isEditMode && (
+              <section className="border rounded p-3 space-y-2" style={{ borderColor: '#3C4149' }}>
+                <div className="text-xs font-semibold" style={{ color: '#E8EAED' }}>Exit Binding Level</div>
+                {BINDING_OPTIONS.map(opt => (
+                  <div key={opt.value}>
+                    <div
+                      className="flex items-center gap-2 cursor-pointer"
+                      onClick={() => setBindingLevel(opt.value)}
+                    >
+                      <div
+                        className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                        style={{ borderColor: bindingLevel === opt.value ? opt.color : '#6B7280' }}
+                      >
+                        {bindingLevel === opt.value && (
+                          <div className="w-2 h-2 rounded-full" style={{ background: opt.color }} />
+                        )}
+                      </div>
+                      <span
+                        className="text-sm font-semibold"
+                        style={{ color: bindingLevel === opt.value ? opt.color : '#9AA0A6' }}
+                      >
+                        {opt.label}
+                      </span>
+                    </div>
+                    <div className="ml-6 text-xs" style={{ color: '#6B7280' }}>{opt.desc}</div>
+
+                    {opt.value === 'BLOCK' && bindingLevel === 'BLOCK' && availableBlocks.length > 0 && (
+                      <div className="ml-6 mt-1.5">
+                        <select
+                          value={selectedBlockName}
+                          onChange={e => setSelectedBlockName(e.target.value)}
+                          className="w-full px-2 py-1.5 rounded border text-xs focus:outline-none"
+                          style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+                        >
+                          <option value="">Select block…</option>
+                          {availableBlocks.map(b => (
+                            <option key={b.id} value={b.name}>{b.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {opt.value === 'SIGNAL' && bindingLevel === 'SIGNAL' && allSignalOptions.length > 0 && (
+                      <div className="ml-6 mt-1.5">
+                        <select
+                          value={selectedSignalKey}
+                          onChange={e => setSelectedSignalKey(e.target.value)}
+                          className="w-full px-2 py-1.5 rounded border text-xs focus:outline-none"
+                          style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+                        >
+                          <option value="">Select signal…</option>
+                          {allSignalOptions.map(o => (
+                            <option key={o.key} value={o.key}>{o.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </section>
+            )}
+
+            {/* Exit Percentage */}
+            <section className="border rounded p-3" style={{ borderColor: '#3C4149' }}>
+              <div className="text-xs font-semibold mb-2" style={{ color: '#E8EAED' }}>Exit Percentage</div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs flex-shrink-0" style={{ color: '#9AA0A6' }}>Close % of Position:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={percentage}
+                  onChange={e =>
+                    setPercentage(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))
+                  }
+                  className="w-16 px-2 py-1 rounded border text-sm text-center focus:outline-none"
+                  style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+                />
+                {[10, 15, 20, 25, 50, 75, 100].map(p => (
+                  <PresetChip key={p} label={`${p}%`} onClick={() => setPercentage(p)} />
+                ))}
+              </div>
+            </section>
+
+            {/* Exit Mode */}
+            <section className="border rounded p-3 space-y-2" style={{ borderColor: '#3C4149' }}>
+              <div className="text-xs font-semibold" style={{ color: '#E8EAED' }}>Exit Mode</div>
+              {MODE_OPTIONS.map(opt => (
+                <div key={opt.value}>
+                  <div className="flex items-center gap-2 cursor-pointer" onClick={() => setExitMode(opt.value)}>
+                    <div
+                      className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                      style={{ borderColor: exitMode === opt.value ? opt.color : '#6B7280' }}
+                    >
+                      {exitMode === opt.value && (
+                        <div className="w-2 h-2 rounded-full" style={{ background: opt.color }} />
+                      )}
+                    </div>
+                    <span
+                      className="text-sm font-semibold"
+                      style={{ color: exitMode === opt.value ? opt.color : '#9AA0A6' }}
+                    >
+                      {opt.label}
+                    </span>
+                  </div>
+                  <div className="ml-6 text-xs" style={{ color: '#6B7280' }}>{opt.desc}</div>
+                </div>
+              ))}
+            </section>
+
+            {/* FLEXIBLE Mode Parameters */}
+            {exitMode === 'FLEXIBLE' && (
+              <section
+                className="border rounded p-3 space-y-3"
+                style={{ borderColor: '#3B82F6', background: 'rgba(59,130,246,0.05)' }}
+              >
+                <div className="text-xs font-semibold" style={{ color: '#3B82F6' }}>
+                  FLEXIBLE Mode Parameters
+                </div>
+
+                {/* TP Proximity */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs w-40 flex-shrink-0" style={{ color: '#9AA0A6' }}>
+                    TP Proximity Threshold:
+                  </span>
                   <input
-                    id="tp-proximity"
                     type="number"
-                    step={0.1}
+                    min={0.25}
+                    max={10}
+                    step={0.25}
                     value={tpProximity}
-                    onChange={(e) => setTpProximity(parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 rounded bg-zinc-700 border border-zinc-600 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
+                    onChange={e =>
+                      setTpProximity(
+                        Math.min(10, Math.max(0.25, parseFloat(e.target.value) || 0.25))
+                      )
+                    }
+                    className="w-20 px-2 py-1 rounded border text-sm text-center focus:outline-none"
+                    style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
                   />
-                </InfoTooltip>
-              </div>
-              <div className="space-y-1.5">
-                <label htmlFor="reversal-trigger" className="text-xs text-zinc-400 font-medium">
-                  Reversal Trigger (%)
-                </label>
-                <InfoTooltip id="exit-reversal-trigger">
-                  <input
-                    id="reversal-trigger"
-                    type="number"
-                    step={0.01}
-                    value={reversalTrigger}
-                    onChange={(e) => setReversalTrigger(parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 rounded bg-zinc-700 border border-zinc-600 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
-                  />
-                </InfoTooltip>
-              </div>
-            </div>
-          )}
+                  <span className="text-xs" style={{ color: '#9AA0A6' }}>%</span>
+                  {[0.25, 0.5, 1.0, 1.5, 2.0].map(v => (
+                    <PresetChip key={v} label={`${v}%`} onClick={() => setTpProximity(v)} />
+                  ))}
+                </div>
 
-          {/* Recheck */}
-          <div className="space-y-2 rounded border border-zinc-700 bg-zinc-800/50 p-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={recheckEnabled}
-                onChange={(e) => setRecheckEnabled(e.target.checked)}
-                className="w-4 h-4"
-              />
-              <span className="text-sm text-zinc-100">Enable RECHECK validation</span>
-            </label>
-            {recheckEnabled && (
-              <div className="space-y-1.5 ml-6">
-                <label htmlFor="recheck-delay" className="text-xs text-zinc-400 font-medium">
-                  Bar Delay
-                </label>
-                <InfoTooltip id="exit-recheck-delay">
+                {/* Reversal Trigger */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs w-40 flex-shrink-0" style={{ color: '#9AA0A6' }}>
+                    Reversal Trigger:
+                  </span>
                   <input
-                    id="recheck-delay"
                     type="number"
                     min={1}
-                    value={recheckBarDelay}
-                    onChange={(e) => setRecheckBarDelay(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 rounded bg-zinc-700 border border-zinc-600 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
+                    max={10}
+                    value={reversal}
+                    onChange={e => setReversal(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))}
+                    className="w-20 px-2 py-1 rounded border text-sm text-center focus:outline-none"
+                    style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
                   />
-                </InfoTooltip>
-              </div>
+                  <span className="text-xs" style={{ color: '#9AA0A6' }}>%</span>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map(v => (
+                    <PresetChip key={v} label={`${v}%`} onClick={() => setReversal(v)} />
+                  ))}
+                </div>
+              </section>
             )}
+
+            {/* RECHECK Validation */}
+            <section className="border rounded p-3" style={{ borderColor: '#3C4149' }}>
+              <div className="text-xs font-semibold mb-2" style={{ color: '#E8EAED' }}>RECHECK Validation</div>
+              <div
+                className="flex items-center gap-2 cursor-pointer"
+                onClick={() => setRecheckEnabled(v => !v)}
+              >
+                <div
+                  className="w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0"
+                  style={{
+                    borderColor: recheckEnabled ? '#10B981' : '#6B7280',
+                    background: recheckEnabled ? '#10B981' : 'transparent',
+                  }}
+                >
+                  {recheckEnabled && (
+                    <span className="text-white leading-none" style={{ fontSize: 10, fontWeight: 700 }}>✓</span>
+                  )}
+                </div>
+                <span className="text-sm" style={{ color: recheckEnabled ? '#E8EAED' : '#9AA0A6' }}>
+                  Enable RECHECK for this exit condition
+                </span>
+              </div>
+
+              {recheckEnabled && (
+                <div className="flex items-center gap-2 flex-wrap mt-2 ml-6">
+                  <span className="text-xs flex-shrink-0" style={{ color: '#9AA0A6' }}>Bar Delay:</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    value={recheckDelay}
+                    onChange={e => setRecheckDelay(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-16 px-2 py-1 rounded border text-sm text-center focus:outline-none"
+                    style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+                  />
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(v => (
+                    <PresetChip key={v} label={String(v)} onClick={() => setRecheckDelay(v)} />
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-zinc-800">
-          <InfoTooltip id="exit-condition-cancel-btn">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium transition-colors"
-            >
-              Cancel
-            </button>
-          </InfoTooltip>
-          <InfoTooltip id="exit-condition-save-btn">
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
-            >
-              Save Exit Condition
-            </button>
-          </InfoTooltip>
+        <div className="flex border-t rounded-b overflow-hidden flex-shrink-0" style={{ borderColor: '#3C4149' }}>
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
+            style={{ background: '#C35252', color: '#ffffff' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
+            style={{ background: '#10B981', color: '#ffffff' }}
+          >
+            {isEditMode ? 'Update Exit Condition' : 'Add Exit Condition'}
+          </button>
         </div>
       </div>
     </div>

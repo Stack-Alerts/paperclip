@@ -75,8 +75,6 @@ function initCurrentStrategy(): { current: Strategy | null; list: Strategy[] } {
   return { current: fresh, list: [fresh] };
 }
 
-const { current: _initStrategy, list: _initList } = initCurrentStrategy();
-
 interface StrategyStoreState {
   // Strategy data
   currentStrategy: Strategy | null;
@@ -98,6 +96,7 @@ interface StrategyStoreState {
   backTestResult: BacktestResult | null;
 
   // Actions
+  hydrateFromLocalStorage: () => void;
   loadStrategy: (id: string) => Promise<void>;
   createStrategy: (name: string, description?: string) => Promise<void>;
   saveStrategy: () => Promise<Strategy>;
@@ -116,9 +115,10 @@ interface StrategyStoreState {
 }
 
 export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
-  // Initial state — eagerly initialize so UI never flashes "No strategy loaded"
-  currentStrategy: _initStrategy,
-  strategyList: _initList,
+  // Initial state — always null so SSR and client initial render match (no hydration mismatch).
+  // hydrateFromLocalStorage() is called after mount in StrategyBuilderMainWindow.
+  currentStrategy: null,
+  strategyList: [],
   isLoadingStrategy: false,
   strategyError: null,
   blockLibrary: [],
@@ -130,6 +130,12 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   backTestInProgress: false,
   backTestProgress: 0,
   backTestResult: null,
+
+  // Load localStorage state after client mount — keeps SSR/client renders in sync.
+  hydrateFromLocalStorage: () => {
+    const { current, list } = initCurrentStrategy();
+    set({ currentStrategy: current, strategyList: list });
+  },
 
   // Load existing strategy by ID
   loadStrategy: async (id: string) => {

@@ -111,6 +111,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     validateStrategy,
     setCurrentStrategy,
     backTestInProgress,
+    hydrateFromLocalStorage,
   } = useStrategyStore();
 
   const [mounted, setMounted] = useState(false);
@@ -118,15 +119,20 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // Load specific strategy by URL param; block library always loaded on mount.
   // Default strategy is pre-initialized in the Zustand store so no createStrategy() needed here.
   useEffect(() => {
+    // Hydrate store from localStorage after mount so SSR and initial client
+    // renders are both null (no hydration mismatch).
+    hydrateFromLocalStorage();
     setMounted(true);
-    // Establish the clean snapshot on first render so loading a strategy
-    // from localStorage doesn't immediately mark it as modified.
-    setCleanSnapshot(strategySnapshot);
     if (strategyId) {
       loadStrategy(strategyId).catch(console.error);
     }
     loadBlockLibrary().catch(console.error);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync clean snapshot whenever the strategy changes (from hydration or load).
+  useEffect(() => {
+    if (mounted) setCleanSnapshot(strategySnapshot);
+  }, [currentStrategy?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Dialog state
   const [activeDialog, setActiveDialog] = useState<DialogKey>(null);
