@@ -109,11 +109,9 @@ function BlockItem({ definition, onAdd, advancedMode }: BlockItemProps) {
   const [addedSignals, setAddedSignals] = useState<Set<string>>(new Set());
 
   const signals = definition.signals ?? [];
-  // Standard: only signals the desktop shows (ui_visible !== false from registry)
-  // Advanced: all signals
-  const visibleSignals = advancedMode
-    ? signals
-    : signals.filter(s => s.ui_visible !== false);
+  // Always use standard signal visibility (ui_visible !== false).
+  // Advanced mode only controls whether duplicate block adds are allowed.
+  const visibleSignals = signals.filter(s => s.ui_visible !== false);
   const ext = definition as unknown as Record<string, unknown>;
   const weight = ext.weight as number | undefined;
   const typeLabel = BLOCK_TYPE_LABELS[definition.type] ?? (definition.type as string).replace('_', ' ').toUpperCase();
@@ -129,12 +127,15 @@ function BlockItem({ definition, onAdd, advancedMode }: BlockItemProps) {
 
   const handleAdd = (logic: 'AND' | 'OR' | 'EXIT') => {
     const selected = checkedSignals.size > 0 ? [...checkedSignals] : visibleSignals.map(s => s.name);
-    // Mark selected signals as added
-    setAddedSignals(prev => {
-      const next = new Set(prev);
-      selected.forEach(s => next.add(s));
-      return next;
-    });
+    // Standard mode: track added signals so they grey out (prevent accidental duplicates).
+    // Advanced mode: skip tracking so the same block can be added again with different config.
+    if (!advancedMode) {
+      setAddedSignals(prev => {
+        const next = new Set(prev);
+        selected.forEach(s => next.add(s));
+        return next;
+      });
+    }
     setCheckedSignals(new Set());
     onAdd(definition, logic, selected);
   };
@@ -173,7 +174,7 @@ function BlockItem({ definition, onAdd, advancedMode }: BlockItemProps) {
           {/* Signal list with checkboxes */}
           <div className="space-y-2">
             {visibleSignals.map((sig, i) => {
-              const isAdded = addedSignals.has(sig.name);
+              const isAdded = !advancedMode && addedSignals.has(sig.name);
               const isChecked = checkedSignals.has(sig.name);
               return (
                 <div key={i} className={`pl-1 ${isAdded ? 'opacity-50' : ''}`}>
@@ -357,6 +358,7 @@ export function BlockSearchPanel() {
         <div className="flex items-center" style={{ border: '1px solid #3C4149', borderRadius: 4, overflow: 'hidden' }}>
           <button
             onClick={() => setAdvancedMode(false)}
+            title="Standard mode: each block can only be added once per signal"
             className="text-xs px-2.5 py-1 transition-colors"
             style={!advancedMode
               ? { background: '#1a3a4a', color: '#38bdf8', fontWeight: 600 }
@@ -366,6 +368,7 @@ export function BlockSearchPanel() {
           </button>
           <button
             onClick={() => setAdvancedMode(true)}
+            title="Advanced mode: allows adding the same building block multiple times with different configurations"
             className="text-xs px-2.5 py-1 transition-colors border-l border-[#3C4149]"
             style={advancedMode
               ? { background: '#1a3a4a', color: '#38bdf8', fontWeight: 600 }
