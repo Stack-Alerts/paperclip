@@ -139,13 +139,15 @@ interface ExitPillProps {
   globalIndex: number;
   onEdit: (index: number) => void;
   onRemove: (index: number) => void;
+  onDuplicate: (index: number) => void;
 }
 
-function ExitPill({ block, globalIndex, onEdit, onRemove }: ExitPillProps) {
+function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate }: ExitPillProps) {
   const name = (block.data.name as string | undefined) || 'Exit';
   const cfg = block.data.exitConfig as StoredExitConfig | undefined;
   const pct = cfg?.percentage != null ? `${Math.round(cfg.percentage * 100)}%` : '50%';
   const mode = cfg?.exitMode ?? 'ABSOLUTE';
+  const pillBtn: React.CSSProperties = { width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 };
   return (
     <div className="flex items-center gap-2 ml-4 mt-1 text-xs px-2 py-1 rounded border border-red-900/50" style={{ background: 'rgba(220,38,38,0.07)' }}>
       <span style={{ color: '#DC2626' }}>↳ 🔴</span>
@@ -153,10 +155,12 @@ function ExitPill({ block, globalIndex, onEdit, onRemove }: ExitPillProps) {
       <span style={{ color: '#10B981' }}>{pct}</span>
       <span style={{ color: mode === 'FLEXIBLE' ? '#3B82F6' : '#9AA0A6' }}>{mode}</span>
       {cfg?.recheckEnabled && <span style={{ color: '#14a0a5' }}>RCHK:{cfg.recheckBarDelay ?? 3}</span>}
-      <button onClick={() => onEdit(globalIndex)} title="Configure exit" className="hover:opacity-80 flex-shrink-0"
-        style={{ background: '#0d7377', color: '#fff', border: '1px solid #14a0a5', width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>⚙</button>
-      <button onClick={() => onRemove(globalIndex)} title="Remove exit" className="hover:opacity-80 flex-shrink-0"
-        style={{ background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252', width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>✕</button>
+      <button onClick={() => onEdit(globalIndex)} title="Configure exit" className="hover:opacity-80"
+        style={{ ...pillBtn, background: '#0d7377', color: '#fff', border: '1px solid #14a0a5' }}>⚙</button>
+      <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition" className="hover:opacity-80"
+        style={{ ...pillBtn, background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9' }}>📋</button>
+      <button onClick={() => onRemove(globalIndex)} title="Remove exit" className="hover:opacity-80"
+        style={{ ...pillBtn, background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252' }}>✕</button>
     </div>
   );
 }
@@ -176,12 +180,14 @@ interface BlockCardProps {
   onConfigRecheck: (blockIndex: number, signalIndex: number) => void;
   onRemoveRecheck: (blockIndex: number, signalIndex: number) => void;
   onDuplicateSignal: (blockIndex: number, signalIndex: number) => void;
+  onRemoveSignal: (blockIndex: number, signalIndex: number) => void;
   // Exits bound to this block (BLOCK-level binding)
   blockExits: { block: Block; globalIndex: number }[];
   // Exits bound to a specific signal in this block: key = signal name
   signalExits: Map<string, { block: Block; globalIndex: number }[]>;
   onEditExit: (index: number) => void;
   onRemoveExit: (index: number) => void;
+  onDuplicateExit: (index: number) => void;
 }
 
 const TEAL_BTN: React.CSSProperties = {
@@ -194,8 +200,8 @@ const TEAL_BTN: React.CSSProperties = {
 function BlockCard({
   block, index, total,
   onMoveUp, onMoveDown, onRemove, onConfig,
-  onToggleRecheck, onConfigRecheck, onRemoveRecheck, onDuplicateSignal,
-  blockExits, signalExits, onEditExit, onRemoveExit,
+  onToggleRecheck, onConfigRecheck, onRemoveRecheck, onDuplicateSignal, onRemoveSignal,
+  blockExits, signalExits, onEditExit, onRemoveExit, onDuplicateExit,
 }: BlockCardProps) {
   const blockName = (block.data.name as string | undefined) || BLOCK_TYPE_LABELS[block.type] || block.type;
   const logic = (block.data.logic as string | undefined) ?? 'AND';
@@ -220,7 +226,11 @@ function BlockCard({
     <div className="rounded border border-[#3C4149] mb-3" style={{ background: cardBg, borderLeft: `4px solid ${leftBorderColor}` }}>
       {/* Header: icon + name + badge + arrows */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#3C4149]/60">
-        <span className="flex-shrink-0 text-base" style={{ color: '#6B7280' }}>📊</span>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="flex-shrink-0">
+          <rect x="1" y="9" width="4" height="6" rx="0.5" fill="#3B82F6"/>
+          <rect x="6" y="5" width="4" height="10" rx="0.5" fill="#10B981"/>
+          <rect x="11" y="7" width="4" height="8" rx="0.5" fill="#3B82F6" opacity="0.55"/>
+        </svg>
         <span className="flex-1 text-sm font-semibold truncate" style={{ color: '#A0AEC0' }} title={blockName}>{blockName}</span>
         <span className="text-xs px-2 py-0.5 rounded font-mono flex-shrink-0" style={badgeStyle}>{badgeLabel}</span>
         <div className="flex items-center gap-0.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
@@ -264,8 +274,8 @@ function BlockCard({
 
               return (
                 <div key={si} className="space-y-1">
-                  {/* Signal row */}
-                  <div className="flex items-center gap-2 text-xs">
+                  {/* Signal row — ⚙/📋/✕ always visible */}
+                  <div className="flex items-center gap-1.5 text-xs">
                     <span className="flex-1 min-w-0">
                       <span style={{ color: '#E8EAED' }}>{si + 1}. {formatSignalName(sig.name)}</span>
                       <span className="font-mono font-semibold ml-1.5" style={{ color: logicColor }}>[{sigLogic}]</span>
@@ -276,31 +286,31 @@ function BlockCard({
                         </span>
                       )}
                     </span>
-                    {!hasRecheck && (
-                      <button onClick={() => onToggleRecheck(index, si)} title="Enable recheck on delayed candles"
-                        className="text-xs px-2.5 py-1 rounded whitespace-nowrap flex-shrink-0 transition-colors hover:opacity-80"
-                        style={{ background: '#0d7377', color: '#ffffff', border: '1px solid #14a0a5', fontSize: 11 }}>
-                        Recheck On Delayed Candles
-                      </button>
-                    )}
+                    {/* ⚙: open recheck config if active, else enable recheck */}
+                    <button
+                      onClick={() => hasRecheck ? onConfigRecheck(index, si) : onToggleRecheck(index, si)}
+                      title={hasRecheck ? 'Configure recheck' : 'Enable recheck on delayed candles'}
+                      style={TEAL_BTN}>⚙</button>
+                    <button onClick={() => onDuplicateSignal(index, si)} title="Duplicate signal" style={TEAL_BTN}>📋</button>
+                    <button onClick={() => onRemoveSignal(index, si)} title="Remove signal"
+                      style={{ ...TEAL_BTN, background: 'rgba(153,27,27,0.7)', border: '1px solid #C35252' }}>✕</button>
                   </div>
 
-                  {/* Recheck sub-row */}
+                  {/* Recheck status sub-row (no buttons — managed via ⚙ above) */}
                   {hasRecheck && (
                     <div className="flex items-center gap-1.5 ml-3 text-xs">
                       <span style={{ color: '#14a0a5' }}>↳</span>
                       <span className="flex-1 font-semibold" style={{ color: '#14a0a5' }}>
                         RECHECK ({sig.recheck_config?.mode ?? 'WITHIN'} {sig.recheck_config?.bar_delay ?? 3} bars)
                       </span>
-                      <button onClick={() => onConfigRecheck(index, si)} title="Configure recheck" style={TEAL_BTN}>⚙</button>
-                      <button onClick={() => onDuplicateSignal(index, si)} title="Duplicate signal" style={TEAL_BTN}>📋</button>
-                      <button onClick={() => onRemoveRecheck(index, si)} title="Remove recheck" style={TEAL_BTN}>✕</button>
+                      <button onClick={() => onRemoveRecheck(index, si)} title="Remove recheck"
+                        style={{ ...TEAL_BTN, width: 22, height: 22, fontSize: 10, background: 'rgba(220,38,38,0.35)', border: '1px solid #C35252' }}>✕</button>
                     </div>
                   )}
 
-                  {/* Signal-level exit conditions (Issue #3 / #6) */}
+                  {/* Signal-level exit conditions */}
                   {sigExits.map(({ block: eb, globalIndex: gi }) => (
-                    <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} />
+                    <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} onDuplicate={onDuplicateExit} />
                   ))}
                 </div>
               );
@@ -320,7 +330,7 @@ function BlockCard({
         <div className="mx-3 mb-3 space-y-1">
           <div className="text-xs font-semibold" style={{ color: '#9AA0A6' }}>Block Exit Conditions:</div>
           {blockExits.map(({ block: eb, globalIndex: gi }) => (
-            <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} />
+            <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} onDuplicate={onDuplicateExit} />
           ))}
         </div>
       )}
@@ -335,9 +345,10 @@ interface ExitConditionsSectionProps {
   strategyExits: { block: Block; globalIndex: number }[];
   onRemove: (index: number) => void;
   onEdit: (index: number) => void;
+  onDuplicate: (index: number) => void;
 }
 
-function ExitConditionsSection({ strategyExits, onRemove, onEdit }: ExitConditionsSectionProps) {
+function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate }: ExitConditionsSectionProps) {
   return (
     <div className="border-t flex-shrink-0" style={{ borderColor: '#3C4149' }}>
       <div className="px-4 py-2 flex items-center justify-between" style={{ background: 'rgba(30,33,40,0.6)' }}>
@@ -367,8 +378,12 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit }: ExitConditio
                       <button onClick={() => onEdit(globalIndex)} title="Configure exit condition"
                         className="hover:opacity-80"
                         style={{ background: '#0d7377', color: '#fff', border: '1px solid #14a0a5', width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>⚙</button>
+                      <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition"
+                        className="hover:opacity-80"
+                        style={{ background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9', width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>📋</button>
                       <button onClick={() => onRemove(globalIndex)} title="Remove exit condition"
-                        className="hover:text-red-400 text-xs" style={{ color: '#6B7280' }}>✕</button>
+                        className="hover:opacity-80"
+                        style={{ background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252', width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>✕</button>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 mt-1 flex-wrap text-xs" style={{ color: '#9AA0A6' }}>
@@ -391,7 +406,7 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit }: ExitConditio
 // StrategyBlocksPanel (main export)
 // ─────────────────────────────────────────────
 export function StrategyBlocksPanel() {
-  const { currentStrategy, deleteBlock, reorderBlocks, updateBlock } = useStrategyStore();
+  const { currentStrategy, deleteBlock, reorderBlocks, updateBlock, addBlock } = useStrategyStore();
 
   const blocks: Block[] = currentStrategy?.blocks ?? [];
 
@@ -463,6 +478,28 @@ export function StrategyBlocksPanel() {
       updateBlock(blockIndex, { signals });
     },
     [blocks, updateBlock]
+  );
+
+  const handleRemoveSignal = useCallback(
+    (blockIndex: number, signalIndex: number) => {
+      const block = blocks[blockIndex];
+      if (!block) return;
+      const signals = [...((block.data.signals as BlockSignal[] | undefined) ?? [])];
+      signals.splice(signalIndex, 1);
+      updateBlock(blockIndex, { signals });
+    },
+    [blocks, updateBlock]
+  );
+
+  const handleDuplicateExit = useCallback(
+    (exitGlobalIndex: number) => {
+      const block = blocks[exitGlobalIndex];
+      if (!block) return;
+      const position = exitGlobalIndex + 1;
+      addBlock(BlockType.EXIT_CONDITION, position);
+      updateBlock(position, { ...block.data });
+    },
+    [blocks, addBlock, updateBlock]
   );
 
   const handleRecheckConfigSave = useCallback(
@@ -614,10 +651,12 @@ export function StrategyBlocksPanel() {
                 onConfigRecheck={handleConfigRecheck}
                 onRemoveRecheck={handleRemoveRecheck}
                 onDuplicateSignal={handleDuplicateSignal}
+                onRemoveSignal={handleRemoveSignal}
                 blockExits={bExits}
                 signalExits={sigExitMap}
                 onEditExit={setEditingExitIndex}
                 onRemoveExit={handleRemove}
+                onDuplicateExit={handleDuplicateExit}
               />
             );
           })
@@ -629,6 +668,7 @@ export function StrategyBlocksPanel() {
         strategyExits={strategyExits}
         onRemove={handleRemove}
         onEdit={setEditingExitIndex}
+        onDuplicate={handleDuplicateExit}
       />
 
       {/* Timing Constraint Dialog */}
