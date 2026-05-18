@@ -220,18 +220,17 @@ jobs:
         id: diff
         run: |
           SNAPSHOT=$(ls data_quality_impact_gate_*.json 2>/dev/null | sort | tail -1)
-          # Refresh git's awareness of modified files by doing a no-op add
-          git add -n . 2>/dev/null || true
+          # Stage all changes (new snapshot, modified state files)
+          git add -A data_quality_impact_gate_*.json .impact_gate_muted_state.json 2>/dev/null || true
 
-          if [ -n "$SNAPSHOT" ] && ! git diff --quiet "$SNAPSHOT"; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "snapshot_file=$SNAPSHOT" >> "$GITHUB_OUTPUT"
-          elif [ -f .impact_gate_muted_state.json ] && ! git diff --quiet .impact_gate_muted_state.json 2>/dev/null; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif [ -f .impact_gate_muted_state.json ] && ! git ls-files --error-unmatch .impact_gate_muted_state.json 2>/dev/null; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
+          # Check for staged changes (covers both new and modified files)
+          if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            if [ -n "$SNAPSHOT" ]; then
+              echo "snapshot_file=$SNAPSHOT" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       - name: Commit updated data quality snapshot and muted state
