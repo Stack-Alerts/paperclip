@@ -309,11 +309,10 @@ export function StrategyBlocksPanel() {
       referenceId: b.id,
     }));
 
-  // Split into main blocks vs exit blocks for display
-  const mainBlocks = blocks.filter(
-    b => b.type !== BlockType.EXIT_CONDITION && (b.data.logic as string) !== 'EXIT'
-  );
   const blockCount = blocks.length;
+  const mainBlockCount = blocks.filter(
+    b => b.type !== BlockType.EXIT_CONDITION && (b.data.logic as string) !== 'EXIT'
+  ).length;
 
   return (
     <div className="flex flex-col h-full bg-zinc-950">
@@ -329,7 +328,7 @@ export function StrategyBlocksPanel() {
 
       {/* Block list (scrollable, main area) */}
       <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0">
-        {mainBlocks.length === 0 ? (
+        {mainBlockCount === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center gap-2">
             <div className="text-3xl opacity-20">📦</div>
             <p className="text-sm text-zinc-500">No building blocks added yet</p>
@@ -338,12 +337,8 @@ export function StrategyBlocksPanel() {
         ) : (
           blocks
             .filter(b => b.type !== BlockType.EXIT_CONDITION && (b.data.logic as string) !== 'EXIT')
-            .map((block, displayIdx) => {
-              // Find the global index of this block
+            .map(block => {
               const globalIndex = blocks.indexOf(block);
-              const mainCount = blocks.filter(
-                b => b.type !== BlockType.EXIT_CONDITION && (b.data.logic as string) !== 'EXIT'
-              ).length;
               return (
                 <BlockCard
                   key={block.id}
