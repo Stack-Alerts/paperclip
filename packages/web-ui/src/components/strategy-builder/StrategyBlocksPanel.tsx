@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { Block, BlockType } from '@/lib/strategy-builder/types';
 import { TimingConstraintDialog, TimingConstraint } from './TimingConstraintDialog';
@@ -33,6 +33,82 @@ interface BlockSignal {
 }
 
 // ─────────────────────────────────────────────
+// RecheckConfigModal
+// ─────────────────────────────────────────────
+interface RecheckConfigModalProps {
+  open: boolean;
+  signalName: string;
+  barDelay: number;
+  mode: string;
+  onSave: (barDelay: number, mode: string) => void;
+  onCancel: () => void;
+}
+
+function RecheckConfigModal({ open, signalName, barDelay, mode, onSave, onCancel }: RecheckConfigModalProps) {
+  const [delay, setDelay] = useState(barDelay);
+  const [recheckMode, setRecheckMode] = useState(mode);
+
+  useEffect(() => {
+    if (open) {
+      setDelay(barDelay);
+      setRecheckMode(mode);
+    }
+  }, [open, barDelay, mode]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="rounded-lg shadow-2xl border p-5 w-80" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
+        <h3 className="text-sm font-semibold mb-1" style={{ color: '#A0AEC0' }}>Configure Recheck</h3>
+        <p className="text-xs mb-4 truncate" style={{ color: '#6B7280' }}>{signalName}</p>
+        <div className="space-y-3 mb-4">
+          <div>
+            <label className="text-xs block mb-1" style={{ color: '#9AA0A6' }}>Bar Delay:</label>
+            <input
+              type="number"
+              min={1}
+              max={200}
+              value={delay}
+              onChange={e => setDelay(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-full px-2.5 py-1.5 rounded border text-sm focus:outline-none"
+              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+            />
+          </div>
+          <div>
+            <label className="text-xs block mb-1" style={{ color: '#9AA0A6' }}>Mode:</label>
+            <select
+              value={recheckMode}
+              onChange={e => setRecheckMode(e.target.value)}
+              className="w-full px-2.5 py-1.5 rounded border text-xs focus:outline-none"
+              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+            >
+              <option value="WITHIN">WITHIN</option>
+              <option value="AFTER">AFTER</option>
+            </select>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="text-xs px-3 py-1.5 rounded border transition-colors hover:opacity-80"
+            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#9AA0A6' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSave(delay, recheckMode)}
+            className="text-xs px-3 py-1.5 rounded border transition-colors hover:opacity-80"
+            style={{ background: '#0d7377', borderColor: '#14a0a5', color: '#ffffff' }}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // BlockCard
 // ─────────────────────────────────────────────
 interface BlockCardProps {
@@ -44,6 +120,9 @@ interface BlockCardProps {
   onRemove: (index: number) => void;
   onConfig: (index: number) => void;
   onToggleRecheck: (blockIndex: number, signalIndex: number) => void;
+  onConfigRecheck: (blockIndex: number, signalIndex: number) => void;
+  onRemoveRecheck: (blockIndex: number, signalIndex: number) => void;
+  onDuplicateSignal: (blockIndex: number, signalIndex: number) => void;
 }
 
 const TEAL_BTN: React.CSSProperties = {
@@ -70,6 +149,9 @@ function BlockCard({
   onRemove,
   onConfig,
   onToggleRecheck,
+  onConfigRecheck,
+  onRemoveRecheck,
+  onDuplicateSignal,
 }: BlockCardProps) {
   const blockName = (block.data.name as string | undefined) || BLOCK_TYPE_LABELS[block.type] || block.type;
   const logic = (block.data.logic as string | undefined) ?? 'AND';
@@ -190,9 +272,9 @@ function BlockCard({
                       <span className="flex-1 font-semibold" style={{ color: '#14a0a5' }}>
                         RECHECK (WITHIN {sig.recheck_config?.bar_delay ?? 3} bars)
                       </span>
-                      <button onClick={() => onToggleRecheck(index, si)} title="Configure recheck" style={TEAL_BTN}>⚙</button>
-                      <button title="Duplicate" style={TEAL_BTN} onClick={() => {}}>📋</button>
-                      <button onClick={() => onToggleRecheck(index, si)} title="Remove recheck" style={TEAL_BTN}>✕</button>
+                      <button onClick={() => onConfigRecheck(index, si)} title="Configure recheck settings" style={TEAL_BTN}>⚙</button>
+                      <button onClick={() => onDuplicateSignal(index, si)} title="Duplicate this signal" style={TEAL_BTN}>📋</button>
+                      <button onClick={() => onRemoveRecheck(index, si)} title="Remove recheck" style={TEAL_BTN}>✕</button>
                     </div>
                   )}
                 </div>
@@ -288,6 +370,9 @@ export function StrategyBlocksPanel() {
   // Timing constraint dialog
   const [timingDialogIndex, setTimingDialogIndex] = useState<number | null>(null);
 
+  // Recheck config modal
+  const [recheckTarget, setRecheckTarget] = useState<{ blockIndex: number; signalIndex: number } | null>(null);
+
   const handleMoveUp = useCallback(
     (index: number) => { if (index > 0) reorderBlocks(index, index - 1); },
     [reorderBlocks]
@@ -327,6 +412,61 @@ export function StrategyBlocksPanel() {
       updateBlock(blockIndex, { signals });
     },
     [blocks, updateBlock]
+  );
+
+  const handleConfigRecheck = useCallback(
+    (blockIndex: number, signalIndex: number) => {
+      setRecheckTarget({ blockIndex, signalIndex });
+    },
+    []
+  );
+
+  const handleRemoveRecheck = useCallback(
+    (blockIndex: number, signalIndex: number) => {
+      const block = blocks[blockIndex];
+      if (!block) return;
+      const signals = [...((block.data.signals as BlockSignal[] | undefined) ?? [])];
+      if (!signals[signalIndex]) return;
+      signals[signalIndex] = {
+        ...signals[signalIndex],
+        recheckEnabled: false,
+        recheck_config: { enabled: false },
+      };
+      updateBlock(blockIndex, { signals });
+    },
+    [blocks, updateBlock]
+  );
+
+  const handleDuplicateSignal = useCallback(
+    (blockIndex: number, signalIndex: number) => {
+      const block = blocks[blockIndex];
+      if (!block) return;
+      const signals = [...((block.data.signals as BlockSignal[] | undefined) ?? [])];
+      if (!signals[signalIndex]) return;
+      const copy = { ...signals[signalIndex] };
+      signals.splice(signalIndex + 1, 0, copy);
+      updateBlock(blockIndex, { signals });
+    },
+    [blocks, updateBlock]
+  );
+
+  const handleRecheckConfigSave = useCallback(
+    (barDelay: number, mode: string) => {
+      if (!recheckTarget) return;
+      const { blockIndex, signalIndex } = recheckTarget;
+      const block = blocks[blockIndex];
+      if (!block) return;
+      const signals = [...((block.data.signals as BlockSignal[] | undefined) ?? [])];
+      if (!signals[signalIndex]) return;
+      signals[signalIndex] = {
+        ...signals[signalIndex],
+        recheckEnabled: true,
+        recheck_config: { enabled: true, bar_delay: barDelay, mode },
+      };
+      updateBlock(blockIndex, { signals });
+      setRecheckTarget(null);
+    },
+    [recheckTarget, blocks, updateBlock]
   );
 
   const handleTimingConstraintSave = useCallback(
@@ -389,6 +529,9 @@ export function StrategyBlocksPanel() {
                   onRemove={handleRemove}
                   onConfig={handleConfig}
                   onToggleRecheck={handleToggleRecheck}
+                  onConfigRecheck={handleConfigRecheck}
+                  onRemoveRecheck={handleRemoveRecheck}
+                  onDuplicateSignal={handleDuplicateSignal}
                 />
               );
             })
@@ -410,6 +553,21 @@ export function StrategyBlocksPanel() {
           onCancel={() => setTimingDialogIndex(null)}
         />
       )}
+
+      {/* Recheck Config Modal */}
+      {recheckTarget && (() => {
+        const sig = (blocks[recheckTarget.blockIndex]?.data.signals as BlockSignal[] | undefined)?.[recheckTarget.signalIndex];
+        return (
+          <RecheckConfigModal
+            open={true}
+            signalName={sig ? formatSignalName(sig.name) : ''}
+            barDelay={sig?.recheck_config?.bar_delay ?? 3}
+            mode={sig?.recheck_config?.mode ?? 'WITHIN'}
+            onSave={handleRecheckConfigSave}
+            onCancel={() => setRecheckTarget(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
