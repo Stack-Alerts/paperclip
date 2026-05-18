@@ -220,30 +220,15 @@ jobs:
         id: diff
         run: |
           SNAPSHOT=$(ls data_quality_impact_gate_*.json 2>/dev/null | sort | tail -1)
-          CHANGED=false
-          SNAPSHOT_FILE=""
-
-          # Refresh git index to detect all working directory changes
-          git add -N . 2>/dev/null || true
-
-          # Check if snapshot file exists and has changes
-          if [ -n "$SNAPSHOT" ]; then
-            if git status --porcelain "$SNAPSHOT" | grep -q .; then
-              CHANGED=true
-              SNAPSHOT_FILE="$SNAPSHOT"
-            fi
-          fi
-
-          # Check if muted state file has changes
-          if [ -f .impact_gate_muted_state.json ]; then
-            if git status --porcelain .impact_gate_muted_state.json | grep -q .; then
-              CHANGED=true
-            fi
-          fi
-
-          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
-          if [ -n "$SNAPSHOT_FILE" ]; then
-            echo "snapshot_file=$SNAPSHOT_FILE" >> "$GITHUB_OUTPUT"
+          if [ -n "$SNAPSHOT" ] && ! git diff --quiet "$SNAPSHOT"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "snapshot_file=$SNAPSHOT" >> "$GITHUB_OUTPUT"
+          elif [ -f .impact_gate_muted_state.json ] && ! git diff --quiet .impact_gate_muted_state.json 2>/dev/null; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif [ -f .impact_gate_muted_state.json ] && ! git ls-files --error-unmatch .impact_gate_muted_state.json 2>/dev/null; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Commit updated data quality snapshot and muted state
