@@ -12,6 +12,7 @@ import { SettingsDialog } from './SettingsDialog';
 import { AlertDialog, QuestionDialog } from './AlertDialog';
 import { AdminPinDialog } from './AdminPinDialog';
 import { StepperRibbon } from './StepperRibbon';
+import { LogViewerWindow } from './LogViewerWindow';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import * as api from '@/lib/strategy-builder/api';
 import type { BacktestResult, BacktestConfig, Strategy } from '@/lib/strategy-builder/types';
@@ -142,14 +143,17 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     if (!currentStrategy) return;
     const newName = window.prompt('Save strategy as:', `${currentStrategy.name} (copy)`);
     if (!newName?.trim()) return;
-    const saved = await api.post<Strategy>('/strategies', {
+    const copy: Strategy = {
       ...currentStrategy,
-      id: undefined,
+      id: `${Date.now()}-copy`,
       name: newName.trim(),
-    });
-    setCurrentStrategy(saved);
-    setCleanSnapshot(JSON.stringify({ id: saved.id, blocks: saved.blocks, name: saved.name }));
-  }, [currentStrategy, setCurrentStrategy]);
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setCurrentStrategy(copy);
+    await saveStrategy();
+    setCleanSnapshot(JSON.stringify({ id: copy.id, blocks: copy.blocks, name: copy.name }));
+  }, [currentStrategy, setCurrentStrategy, saveStrategy]);
 
   const handleExit = useCallback(() => {
     if (isModified && !window.confirm('You have unsaved changes. Exit without saving?')) return;
@@ -176,8 +180,8 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     await api.post('/data/update', { startDate, endDate });
   }, []);
 
-  const handleVerifyData = useCallback(async () => {
-    return await api.post<Record<string, TimeframeVerifyResult>>('/data/verify', {});
+  const handleVerifyData = useCallback(async (): Promise<Record<string, TimeframeVerifyResult>> => {
+    return api.post<Record<string, TimeframeVerifyResult>>('/data/verify', {});
   }, []);
 
   const handleRepairData = useCallback(async (timeframe: string): Promise<void> => {
@@ -349,37 +353,15 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         onClose={close}
       />
 
-      {/* Log Viewer Dialog */}
-      {activeDialog === 'logViewer' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-2/3 max-h-[70vh] flex flex-col p-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-zinc-100">Debug Log Viewer</h2>
-              <div className="flex gap-2 items-center">
-                <button
-                  onClick={() => setConsoleLogs([])}
-                  className="text-xs px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded"
-                >
-                  Clear
-                </button>
-                <button
-                  onClick={handleDownloadLogs}
-                  className="text-xs px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded"
-                >
-                  Download
-                </button>
-                <button onClick={close} className="text-zinc-500 hover:text-zinc-300 text-xl leading-none ml-2">✕</button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto bg-zinc-950 rounded border border-zinc-800 p-3 font-mono text-xs text-zinc-400">
-              {consoleLogs.length === 0
-                ? <span className="text-zinc-600">No log entries.</span>
-                : consoleLogs.map((line, i) => <div key={i}>{line}</div>)
-              }
-            </div>
-          </div>
-        </div>
-      )}
+      <LogViewerWindow
+        open={activeDialog === 'logViewer'}
+        onClose={close}
+        logs={consoleLogs.map((line) => {
+          const lvl = /^\[(ERROR|WARNING|SYSTEM|DEBUG|TRADE_OPENED|TRADE_CLOSED)\]/.exec(line);
+          return { message: line, level: lvl ? lvl[1] : 'INFO', timestamp: new Date().toISOString() };
+        })}
+        onClear={() => setConsoleLogs([])}
+      />
 
       <AlertDialog
         open={activeDialog === 'alert'}

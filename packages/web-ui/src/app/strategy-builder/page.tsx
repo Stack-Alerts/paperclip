@@ -2,13 +2,13 @@
 
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { StrategyBuilder } from '@/components/strategy-builder/StrategyBuilder';
+import { StrategyBuilderMainWindow } from '@/components/strategy-builder/StrategyBuilderMainWindow';
 
 function StrategyBuilderContent() {
   const searchParams = useSearchParams();
   const strategyId = searchParams.get('id');
 
-  return <StrategyBuilder strategyId={strategyId ?? undefined} />;
+  return <StrategyBuilderMainWindow strategyId={strategyId ?? undefined} />;
 }
 
 export function StrategyBuilderPageWrapper() {

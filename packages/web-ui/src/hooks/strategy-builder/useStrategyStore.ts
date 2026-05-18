@@ -15,7 +15,48 @@ import {
   BacktestResult,
   StrategySettings,
 } from '@/lib/strategy-builder/types';
-import * as api from '@/lib/strategy-builder/api';
+
+const STORAGE_KEY = 'strategy_builder_strategies';
+
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function loadFromStorage(): Strategy[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveToStorage(strategies: Strategy[]) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(strategies));
+}
+
+function makeDefaultStrategy(name: string, description = ''): Strategy {
+  const now = new Date().toISOString();
+  return {
+    id: generateId(),
+    name,
+    description,
+    status: StrategyStatus.DRAFT,
+    strategyType: 'Bullish',
+    blocks: [],
+    settings: {
+      timeframe: '1h',
+      targetMarket: 'BTC/USDT',
+      riskParameters: null,
+      strategyExits: [],
+    },
+    validationStatus: null,
+    createdAt: now,
+    updatedAt: now,
+  } as unknown as Strategy;
+}
 
 interface StrategyStoreState {
   // Strategy data
@@ -56,9 +97,9 @@ interface StrategyStoreState {
 }
 
 export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
-  // Initial state
+  // Initial state — load strategy list from localStorage immediately
   currentStrategy: null,
-  strategyList: [],
+  strategyList: loadFromStorage(),
   isLoadingStrategy: false,
   strategyError: null,
   blockLibrary: [],
@@ -74,53 +115,50 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   // Load existing strategy by ID
   loadStrategy: async (id: string) => {
     set({ isLoadingStrategy: true, strategyError: null });
-    try {
-      const strategy = await api.get<Strategy>(`/strategies/${id}`);
-      set({ currentStrategy: strategy, isLoadingStrategy: false });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load strategy';
-      set({ isLoadingStrategy: false, strategyError: message });
-      throw error;
+    const strategies = loadFromStorage();
+    const strategy = strategies.find((s) => s.id === id) ?? null;
+    if (!strategy) {
+      set({ isLoadingStrategy: false, strategyError: `Strategy ${id} not found` });
+      return;
     }
+    set({ currentStrategy: strategy, isLoadingStrategy: false });
   },
 
-  // Create new strategy
+  // Create new strategy (stored in localStorage)
   createStrategy: async (name: string, description?: string) => {
     set({ isLoadingStrategy: true });
-    try {
-      const strategy = await api.post<Strategy>('/strategies', {
-        name,
-        description: description || '',
-      });
-      set({
-        currentStrategy: strategy,
-        isLoadingStrategy: false,
-        validationMessages: [],
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create strategy';
-      set({ isLoadingStrategy: false, strategyError: message });
-      throw error;
-    }
+    const strategy = makeDefaultStrategy(name, description);
+    const strategies = loadFromStorage();
+    strategies.push(strategy);
+    saveToStorage(strategies);
+    set({
+      currentStrategy: strategy,
+      strategyList: strategies,
+      isLoadingStrategy: false,
+      validationMessages: [],
+    });
   },
 
-  // Save current strategy
+  // Save current strategy to localStorage
   saveStrategy: async () => {
     const { currentStrategy } = get();
     if (!currentStrategy) throw new Error('No strategy to save');
 
-    try {
-      const updated = await api.put<Strategy>(
-        `/strategies/${currentStrategy.id}`,
-        currentStrategy
-      );
-      set({ currentStrategy: updated });
-      return updated;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save strategy';
-      set({ strategyError: message });
-      throw error;
+    const updated: Strategy = {
+      ...currentStrategy,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const strategies = loadFromStorage();
+    const idx = strategies.findIndex((s) => s.id === updated.id);
+    if (idx >= 0) {
+      strategies[idx] = updated;
+    } else {
+      strategies.push(updated);
     }
+    saveToStorage(strategies);
+    set({ currentStrategy: updated, strategyList: strategies });
+    return updated;
   },
 
   // Add block to strategy
@@ -138,10 +176,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     const updatedBlocks = [...currentStrategy.blocks];
     if (position >= 0) {
       updatedBlocks.splice(position, 0, newBlock);
-      // Re-index all blocks after insertion point
-      updatedBlocks.forEach((block, idx) => {
-        block.index = idx;
-      });
+      updatedBlocks.forEach((block, idx) => { block.index = idx; });
     } else {
       updatedBlocks.push(newBlock);
     }
@@ -161,10 +196,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     if (!currentStrategy) return;
 
     const updatedBlocks = currentStrategy.blocks.filter((_, i) => i !== index);
-    // Re-index remaining blocks
-    updatedBlocks.forEach((block, idx) => {
-      block.index = idx;
-    });
+    updatedBlocks.forEach((block, idx) => { block.index = idx; });
 
     set({
       currentStrategy: {
@@ -208,11 +240,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     const updatedBlocks = [...currentStrategy.blocks];
     const [removed] = updatedBlocks.splice(fromIdx, 1);
     updatedBlocks.splice(toIdx, 0, removed);
-
-    // Re-index all blocks
-    updatedBlocks.forEach((block, idx) => {
-      block.index = idx;
-    });
+    updatedBlocks.forEach((block, idx) => { block.index = idx; });
 
     set({
       currentStrategy: {
@@ -223,140 +251,70 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     });
   },
 
-  // Validate strategy against rules
+  // Validate strategy client-side
   validateStrategy: async () => {
     const { currentStrategy } = get();
     if (!currentStrategy) return;
 
     set({ isValidating: true });
-    try {
-      // Optimistic validation client-side first
-      const messages: ValidationMessage[] = [];
+    const messages: ValidationMessage[] = [];
 
-      if (!currentStrategy.name || currentStrategy.name.trim() === '') {
-        messages.push({
-          id: 'validation-name',
-          level: ValidationLevel.ERROR,
-          text: 'Strategy name is required',
-          code: 'MISSING_NAME',
-          timestamp: new Date().toISOString(),
-        });
-      }
-
-      if (currentStrategy.blocks.length === 0) {
-        messages.push({
-          id: 'validation-blocks',
-          level: ValidationLevel.ERROR,
-          text: 'Strategy must contain at least one block',
-          code: 'NO_BLOCKS',
-          timestamp: new Date().toISOString(),
-        });
-      }
-
-      // Server-side validation
-      const result = await api.post<{ messages: ValidationMessage[] }>(
-        `/strategies/${currentStrategy.id}/validate`,
-        currentStrategy
-      );
-
-      const allMessages = [
-        ...messages,
-        ...result.messages,
-      ];
-
-      const hasErrors = allMessages.some((m) => m.level === ValidationLevel.ERROR);
-      const newStatus = hasErrors ? StrategyStatus.INVALID : StrategyStatus.VALID;
-
-      set({
-        validationMessages: allMessages,
-        isValidating: false,
-        currentStrategy: {
-          ...currentStrategy,
-          status: newStatus,
-        },
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Validation failed';
-      set({
-        isValidating: false,
-        validationMessages: [
-          {
-            id: `validation-error-${Date.now()}`,
-            level: ValidationLevel.ERROR,
-            text: message,
-            code: 'VALIDATION_ERROR',
-            timestamp: new Date().toISOString(),
-          },
-        ],
+    if (!currentStrategy.name || currentStrategy.name.trim() === '') {
+      messages.push({
+        id: 'validation-name',
+        level: ValidationLevel.ERROR,
+        text: 'Strategy name is required',
+        code: 'MISSING_NAME',
+        timestamp: new Date().toISOString(),
       });
     }
+
+    if (currentStrategy.blocks.length === 0) {
+      messages.push({
+        id: 'validation-blocks',
+        level: ValidationLevel.WARNING,
+        text: 'Strategy has no building blocks',
+        code: 'NO_BLOCKS',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const hasErrors = messages.some((m) => m.level === ValidationLevel.ERROR);
+    const newStatus = hasErrors ? StrategyStatus.INVALID : StrategyStatus.VALID;
+
+    set({
+      validationMessages: messages,
+      isValidating: false,
+      currentStrategy: { ...currentStrategy, status: newStatus },
+    });
   },
 
-  // Run backtest
-  runBacktest: async (config: BacktestConfig | BacktestConfigFull) => {
+  // Run backtest (stub — backend not available)
+  runBacktest: async (_config: BacktestConfig | BacktestConfigFull) => {
     set({ backTestInProgress: true, backTestProgress: 0 });
-    try {
-      const result = await api.post<BacktestResult>(
-        `/strategies/${config.strategyId}/backtest`,
-        config
-      );
-
-      set({
-        backTestResult: result,
-        backTestInProgress: false,
-        backTestProgress: 100,
-      });
-
-      return result;
-    } catch (error) {
-      set({ backTestInProgress: false });
-      const message = error instanceof Error ? error.message : 'Backtest failed';
-      throw new Error(message);
-    }
+    await new Promise((r) => setTimeout(r, 500));
+    set({ backTestInProgress: false });
+    throw new Error('Backtest backend not connected');
   },
 
-  // Poll for backtest results
-  pollBacktestResult: async (runId: string) => {
-    const { currentStrategy } = get();
-    if (!currentStrategy) return;
-
-    try {
-      const result = await api.get<BacktestResult>(
-        `/strategies/${currentStrategy.id}/backtest/${runId}`
-      );
-
-      if (result.status === 'completed') {
-        set({
-          backTestResult: result,
-          backTestInProgress: false,
-          backTestProgress: 100,
-        });
-      } else if (result.status === 'running') {
-        // Update progress if available
-        if (result.completedAt) {
-          set({ backTestProgress: result.totalTrades });
-        }
-      }
-
-      return result;
-    } catch (error) {
-      set({ backTestInProgress: false });
-      throw error;
-    }
+  // Poll for backtest results (stub)
+  pollBacktestResult: async (_runId: string) => {
+    return undefined;
   },
 
-  // Load block library from backend
+  // Load block library from static file
   loadBlockLibrary: async () => {
     set({ isLoadingLibrary: true });
     try {
-      const response = await api.get<{
+      const response = await fetch('/block-library.json');
+      if (!response.ok) throw new Error('Failed to load block library');
+      const data = await response.json() as {
         blocks: BlockDefinition[];
         categories: BlockCategory[];
-      }>('/blocks');
-
+      };
       set({
-        blockLibrary: response.blocks,
-        blockCategories: response.categories,
+        blockLibrary: data.blocks,
+        blockCategories: data.categories,
         isLoadingLibrary: false,
       });
     } catch (error) {
@@ -375,7 +333,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     set({ selectedBlockIndex: index });
   },
 
-  // Set current strategy directly (useful for tests/overrides)
+  // Set current strategy directly
   setCurrentStrategy: (strategy: Strategy | null) => {
     set({ currentStrategy: strategy });
   },
