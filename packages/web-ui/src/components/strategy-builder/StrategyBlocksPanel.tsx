@@ -5,6 +5,7 @@ import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { Block, BlockType } from '@/lib/strategy-builder/types';
 import { InfoTooltip } from './InfoTooltip';
 import { TimingConstraintDialog, TimingConstraint } from './TimingConstraintDialog';
+import { BlockConfigDialog } from './BlockConfigDialog';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -167,11 +168,13 @@ function BlockItem({
 }: BlockItemProps) {
   const accent    = TYPE_ACCENT[block.type] ?? 'border-l-zinc-600';
   const typeLabel = BLOCK_TYPE_LABELS[block.type] ?? block.type;
+  const blockName = (block.data?.name as string | undefined) || typeLabel;
   const hasTimingConstraint = !!(block.data?.timingConstraint as TimingConstraint | undefined)?.enabled;
   const signals   = (block.data?.signals as BlockSignalEntry[] | undefined) ?? [];
   const blockExits = (block.data?.exits as BlockExitEntry[] | undefined) ?? [];
   const logicType = (block.data?.logic as string | undefined) ?? 'AND';
-  const isRequired = logicType === 'AND';
+  const isRequired = block.type !== 'exit_condition' && logicType === 'AND';
+  const isExit = block.type === 'exit_condition';
 
   return (
     <div
@@ -188,14 +191,16 @@ function BlockItem({
         {/* Block info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-zinc-100">{typeLabel}</span>
-            {/* Logic badge */}
+            <span className="text-sm font-semibold text-zinc-100">{blockName}</span>
+            {/* Logic / type badge */}
             <span className={`text-xs px-2 py-0.5 rounded font-semibold border ${
-              isRequired
+              isExit
+                ? 'bg-red-900/30 text-red-400 border-red-800'
+                : isRequired
                 ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800'
                 : 'bg-blue-900/30 text-blue-400 border-blue-800'
             }`}>
-              {isRequired ? 'REQUIRED' : 'OPTIONAL'}
+              {isExit ? 'EXIT' : isRequired ? 'REQUIRED' : 'OPTIONAL'}
             </span>
           </div>
           <div className="text-xs text-zinc-500 mt-0.5 flex items-center gap-2 flex-wrap">
@@ -360,10 +365,12 @@ export function StrategyBlocksPanel() {
     updateBlock,
   } = useStrategyStore();
 
+
   const blocks: Block[] = currentStrategy?.blocks ?? [];
   const strategyExits = (currentStrategy?.settings as unknown as { strategyExits?: StrategyExitEntry[] })?.strategyExits ?? [];
 
   const [timingDialogIndex, setTimingDialogIndex] = useState<number | null>(null);
+  const [configDialogIndex, setConfigDialogIndex] = useState<number | null>(null);
 
   const handleMoveUp = useCallback(
     (index: number) => { if (index > 0) reorderBlocks(index, index - 1); },
@@ -390,8 +397,17 @@ export function StrategyBlocksPanel() {
   }, []);
 
   const handleConfigure = useCallback((index: number) => {
-    console.log('Configure block at index', index);
+    setConfigDialogIndex(index);
   }, []);
+
+  const handleConfigSave = useCallback(
+    (index: number, data: Record<string, unknown>) => {
+      const block = blocks[index];
+      if (!block) return;
+      updateBlock(index, { ...block.data, ...data });
+    },
+    [blocks, updateBlock],
+  );
 
   const handleTimingConstraintSave = useCallback(
     (constraint: TimingConstraint) => {
@@ -452,6 +468,15 @@ export function StrategyBlocksPanel() {
       <div className="flex-shrink-0 border-t border-zinc-800">
         <StrategyExitsSection exits={strategyExits} />
       </div>
+
+      {/* Block Config Dialog */}
+      <BlockConfigDialog
+        open={configDialogIndex !== null}
+        block={configDialogIndex !== null ? (blocks[configDialogIndex] ?? null) : null}
+        blockIndex={configDialogIndex ?? 0}
+        onSave={handleConfigSave}
+        onClose={() => setConfigDialogIndex(null)}
+      />
 
       {/* Timing Constraint Dialog */}
       {timingDialogIndex !== null && timingBlock && (

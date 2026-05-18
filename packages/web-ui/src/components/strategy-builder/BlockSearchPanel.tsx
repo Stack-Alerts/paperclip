@@ -288,6 +288,7 @@ function BlockCard({
 export function BlockSearchPanel() {
   const { blockLibrary, blockCategories, isLoadingLibrary, addBlock, currentStrategy } =
     useStrategyStore();
+  const updateBlock = useStrategyStore((s) => s.updateBlock);
 
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -317,18 +318,28 @@ export function BlockSearchPanel() {
     (blockName: string, signals: BlockSignal[], logic: 'AND' | 'OR') => {
       const strategy = useStrategyStore.getState().currentStrategy;
       const position = strategy?.blocks.length ?? 0;
-      // TODO: Wire to orchestrator with logic type and signals
       addBlock(BlockType.ENTRY_CONDITION, position);
+      useStrategyStore.getState().updateBlock(position, {
+        name: blockName,
+        logic,
+        signals: signals.map((s) => ({ name: s.name, logic })),
+      });
     },
     [addBlock]
   );
 
   const handleAddExit = useCallback(
     (blockName: string, signal: BlockSignal) => {
-      // TODO: Open ExitConditionDialog
-      console.log('Add exit:', blockName, signal.name);
+      const strategy = useStrategyStore.getState().currentStrategy;
+      const position = strategy?.blocks.length ?? 0;
+      addBlock(BlockType.EXIT_CONDITION, position);
+      useStrategyStore.getState().updateBlock(position, {
+        name: blockName,
+        logic: 'AND',
+        signals: [{ name: signal.name, logic: 'AND' }],
+      });
     },
-    []
+    [addBlock]
   );
 
   const handleAddSimple = useCallback(
