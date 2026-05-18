@@ -5,6 +5,7 @@ import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { Block, BlockType } from '@/lib/strategy-builder/types';
 import { TimingConstraintDialog, TimingConstraint } from './TimingConstraintDialog';
 import { ExitConditionDialog, ExitConditionConfig, AvailableBlock } from './ExitConditionDialog';
+import { RichTooltip, TooltipContent } from './RichTooltip';
 
 function formatSignalName(name: string): string {
   return name
@@ -21,6 +22,149 @@ const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   [BlockType.FILTER]:           'Filter',
   [BlockType.INDICATOR]:        'Indicator',
   [BlockType.POSITION_SIZING]:  'Position Sizing',
+};
+
+// ─── Tooltip content constants ────────────────────────────────────────────────
+const TT_MOVE_UP: TooltipContent = {
+  title: 'Move Block Up',
+  body: 'Shift this block earlier in the strategy evaluation sequence.',
+  sections: [
+    { header: 'Why order matters:', items: [
+      'Blocks are evaluated in order — an AND block that fails early short-circuits later blocks',
+      'Timing constraints reference prior blocks by position, so reordering can break them',
+    ]},
+    { header: 'Note:', items: ['A confirmation dialog appears if either block has timing constraints referencing the other'] },
+  ],
+};
+const TT_MOVE_DOWN: TooltipContent = {
+  title: 'Move Block Down',
+  body: 'Shift this block later in the strategy evaluation sequence.',
+  sections: [
+    { header: 'Why order matters:', items: [
+      'Later blocks can reference earlier blocks in timing constraints',
+      'AND blocks evaluated later are checked only after all earlier required blocks pass',
+    ]},
+    { header: 'Note:', items: ['A confirmation dialog appears if either block has timing constraints referencing the other'] },
+  ],
+};
+const TT_TIMING_CONFIG: TooltipContent = {
+  title: 'Configure Timing Constraint',
+  body: 'Links this block to a prior block by requiring its signal to fire within a specified candle window after the reference block\'s signal.',
+  sections: [
+    { header: 'How it works:', items: [
+      'Select a reference block and set a max candle count',
+      'This block\'s signals are only valid if the reference signal fired within N candles',
+      'Enforces sequential confirmation — useful for pattern + oscillator setups',
+    ]},
+    { header: 'Example:', items: ['MACD cross must fire within 5 candles of a Break of Structure signal'] },
+    { header: 'Requires:', items: ['At least one prior block in the strategy (first block cannot have a timing constraint)'] },
+  ],
+};
+const TT_REMOVE_BLOCK: TooltipContent = {
+  title: 'Remove Building Block',
+  body: 'Removes this block and all its signals from the strategy.',
+  sections: [
+    { header: 'What is removed:', items: [
+      'All signals and their RECHECK configurations',
+      'Timing constraints referencing or originating from this block',
+      'Block-level exit conditions bound to this block',
+    ]},
+    { header: 'Note:', items: ['Re-add from the library if removed by mistake — signal selections will need to be reconfigured'] },
+  ],
+};
+const TT_RECHECK_CONFIG: TooltipContent = {
+  title: 'Configure RECHECK Validation',
+  body: 'Requires this signal to reoccur within a specified bar window after its initial fire before confirming the entry.',
+  sections: [
+    { header: 'Why use RECHECK:', items: [
+      'Prevents acting on single-bar spikes or stale signals',
+      'Demands that the condition persists — increasing confidence in the entry',
+      'Especially useful for oscillator-based and pattern signals that can produce noise',
+    ]},
+    { header: 'RECHECK modes:', items: [
+      'WITHIN N bars — signal must reoccur anywhere in the next N bars',
+      'AT bar N — signal must reoccur at exactly bar N after the initial fire',
+    ]},
+    { header: 'Indicator (green dot):', items: ['The green dot means RECHECK is currently active on this signal'] },
+  ],
+};
+const TT_DUPLICATE_SIGNAL: TooltipContent = {
+  title: 'Duplicate Signal',
+  body: 'Creates a copy of this signal within the same block with independent RECHECK and timing settings.',
+  sections: [
+    { header: 'Use when:', items: [
+      'You need the same signal type with different RECHECK bar delays',
+      'Building confirmation layers using the same indicator at different sensitivities',
+    ]},
+    { header: 'Note:', items: ['The duplicate starts with RECHECK disabled — configure it separately after duplication'] },
+  ],
+};
+const TT_REMOVE_SIGNAL: TooltipContent = {
+  title: 'Remove Signal',
+  body: 'Removes this individual signal output from the block.',
+  sections: [
+    { header: 'Effect:', items: [
+      'The block remains in the strategy — only this specific signal is removed',
+      'If all signals are removed, the block contributes no entry conditions to the evaluation',
+    ]},
+    { header: 'Note:', items: ['Re-add by expanding the block in the library and selecting signals again'] },
+  ],
+};
+const TT_REMOVE_RECHECK: TooltipContent = {
+  title: 'Remove RECHECK',
+  body: 'Disables the RECHECK validation requirement on this signal.',
+  sections: [
+    { header: 'Effect:', items: [
+      'The signal fires on its first occurrence without requiring reoccurrence confirmation',
+      'Increases signal frequency but may introduce more noise',
+    ]},
+    { header: 'Tip:', items: ['Click the ⚙ gear icon to re-enable or change the RECHECK configuration at any time'] },
+  ],
+};
+const TT_EDIT_EXIT: TooltipContent = {
+  title: 'Edit Exit Condition',
+  body: 'Opens the Exit Condition dialog to modify this exit rule\'s percentage, mode, binding level, and recheck settings.',
+  sections: [
+    { header: 'Configurable fields:', items: [
+      'Exit percentage — profit or loss threshold that triggers the close',
+      'Mode: ABSOLUTE (fixed %) or FLEXIBLE (TP proximity + reversal trigger)',
+      'Binding level: Strategy (all positions), Block (this block only), Signal (one signal)',
+      'RECHECK — optionally require the exit signal to reconfirm before closing',
+    ]},
+  ],
+};
+const TT_DUPLICATE_EXIT: TooltipContent = {
+  title: 'Duplicate Exit Condition',
+  body: 'Creates an identical copy of this exit rule with all settings preserved.',
+  sections: [
+    { header: 'Use when:', items: [
+      'Setting up tiered exits at different percentages (e.g. 25% and 50% targets)',
+      'Creating exit rules for multiple binding levels from the same base configuration',
+    ]},
+    { header: 'Tip:', items: ['Edit the duplicate immediately after creation to adjust the percentage or binding'] },
+  ],
+};
+const TT_REMOVE_EXIT: TooltipContent = {
+  title: 'Remove Exit Condition',
+  body: 'Permanently removes this exit rule from the strategy.',
+  sections: [
+    { header: 'Impact:', items: [
+      'This position management rule will no longer apply during backtesting or live trading',
+      'Other exit conditions at different binding levels remain unaffected',
+    ]},
+    { header: 'Caution:', items: ['Ensure at least one exit condition or risk management block remains to close positions'] },
+  ],
+};
+const TT_FIND_IN_LIBRARY: TooltipContent = {
+  title: 'Find in Library',
+  body: 'Highlights and scrolls to this block\'s definition in the Available Building Blocks panel.',
+  sections: [
+    { header: 'Use when:', items: [
+      'You want to review all available signals for this block',
+      'Adding additional signals from the same block to the strategy',
+      'Checking signal descriptions or occurrence statistics',
+    ]},
+  ],
 };
 
 interface BlockSignal {
@@ -183,12 +327,15 @@ function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate }: ExitPil
       <span style={{ color: mode === 'FLEXIBLE' ? '#3B82F6' : '#9AA0A6' }}>{mode}</span>
       {cfg?.recheckEnabled && <span style={{ color: '#14a0a5' }}>RCHK:{cfg.recheckBarDelay ?? 3}</span>}
       <div style={BTN_GROUP}>
-        <button onClick={() => onEdit(globalIndex)} title="Configure exit" className="hover:opacity-80"
-          style={GEAR_STYLE}><GearIcon /></button>
-        <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition" className="hover:opacity-80"
-          style={DUP_STYLE}><DupIcon /></button>
-        <button onClick={() => onRemove(globalIndex)} title="Remove exit" className="hover:opacity-80"
-          style={REM_STYLE}><XIcon /></button>
+        <RichTooltip content={TT_EDIT_EXIT}>
+          <button onClick={() => onEdit(globalIndex)} className="hover:opacity-80" style={GEAR_STYLE}><GearIcon /></button>
+        </RichTooltip>
+        <RichTooltip content={TT_DUPLICATE_EXIT}>
+          <button onClick={() => onDuplicate(globalIndex)} className="hover:opacity-80" style={DUP_STYLE}><DupIcon /></button>
+        </RichTooltip>
+        <RichTooltip content={TT_REMOVE_EXIT}>
+          <button onClick={() => onRemove(globalIndex)} className="hover:opacity-80" style={REM_STYLE}><XIcon /></button>
+        </RichTooltip>
       </div>
     </div>
   );
@@ -307,22 +454,27 @@ function BlockCard({
           <rect x="6" y="5" width="4" height="10" rx="0.5" fill="#10B981"/>
           <rect x="11" y="7" width="4" height="8" rx="0.5" fill="#3B82F6" opacity="0.55"/>
         </svg>
-        <span
-          className="flex-1 text-sm font-semibold truncate hover:text-sky-300 transition-colors"
-          style={{ color: '#A0AEC0', cursor: definitionId ? 'pointer' : 'default' }}
-          title={definitionId ? `Click to find "${blockName}" in library` : blockName}
-          onClick={() => { if (definitionId) onHighlightInLibrary(definitionId); }}
-        >
-          {blockName}
-        </span>
+        <RichTooltip content={definitionId ? TT_FIND_IN_LIBRARY : { title: blockName }}>
+          <span
+            className="flex-1 text-sm font-semibold truncate hover:text-sky-300 transition-colors"
+            style={{ color: '#A0AEC0', cursor: definitionId ? 'pointer' : 'default' }}
+            onClick={() => { if (definitionId) onHighlightInLibrary(definitionId); }}
+          >
+            {blockName}
+          </span>
+        </RichTooltip>
         <span className="text-xs px-2 py-0.5 rounded font-mono flex-shrink-0" style={badgeStyle}>{badgeLabel}</span>
         <div className="flex items-center gap-0.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
-          <button onClick={() => onMoveUp(index)} disabled={mainIndex === 0} title="Move block up"
-            className="p-1 rounded hover:text-[#E8EAED] hover:bg-[#2A2F3A] disabled:opacity-25 disabled:cursor-not-allowed text-xs transition-colors"
-            style={{ color: '#9AA0A6' }}>▲</button>
-          <button onClick={() => onMoveDown(index)} disabled={mainIndex === mainTotal - 1} title="Move block down"
-            className="p-1 rounded hover:text-[#E8EAED] hover:bg-[#2A2F3A] disabled:opacity-25 disabled:cursor-not-allowed text-xs transition-colors"
-            style={{ color: '#9AA0A6' }}>▼</button>
+          <RichTooltip content={TT_MOVE_UP}>
+            <button onClick={() => onMoveUp(index)} disabled={mainIndex === 0}
+              className="p-1 rounded hover:text-[#E8EAED] hover:bg-[#2A2F3A] disabled:opacity-25 disabled:cursor-not-allowed text-xs transition-colors"
+              style={{ color: '#9AA0A6' }}>▲</button>
+          </RichTooltip>
+          <RichTooltip content={TT_MOVE_DOWN}>
+            <button onClick={() => onMoveDown(index)} disabled={mainIndex === mainTotal - 1}
+              className="p-1 rounded hover:text-[#E8EAED] hover:bg-[#2A2F3A] disabled:opacity-25 disabled:cursor-not-allowed text-xs transition-colors"
+              style={{ color: '#9AA0A6' }}>▼</button>
+          </RichTooltip>
         </div>
       </div>
 
@@ -331,19 +483,21 @@ function BlockCard({
         <span className="text-sm font-bold" style={{ color: '#2a5eb8' }}>#{mainIndex + 1}</span>
         <div className="flex-1" />
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => onConfig(index)}
-            disabled={mainIndex === 0}
-            title={mainIndex === 0 ? 'Timing constraints require a prior block' : 'Configure timing constraint'}
-            className="hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition-opacity"
-            style={{ ...BTN, background: '#2a5eb8', color: '#ffffff', border: '1px solid #1a4a9a', gap: 5 }}
-          ><GearIcon size={11} /> Config</button>
-          <button
-            onClick={() => onRemove(index)}
-            title="Remove this block"
-            className="hover:opacity-80 transition-opacity"
-            style={{ ...BTN, background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252', gap: 5 }}
-          ><XIcon size={9} /> Remove</button>
+          <RichTooltip content={TT_TIMING_CONFIG}>
+            <button
+              onClick={() => onConfig(index)}
+              disabled={mainIndex === 0}
+              className="hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition-opacity"
+              style={{ ...BTN, background: '#2a5eb8', color: '#ffffff', border: '1px solid #1a4a9a', gap: 5 }}
+            ><GearIcon size={11} /> Config</button>
+          </RichTooltip>
+          <RichTooltip content={TT_REMOVE_BLOCK}>
+            <button
+              onClick={() => onRemove(index)}
+              className="hover:opacity-80 transition-opacity"
+              style={{ ...BTN, background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252', gap: 5 }}
+            ><XIcon size={9} /> Remove</button>
+          </RichTooltip>
         </div>
       </div>
 
@@ -380,22 +534,27 @@ function BlockCard({
                       )}
                     </span>
                     <div style={BTN_GROUP}>
-                      <div className="relative">
-                        <button
-                          onClick={() => onConfigRecheck(index, si)}
-                          title={hasRecheck ? 'Configure recheck (active)' : 'Configure recheck'}
-                          className="hover:opacity-80"
-                          style={GEAR_STYLE}>
-                          <GearIcon />
-                        </button>
-                        {hasRecheck && (
-                          <span className="absolute -top-px -right-px w-1.5 h-1.5 rounded-full" style={{ background: '#10B981', border: '1px solid #15191E' }} />
-                        )}
-                      </div>
-                      <button onClick={() => onDuplicateSignal(index, si)} title="Duplicate signal" className="hover:opacity-80"
-                        style={DUP_STYLE}><DupIcon /></button>
-                      <button onClick={() => onRemoveSignal(index, si)} title="Remove signal" className="hover:opacity-80"
-                        style={REM_STYLE}><XIcon /></button>
+                      <RichTooltip content={TT_RECHECK_CONFIG}>
+                        <div className="relative" style={{ display: 'inline-flex' }}>
+                          <button
+                            onClick={() => onConfigRecheck(index, si)}
+                            className="hover:opacity-80"
+                            style={GEAR_STYLE}>
+                            <GearIcon />
+                          </button>
+                          {hasRecheck && (
+                            <span className="absolute -top-px -right-px w-1.5 h-1.5 rounded-full" style={{ background: '#10B981', border: '1px solid #15191E' }} />
+                          )}
+                        </div>
+                      </RichTooltip>
+                      <RichTooltip content={TT_DUPLICATE_SIGNAL}>
+                        <button onClick={() => onDuplicateSignal(index, si)} className="hover:opacity-80"
+                          style={DUP_STYLE}><DupIcon /></button>
+                      </RichTooltip>
+                      <RichTooltip content={TT_REMOVE_SIGNAL}>
+                        <button onClick={() => onRemoveSignal(index, si)} className="hover:opacity-80"
+                          style={REM_STYLE}><XIcon /></button>
+                      </RichTooltip>
                     </div>
                   </div>
 
@@ -409,8 +568,10 @@ function BlockCard({
                       <span className="flex-1 font-semibold" style={{ color: '#14a0a5' }}>
                         RECHECK ({sig.recheck_config?.mode ?? 'WITHIN'} {sig.recheck_config?.bar_delay ?? 3} bars)
                       </span>
-                      <button onClick={() => onRemoveRecheck(index, si)} title="Remove recheck" className="hover:opacity-80"
-                        style={REM_STYLE}><XIcon /></button>
+                      <RichTooltip content={TT_REMOVE_RECHECK}>
+                        <button onClick={() => onRemoveRecheck(index, si)} className="hover:opacity-80"
+                          style={REM_STYLE}><XIcon /></button>
+                      </RichTooltip>
                     </div>
                   )}
                 </div>
@@ -487,12 +648,15 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate }:
                       )}
                     </div>
                     <div style={BTN_GROUP}>
-                      <button onClick={() => onEdit(globalIndex)} title="Configure exit condition" className="hover:opacity-80"
-                        style={GEAR_STYLE}><GearIcon /></button>
-                      <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition" className="hover:opacity-80"
-                        style={DUP_STYLE}><DupIcon /></button>
-                      <button onClick={() => onRemove(globalIndex)} title="Remove exit condition" className="hover:opacity-80"
-                        style={REM_STYLE}><XIcon /></button>
+                      <RichTooltip content={TT_EDIT_EXIT}>
+                        <button onClick={() => onEdit(globalIndex)} className="hover:opacity-80" style={GEAR_STYLE}><GearIcon /></button>
+                      </RichTooltip>
+                      <RichTooltip content={TT_DUPLICATE_EXIT}>
+                        <button onClick={() => onDuplicate(globalIndex)} className="hover:opacity-80" style={DUP_STYLE}><DupIcon /></button>
+                      </RichTooltip>
+                      <RichTooltip content={TT_REMOVE_EXIT}>
+                        <button onClick={() => onRemove(globalIndex)} className="hover:opacity-80" style={REM_STYLE}><XIcon /></button>
+                      </RichTooltip>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 mt-1 flex-wrap text-xs" style={{ color: '#9AA0A6' }}>

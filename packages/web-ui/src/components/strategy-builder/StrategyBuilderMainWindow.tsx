@@ -17,6 +17,7 @@ import { BlockSearchPanel } from './BlockSearchPanel';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import * as api from '@/lib/strategy-builder/api';
 import type { BacktestResult, BacktestConfig, Strategy } from '@/lib/strategy-builder/types';
+import { RichTooltip, TooltipContent } from './RichTooltip';
 
 type DialogKey =
   | 'newStrategy'
@@ -431,18 +432,18 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       <div className="flex items-center border-b px-3 py-1.5 flex-shrink-0" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
         {/* Left: toolbar buttons */}
         <div className="flex items-center gap-1">
-          <ToolbarButton label="New"  title="New Strategy (Ctrl+N)"  onClick={() => open('newStrategy')} />
-          <ToolbarButton label="Open" title="Open Strategy (Ctrl+O)" onClick={() => open('strategyBrowser')} />
+          <ToolbarButton label="New"  tooltip={TT_NEW}  onClick={() => open('newStrategy')} />
+          <ToolbarButton label="Open" tooltip={TT_OPEN} onClick={() => open('strategyBrowser')} />
           <ToolbarButton
             label={mounted && isModified ? 'Save ●' : 'Save'}
-            title="Save (Ctrl+S)"
+            tooltip={TT_SAVE}
             onClick={handleSave}
             active={mounted && isModified}
           />
           <div className="w-px h-5 mx-1 flex-shrink-0" style={{ background: '#3C4149' }} />
           <ToolbarButton
             label={backTestInProgress ? '▶ Running…' : '▶ Quick Preview'}
-            title="Run Quick Preview backtest (30 days)"
+            tooltip={TT_QUICK_PREVIEW}
             onClick={handleQuickPreview}
             disabled={!currentStrategy || backTestInProgress}
           />
@@ -582,34 +583,77 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 };
 
 // ---------------------------------------------------------------------------
+// ToolbarButton tooltip content
+// ---------------------------------------------------------------------------
+const TT_NEW: TooltipContent = {
+  title: 'New Strategy (Ctrl+N)',
+  body: 'Create a blank strategy from scratch. The current strategy will remain saved.',
+  sections: [
+    { header: 'Shortcut:', items: ['Ctrl+N'] },
+    { header: 'Note:', items: ['Any unsaved changes will be lost — save first if needed'] },
+  ],
+};
+const TT_OPEN: TooltipContent = {
+  title: 'Open Strategy (Ctrl+O)',
+  body: 'Browse and load a previously saved strategy from the strategy library.',
+  sections: [
+    { header: 'Shortcut:', items: ['Ctrl+O'] },
+    { header: 'Tip:', items: ['Use the search in the browser to filter by name or tags'] },
+  ],
+};
+const TT_SAVE: TooltipContent = {
+  title: 'Save Strategy (Ctrl+S)',
+  body: 'Persist the current strategy state to storage. The amber dot (●) indicates unsaved changes.',
+  sections: [
+    { header: 'Shortcut:', items: ['Ctrl+S'] },
+    { header: 'Auto-save:', items: ['Strategy name changes are auto-saved on blur — all other edits require a manual save'] },
+  ],
+};
+const TT_QUICK_PREVIEW: TooltipContent = {
+  title: 'Quick Preview Backtest',
+  body: 'Run a fast 30-day backtest on the current strategy using default capital and risk settings.',
+  sections: [
+    { header: 'Purpose:', items: [
+      'Rapid signal quality check before committing to a full configuration',
+      'Reveals entry frequency, basic win-rate, and gross P&L over the last 30 days',
+    ]},
+    { header: 'Limitations:', items: [
+      'Uses simplified slippage and fee model',
+      'Full backtest via the Backtest Config dialog provides granular control over capital, risk, and timeframe',
+    ]},
+  ],
+};
+
+// ---------------------------------------------------------------------------
 // ToolbarButton
 // ---------------------------------------------------------------------------
 interface ToolbarButtonProps {
   label: string;
-  title: string;
+  tooltip: TooltipContent;
   onClick: () => void;
   disabled?: boolean;
   active?: boolean;
   accent?: boolean;
 }
 
-const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, title, onClick, disabled, active, accent }) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    title={title}
-    className={`px-2.5 py-1 text-xs rounded transition-colors border ${
-      disabled
-        ? 'text-[#6B7280] bg-[#1E2128] border-[#3C4149] cursor-not-allowed'
-        : accent
-        ? 'text-white bg-blue-700 border-blue-600 hover:bg-blue-600 font-medium'
-        : active
-        ? 'text-amber-300 bg-[#2A2F3A] border-[#3C4149] hover:bg-[#3C4149]'
-        : 'text-[#A0AEC0] bg-[#2A2F3A] border-[#3C4149] hover:bg-[#3C4149] hover:text-[#E8EAED]'
-    }`}
-  >
-    {label}
-  </button>
+const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, tooltip, onClick, disabled, active, accent }) => (
+  <RichTooltip content={tooltip}>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`px-2.5 py-1 text-xs rounded transition-colors border ${
+        disabled
+          ? 'text-[#6B7280] bg-[#1E2128] border-[#3C4149] cursor-not-allowed'
+          : accent
+          ? 'text-white bg-blue-700 border-blue-600 hover:bg-blue-600 font-medium'
+          : active
+          ? 'text-amber-300 bg-[#2A2F3A] border-[#3C4149] hover:bg-[#3C4149]'
+          : 'text-[#A0AEC0] bg-[#2A2F3A] border-[#3C4149] hover:bg-[#3C4149] hover:text-[#E8EAED]'
+      }`}
+    >
+      {label}
+    </button>
+  </RichTooltip>
 );
 
 // ---------------------------------------------------------------------------
