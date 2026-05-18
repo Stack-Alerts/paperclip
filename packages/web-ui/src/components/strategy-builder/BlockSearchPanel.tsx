@@ -79,7 +79,6 @@ function BlockItem({ definition, onAdd }: BlockItemProps) {
       {/* Block name + meta */}
       <div className="px-3 pt-2.5 pb-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="text-base flex-shrink-0">📊</span>
           {/* text_primary: #E8EAED — slightly off-white like desktop, not harsh pure-white */}
           <span className="text-sm font-semibold leading-tight" style={{ color: '#E8EAED' }}>{definition.name}</span>
         </div>

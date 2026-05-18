@@ -68,16 +68,16 @@ function BlockCard({
     : 'border-l-emerald-600';
 
   return (
-    <div className={`rounded border border-zinc-800 border-l-4 ${leftAccent} bg-zinc-900 mb-3`}>
+    <div className={`rounded border border-[#3C4149] border-l-4 ${leftAccent} mb-3`} style={{ background: '#1E2128' }}>
       {/* Header row */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-zinc-800/60">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#3C4149]/60">
         {/* Block number */}
         <span className="text-sm font-bold text-blue-400 w-7 flex-shrink-0">
           #{index + 1}
         </span>
 
         {/* Block name */}
-        <span className="flex-1 text-sm font-semibold text-zinc-100 truncate" title={blockName}>
+        <span className="flex-1 text-sm font-semibold truncate" style={{ color: '#E8EAED' }} title={blockName}>
           {blockName}
         </span>
 
@@ -92,7 +92,8 @@ function BlockCard({
             onClick={() => onMoveUp(index)}
             disabled={index === 0}
             title="Move block up"
-            className="px-1.5 py-0.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 disabled:opacity-25 disabled:cursor-not-allowed text-sm transition-colors"
+            className="px-1.5 py-0.5 rounded hover:text-[#E8EAED] hover:bg-[#2A2F3A] disabled:opacity-25 disabled:cursor-not-allowed text-sm transition-colors"
+            style={{ color: '#9AA0A6' }}
           >
             ▴
           </button>
@@ -100,7 +101,8 @@ function BlockCard({
             onClick={() => onMoveDown(index)}
             disabled={index === total - 1}
             title="Move block down"
-            className="px-1.5 py-0.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 disabled:opacity-25 disabled:cursor-not-allowed text-sm transition-colors"
+            className="px-1.5 py-0.5 rounded hover:text-[#E8EAED] hover:bg-[#2A2F3A] disabled:opacity-25 disabled:cursor-not-allowed text-sm transition-colors"
+            style={{ color: '#9AA0A6' }}
           >
             ▾
           </button>
@@ -109,14 +111,14 @@ function BlockCard({
 
       {/* Signals section */}
       {signals.length > 0 && (
-        <div className="px-3 py-2 space-y-1.5 border-b border-zinc-800/60">
-          <div className="text-xs text-zinc-500 font-medium mb-1">Signals:</div>
+        <div className="px-3 py-2 space-y-1.5 border-b border-[#3C4149]/60">
+          <div className="text-xs font-medium mb-1" style={{ color: '#9AA0A6' }}>Signals:</div>
           {signals.map((sig, si) => {
             const hasRecheck = sig.recheckEnabled || sig.recheck_config?.enabled;
             const hasTiming = !!sig.timing_constraint;
             return (
               <div key={si} className="flex items-center gap-2 text-xs">
-                <span className="text-zinc-400 flex-1 truncate" title={sig.name}>
+                <span className="flex-1 truncate" style={{ color: '#9AA0A6' }} title={sig.name}>
                   {si + 1}. {sig.name}
                   {hasTiming && (
                     <span className="text-amber-400 ml-1">
@@ -136,7 +138,8 @@ function BlockCard({
                   <button
                     onClick={() => onToggleRecheck(index, si)}
                     title="Enable recheck on delayed candles"
-                    className="text-zinc-500 hover:text-blue-400 hover:bg-zinc-800 text-xs px-1.5 py-0.5 rounded border border-zinc-700 hover:border-blue-700 transition-colors flex-shrink-0 whitespace-nowrap"
+                    className="text-xs px-1.5 py-0.5 rounded border hover:text-blue-400 hover:bg-[#2A2F3A] hover:border-blue-700 transition-colors flex-shrink-0 whitespace-nowrap"
+                    style={{ color: '#6B7280', borderColor: '#3C4149' }}
                   >
                     ⟳ Recheck
                   </button>
@@ -148,8 +151,8 @@ function BlockCard({
       )}
 
       {signals.length === 0 && (
-        <div className="px-3 py-2 border-b border-zinc-800/60">
-          <span className="text-xs text-zinc-600 italic">No signals — configure this block</span>
+        <div className="px-3 py-2 border-b border-[#3C4149]/60">
+          <span className="text-xs italic" style={{ color: '#6B7280' }}>No signals — configure this block</span>
         </div>
       )}
 
@@ -158,14 +161,16 @@ function BlockCard({
         <button
           onClick={() => onConfig(index)}
           title="Configure timing constraint for this block"
-          className="text-xs px-2.5 py-1 rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-zinc-100 transition-colors"
+          className="text-xs px-2.5 py-1 rounded border hover:bg-[#3C4149] hover:text-[#E8EAED] transition-colors"
+          style={{ borderColor: '#3C4149', background: '#2A2F3A', color: '#A0AEC0' }}
         >
           ⚙ Config
         </button>
         <button
           onClick={() => onRemove(index)}
           title="Remove this block from strategy"
-          className="text-xs px-2.5 py-1 rounded border border-zinc-700 bg-zinc-800 hover:bg-red-900/40 hover:border-red-800 text-zinc-400 hover:text-red-300 transition-colors ml-auto"
+          className="text-xs px-2.5 py-1 rounded border hover:bg-red-900/40 hover:border-red-800 hover:text-red-300 transition-colors ml-auto"
+          style={{ borderColor: '#3C4149', background: '#2A2F3A', color: '#9AA0A6' }}
         >
           ✕ Remove
         </button>
@@ -188,16 +193,16 @@ function ExitConditionsSection({ blocks, onRemove }: ExitConditionsSectionProps)
     .filter(({ block }) => block.type === BlockType.EXIT_CONDITION || (block.data.logic as string) === 'EXIT');
 
   return (
-    <div className="border-t border-zinc-700 flex-shrink-0">
-      <div className="px-4 py-2 flex items-center justify-between bg-zinc-900/60">
-        <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+    <div className="border-t flex-shrink-0" style={{ borderColor: '#3C4149' }}>
+      <div className="px-4 py-2 flex items-center justify-between" style={{ background: 'rgba(30,33,40,0.6)' }}>
+        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#9AA0A6' }}>
           Strategy Exit Conditions
         </span>
-        <span className="text-xs text-zinc-600">{exitBlocks.length} exit block{exitBlocks.length !== 1 ? 's' : ''}</span>
+        <span className="text-xs" style={{ color: '#6B7280' }}>{exitBlocks.length} exit block{exitBlocks.length !== 1 ? 's' : ''}</span>
       </div>
       <div className="px-4 pb-3">
         {exitBlocks.length === 0 ? (
-          <p className="text-xs text-zinc-600 italic">
+          <p className="text-xs italic" style={{ color: '#6B7280' }}>
             No exit conditions configured. Add exit blocks from the library on the right.
           </p>
         ) : (
@@ -208,17 +213,19 @@ function ExitConditionsSection({ blocks, onRemove }: ExitConditionsSectionProps)
               return (
                 <div
                   key={block.id}
-                  className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/60 border border-red-900/40"
+                  className="flex items-center justify-between text-xs py-1.5 px-2 rounded border border-red-900/40"
+                  style={{ background: 'rgba(42,47,58,0.6)' }}
                 >
                   <div className="flex-1 min-w-0">
                     <span className="text-red-300 font-medium">{name}</span>
                     {signals.length > 0 && (
-                      <span className="text-zinc-500 ml-2">({signals.length} signal{signals.length !== 1 ? 's' : ''})</span>
+                      <span className="ml-2" style={{ color: '#6B7280' }}>({signals.length} signal{signals.length !== 1 ? 's' : ''})</span>
                     )}
                   </div>
                   <button
                     onClick={() => onRemove(globalIndex)}
-                    className="text-zinc-500 hover:text-red-400 ml-2 flex-shrink-0"
+                    className="hover:text-red-400 ml-2 flex-shrink-0"
+                    style={{ color: '#6B7280' }}
                     title="Remove exit condition"
                   >
                     ✕
@@ -315,13 +322,13 @@ export function StrategyBlocksPanel() {
   ).length;
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950">
+    <div className="flex flex-col h-full" style={{ background: '#15191E' }}>
       {/* Header */}
-      <div className="px-4 py-2.5 border-b border-zinc-800 flex items-center justify-between flex-shrink-0 bg-zinc-900/50">
-        <h2 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+      <div className="px-4 py-2.5 border-b flex items-center justify-between flex-shrink-0" style={{ borderColor: '#3C4149', background: 'rgba(30,33,40,0.5)' }}>
+        <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#A0AEC0' }}>
           Strategy Building Blocks
         </h2>
-        <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-full border border-zinc-700">
+        <span className="text-xs px-2 py-0.5 rounded-full border" style={{ color: '#9AA0A6', background: '#2A2F3A', borderColor: '#3C4149' }}>
           {blockCount}
         </span>
       </div>
@@ -331,8 +338,8 @@ export function StrategyBlocksPanel() {
         {mainBlockCount === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center gap-2">
             <div className="text-3xl opacity-20">📦</div>
-            <p className="text-sm text-zinc-500">No building blocks added yet</p>
-            <p className="text-xs text-zinc-600">Use the library on the right to add blocks</p>
+            <p className="text-sm" style={{ color: '#9AA0A6' }}>No building blocks added yet</p>
+            <p className="text-xs" style={{ color: '#6B7280' }}>Use the library on the right to add blocks</p>
           </div>
         ) : (
           blocks

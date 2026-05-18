@@ -168,7 +168,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   }, []);
 
   // Resizable splitter
-  const [leftPercent, setLeftPercent] = useState(60);
+  const [leftPercent, setLeftPercent] = useState(65);
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -336,14 +336,14 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // -------------------------------------------------------------------------
   if (isLoadingStrategy) {
     return (
-      <div className="flex items-center justify-center h-full bg-zinc-950">
-        <div className="text-zinc-400 text-sm">Loading strategy…</div>
+      <div className="flex items-center justify-center h-full" style={{ background: '#15191E' }}>
+        <div className="text-sm" style={{ color: '#9AA0A6' }}>Loading strategy…</div>
       </div>
     );
   }
   if (strategyError) {
     return (
-      <div className="flex items-center justify-center h-full bg-zinc-950">
+      <div className="flex items-center justify-center h-full" style={{ background: '#15191E' }}>
         <div className="text-red-400 text-sm">Error: {strategyError}</div>
       </div>
     );
@@ -351,13 +351,13 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 
   return (
     <div
-      className="flex flex-col h-full bg-zinc-950 select-none"
+      className="flex flex-col h-full select-none"
       onKeyDown={handleKeyDown}
       tabIndex={-1}
-      style={{ outline: 'none' }}
+      style={{ outline: 'none', background: '#0F1117' }}
     >
       {/* ── Window title / Menu Bar ─────────────────────────────────────── */}
-      <div className="flex items-center gap-0.5 bg-zinc-900 border-b border-zinc-800 px-2 py-1 flex-shrink-0">
+      <div className="flex items-center gap-0.5 border-b px-2 py-1 flex-shrink-0" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
         <MenuDropdown
           label="File"
           items={[
@@ -403,16 +403,16 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 
         {/* Strategy name + dirty indicator */}
         {mounted && currentStrategy && (
-          <span className="ml-auto text-xs text-zinc-400 truncate max-w-xs pr-2">
+          <span className="ml-auto text-xs truncate max-w-xs pr-2" style={{ color: '#9AA0A6' }}>
             BTC Trade Engine — Strategy Builder —{' '}
-            <span className="text-zinc-200">{currentStrategy.name}</span>
+            <span style={{ color: '#E8EAED' }}>{currentStrategy.name}</span>
             {isModified && <span className="text-amber-400 ml-1" title="Unsaved changes">●</span>}
           </span>
         )}
       </div>
 
       {/* ── Toolbar + Stepper (3-column: left tools | center stepper | right spacer) ── */}
-      <div className="flex items-center bg-zinc-900 border-b border-zinc-700 px-3 py-1.5 flex-shrink-0">
+      <div className="flex items-center border-b px-3 py-1.5 flex-shrink-0" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
         {/* Left: toolbar buttons */}
         <div className="flex items-center gap-1">
           <ToolbarButton label="New"  title="New Strategy (Ctrl+N)"  onClick={() => open('newStrategy')} />
@@ -423,7 +423,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             onClick={handleSave}
             active={isModified}
           />
-          <div className="w-px h-5 bg-zinc-700 mx-1 flex-shrink-0" />
+          <div className="w-px h-5 mx-1 flex-shrink-0" style={{ background: '#3C4149' }} />
           <ToolbarButton
             label={backTestInProgress ? '▶ Running…' : '▶ Quick Preview'}
             title="Run Quick Preview backtest (30 days)"
@@ -449,11 +449,11 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       <div ref={containerRef} className="flex flex-1 overflow-hidden min-h-0">
         {/* LEFT PANEL: Strategy Info + Blocks */}
         <div
-          className="flex flex-col overflow-hidden border-r border-zinc-800"
-          style={{ width: `${leftPercent}%` }}
+          className="flex flex-col overflow-hidden border-r"
+          style={{ width: `${leftPercent}%`, borderColor: '#3C4149' }}
         >
           {/* Section 1: Strategy Information (compact top) */}
-          <div className="flex-shrink-0 border-b border-zinc-700">
+          <div className="flex-shrink-0 border-b" style={{ borderColor: '#3C4149' }}>
             <StrategyInfoPanel compact />
           </div>
 
@@ -465,11 +465,11 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 
         {/* Drag handle */}
         <div
-          className="w-2 bg-zinc-800 hover:bg-blue-700 transition-colors cursor-col-resize flex-shrink-0 flex flex-col items-center justify-center gap-0.5"
+          className="w-2 bg-[#2A2F3A] hover:bg-blue-700 transition-colors cursor-col-resize flex-shrink-0 flex flex-col items-center justify-center gap-0.5"
           onMouseDown={() => { isDragging.current = true; }}
         >
           {[0, 1, 2].map(i => (
-            <div key={i} className="w-0.5 h-3 bg-zinc-600 rounded-full" />
+            <div key={i} className="w-0.5 h-3 bg-[#3C4149] rounded-full" />
           ))}
         </div>
 
@@ -480,8 +480,8 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       </div>
 
       {/* ── Status Bar ──────────────────────────────────────────────────── */}
-      <div className="h-6 bg-zinc-900 border-t border-zinc-800 px-3 flex items-center flex-shrink-0">
-        <span className="text-xs text-zinc-500">{statusText}</span>
+      <div className="h-6 border-t px-3 flex items-center flex-shrink-0" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
+        <span className="text-xs" style={{ color: '#9AA0A6' }}>{statusText}</span>
       </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────────────── */}
@@ -584,12 +584,12 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, title, onClick, di
     title={title}
     className={`px-2.5 py-1 text-xs rounded transition-colors border ${
       disabled
-        ? 'text-zinc-600 bg-zinc-900 border-zinc-800 cursor-not-allowed'
+        ? 'text-[#6B7280] bg-[#1E2128] border-[#3C4149] cursor-not-allowed'
         : accent
         ? 'text-white bg-blue-700 border-blue-600 hover:bg-blue-600 font-medium'
         : active
-        ? 'text-amber-300 bg-zinc-800 border-zinc-600 hover:bg-zinc-700'
-        : 'text-zinc-300 bg-zinc-800 border-zinc-700 hover:bg-zinc-700 hover:text-zinc-100'
+        ? 'text-amber-300 bg-[#2A2F3A] border-[#3C4149] hover:bg-[#3C4149]'
+        : 'text-[#A0AEC0] bg-[#2A2F3A] border-[#3C4149] hover:bg-[#3C4149] hover:text-[#E8EAED]'
     }`}
   >
     {label}
@@ -613,24 +613,24 @@ const MenuDropdown: React.FC<{ label: string; items: MenuItem[] }> = ({ label, i
       <button
         onClick={() => setOpen(v => !v)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        className="px-3 py-1 text-sm text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 rounded transition-colors"
+        className="px-3 py-1 text-sm text-[#A0AEC0] hover:text-[#E8EAED] hover:bg-[#2A2F3A] rounded transition-colors"
       >
         {label}
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-0.5 bg-zinc-800 border border-zinc-700 rounded shadow-xl z-50 min-w-max">
+        <div className="absolute top-full left-0 mt-0.5 border rounded shadow-xl z-50 min-w-max" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
           {items.map((item, i) =>
             item.label === '—' ? (
-              <div key={i} className="border-t border-zinc-700 my-0.5" />
+              <div key={i} className="border-t my-0.5" style={{ borderColor: '#3C4149' }} />
             ) : (
               <button
                 key={i}
                 onClick={() => { setOpen(false); item.onClick(); }}
-                className="flex items-center justify-between w-full px-4 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700 transition-colors text-left gap-8 whitespace-nowrap"
+                className="flex items-center justify-between w-full px-4 py-1.5 text-sm text-[#E8EAED] hover:bg-[#2A2F3A] transition-colors text-left gap-8 whitespace-nowrap"
               >
                 <span>{item.label}</span>
                 {item.shortcut && (
-                  <span className="text-xs text-zinc-500">{item.shortcut}</span>
+                  <span className="text-xs text-[#6B7280]">{item.shortcut}</span>
                 )}
               </button>
             )

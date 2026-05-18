@@ -106,11 +106,11 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
 
   if (!currentStrategy) {
     return (
-      <div className="bg-zinc-900 px-4 py-3 space-y-2">
-        <div className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+      <div className="px-4 py-3 space-y-2" style={{ background: '#1E2128' }}>
+        <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#9AA0A6' }}>
           💡 Strategy Information
         </div>
-        <div className="text-xs text-zinc-600 italic">No strategy loaded</div>
+        <div className="text-xs italic" style={{ color: '#6B7280' }}>No strategy loaded</div>
       </div>
     );
   }
@@ -118,15 +118,15 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
   const currentType = (currentStrategy.strategyType as string | undefined) ?? 'Bullish';
 
   return (
-    <div className="bg-zinc-900 px-4 py-3 space-y-2.5">
+    <div className="px-4 py-3 space-y-2.5" style={{ background: '#1E2128' }}>
       {/* Section header */}
-      <div className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+      <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#9AA0A6' }}>
         💡 Strategy Information
       </div>
 
       {/* Strategy Name */}
       <div className="space-y-1">
-        <label className="text-xs text-zinc-500">Strategy Name:</label>
+        <label className="text-xs" style={{ color: '#9AA0A6' }}>Strategy Name:</label>
         <input
           type="text"
           key={currentStrategy.id}
@@ -134,28 +134,35 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
           onBlur={e => handleNameChange(e.target.value)}
           placeholder="e.g., Example_MA_Crossover"
           maxLength={100}
-          className="w-full px-2 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
+          className="w-full px-2 py-1.5 rounded border text-sm focus:outline-none"
+          style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
         />
       </div>
 
       {/* Description (auto-generated, read-only) */}
       <div className="space-y-1">
-        <label className="text-xs text-zinc-500">
+        <label className="text-xs" style={{ color: '#9AA0A6' }}>
           Description:
-          {descLabel && <span className="ml-1 text-zinc-600 font-normal">{descLabel}.</span>}
+          {descLabel && <span className="ml-1 font-normal" style={{ color: '#6B7280' }}>{descLabel}.</span>}
         </label>
         <textarea
           rows={5}
           value={autoDescription}
           readOnly
-          className="w-full px-2 py-1.5 rounded bg-zinc-800/40 border border-zinc-700/60 text-xs text-zinc-500 resize-none focus:outline-none leading-relaxed cursor-default select-none"
-          style={{ scrollbarWidth: 'thin' as const, scrollbarColor: '#52525b #18181b' }}
+          className="w-full px-2 py-1.5 rounded border text-xs resize-none focus:outline-none leading-relaxed cursor-default select-none"
+          style={{
+            background: 'rgba(42,47,58,0.4)',
+            borderColor: 'rgba(60,65,73,0.6)',
+            color: '#9AA0A6',
+            scrollbarWidth: 'thin' as const,
+            scrollbarColor: '#3C4149 #1E2128',
+          }}
         />
       </div>
 
       {/* Strategy Type + Meta stats — all inline */}
       <div className="flex items-center gap-2 flex-wrap text-xs">
-        <span className="text-zinc-500 flex-shrink-0">Strategy Type:</span>
+        <span className="flex-shrink-0" style={{ color: '#9AA0A6' }}>Strategy Type:</span>
         {(['Bullish', 'Bearish'] as const).map(type => (
           <button
             key={type}
@@ -165,29 +172,30 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
                 ? type === 'Bullish'
                   ? 'bg-emerald-900 text-emerald-300 border-emerald-700'
                   : 'bg-red-900 text-red-300 border-red-700'
-                : 'bg-zinc-800 text-zinc-500 border-zinc-700 hover:border-zinc-500 hover:text-zinc-300'
+                : 'border-[#3C4149] hover:border-[#9AA0A6] hover:text-[#A0AEC0]'
             }`}
+            style={currentType !== type ? { background: '#2A2F3A', color: '#9AA0A6' } : undefined}
           >
             {type}
           </button>
         ))}
         {stats && (
           <>
-            <span className="text-zinc-600 mx-0.5">|</span>
-            <span className="text-zinc-500">Required:</span>
-            <span className={`font-bold ${stats.required > 0 ? 'text-emerald-400' : 'text-zinc-400'}`}>{stats.required}</span>
-            <span className="text-zinc-600">|</span>
-            <span className="text-zinc-500">Optional:</span>
-            <span className={`font-bold ${stats.optional > 0 ? 'text-blue-400' : 'text-zinc-400'}`}>{stats.optional}</span>
-            <span className="text-zinc-600">|</span>
-            <span className="text-zinc-500">Rechecked:</span>
-            <span className={`font-bold ${stats.rechecked > 0 ? 'text-amber-400' : 'text-zinc-400'}`}>{stats.rechecked}</span>
-            <span className="text-zinc-600">|</span>
-            <span className="text-zinc-500">Exit Conditions:</span>
-            <span className={`font-bold ${stats.exits > 0 ? 'text-red-400' : 'text-zinc-400'}`}>{stats.exits}</span>
-            <span className="text-zinc-600">|</span>
-            <span className="text-zinc-500">Time Constraint:</span>
-            <span className={`font-bold ${stats.timeConstrained > 0 ? 'text-emerald-400' : 'text-zinc-400'}`}>
+            <span className="mx-0.5" style={{ color: '#6B7280' }}>|</span>
+            <span style={{ color: '#9AA0A6' }}>Required:</span>
+            <span className={`font-bold ${stats.required > 0 ? 'text-emerald-400' : ''}`} style={stats.required === 0 ? { color: '#9AA0A6' } : undefined}>{stats.required}</span>
+            <span style={{ color: '#6B7280' }}>|</span>
+            <span style={{ color: '#9AA0A6' }}>Optional:</span>
+            <span className={`font-bold ${stats.optional > 0 ? 'text-blue-400' : ''}`} style={stats.optional === 0 ? { color: '#9AA0A6' } : undefined}>{stats.optional}</span>
+            <span style={{ color: '#6B7280' }}>|</span>
+            <span style={{ color: '#9AA0A6' }}>Rechecked:</span>
+            <span className={`font-bold ${stats.rechecked > 0 ? 'text-amber-400' : ''}`} style={stats.rechecked === 0 ? { color: '#9AA0A6' } : undefined}>{stats.rechecked}</span>
+            <span style={{ color: '#6B7280' }}>|</span>
+            <span style={{ color: '#9AA0A6' }}>Exit Conditions:</span>
+            <span className={`font-bold ${stats.exits > 0 ? 'text-red-400' : ''}`} style={stats.exits === 0 ? { color: '#9AA0A6' } : undefined}>{stats.exits}</span>
+            <span style={{ color: '#6B7280' }}>|</span>
+            <span style={{ color: '#9AA0A6' }}>Time Constraint:</span>
+            <span className={`font-bold ${stats.timeConstrained > 0 ? 'text-emerald-400' : ''}`} style={stats.timeConstrained === 0 ? { color: '#9AA0A6' } : undefined}>
               {stats.timeConstrained > 0 ? 'Yes' : 'No'}
             </span>
           </>
