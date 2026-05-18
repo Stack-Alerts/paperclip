@@ -145,16 +145,17 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
           {descLabel && <span className="ml-1 text-zinc-600 font-normal">{descLabel}.</span>}
         </label>
         <textarea
-          rows={3}
+          rows={5}
           value={autoDescription}
           readOnly
           className="w-full px-2 py-1.5 rounded bg-zinc-800/40 border border-zinc-700/60 text-xs text-zinc-500 resize-none focus:outline-none leading-relaxed cursor-default select-none"
+          style={{ scrollbarWidth: 'thin' as const, scrollbarColor: '#52525b #18181b' }}
         />
       </div>
 
-      {/* Strategy Type: Bullish / Bearish radio-style */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-xs text-zinc-500">Strategy Type:</span>
+      {/* Strategy Type + Meta stats — all inline */}
+      <div className="flex items-center gap-2 flex-wrap text-xs">
+        <span className="text-zinc-500 flex-shrink-0">Strategy Type:</span>
         {(['Bullish', 'Bearish'] as const).map(type => (
           <button
             key={type}
@@ -170,29 +171,28 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
             {type}
           </button>
         ))}
+        {stats && (
+          <>
+            <span className="text-zinc-700 mx-0.5">|</span>
+            <span className="text-zinc-500">Required:</span>
+            <span className={`font-bold ${stats.required > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>{stats.required}</span>
+            <span className="text-zinc-700">|</span>
+            <span className="text-zinc-500">Optional:</span>
+            <span className={`font-bold ${stats.optional > 0 ? 'text-blue-400' : 'text-zinc-600'}`}>{stats.optional}</span>
+            <span className="text-zinc-700">|</span>
+            <span className="text-zinc-500">Rechecked:</span>
+            <span className={`font-bold ${stats.rechecked > 0 ? 'text-amber-400' : 'text-zinc-600'}`}>{stats.rechecked}</span>
+            <span className="text-zinc-700">|</span>
+            <span className="text-zinc-500">Exit Conditions:</span>
+            <span className={`font-bold ${stats.exits > 0 ? 'text-red-400' : 'text-zinc-600'}`}>{stats.exits}</span>
+            <span className="text-zinc-700">|</span>
+            <span className="text-zinc-500">Time Constraint:</span>
+            <span className={`font-bold ${stats.timeConstrained > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>
+              {stats.timeConstrained > 0 ? 'Yes' : 'No'}
+            </span>
+          </>
+        )}
       </div>
-
-      {/* Meta stats row */}
-      {stats && (
-        <div className="flex items-center gap-2 text-xs flex-wrap border-t border-zinc-800/80 pt-2">
-          <span className="text-zinc-500">Required:</span>
-          <span className={`font-bold ${stats.required > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>{stats.required}</span>
-          <span className="text-zinc-700">|</span>
-          <span className="text-zinc-500">Optional:</span>
-          <span className={`font-bold ${stats.optional > 0 ? 'text-blue-400' : 'text-zinc-600'}`}>{stats.optional}</span>
-          <span className="text-zinc-700">|</span>
-          <span className="text-zinc-500">Rechecked:</span>
-          <span className={`font-bold ${stats.rechecked > 0 ? 'text-amber-400' : 'text-zinc-600'}`}>{stats.rechecked}</span>
-          <span className="text-zinc-700">|</span>
-          <span className="text-zinc-500">Exit Conditions:</span>
-          <span className={`font-bold ${stats.exits > 0 ? 'text-red-400' : 'text-zinc-600'}`}>{stats.exits}</span>
-          <span className="text-zinc-700">|</span>
-          <span className="text-zinc-500">Time Constraint:</span>
-          <span className={`font-bold ${stats.timeConstrained > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>
-            {stats.timeConstrained > 0 ? 'Yes' : 'No'}
-          </span>
-        </div>
-      )}
     </div>
   );
 }

@@ -14,16 +14,6 @@ const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   [BlockType.POSITION_SIZING]:  'SIZE',
 };
 
-const TYPE_BADGE: Record<BlockType, string> = {
-  [BlockType.ENTRY_CONDITION]:  'text-emerald-400 bg-emerald-950 border-emerald-800',
-  [BlockType.EXIT_CONDITION]:   'text-red-400 bg-red-950 border-red-800',
-  [BlockType.RISK_MANAGEMENT]:  'text-amber-400 bg-amber-950 border-amber-800',
-  [BlockType.TIME_CONSTRAINT]:  'text-blue-400 bg-blue-950 border-blue-800',
-  [BlockType.FILTER]:           'text-purple-400 bg-purple-950 border-purple-800',
-  [BlockType.INDICATOR]:        'text-cyan-400 bg-cyan-950 border-cyan-800',
-  [BlockType.POSITION_SIZING]:  'text-orange-400 bg-orange-950 border-orange-800',
-};
-
 // ─────────────────────────────────────────────
 // Preset management (localStorage)
 // ─────────────────────────────────────────────
@@ -59,82 +49,84 @@ interface BlockItemProps {
 function BlockItem({ definition, onAdd }: BlockItemProps) {
   const [signalsOpen, setSignalsOpen] = useState(false);
   const signals = definition.signals ?? [];
-  const typeBadge = TYPE_BADGE[definition.type] ?? 'text-zinc-400 bg-zinc-800 border-zinc-700';
-  const typeLabel = BLOCK_TYPE_LABELS[definition.type] ?? definition.type;
+  const ext = definition as unknown as Record<string, unknown>;
+  const weight = ext.weight as number | undefined;
+  const typeLabel = BLOCK_TYPE_LABELS[definition.type] ?? (definition.type as string).replace('_', ' ').toUpperCase();
 
   return (
-    <div className="rounded border border-zinc-800 bg-zinc-900 mb-2">
-      {/* Block header */}
-      <div className="px-3 py-2 flex items-start gap-2">
-        {/* Type badge */}
-        <span className={`text-xs px-1.5 py-0.5 rounded border font-mono flex-shrink-0 mt-0.5 ${typeBadge}`}>
-          {typeLabel}
-        </span>
-        {/* Name + meta */}
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-zinc-100 leading-tight">{definition.name}</div>
-          <div className="text-xs text-zinc-500 mt-0.5 truncate">
-            {definition.category}
-            {(definition as unknown as Record<string, unknown>).defaultWeight != null && (
-              <span className="ml-1">· {String((definition as unknown as Record<string, unknown>).defaultWeight)} pts</span>
-            )}
+    <div className="rounded border border-zinc-800 bg-zinc-900/80 mb-1.5">
+      {/* Block header: icon + name + Show/Hide signals button */}
+      <div className="px-3 pt-2.5 pb-1.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-zinc-500 text-sm flex-shrink-0">⬛</span>
+            <span className="text-sm font-semibold text-zinc-100 leading-tight">{definition.name}</span>
+          </div>
+          {signals.length > 0 && (
+            <button
+              onClick={() => setSignalsOpen(v => !v)}
+              className="flex-shrink-0 text-xs px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors whitespace-nowrap"
+            >
+              {signalsOpen ? `▼ Hide Signals (${signals.length})` : `▶ Show Signals (${signals.length})`}
+            </button>
+          )}
+        </div>
+        {/* Category | Type | Weight meta line */}
+        <div className="text-xs text-zinc-500 mt-0.5 ml-5">
+          Category: {definition.category}
+          {typeLabel && ` | Type: ${typeLabel}`}
+          {weight != null && ` | Weight: ${weight} points`}
+        </div>
+      </div>
+
+      {/* Expanded: signals list + add buttons (only when signalsOpen) */}
+      {signalsOpen && signals.length > 0 && (
+        <div className="border-t border-zinc-800 px-3 pb-2">
+          {/* Signal list */}
+          <div className="pt-2 space-y-2">
+            {signals.map((sig, i) => (
+              <div key={i} className="text-xs pl-2 border-l border-zinc-700">
+                <div className="text-zinc-300 font-medium">
+                  {sig.name}
+                  {sig.occurrences != null && (
+                    <span className="text-zinc-500 font-normal ml-1.5">
+                      ({sig.occurrences.toLocaleString()} found{sig.occurrence_percentage != null && `, ${sig.occurrence_percentage.toFixed(1)}%`})
+                    </span>
+                  )}
+                </div>
+                {sig.description && (
+                  <div className="text-zinc-600 mt-0.5 leading-relaxed italic">{sig.description}</div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Add buttons — only visible when expanded */}
+          <div className="flex gap-1.5 mt-3">
+            <button
+              onClick={() => onAdd(definition, 'AND')}
+              className="flex-1 text-xs py-1 rounded border border-emerald-800 bg-emerald-900/30 hover:bg-emerald-900/60 text-emerald-300 transition-colors"
+              title={`Add "${definition.name}" as required (AND)`}
+            >
+              + Add Required Signal
+            </button>
+            <button
+              onClick={() => onAdd(definition, 'OR')}
+              className="flex-1 text-xs py-1 rounded border border-blue-800 bg-blue-900/30 hover:bg-blue-900/60 text-blue-300 transition-colors"
+              title={`Add "${definition.name}" as optional (OR)`}
+            >
+              + Add as OR (Optional)
+            </button>
+            <button
+              onClick={() => onAdd(definition, 'EXIT')}
+              className="flex-1 text-xs py-1 rounded border border-red-800 bg-red-900/30 hover:bg-red-900/60 text-red-300 transition-colors"
+              title={`Add "${definition.name}" as exit condition`}
+            >
+              + Add as Exit
+            </button>
           </div>
         </div>
-        {/* Show/Hide signals */}
-        {signals.length > 0 && (
-          <button
-            onClick={() => setSignalsOpen(v => !v)}
-            className="flex-shrink-0 text-xs px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors whitespace-nowrap"
-          >
-            {signalsOpen ? `Hide Signals (${signals.length})` : `Show Signals (${signals.length})`}
-          </button>
-        )}
-      </div>
-
-      {/* Signals */}
-      {signalsOpen && signals.length > 0 && (
-        <div className="px-3 pb-2 space-y-1">
-          {signals.map((sig, i) => (
-            <div key={i} className="text-xs text-zinc-400 pl-2 border-l border-zinc-700 py-0.5">
-              <div className="text-zinc-300">{sig.name}</div>
-              {sig.description && (
-                <div className="text-zinc-600 italic mt-0.5">{sig.description}</div>
-              )}
-              {sig.occurrences != null && (
-                <div className="text-zinc-600 mt-0.5">
-                  {sig.occurrences.toLocaleString()} occurrences
-                  {sig.occurrence_percentage != null && ` (${sig.occurrence_percentage.toFixed(1)}%)`}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
       )}
-
-      {/* Add buttons */}
-      <div className="flex gap-1.5 px-3 pb-3 pt-1">
-        <button
-          onClick={() => onAdd(definition, 'AND')}
-          className="flex-1 text-xs py-1 rounded border border-emerald-800 bg-emerald-900/30 hover:bg-emerald-900/60 text-emerald-300 transition-colors"
-          title={`Add "${definition.name}" as a required (AND) block`}
-        >
-          + AND (Required)
-        </button>
-        <button
-          onClick={() => onAdd(definition, 'OR')}
-          className="flex-1 text-xs py-1 rounded border border-blue-800 bg-blue-900/30 hover:bg-blue-900/60 text-blue-300 transition-colors"
-          title={`Add "${definition.name}" as an optional (OR) block`}
-        >
-          + OR (Optional)
-        </button>
-        <button
-          onClick={() => onAdd(definition, 'EXIT')}
-          className="flex-1 text-xs py-1 rounded border border-red-800 bg-red-900/30 hover:bg-red-900/60 text-red-300 transition-colors"
-          title={`Add "${definition.name}" as an exit condition`}
-        >
-          + Exit
-        </button>
-      </div>
     </div>
   );
 }
@@ -289,63 +281,56 @@ export function BlockSearchPanel() {
 
       {/* Search + Filters */}
       <div className="px-3 pt-3 pb-2 space-y-2 flex-shrink-0 border-b border-zinc-800">
-        {/* Search input */}
-        <input
-          type="text"
-          placeholder="Search by block name, description, or signal…"
-          value={searchText}
-          onChange={e => setSearchText(e.target.value)}
-          className="w-full px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
-        />
-
-        {/* Category + Type row */}
-        <div className="flex gap-2">
-          <div className="flex-1 flex items-center gap-1.5">
-            <label className="text-xs text-zinc-500 flex-shrink-0">Category:</label>
-            <select
-              value={selectedCategory}
-              onChange={e => setSelectedCategory(e.target.value)}
-              className="flex-1 min-w-0 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 focus:outline-none"
-            >
-              <option value="all">All Categories</option>
-              {allCategories.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex-1 flex items-center gap-1.5">
-            <label className="text-xs text-zinc-500 flex-shrink-0">Type:</label>
-            <select
-              value={selectedType}
-              onChange={e => setSelectedType(e.target.value as BlockType | 'all')}
-              className="flex-1 min-w-0 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 focus:outline-none"
-            >
-              <option value="all">All Types</option>
-              {Object.entries(BLOCK_TYPE_LABELS).map(([type, label]) => (
-                <option key={type} value={type}>{label}</option>
-              ))}
-            </select>
-          </div>
+        {/* Row 1 - Search only */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-500 flex-shrink-0">🔍 Search:</span>
+          <input
+            type="text"
+            placeholder="Search by block name, description, or signal…"
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+            className="flex-1 px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
+          />
         </div>
 
-        {/* Preset management row */}
-        <div className="flex items-center gap-1.5">
+        {/* Row 2 - Category, Type, and Preset buttons all in one row */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <label className="text-xs text-zinc-500 flex-shrink-0">Category:</label>
+          <select
+            value={selectedCategory}
+            onChange={e => setSelectedCategory(e.target.value)}
+            className="flex-1 min-w-[100px] max-w-[140px] px-1.5 py-1 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 focus:outline-none"
+          >
+            <option value="all">All Categories</option>
+            {allCategories.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <label className="text-xs text-zinc-500 flex-shrink-0">Type:</label>
+          <select
+            value={selectedType}
+            onChange={e => setSelectedType(e.target.value as BlockType | 'all')}
+            className="flex-1 min-w-[80px] max-w-[120px] px-1.5 py-1 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 focus:outline-none"
+          >
+            <option value="all">All Types</option>
+            {Object.entries(BLOCK_TYPE_LABELS).map(([type, label]) => (
+              <option key={type} value={type}>{label}</option>
+            ))}
+          </select>
           <select
             value={selectedPreset}
             onChange={e => setSelectedPreset(e.target.value)}
-            className="flex-1 min-w-0 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-400 focus:outline-none"
+            className="flex-1 min-w-[80px] max-w-[110px] px-1.5 py-1 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-400 focus:outline-none"
           >
-            <option value="">— Select preset —</option>
-            {presets.map(p => (
-              <option key={p.name} value={p.name}>{p.name}</option>
-            ))}
+            <option value="">— Preset —</option>
+            {presets.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
           </select>
           <button
             onClick={handleSavePreset}
             title="Save current filter as preset"
             className="text-xs px-2 py-1 rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors whitespace-nowrap"
           >
-            Save
+            □ Save
           </button>
           <button
             onClick={handleLoadPreset}
@@ -353,7 +338,7 @@ export function BlockSearchPanel() {
             title="Load selected preset"
             className="text-xs px-2 py-1 rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
           >
-            Load
+            □ Load
           </button>
           <button
             onClick={handleDeletePreset}
@@ -361,7 +346,7 @@ export function BlockSearchPanel() {
             title="Delete selected preset"
             className="text-xs px-2 py-1 rounded border border-zinc-700 bg-zinc-800 hover:bg-red-900/40 hover:border-red-800 text-zinc-400 hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
           >
-            Del
+            🗑
           </button>
         </div>
       </div>

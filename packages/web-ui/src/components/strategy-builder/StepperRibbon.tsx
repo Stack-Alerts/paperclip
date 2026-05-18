@@ -39,6 +39,7 @@ export interface StepperRibbonProps {
   completedSteps?: Set<number>;
   errorSteps?: Set<number>;
   onStepClick?: (step: number) => void;
+  inline?: boolean;
 }
 
 export function StepperRibbon({
@@ -46,6 +47,7 @@ export function StepperRibbon({
   completedSteps = new Set(),
   errorSteps = new Set(),
   onStepClick,
+  inline = false,
 }: StepperRibbonProps) {
   const getStatus = (id: number): StepStatus => {
     if (errorSteps.has(id)) return 'error';
@@ -54,32 +56,38 @@ export function StepperRibbon({
     return 'pending';
   };
 
+  const stepButtons = STEPS.map((step, idx) => {
+    const status = getStatus(step.id);
+    const clickable = !!onStepClick;
+    return (
+      <div key={step.id} className="flex items-center gap-2">
+        <InfoTooltip id={`stepper-step-${step.id}`}>
+          <button
+            className={stepClasses(status, clickable)}
+            onClick={() => onStepClick?.(step.id)}
+            aria-current={status === 'active' ? 'step' : undefined}
+            title={step.tooltip}
+          >
+            <span aria-hidden="true">{step.icon}</span>
+            {step.name}
+            {status === 'complete' && <span className="ml-1 text-emerald-400" aria-label="complete">✓</span>}
+            {status === 'error' && <span className="ml-1 text-red-400" aria-label="error">✗</span>}
+          </button>
+        </InfoTooltip>
+        {idx < STEPS.length - 1 && (
+          <span className="text-zinc-600 text-sm" aria-hidden="true">→</span>
+        )}
+      </div>
+    );
+  });
+
+  if (inline) {
+    return <>{stepButtons}</>;
+  }
+
   return (
     <div className="flex items-center gap-2 border-b border-zinc-800 bg-zinc-900 px-6 py-2 flex-shrink-0">
-      {STEPS.map((step, idx) => {
-        const status = getStatus(step.id);
-        const clickable = !!onStepClick;
-        return (
-          <div key={step.id} className="flex items-center gap-2">
-            <InfoTooltip id={`stepper-step-${step.id}`}>
-              <button
-                className={stepClasses(status, clickable)}
-                onClick={() => onStepClick?.(step.id)}
-                aria-current={status === 'active' ? 'step' : undefined}
-                title={step.tooltip}
-              >
-                <span aria-hidden="true">{step.icon}</span>
-                {step.name}
-                {status === 'complete' && <span className="ml-1 text-emerald-400" aria-label="complete">✓</span>}
-                {status === 'error' && <span className="ml-1 text-red-400" aria-label="error">✗</span>}
-              </button>
-            </InfoTooltip>
-            {idx < STEPS.length - 1 && (
-              <span className="text-zinc-600 text-sm font-bold" aria-hidden="true">→</span>
-            )}
-          </div>
-        );
-      })}
+      {stepButtons}
     </div>
   );
 }

@@ -165,7 +165,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   }, []);
 
   // Resizable splitter
-  const [leftPercent, setLeftPercent] = useState(40);
+  const [leftPercent, setLeftPercent] = useState(60);
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -408,8 +408,8 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         )}
       </div>
 
-      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 bg-zinc-900 border-b border-zinc-700 px-3 py-1.5 flex-shrink-0">
+      {/* ── Toolbar + Stepper (single row) ─────────────────────────────── */}
+      <div className="flex items-center gap-1 bg-zinc-900 border-b border-zinc-700 px-3 py-1.5 flex-shrink-0 flex-wrap">
         <ToolbarButton label="New"  title="New Strategy (Ctrl+N)"  onClick={() => open('newStrategy')} />
         <ToolbarButton label="Open" title="Open Strategy (Ctrl+O)" onClick={() => open('strategyBrowser')} />
         <ToolbarButton
@@ -418,7 +418,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
           onClick={handleSave}
           active={isModified}
         />
-        <div className="w-px h-5 bg-zinc-700 mx-1" />
+        <div className="w-px h-5 bg-zinc-700 mx-1 flex-shrink-0" />
         <ToolbarButton
           label={backTestInProgress ? '▶ Running…' : '▶ Quick Preview'}
           title="Run Quick Preview backtest (30 days)"
@@ -426,15 +426,15 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
           disabled={!currentStrategy || backTestInProgress}
           accent
         />
+        <div className="w-px h-5 bg-zinc-700 mx-1 flex-shrink-0" />
+        <StepperRibbon
+          currentStep={currentStep}
+          completedSteps={completedSteps}
+          errorSteps={errorSteps}
+          onStepClick={setCurrentStep}
+          inline
+        />
       </div>
-
-      {/* ── Stepper Ribbon ──────────────────────────────────────────────── */}
-      <StepperRibbon
-        currentStep={currentStep}
-        completedSteps={completedSteps}
-        errorSteps={errorSteps}
-        onStepClick={setCurrentStep}
-      />
 
       {/* ── Main Content Area (40% left / 60% right) ────────────────────── */}
       <div ref={containerRef} className="flex flex-1 overflow-hidden min-h-0">
