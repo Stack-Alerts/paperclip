@@ -35,6 +35,14 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from touch_index.paperclip_client import _base, _company
 
+# Load .env file to ensure POSTGRES_* variables are available in routine execution
+if Path(REPO_ROOT / ".env").exists():
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(REPO_ROOT / ".env")
+    except ImportError:
+        pass
+
 MONITOR_LOG = Path.home() / ".paperclip" / "recovery_monitor.log"
 RECOVERY_STATE_FILE = Path.home() / ".paperclip" / "recovery_monitor_state.json"
 CONFIG_PATH = REPO_ROOT / "scripts" / "paperclip_recovery_actions.json"
