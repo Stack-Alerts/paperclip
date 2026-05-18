@@ -170,7 +170,6 @@ function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate }: ExitPil
   const cfg = block.data.exitConfig as StoredExitConfig | undefined;
   const pct = cfg?.percentage != null ? `${Math.round(cfg.percentage * 100)}%` : '50%';
   const mode = cfg?.exitMode ?? 'ABSOLUTE';
-  const pillBtn: React.CSSProperties = { width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 };
   return (
     <div className="flex items-center gap-2 ml-4 mt-1 text-xs px-2 py-1 rounded border border-red-900/50" style={{ background: 'rgba(220,38,38,0.07)' }}>
       <span style={{ color: '#DC2626' }}>↳ 🔴</span>
@@ -179,12 +178,14 @@ function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate }: ExitPil
       <span style={{ color: '#10B981' }}>{pct}</span>
       <span style={{ color: mode === 'FLEXIBLE' ? '#3B82F6' : '#9AA0A6' }}>{mode}</span>
       {cfg?.recheckEnabled && <span style={{ color: '#14a0a5' }}>RCHK:{cfg.recheckBarDelay ?? 3}</span>}
-      <button onClick={() => onEdit(globalIndex)} title="Configure exit" className="hover:opacity-80"
-        style={{ ...pillBtn, background: '#0d7377', color: '#fff', border: '1px solid #14a0a5' }}>⚙</button>
-      <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition" className="hover:opacity-80"
-        style={{ ...pillBtn, background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9' }}><DupIcon /></button>
-      <button onClick={() => onRemove(globalIndex)} title="Remove exit" className="hover:opacity-80"
-        style={{ ...pillBtn, background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252' }}>✕</button>
+      <div className="flex items-center gap-1.5">
+        <button onClick={() => onEdit(globalIndex)} title="Configure exit" className="hover:opacity-80"
+          style={{ ...ICON_BTN, background: '#0d7377', color: '#fff', border: '1px solid #14a0a5' }}><GearIcon /></button>
+        <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition" className="hover:opacity-80"
+          style={{ ...ICON_BTN, background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9' }}><DupIcon /></button>
+        <button onClick={() => onRemove(globalIndex)} title="Remove exit" className="hover:opacity-80"
+          style={{ ...ICON_BTN, background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252' }}><XIcon /></button>
+      </div>
     </div>
   );
 }
@@ -213,17 +214,17 @@ interface BlockCardProps {
   onDuplicateExit: (index: number) => void;
 }
 
+// Unified 28×28 icon button — all action buttons use this base
+const ICON_BTN: React.CSSProperties = {
+  width: 28, height: 28, borderRadius: 4, flexShrink: 0,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  cursor: 'pointer', border: 'none',
+};
+
 const BTN: React.CSSProperties = {
   height: 28, borderRadius: 4,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   fontSize: 12, cursor: 'pointer', flexShrink: 0, padding: '0 10px', fontWeight: 600,
-};
-
-const TEAL_BTN: React.CSSProperties = {
-  background: '#0d7377', color: '#ffffff', border: '1px solid #14a0a5',
-  width: 28, height: 28, borderRadius: 4,
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  fontSize: 13, cursor: 'pointer', flexShrink: 0,
 };
 
 function DupIcon() {
@@ -231,6 +232,25 @@ function DupIcon() {
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect x="3.5" y="0.5" width="8" height="8" rx="1.2" stroke="#14a0a5" strokeWidth="1.1"/>
       <rect x="0.5" y="3.5" width="8" height="8" rx="1.2" stroke="#38bdf8" strokeWidth="1.1" fill="rgba(10,20,35,0.85)"/>
+    </svg>
+  );
+}
+
+function GearIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" fill="currentColor"/>
+      <path d="M6.5 1.5l-.8 1.6a5.5 5.5 0 00-1.1.65l-1.76-.4L1.5 5l1.2 1.4a5.6 5.6 0 000 1.2L1.5 9l1.34 1.65 1.76-.4c.33.25.7.47 1.1.65l.8 1.6h2l.8-1.6c.4-.18.77-.4 1.1-.65l1.76.4L14.5 9l-1.2-1.4c.04-.4.04-.8 0-1.2l1.2-1.4-1.34-1.65-1.76.4a5.5 5.5 0 00-1.1-.65L9.5 1.5h-3z"
+        stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" fill="none"/>
+    </svg>
+  );
+}
+
+function XIcon({ size = 10 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <line x1="1.5" y1="1.5" x2="8.5" y2="8.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+      <line x1="8.5" y1="1.5" x2="1.5" y2="8.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
     </svg>
   );
 }
@@ -294,19 +314,21 @@ function BlockCard({
       <div className="flex items-center gap-2 px-3 pt-2 pb-1">
         <span className="text-sm font-bold" style={{ color: '#2a5eb8' }}>#{mainIndex + 1}</span>
         <div className="flex-1" />
-        <button
-          onClick={() => onConfig(index)}
-          disabled={mainIndex === 0}
-          title={mainIndex === 0 ? 'Timing constraints require a prior block' : 'Configure timing constraint'}
-          className="hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition-opacity flex-shrink-0"
-          style={{ ...BTN, background: '#2a5eb8', color: '#ffffff', border: '1px solid #1a4a9a' }}
-        >⚙ Config</button>
-        <button
-          onClick={() => onRemove(index)}
-          title="Remove this block"
-          className="hover:opacity-80 transition-opacity flex-shrink-0"
-          style={{ ...BTN, background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252' }}
-        >✕ Remove</button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => onConfig(index)}
+            disabled={mainIndex === 0}
+            title={mainIndex === 0 ? 'Timing constraints require a prior block' : 'Configure timing constraint'}
+            className="hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition-opacity"
+            style={{ ...BTN, background: '#2a5eb8', color: '#ffffff', border: '1px solid #1a4a9a', gap: 5 }}
+          ><GearIcon size={11} /> Config</button>
+          <button
+            onClick={() => onRemove(index)}
+            title="Remove this block"
+            className="hover:opacity-80 transition-opacity"
+            style={{ ...BTN, background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252', gap: 5 }}
+          ><XIcon size={9} /> Remove</button>
+        </div>
       </div>
 
       <div className="px-3 pb-2 text-xs" style={{ color: '#9AA0A6' }}>Signals: {signals.length}</div>
@@ -341,13 +363,24 @@ function BlockCard({
                         </span>
                       )}
                     </span>
-                    <button
-                      onClick={() => onConfigRecheck(index, si)}
-                      title="Configure recheck"
-                      style={{ ...TEAL_BTN, background: hasRecheck ? '#0d7377' : '#2A2F3A', border: hasRecheck ? '1px solid #14a0a5' : '1px solid #3C4149' }}>⚙</button>
-                    <button onClick={() => onDuplicateSignal(index, si)} title="Duplicate signal" style={TEAL_BTN}><DupIcon /></button>
-                    <button onClick={() => onRemoveSignal(index, si)} title="Remove signal"
-                      style={{ ...TEAL_BTN, background: 'rgba(153,27,27,0.7)', border: '1px solid #C35252' }}>✕</button>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <div className="relative">
+                        <button
+                          onClick={() => onConfigRecheck(index, si)}
+                          title={hasRecheck ? 'Configure recheck (active)' : 'Configure recheck'}
+                          className="hover:opacity-80"
+                          style={{ ...ICON_BTN, background: '#0d7377', color: '#fff', border: '1px solid #14a0a5' }}>
+                          <GearIcon />
+                        </button>
+                        {hasRecheck && (
+                          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full" style={{ background: '#10B981', border: '1px solid #15191E' }} />
+                        )}
+                      </div>
+                      <button onClick={() => onDuplicateSignal(index, si)} title="Duplicate signal" className="hover:opacity-80"
+                        style={{ ...ICON_BTN, background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9' }}><DupIcon /></button>
+                      <button onClick={() => onRemoveSignal(index, si)} title="Remove signal" className="hover:opacity-80"
+                        style={{ ...ICON_BTN, background: 'rgba(153,27,27,0.8)', color: '#FCA5A5', border: '1px solid #C35252' }}><XIcon /></button>
+                    </div>
                   </div>
 
                   {hasRecheck && (
@@ -356,8 +389,8 @@ function BlockCard({
                       <span className="flex-1 font-semibold" style={{ color: '#14a0a5' }}>
                         RECHECK ({sig.recheck_config?.mode ?? 'WITHIN'} {sig.recheck_config?.bar_delay ?? 3} bars)
                       </span>
-                      <button onClick={() => onRemoveRecheck(index, si)} title="Remove recheck"
-                        style={{ ...TEAL_BTN, width: 22, height: 22, fontSize: 10, background: 'rgba(220,38,38,0.35)', border: '1px solid #C35252' }}>✕</button>
+                      <button onClick={() => onRemoveRecheck(index, si)} title="Remove recheck" className="hover:opacity-80"
+                        style={{ ...ICON_BTN, background: 'rgba(153,27,27,0.8)', color: '#FCA5A5', border: '1px solid #C35252' }}><XIcon /></button>
                     </div>
                   )}
 
@@ -438,15 +471,12 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate }:
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <button onClick={() => onEdit(globalIndex)} title="Configure exit condition"
-                        className="hover:opacity-80"
-                        style={{ background: '#0d7377', color: '#fff', border: '1px solid #14a0a5', width: 28, height: 28, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>⚙</button>
-                      <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition"
-                        className="hover:opacity-80"
-                        style={{ background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9', width: 28, height: 28, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}><DupIcon /></button>
-                      <button onClick={() => onRemove(globalIndex)} title="Remove exit condition"
-                        className="hover:opacity-80"
-                        style={{ background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252', width: 28, height: 28, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
+                      <button onClick={() => onEdit(globalIndex)} title="Configure exit condition" className="hover:opacity-80"
+                        style={{ ...ICON_BTN, background: '#0d7377', color: '#fff', border: '1px solid #14a0a5' }}><GearIcon /></button>
+                      <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition" className="hover:opacity-80"
+                        style={{ ...ICON_BTN, background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9' }}><DupIcon /></button>
+                      <button onClick={() => onRemove(globalIndex)} title="Remove exit condition" className="hover:opacity-80"
+                        style={{ ...ICON_BTN, background: 'rgba(153,27,27,0.8)', color: '#FCA5A5', border: '1px solid #C35252' }}><XIcon /></button>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 mt-1 flex-wrap text-xs" style={{ color: '#9AA0A6' }}>
