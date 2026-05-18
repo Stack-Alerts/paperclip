@@ -429,7 +429,6 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             title="Run Quick Preview backtest (30 days)"
             onClick={handleQuickPreview}
             disabled={!currentStrategy || backTestInProgress}
-            accent
           />
         </div>
         {/* Center: stepper ribbon */}

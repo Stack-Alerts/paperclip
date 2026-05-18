@@ -76,23 +76,12 @@ function BlockItem({ definition, onAdd }: BlockItemProps) {
 
   return (
     <div className="rounded border border-zinc-800 bg-zinc-900/80 mb-1.5">
-      {/* Block header */}
+      {/* Block name + meta */}
       <div className="px-3 pt-2.5 pb-1.5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-base flex-shrink-0">📊</span>
-            <span className="text-sm font-semibold text-zinc-100 leading-tight">{definition.name}</span>
-          </div>
-          {signals.length > 0 && (
-            <button
-              onClick={() => setSignalsOpen(v => !v)}
-              className="flex-shrink-0 text-xs px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors whitespace-nowrap"
-            >
-              {signalsOpen ? `▼ Hide Signals (${signals.length})` : `▶ Show Signals (${signals.length})`}
-            </button>
-          )}
+        <div className="flex items-center gap-1.5">
+          <span className="text-base flex-shrink-0">📊</span>
+          <span className="text-sm font-semibold text-zinc-100 leading-tight">{definition.name}</span>
         </div>
-        {/* Category | Type | Weight meta line */}
         <div className="text-xs text-zinc-500 mt-0.5 ml-6">
           Category: {definition.category}
           {typeLabel && ` | Type: ${typeLabel}`}
@@ -100,9 +89,19 @@ function BlockItem({ definition, onAdd }: BlockItemProps) {
         </div>
       </div>
 
+      {/* Full-width expand/collapse button (below meta, matches desktop) */}
+      {signals.length > 0 && (
+        <button
+          onClick={() => setSignalsOpen(v => !v)}
+          className="w-full px-5 py-2.5 text-left text-sm font-bold bg-[#2D3748] text-[#A0AEC0] border-t border-[#374151] hover:bg-[#374151] hover:border-sky-400 transition-colors"
+        >
+          {signalsOpen ? `▼ Hide Signals (${signals.length})` : `▶ Show Signals (${signals.length})`}
+        </button>
+      )}
+
       {/* Expanded: signals list + add buttons */}
       {signalsOpen && signals.length > 0 && (
-        <div className="border-t border-zinc-800 px-3 pb-2">
+        <div className="px-3 pb-2">
           {/* Header */}
           <p className="text-xs font-semibold text-sky-400 pt-2 pb-1">Select signals to add:</p>
 
@@ -131,7 +130,7 @@ function BlockItem({ definition, onAdd }: BlockItemProps) {
                         </span>
                       )}
                       {sig.description && (
-                        <div className="text-zinc-600 text-xs mt-0.5 italic leading-relaxed">{sig.description}</div>
+                        <div className="text-zinc-500 text-xs mt-0.5 italic leading-relaxed">{sig.description}</div>
                       )}
                     </div>
                   </label>
