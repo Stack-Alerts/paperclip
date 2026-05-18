@@ -142,6 +142,13 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode }: BlockItemProp
 
   const handleAddExit = () => {
     const selected = checkedSignals.size > 0 ? [...checkedSignals] : visibleSignals.map(s => s.name);
+    if (!advancedMode) {
+      setAddedSignals(prev => {
+        const next = new Set(prev);
+        selected.forEach(s => next.add(s));
+        return next;
+      });
+    }
     setCheckedSignals(new Set());
     onAddExit(definition, selected);
   };

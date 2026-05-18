@@ -134,7 +134,11 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   // Load localStorage state after client mount — keeps SSR/client renders in sync.
   hydrateFromLocalStorage: () => {
     const { current, list } = initCurrentStrategy();
-    set({ currentStrategy: current, strategyList: list });
+    // Migrate legacy "New_Strategy" name to empty string
+    const migrated = list.map(s => s.name === 'New_Strategy' ? { ...s, name: '' } : s);
+    const migratedCurrent = current?.name === 'New_Strategy' ? { ...current, name: '' } : current;
+    if (migrated.some((s, i) => s.name !== list[i].name)) saveToStorage(migrated);
+    set({ currentStrategy: migratedCurrent, strategyList: migrated });
   },
 
   // Load existing strategy by ID
