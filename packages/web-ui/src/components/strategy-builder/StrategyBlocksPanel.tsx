@@ -6,6 +6,7 @@ import { Block, BlockType } from '@/lib/strategy-builder/types';
 import { InfoTooltip } from './InfoTooltip';
 import { TimingConstraintDialog, TimingConstraint } from './TimingConstraintDialog';
 import { BlockConfigDialog } from './BlockConfigDialog';
+import { ExitConditionDialog, ExitConditionConfig } from './ExitConditionDialog';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -314,35 +315,66 @@ function BlockItem({
 
 // ── Strategy-level exits ──────────────────────────────────────────────────────
 
-interface StrategyExitEntry {
+export interface StrategyExitEntry {
   signalName: string;
   percentage?: number;
   exitMode?: string;
+  tpProximity?: number;
+  reversalTrigger?: number;
+  recheckEnabled?: boolean;
+  recheckBarDelay?: number;
 }
 
-function StrategyExitsSection({ exits }: { exits: StrategyExitEntry[] }) {
+interface StrategyExitsSectionProps {
+  exits: StrategyExitEntry[];
+  onAdd: () => void;
+  onEdit: (index: number) => void;
+  onRemove: (index: number) => void;
+}
+
+function StrategyExitsSection({ exits, onAdd, onEdit, onRemove }: StrategyExitsSectionProps) {
   const [collapsed, setCollapsed] = useState(false);
   return (
     <div>
-      <button
-        onClick={() => setCollapsed((c) => !c)}
-        className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-red-400 hover:bg-zinc-800/50 transition-colors"
-      >
-        <span>Strategy Exit Conditions ({exits.length})</span>
-        <span className="text-zinc-600">{collapsed ? '▶' : '▼'}</span>
-      </button>
+      <div className="flex items-center justify-between px-4 py-2.5">
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          className="flex items-center gap-1.5 text-xs font-semibold text-red-400 hover:text-red-300 transition-colors"
+        >
+          <span>{collapsed ? '▶' : '▼'}</span>
+          <span>Strategy Exit Conditions ({exits.length})</span>
+        </button>
+        <button
+          onClick={onAdd}
+          className="text-xs px-2 py-0.5 rounded bg-red-900/40 hover:bg-red-900/70 text-red-400 border border-red-800 transition-colors"
+          title="Add strategy-level exit condition"
+        >
+          + Add Exit
+        </button>
+      </div>
       {!collapsed && (
-        <div className="px-4 pb-3 space-y-1">
+        <div className="px-4 pb-3 space-y-1.5">
           {exits.length === 0 ? (
-            <p className="text-xs text-zinc-600 italic">Strategy exit conditions do not apply to this strategy</p>
+            <p className="text-xs text-zinc-600 italic">No strategy-level exit conditions configured.</p>
           ) : (
             exits.map((exit, i) => (
-              <div key={i} className="flex items-center gap-1.5 py-0.5">
-                <span className="text-xs text-red-400 font-semibold">🔴</span>
-                <span className="text-xs text-zinc-400">
-                  {exit.signalName}{exit.percentage != null ? ` (${exit.percentage}%)` : ''}
+              <div key={i} className="flex items-center gap-1.5 py-0.5 group">
+                <span className="text-xs text-red-400 font-semibold flex-shrink-0">🔴</span>
+                <span className="text-xs text-zinc-400 flex-1 min-w-0 truncate">
+                  {exit.signalName}
+                  {exit.percentage != null ? ` (${exit.percentage}%)` : ''}
                   {exit.exitMode ? ` — ${exit.exitMode}` : ''}
                 </span>
+                <button
+                  onClick={() => onEdit(i)}
+                  className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 rounded text-zinc-400 hover:text-blue-300 hover:bg-blue-950 text-xs transition-all"
+                  title="Edit exit condition"
+                >⚙</button>
+                <button
+                  onClick={() => onRemove(i)}
+                  className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-950 text-xs transition-all"
+                  title="Remove exit condition"
+                >✕</button>
               </div>
             ))
           )}
@@ -371,6 +403,10 @@ export function StrategyBlocksPanel() {
 
   const [timingDialogIndex, setTimingDialogIndex] = useState<number | null>(null);
   const [configDialogIndex, setConfigDialogIndex] = useState<number | null>(null);
+  const [exitDialogOpen, setExitDialogOpen] = useState(false);
+  const [editingExitIndex, setEditingExitIndex] = useState<number | null>(null);
+
+  const { updateStrategySettings } = useStrategyStore();
 
   const handleMoveUp = useCallback(
     (index: number) => { if (index > 0) reorderBlocks(index, index - 1); },
@@ -407,6 +443,50 @@ export function StrategyBlocksPanel() {
       updateBlock(index, { ...block.data, ...data });
     },
     [blocks, updateBlock],
+  );
+
+  const handleStrategyExitAdd = useCallback(() => {
+    setEditingExitIndex(null);
+    setExitDialogOpen(true);
+  }, []);
+
+  const handleStrategyExitEdit = useCallback((index: number) => {
+    setEditingExitIndex(index);
+    setExitDialogOpen(true);
+  }, []);
+
+  const handleStrategyExitRemove = useCallback(
+    (index: number) => {
+      const updated = strategyExits.filter((_, i) => i !== index);
+      updateStrategySettings({ strategyExits: updated } as never);
+    },
+    [strategyExits, updateStrategySettings],
+  );
+
+  const handleStrategyExitSave = useCallback(
+    (config: ExitConditionConfig) => {
+      const entry: StrategyExitEntry = {
+        signalName: editingExitIndex !== null
+          ? (strategyExits[editingExitIndex]?.signalName ?? 'Exit Signal')
+          : 'Exit Signal',
+        percentage: config.percentage,
+        exitMode: config.exitMode,
+        tpProximity: config.tpProximity,
+        reversalTrigger: config.reversalTrigger,
+        recheckEnabled: config.recheckEnabled,
+        recheckBarDelay: config.recheckBarDelay,
+      };
+      let updated: StrategyExitEntry[];
+      if (editingExitIndex !== null) {
+        updated = strategyExits.map((e, i) => (i === editingExitIndex ? entry : e));
+      } else {
+        updated = [...strategyExits, entry];
+      }
+      updateStrategySettings({ strategyExits: updated } as never);
+      setExitDialogOpen(false);
+      setEditingExitIndex(null);
+    },
+    [editingExitIndex, strategyExits, updateStrategySettings],
   );
 
   const handleTimingConstraintSave = useCallback(
@@ -466,8 +546,29 @@ export function StrategyBlocksPanel() {
 
       {/* Section 3: Strategy Exit Conditions — always visible footer */}
       <div className="flex-shrink-0 border-t border-zinc-800">
-        <StrategyExitsSection exits={strategyExits} />
+        <StrategyExitsSection
+          exits={strategyExits}
+          onAdd={handleStrategyExitAdd}
+          onEdit={handleStrategyExitEdit}
+          onRemove={handleStrategyExitRemove}
+        />
       </div>
+
+      {/* Strategy Exit Condition Dialog */}
+      <ExitConditionDialog
+        open={exitDialogOpen}
+        signalName={editingExitIndex !== null ? strategyExits[editingExitIndex]?.signalName : undefined}
+        existingConfig={editingExitIndex !== null ? {
+          percentage: strategyExits[editingExitIndex]?.percentage ?? 50,
+          exitMode: (strategyExits[editingExitIndex]?.exitMode as 'ABSOLUTE' | 'FLEXIBLE') ?? 'ABSOLUTE',
+          tpProximity: strategyExits[editingExitIndex]?.tpProximity,
+          reversalTrigger: strategyExits[editingExitIndex]?.reversalTrigger,
+          recheckEnabled: strategyExits[editingExitIndex]?.recheckEnabled,
+          recheckBarDelay: strategyExits[editingExitIndex]?.recheckBarDelay,
+        } : undefined}
+        onSave={handleStrategyExitSave}
+        onClose={() => { setExitDialogOpen(false); setEditingExitIndex(null); }}
+      />
 
       {/* Block Config Dialog */}
       <BlockConfigDialog

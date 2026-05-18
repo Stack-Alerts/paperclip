@@ -43,10 +43,12 @@ interface SignalStatisticsCache {
   };
 }
 
+import type { ExitConditionConfig } from './ExitConditionDialog';
+
 interface BlockCardProps {
   block: BlockDefinition;
   onAddSignals: (blockName: string, signals: BlockSignal[], logic: 'AND' | 'OR') => void;
-  onAddExit: (blockName: string, signal: BlockSignal) => void;
+  onAddExit: (blockName: string, signal: BlockSignal, config: ExitConditionConfig) => void;
   onAddSimple: (block: BlockDefinition) => void;
   strategyBlocks: any[];
 }
@@ -139,10 +141,10 @@ function BlockCard({
     setShowExitDialog(true);
   };
 
-  const handleExitDialogSave = (config: any) => {
+  const handleExitDialogSave = (config: ExitConditionConfig) => {
     const signal = visibleSignals.find((s) => s.name === exitSignalName);
     if (signal) {
-      onAddExit(block.name, signal);
+      onAddExit(block.name, signal, config);
       markSignalsAdded([exitSignalName]);
       setSelectedSignals(new Set());
     }
@@ -329,7 +331,7 @@ export function BlockSearchPanel() {
   );
 
   const handleAddExit = useCallback(
-    (blockName: string, signal: BlockSignal) => {
+    (blockName: string, signal: BlockSignal, config: ExitConditionConfig) => {
       const strategy = useStrategyStore.getState().currentStrategy;
       const position = strategy?.blocks.length ?? 0;
       addBlock(BlockType.EXIT_CONDITION, position);
@@ -337,6 +339,14 @@ export function BlockSearchPanel() {
         name: blockName,
         logic: 'AND',
         signals: [{ name: signal.name, logic: 'AND' }],
+        exitConfig: {
+          percentage: config.percentage,
+          exitMode: config.exitMode,
+          tpProximity: config.tpProximity,
+          reversalTrigger: config.reversalTrigger,
+          recheckEnabled: config.recheckEnabled,
+          recheckBarDelay: config.recheckBarDelay,
+        },
       });
     },
     [addBlock]

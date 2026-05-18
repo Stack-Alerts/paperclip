@@ -162,6 +162,11 @@ export function BlockConfigDialog({ open, block, blockIndex, onSave, onClose }: 
                           className="w-16 px-2 py-0.5 rounded bg-zinc-700 border border-zinc-600 text-xs text-zinc-300 focus:outline-none"
                         />
                         <span className="text-xs text-zinc-500">bars</span>
+                        <button
+                          onClick={() => handleRecheckModeChange(idx, '')}
+                          className="ml-1 text-zinc-500 hover:text-red-400 text-xs px-1 rounded hover:bg-red-950 transition-colors"
+                          title="Remove recheck"
+                        >✕</button>
                       </>
                     )}
                   </div>

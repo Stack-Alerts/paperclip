@@ -308,6 +308,21 @@ export function StrategyInfoPanel() {
             </div>
           </Field>
 
+          {/* Time Constraint indicator */}
+          {(() => {
+            const hasTimeConstraint = blocks.some((b) => {
+              const tc = b.data?.timingConstraint as { enabled?: boolean } | undefined;
+              return tc?.enabled === true;
+            });
+            return (
+              <Field label="Time Constraint">
+                <span className={`text-sm font-semibold ${hasTimeConstraint ? 'text-blue-400' : 'text-zinc-500'}`}>
+                  {hasTimeConstraint ? 'Yes' : 'No'}
+                </span>
+              </Field>
+            );
+          })()}
+
           {/* Target market */}
           {settings.targetMarket && (
             <Field label="Target Market">
