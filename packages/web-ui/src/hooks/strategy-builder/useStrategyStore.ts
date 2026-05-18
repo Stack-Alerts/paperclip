@@ -114,6 +114,7 @@ interface StrategyStoreState {
   pollBacktestResult: (runId: string) => Promise<BacktestResult | undefined>;
   highlightedLibraryBlockId: string | null;
   highlightLibraryBlock: (definitionId: string | null) => void;
+  duplicateBlock: (fromIndex: number, position: number) => void;
 }
 
 export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
@@ -372,6 +373,24 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   highlightedLibraryBlockId: null,
   highlightLibraryBlock: (definitionId) => {
     set({ highlightedLibraryBlockId: definitionId });
+  },
+
+  // Atomically clone block at fromIndex and insert at position with a deep-copied data object
+  duplicateBlock: (fromIndex: number, position: number) => {
+    const { currentStrategy } = get();
+    if (!currentStrategy) return;
+    const source = currentStrategy.blocks[fromIndex];
+    if (!source) return;
+    const newBlock: Block = {
+      id: `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type: source.type,
+      index: position,
+      data: JSON.parse(JSON.stringify(source.data)) as BlockData,
+    };
+    const updatedBlocks = [...currentStrategy.blocks];
+    updatedBlocks.splice(position, 0, newBlock);
+    updatedBlocks.forEach((block, idx) => { block.index = idx; });
+    set({ currentStrategy: { ...currentStrategy, blocks: updatedBlocks, status: StrategyStatus.DRAFT } });
   },
 
   // Update strategy settings

@@ -214,29 +214,29 @@ interface BlockCardProps {
   onDuplicateExit: (index: number) => void;
 }
 
-// Unified 28×28 icon button — all action buttons use this base
+// Unified 20×20 icon button — all action buttons use this base
 const ICON_BTN: React.CSSProperties = {
-  width: 28, height: 28, borderRadius: 4, flexShrink: 0,
+  width: 20, height: 20, borderRadius: 3, flexShrink: 0,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   cursor: 'pointer', border: 'none',
 };
 
 const BTN: React.CSSProperties = {
-  height: 28, borderRadius: 4,
+  height: 24, borderRadius: 3,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  fontSize: 12, cursor: 'pointer', flexShrink: 0, padding: '0 10px', fontWeight: 600,
+  fontSize: 11, cursor: 'pointer', flexShrink: 0, padding: '0 8px', fontWeight: 600,
 };
 
 function DupIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3.5" y="0.5" width="8" height="8" rx="1.2" stroke="#14a0a5" strokeWidth="1.1"/>
-      <rect x="0.5" y="3.5" width="8" height="8" rx="1.2" stroke="#38bdf8" strokeWidth="1.1" fill="rgba(10,20,35,0.85)"/>
+    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3.5" y="0.5" width="8" height="8" rx="1.2" stroke="#14a0a5" strokeWidth="1.2"/>
+      <rect x="0.5" y="3.5" width="8" height="8" rx="1.2" stroke="#38bdf8" strokeWidth="1.2" fill="rgba(10,20,35,0.85)"/>
     </svg>
   );
 }
 
-function GearIcon({ size = 13 }: { size?: number }) {
+function GearIcon({ size = 11 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" fill="currentColor"/>
@@ -246,11 +246,11 @@ function GearIcon({ size = 13 }: { size?: number }) {
   );
 }
 
-function XIcon({ size = 10 }: { size?: number }) {
+function XIcon({ size = 8 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <line x1="1.5" y1="1.5" x2="8.5" y2="8.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-      <line x1="8.5" y1="1.5" x2="1.5" y2="8.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+      <line x1="1.5" y1="1.5" x2="8.5" y2="8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+      <line x1="8.5" y1="1.5" x2="1.5" y2="8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
     </svg>
   );
 }
@@ -373,7 +373,7 @@ function BlockCard({
                           <GearIcon />
                         </button>
                         {hasRecheck && (
-                          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full" style={{ background: '#10B981', border: '1px solid #15191E' }} />
+                          <span className="absolute -top-px -right-px w-1.5 h-1.5 rounded-full" style={{ background: '#10B981', border: '1px solid #15191E' }} />
                         )}
                       </div>
                       <button onClick={() => onDuplicateSignal(index, si)} title="Duplicate signal" className="hover:opacity-80"
@@ -536,7 +536,7 @@ function ReorderConfirmModal({ fromName, toName, direction, onConfirm, onCancel 
 // StrategyBlocksPanel (main export)
 // ─────────────────────────────────────────────
 export function StrategyBlocksPanel() {
-  const { currentStrategy, deleteBlock, reorderBlocks, updateBlock, addBlock, highlightLibraryBlock } = useStrategyStore();
+  const { currentStrategy, deleteBlock, reorderBlocks, updateBlock, duplicateBlock, highlightLibraryBlock } = useStrategyStore();
 
   const blocks: Block[] = currentStrategy?.blocks ?? [];
 
@@ -641,14 +641,9 @@ export function StrategyBlocksPanel() {
 
   const handleDuplicateExit = useCallback(
     (exitGlobalIndex: number) => {
-      const block = blocks[exitGlobalIndex];
-      if (!block) return;
-      const position = exitGlobalIndex + 1;
-      addBlock(BlockType.EXIT_CONDITION, position);
-      const clonedData = JSON.parse(JSON.stringify(block.data)) as typeof block.data;
-      updateBlock(position, clonedData);
+      duplicateBlock(exitGlobalIndex, exitGlobalIndex + 1);
     },
-    [blocks, addBlock, updateBlock]
+    [duplicateBlock]
   );
 
   const handleRecheckConfigSave = useCallback(
