@@ -23,8 +23,8 @@ export interface AvailableBlock {
 
 export interface ExitConditionDialogProps {
   open: boolean;
-  signalName: string;
-  availableBlocks: AvailableBlock[];
+  signalName?: string;
+  availableBlocks?: AvailableBlock[];
   existing?: ExitConditionConfig;
   onSave: (config: ExitConditionConfig) => void;
   onCancel: () => void;
@@ -126,7 +126,7 @@ export function ExitConditionDialog({
 
   // Flat list of block→signal pairs for SIGNAL binding selector
   const allSignalOptions: { key: string; label: string }[] = [];
-  for (const b of availableBlocks) {
+  for (const b of (availableBlocks ?? [])) {
     for (const sig of b.signals) {
       allSignalOptions.push({ key: `${b.name}::${sig}`, label: `${b.name} → ${sig}` });
     }
@@ -134,7 +134,7 @@ export function ExitConditionDialog({
 
   const handleSave = () => {
     const config: ExitConditionConfig = {
-      signalName,
+      signalName: signalName ?? '',
       percentage: percentage / 100,
       exitMode,
       bindingLevel,
@@ -212,7 +212,7 @@ export function ExitConditionDialog({
                     </div>
                     <div className="ml-6 text-xs" style={{ color: '#6B7280' }}>{opt.desc}</div>
 
-                    {opt.value === 'BLOCK' && bindingLevel === 'BLOCK' && availableBlocks.length > 0 && (
+                    {opt.value === 'BLOCK' && bindingLevel === 'BLOCK' && (availableBlocks ?? []).length > 0 && (
                       <div className="ml-6 mt-1.5">
                         <select
                           value={selectedBlockName}
@@ -221,7 +221,7 @@ export function ExitConditionDialog({
                           style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
                         >
                           <option value="">Select block…</option>
-                          {availableBlocks.map(b => (
+                          {(availableBlocks ?? []).map(b => (
                             <option key={b.id} value={b.name}>{b.name}</option>
                           ))}
                         </select>

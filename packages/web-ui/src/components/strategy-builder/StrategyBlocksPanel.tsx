@@ -171,10 +171,14 @@ function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate }: ExitPil
   const pct = cfg?.percentage != null ? `${Math.round(cfg.percentage * 100)}%` : '50%';
   const mode = cfg?.exitMode ?? 'ABSOLUTE';
   return (
-    <div className="flex items-center gap-2 ml-4 mt-1 text-xs pl-2 py-1 rounded border border-red-900/50" style={{ background: 'rgba(220,38,38,0.07)' }}>
+    <div className="flex items-center gap-2 ml-3 mt-1 text-xs pl-2 py-1 rounded border border-red-900/50" style={{ background: 'rgba(220,38,38,0.07)' }}>
       <span style={{ color: '#DC2626' }}>↳ 🔴</span>
-      <span className="font-semibold flex-1 truncate" style={{ color: '#FCA5A5' }}>{name}</span>
-      {cfg?.signalName && <span className="truncate" style={{ color: '#9AA0A6' }}>({formatSignalName(cfg.signalName)})</span>}
+      <span className="flex-1 min-w-0 truncate" style={{ color: '#FCA5A5' }}>
+        <span className="font-semibold">{name}</span>
+        {cfg?.signalName && cfg.signalName !== name && (
+          <span className="ml-1" style={{ color: '#A0AEC0' }}>→ {formatSignalName(cfg.signalName)}</span>
+        )}
+      </span>
       <span style={{ color: '#10B981' }}>{pct}</span>
       <span style={{ color: mode === 'FLEXIBLE' ? '#3B82F6' : '#9AA0A6' }}>{mode}</span>
       {cfg?.recheckEnabled && <span style={{ color: '#14a0a5' }}>RCHK:{cfg.recheckBarDelay ?? 3}</span>}
@@ -395,6 +399,10 @@ function BlockCard({
                     </div>
                   </div>
 
+                  {sigExits.map(({ block: eb, globalIndex: gi }) => (
+                    <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} onDuplicate={onDuplicateExit} />
+                  ))}
+
                   {hasRecheck && (
                     <div className="flex items-center gap-1.5 ml-3 text-xs">
                       <span style={{ color: '#14a0a5' }}>↳</span>
@@ -405,10 +413,6 @@ function BlockCard({
                         style={REM_STYLE}><XIcon /></button>
                     </div>
                   )}
-
-                  {sigExits.map(({ block: eb, globalIndex: gi }) => (
-                    <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} onDuplicate={onDuplicateExit} />
-                  ))}
                 </div>
               );
             })}
@@ -470,9 +474,9 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate }:
                 <div key={block.id} className="rounded border border-red-900/40 px-3 py-2" style={{ background: 'rgba(42,47,58,0.6)' }}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <span className="text-red-300 font-semibold text-xs truncate">🔴 {name}</span>
-                      {cfg?.signalName && (
-                        <span className="text-xs truncate" style={{ color: '#9AA0A6' }}>
+                      <span className="text-red-300 font-semibold text-xs flex-shrink-0">🔴 {name}</span>
+                      {cfg?.signalName && cfg.signalName !== name && (
+                        <span className="text-xs truncate" style={{ color: '#A0AEC0' }}>
                           → {formatSignalName(cfg.signalName)}
                         </span>
                       )}
