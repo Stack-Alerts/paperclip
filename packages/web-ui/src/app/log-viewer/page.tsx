@@ -18,8 +18,8 @@ export default function LogViewerPage() {
     <AppLayout>
       <div className="p-8">
         <div className="mb-6">
-          <h2 className="text-3xl font-bold text-gray-900">Log Viewer</h2>
-          <p className="text-gray-600 mt-1">Monitor system and strategy execution logs</p>
+          <h2 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>Log Viewer</h2>
+          <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>Monitor system and strategy execution logs</p>
         </div>
         <LogViewerPanel logs={logs} onClear={() => setLogs([])} />
       </div>

@@ -53,8 +53,8 @@ export default function SettingsPage() {
     <AppLayout>
       <div className="p-8">
         <div className="mb-6">
-          <h2 className="text-3xl font-bold text-gray-900">Settings</h2>
-          <p className="text-gray-600 mt-1">Configure application and API settings</p>
+          <h2 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>Settings</h2>
+          <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>Configure application and API settings</p>
         </div>
         <SettingsPanel settings={settings} onSave={handleSave} />
       </div>

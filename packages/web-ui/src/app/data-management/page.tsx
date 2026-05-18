@@ -36,8 +36,8 @@ export default function DataManagementPage() {
     <AppLayout>
       <div className="p-8">
         <div className="mb-6">
-          <h2 className="text-3xl font-bold text-gray-900">Data Management</h2>
-          <p className="text-gray-600 mt-1">Verify and manage market data sources</p>
+          <h2 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>Data Management</h2>
+          <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>Verify and manage market data sources</p>
         </div>
         <DataManagementPanel dataSources={dataSources} onVerify={handleVerify} verificationResults={verificationResults} />
       </div>

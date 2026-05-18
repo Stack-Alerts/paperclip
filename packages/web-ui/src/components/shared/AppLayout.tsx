@@ -27,22 +27,40 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen" style={{ background: 'var(--app-bg)' }}>
       <aside
-        className={`bg-gray-900 text-white flex-shrink-0 transition-all duration-200 ${
+        className={`flex-shrink-0 transition-all duration-200 flex flex-col ${
           collapsed ? 'w-16' : 'w-56'
-        } border-r border-gray-800 flex flex-col`}
+        }`}
+        style={{
+          background: 'var(--sidebar-bg)',
+          borderRight: '1px solid var(--border)',
+          color: 'var(--text-primary)',
+        }}
       >
-        <div className="flex items-center justify-between p-3 border-b border-gray-800">
+        <div
+          className="flex items-center justify-between p-3"
+          style={{ borderBottom: '1px solid var(--border)' }}
+        >
           {!collapsed && (
             <div className="flex items-center gap-2 min-w-0">
-              <Activity className="w-4 h-4 text-blue-400 flex-shrink-0" />
-              <span className="text-sm font-bold truncate text-gray-100">BTC Trade Engine</span>
+              <Activity className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--accent-blue)' }} />
+              <span
+                className="text-xs font-bold truncate"
+                style={{
+                  color: 'var(--text-secondary)',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                BTC Trade Engine
+              </span>
             </div>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1 hover:bg-gray-800 rounded transition-colors ml-auto"
+            className="p-1 rounded transition-colors ml-auto"
+            style={{ color: 'var(--text-secondary)' }}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? <Menu className="w-4 h-4" /> : <X className="w-4 h-4" />}
@@ -57,13 +75,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 key={href}
                 href={href}
                 title={label}
-                className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                  active
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                }`}
+                className="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors"
+                style={active
+                  ? {
+                      background: 'var(--bg-panel)',
+                      color: '#FFFFFF',
+                      borderLeft: '3px solid var(--accent-blue)',
+                      paddingLeft: '9px',
+                    }
+                  : { color: 'var(--text-secondary)' }}
               >
-                <Icon className="w-4 h-4 flex-shrink-0" />
+                <Icon
+                  className="w-4 h-4 flex-shrink-0"
+                  style={active ? { color: 'var(--accent-blue)' } : {}}
+                />
                 {!collapsed && <span className="truncate">{label}</span>}
               </Link>
             );
@@ -71,8 +96,28 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         {!collapsed && (
-          <div className="p-3 border-t border-gray-800">
-            <p className="text-xs text-gray-600">PyQt5 Web Port</p>
+          <div className="p-3" style={{ borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: '#26C46A',
+                  display: 'inline-block',
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 10,
+                  color: '#26C46A',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                CONNECTED
+              </span>
+            </div>
           </div>
         )}
       </aside>
