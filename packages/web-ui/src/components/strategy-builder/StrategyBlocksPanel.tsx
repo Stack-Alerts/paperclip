@@ -178,7 +178,7 @@ function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate }: ExitPil
       <span style={{ color: '#10B981' }}>{pct}</span>
       <span style={{ color: mode === 'FLEXIBLE' ? '#3B82F6' : '#9AA0A6' }}>{mode}</span>
       {cfg?.recheckEnabled && <span style={{ color: '#14a0a5' }}>RCHK:{cfg.recheckBarDelay ?? 3}</span>}
-      <div className="flex items-center gap-1.5">
+      <div style={BTN_GROUP}>
         <button onClick={() => onEdit(globalIndex)} title="Configure exit" className="hover:opacity-80"
           style={{ ...ICON_BTN, background: '#0d7377', color: '#fff', border: '1px solid #14a0a5' }}><GearIcon /></button>
         <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition" className="hover:opacity-80"
@@ -219,6 +219,13 @@ const ICON_BTN: React.CSSProperties = {
   width: 20, height: 20, borderRadius: 3, flexShrink: 0,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   cursor: 'pointer', border: 'none',
+};
+
+// Fixed-width container for 3-button icon groups: 3×20px + 2×6px gaps = 72px
+// All rows use this so buttons align in a vertical grid across the panel
+const BTN_GROUP: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 6,
+  width: 72, flexShrink: 0, justifyContent: 'flex-end',
 };
 
 const BTN: React.CSSProperties = {
@@ -363,7 +370,7 @@ function BlockCard({
                         </span>
                       )}
                     </span>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div style={BTN_GROUP}>
                       <div className="relative">
                         <button
                           onClick={() => onConfigRecheck(index, si)}
@@ -470,7 +477,7 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate }:
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div style={BTN_GROUP}>
                       <button onClick={() => onEdit(globalIndex)} title="Configure exit condition" className="hover:opacity-80"
                         style={{ ...ICON_BTN, background: '#0d7377', color: '#fff', border: '1px solid #14a0a5' }}><GearIcon /></button>
                       <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition" className="hover:opacity-80"
