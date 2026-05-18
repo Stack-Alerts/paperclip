@@ -725,7 +725,7 @@ export function BlockSearchPanel() {
             <select
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
-              className="flex-[2] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
+              className="flex-[1.5] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
               style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
             >
               <option value="all">All Categories</option>
@@ -738,7 +738,7 @@ export function BlockSearchPanel() {
             <select
               value={selectedType}
               onChange={e => setSelectedType(e.target.value as 'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all')}
-              className="flex-[1.5] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
+              className="flex-[0.75] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
               style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
             >
               <option value="all">All Types</option>
@@ -751,7 +751,7 @@ export function BlockSearchPanel() {
             <select
               value={selectedPreset}
               onChange={e => setSelectedPreset(e.target.value)}
-              className="flex-1 min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
+              className="flex-[3] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
               style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}
             >
               <option value="">— Preset —</option>
