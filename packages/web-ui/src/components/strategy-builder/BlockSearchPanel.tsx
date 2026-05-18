@@ -370,18 +370,25 @@ export function BlockSearchPanel() {
       });
   }, [blockLibrary, searchText, selectedCategory, selectedType]);
 
-  // All categories for dropdown
+  // All categories for dropdown — format SNAKE_CASE to Title Case for display
   const allCategories = useMemo(() => {
     if (blockCategories.length > 0) return blockCategories.map(c => ({ id: c.id, name: c.name }));
     const cats = new Set(blockLibrary.map(b => b.category));
-    return [...cats].sort().map(c => ({ id: c, name: c }));
+    return [...cats].sort().map(c => ({
+      id: c,
+      name: c.replace(/_/g, ' ').replace(/\b\w/g, (ch: string) => ch.toUpperCase()),
+    }));
   }, [blockCategories, blockLibrary]);
 
-  // Always show all defined types — matches desktop client which shows all options
-  // regardless of what the current library contains
-  const allTypes = useMemo(() =>
-    Object.entries(BLOCK_TYPE_LABELS).map(([value, label]) => ({ value, label })),
-  []);
+  // Show only types that actually exist in the library — matches desktop client
+  // (hardcoding all 7 enum types shows empty results for most selections)
+  const allTypes = useMemo(() => {
+    const seen = new Set(blockLibrary.map(b => b.type));
+    return [...seen].sort().map(t => ({
+      value: t,
+      label: BLOCK_TYPE_LABELS[t] ?? t.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+    }));
+  }, [blockLibrary]);
 
   // Add block to strategy.
   // Standard mode: signals from the same block definition + logic are merged
@@ -496,28 +503,29 @@ export function BlockSearchPanel() {
         </div>
       </div>
 
-      {/* Search + Filters — 2 rows */}
-      <div className="px-3 pt-3 pb-2 space-y-2 flex-shrink-0 border-b border-[#3C4149]" style={{ background: '#1E2128' }}>
+      {/* Search + Filters — 2 rows, labels fixed-width so inputs align */}
+      <div className="px-3 pt-3 pb-2 space-y-1.5 flex-shrink-0 border-b border-[#3C4149]" style={{ background: '#1E2128' }}>
         {/* Row 1: Search */}
         <div className="flex items-center gap-2">
-          <span className="text-xs flex-shrink-0" style={{ color: '#9AA0A6' }}>🔍 Search:</span>
+          <span className="text-xs flex-shrink-0 text-right" style={{ color: '#9AA0A6', width: 68 }}>🔍 Search:</span>
           <input
             type="text"
             placeholder="Search by block name, description, or signal…"
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
-            className="flex-1 px-2.5 py-1.5 rounded border text-sm focus:outline-none"
+            className="flex-1 px-2.5 py-1.5 rounded border text-xs focus:outline-none"
             style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
           />
         </div>
 
-        {/* Row 2: Category, Type, Preset buttons */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <label className="text-xs flex-shrink-0" style={{ color: '#9AA0A6' }}>Category:</label>
+        {/* Row 2: Category + Type dropdowns — same label width so controls align with search input */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs flex-shrink-0 text-right" style={{ color: '#9AA0A6', width: 68 }}>🏷 Filter:</span>
           <select
             value={selectedCategory}
             onChange={e => setSelectedCategory(e.target.value)}
-            className="flex-1 min-w-[100px] max-w-[140px] px-1.5 py-1 rounded border text-xs focus:outline-none"
+            title="Filter by category"
+            className="flex-[2] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
             style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
           >
             <option value="all">All Categories</option>
@@ -525,11 +533,11 @@ export function BlockSearchPanel() {
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-          <label className="text-xs flex-shrink-0" style={{ color: '#9AA0A6' }}>Type:</label>
           <select
             value={selectedType}
             onChange={e => setSelectedType(e.target.value as BlockType | 'all')}
-            className="flex-1 min-w-[80px] max-w-[140px] px-1.5 py-1 rounded border text-xs focus:outline-none"
+            title="Filter by block type"
+            className="flex-[1.5] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
             style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
           >
             <option value="all">All Types</option>
@@ -540,38 +548,21 @@ export function BlockSearchPanel() {
           <select
             value={selectedPreset}
             onChange={e => setSelectedPreset(e.target.value)}
-            className="flex-1 min-w-[80px] max-w-[110px] px-1.5 py-1 rounded border text-xs focus:outline-none"
+            className="flex-1 min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
             style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}
           >
             <option value="">— Preset —</option>
             {presets.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
           </select>
-          <button
-            onClick={handleSavePreset}
-            title="Save current filter as preset"
-            className="text-xs px-2 py-1 rounded border transition-colors whitespace-nowrap hover:opacity-80"
-            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}
-          >
-            □ Save
-          </button>
-          <button
-            onClick={handleLoadPreset}
-            disabled={!selectedPreset}
-            title="Load selected preset"
-            className="text-xs px-2 py-1 rounded border transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-80"
-            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}
-          >
-            □ Load
-          </button>
-          <button
-            onClick={handleDeletePreset}
-            disabled={!selectedPreset}
-            title="Delete selected preset"
-            className="text-xs px-2 py-1 rounded border transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-80"
-            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}
-          >
-            🗑
-          </button>
+          <button onClick={handleSavePreset} title="Save current filter as preset"
+            className="text-xs px-1.5 py-1 rounded border flex-shrink-0 hover:opacity-80"
+            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>💾</button>
+          <button onClick={handleLoadPreset} disabled={!selectedPreset} title="Load selected preset"
+            className="text-xs px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
+            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>📂</button>
+          <button onClick={handleDeletePreset} disabled={!selectedPreset} title="Delete selected preset"
+            className="text-xs px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
+            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>🗑</button>
         </div>
       </div>
 
