@@ -1,26 +1,216 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* ─── Tailwind theme tokens ───────────────────────────────────────────────── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ─────────────────────────────────────────────────────────────────────────── */
+/*  Dark theme — defined on :root so it works with OR without data-theme attr  */
+/* ─────────────────────────────────────────────────────────────────────────── */
+:root,
+[data-theme="dark"] {
+  /* ── Core tokens ─────────────────────────────────────── */
+  --core-bg-app:         #080C12;
+  --core-bg-shell:       #0D1218;
+  --core-bg-elevated:    #111720;
+  --core-surface-panel:  #131B27;
+  --core-surface-card:   #1A2335;
+  --core-border-subtle:  #1A2535;
+  --core-text-primary:   #E8F2FF;
+  --core-text-secondary: #8A9FBF;
+  --core-text-muted:     #4A5C73;
+  --core-accent-blue:    #2E8CFF;
+  --core-accent-cyan:    #2BE8F2;
+  --core-accent-teal:    #1CC7D8;
+  --core-danger:         #FF3B5C;
+  --core-success:        #26C46A;
+  --core-warning:        #F5A623;
+
+  /* ── Semantic surface / shell ────────────────────────── */
+  --app-bg:              var(--core-bg-app);
+  --shell-bg:            var(--core-bg-shell);
+  --sidebar-bg:          var(--core-bg-shell);
+  --topbar-bg:           var(--core-bg-shell);
+  --surface-panel:       var(--core-surface-panel);
+  --surface-card:        var(--core-surface-card);
+  --surface-hover:       var(--core-bg-elevated);
+  --surface-selected:    var(--core-surface-panel);
+
+  /* ── Additional semantic aliases ────────────────────── */
+  --bg-app:              var(--core-bg-app);
+  --bg-sidebar:          var(--core-bg-shell);
+  --bg-base:             var(--core-bg-app);
+  --bg-panel:            var(--core-surface-panel);
+  --bg-panel-raised:     var(--core-surface-card);
+  --bg-input:            var(--core-bg-elevated);
+  --bg-header:           var(--core-bg-shell);
+  --text-placeholder:    var(--core-text-muted);
+  --text-disabled:       color-mix(in srgb, var(--core-text-muted) 60%, transparent);
+  --color-bullish:       var(--core-success);
+  --color-bearish:       var(--core-danger);
+  --color-warning:       var(--core-warning);
+  --border-default:      #253040;
+  --border-strong:       #2E3F55;
+
+  /* ── Semantic borders ────────────────────────────────── */
+  --border:              var(--core-border-subtle);
+  --border-focus:        var(--core-accent-cyan);
+
+  /* ── Semantic text ───────────────────────────────────── */
+  --text-primary:        var(--core-text-primary);
+  --text-secondary:      var(--core-text-secondary);
+  --text-muted:          var(--core-text-muted);
+  --text-dim:            var(--core-text-secondary);
+  --text-faint:          var(--core-text-muted);
+  --text-faintest:       color-mix(in srgb, var(--core-text-muted) 70%, transparent);
+
+  /* ── Semantic buttons ────────────────────────────────── */
+  --btn-primary-bg:      var(--core-accent-blue);
+  --btn-primary-text:    var(--core-text-primary);
+  --btn-primary-hover:   var(--core-accent-cyan);
+  --btn-secondary-bg:    var(--core-surface-panel);
+  --btn-secondary-text:  var(--core-text-secondary);
+  --btn-secondary-border: var(--core-border-subtle);
+
+  /* ── Semantic inputs ─────────────────────────────────── */
+  --input-bg:            var(--core-bg-elevated);
+  --input-border:        #253040;
+  --input-text:          var(--core-text-primary);
+  --input-placeholder:   var(--core-text-muted);
+  --input-focus:         var(--core-accent-cyan);
+
+  /* ── Semantic table ──────────────────────────────────── */
+  --table-row-bg:        var(--core-surface-panel);
+  --table-row-hover:     var(--core-bg-elevated);
+  --table-divider:       var(--core-border-subtle);
+
+  /* ── Semantic signals / status ───────────────────────── */
+  --signal-bullish:      var(--core-success);
+  --signal-bearish:      var(--core-danger);
+  --signal-neutral:      var(--core-text-secondary);
+  --status-connected:    var(--core-success);
+  --status-warning:      var(--core-warning);
+  --status-error:        var(--core-danger);
+
+  /* ── Semantic chart ──────────────────────────────────── */
+  --chart-grid:          var(--core-border-subtle);
+  --chart-axis:          var(--core-text-muted);
+  --chart-series-1:      var(--core-accent-blue);
+  --chart-series-2:      var(--core-accent-cyan);
+  --chart-series-3:      var(--core-accent-teal);
+  --chart-bullish:       var(--core-success);
+  --chart-bearish:       var(--core-danger);
+
+  /* ── Glow ────────────────────────────────────────────── */
+  --glow-blue:           var(--core-accent-blue);
+  --glow-cyan:           var(--core-accent-cyan);
+
+  /* ── Legacy / convenience aliases (used by components) ── */
+  --bg-base:             var(--core-bg-app);
+  --bg-deep:             var(--core-bg-shell);
+  --bg-panel:            var(--core-surface-panel);
+  --bg-card:             var(--core-surface-card);
+  --bg-hover:            var(--core-bg-elevated);
+  --border-subtle:       var(--core-border-subtle);
+
+  --accent-green:        var(--core-success);
+  --accent-green-dark:   #0A3A28;
+  --accent-green-mid:    #0E6644;
+  --accent-green-bright: #4DFFA5;
+  --accent-blue:         var(--core-accent-blue);
+  --accent-blue-alt:     #1A6FD8;
+  --accent-blue-dark:    #0A2A4A;
+  --accent-blue-mid:     #1A4A7A;
+  --accent-blue-bright:  var(--core-accent-cyan);
+  --accent-sky:          var(--core-accent-cyan);
+  --accent-sky-bright:   var(--core-accent-cyan);
+  --accent-orange:       var(--core-warning);
+  --accent-red:          var(--core-danger);
+  --accent-red-dark:     #4A1418;
+  --accent-red-deeper:   #3A0A0D;
+  --accent-teal:         var(--core-accent-teal);
+  --accent-teal-dark:    #0A2A2E;
+  --accent-teal-mid:     #0E5560;
+
+  /* ── Sidebar semantic ────────────────────────────────── */
+  --sidebar-item-default:      var(--core-text-secondary);
+  --sidebar-item-hover:        var(--core-text-primary);
+  --sidebar-item-active-bg:    var(--core-surface-panel);
+  --sidebar-item-active-border: var(--core-accent-blue);
+
+  /* ── Toolbar controls ────────────────────────────────── */
+  --toolbar-accent:      var(--core-text-muted);
+
+  /* ── RichTooltip ─────────────────────────────────────── */
+  --tooltip-bg:          var(--core-bg-shell);
+  --tooltip-border:      var(--core-border-subtle);
+  --tooltip-title:       var(--core-text-secondary);
+  --tooltip-body:        var(--core-text-muted);
+  --tooltip-header:      color-mix(in srgb, var(--core-text-muted) 80%, transparent);
+  --tooltip-bullet:      color-mix(in srgb, var(--core-border-subtle) 80%, transparent);
+  --tooltip-text:        var(--core-text-primary);
 }
 
+/* ─── Ocean theme — overrides only ───────────────────────────────────────── */
+[data-theme="ocean"] {
+  --core-bg-app:         #050911;
+  --core-bg-shell:       #0D141E;
+  --core-bg-elevated:    #1A232D;
+  --core-surface-panel:  #354958;
+  --core-surface-card:   #1A232D;
+  --core-border-subtle:  #6DA6BE;
+  --core-text-primary:   #F2F7FF;
+  --core-text-secondary: #A9B7C9;
+  --core-text-muted:     #6F7E95;
+  --core-accent-blue:    #2EA8FF;
+  --core-accent-cyan:    #39E7E5;
+  --core-accent-teal:    #1EC8D6;
+  --core-danger:         #C4515A;
+  --core-success:        #1EC8D6;
+  --core-warning:        #F59E0B;
+
+  --accent-green-dark:   #0A3A40;
+  --accent-green-mid:    #0E5B64;
+  --accent-green-bright: #52F3FF;
+  --accent-blue-dark:    #0A2A40;
+  --accent-blue-mid:     #1A4A6A;
+  --accent-sky-bright:   #52F3FF;
+  --accent-teal-dark:    #0A3A40;
+  --accent-teal-mid:     #0E5B64;
+
+  --toolbar-accent:      var(--core-border-subtle);
+}
+
+/* ─── Global base styles ─────────────────────────────────────────────────── */
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--app-bg);
+  color: var(--text-primary);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ─── Scrollbars ─────────────────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 2px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-secondary);
 }

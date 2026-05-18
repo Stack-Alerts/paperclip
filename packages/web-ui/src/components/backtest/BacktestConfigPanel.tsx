@@ -195,26 +195,28 @@ export const BacktestConfigPanel: React.FC<BacktestConfigPanelProps> = ({
             <div className="space-y-2">
               <div className="space-y-1">
                 <Label className="text-xs">Candle Progress</Label>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full rounded-full h-2" style={{ backgroundColor: 'var(--border-default)' }}>
                   <div
-                    className="bg-blue-600 h-2 rounded-full transition-all"
+                    className="h-2 rounded-full transition-all"
                     style={{
                       width: `${progress.totalCandles > 0
                         ? (progress.currentCandle / progress.totalCandles) * 100
                         : 0}%`,
+                      backgroundColor: 'var(--accent-blue)',
                     }}
                   />
                 </div>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Trade Progress</Label>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full rounded-full h-2" style={{ backgroundColor: 'var(--border-default)' }}>
                   <div
-                    className="bg-green-600 h-2 rounded-full transition-all"
+                    className="h-2 rounded-full transition-all"
                     style={{
                       width: `${progress.totalTrades > 0
                         ? (progress.currentTrade / progress.totalTrades) * 100
                         : 0}%`,
+                      backgroundColor: 'var(--color-bullish)',
                     }}
                   />
                 </div>

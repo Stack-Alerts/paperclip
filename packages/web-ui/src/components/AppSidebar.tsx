@@ -4,23 +4,29 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import {
-  Home,
-  BarChart3,
-  Database,
-  TerminalSquare,
-  Settings,
+  LayoutDashboard,
   Layers,
+  BarChart3,
+  Zap,
+  Database,
+  FileBarChart,
+  FileCode,
+  Settings,
+  HelpCircle,
   Menu,
   ChevronLeft,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { href: '/', label: 'Home', icon: Home },
-  { href: '/strategy-builder', label: 'Strategy Builder', icon: Layers },
-  { href: '/backtest', label: 'Backtest', icon: BarChart3 },
-  { href: '/data-management', label: 'Data Management', icon: Database },
-  { href: '/log-viewer', label: 'Log Viewer', icon: TerminalSquare },
+  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/strategy-builder', label: 'Strategies', icon: Layers },
+  { href: '/backtest', label: 'Backtesting', icon: BarChart3 },
+  { href: '/signals', label: 'Signals', icon: Zap },
+  { href: '/data-management', label: 'Market Data', icon: Database },
+  { href: '/reports', label: 'Reports', icon: FileBarChart },
+  { href: '/templates', label: 'Templates', icon: FileCode },
   { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/help', label: 'Help & Docs', icon: HelpCircle },
 ];
 
 export function AppSidebar() {
@@ -40,11 +46,21 @@ export function AppSidebar() {
         className="flex items-center justify-between px-3 py-4"
         style={{ borderBottom: '1px solid var(--border)' }}
       >
-        {!collapsed && (
-          <span className="font-bold text-sm truncate" style={{ color: 'var(--text-primary)' }}>
-            BTC Trade Engine
-          </span>
-        )}
+        <div className="flex items-center gap-2 flex-1">
+          <BarChart3 className="w-5 h-5 flex-shrink-0" style={{ color: '#2E8CFF' }} />
+          {!collapsed && (
+            <span
+              className="font-bold text-xs truncate"
+              style={{
+                color: 'var(--text-secondary)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+              }}
+            >
+              BTC TRADE ENGINE
+            </span>
+          )}
+        </div>
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="p-1 rounded transition-colors flex-shrink-0"
@@ -69,10 +85,10 @@ export function AppSidebar() {
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm"
               style={active
                 ? {
-                    background: 'var(--sidebar-item-active-bg)',
-                    color: 'var(--sidebar-item-hover)',
-                    borderLeft: '2px solid var(--sidebar-item-active-border)',
-                    paddingLeft: 10,
+                    background: 'var(--bg-panel)',
+                    color: '#FFFFFF',
+                    borderLeft: '3px solid var(--accent-blue)',
+                    paddingLeft: '9px',
                   }
                 : {
                     color: 'var(--sidebar-item-default)',
@@ -92,7 +108,10 @@ export function AppSidebar() {
                 }
               }}
             >
-              <Icon className="w-4 h-4 flex-shrink-0" />
+              <Icon
+                className="w-4 h-4 flex-shrink-0"
+                style={active ? { color: '#2E8CFF' } : {}}
+              />
               {!collapsed && <span className="truncate">{label}</span>}
             </Link>
           );
@@ -101,9 +120,27 @@ export function AppSidebar() {
 
       <div className="px-3 py-3" style={{ borderTop: '1px solid var(--border)' }}>
         {!collapsed && (
-          <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
-            NautilusTrader v2
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: '#26C46A',
+                display: 'inline-block',
+              }}
+            />
+            <span
+              style={{
+                fontSize: 10,
+                color: '#26C46A',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+              }}
+            >
+              CONNECTED
+            </span>
+          </div>
         )}
       </div>
     </aside>

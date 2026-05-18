@@ -69,17 +69,40 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200">
+      <div style={{ borderBottom: '1px solid var(--border-subtle)' }}>
         <div className="flex overflow-x-auto">
           {categories.map((category) => (
             <button
               key={category}
               onClick={() => setActiveTab(category)}
-              className={`px-4 py-2 border-b-2 font-medium transition-colors whitespace-nowrap ${
+              className="px-4 py-2 border-b-2 font-medium transition-colors whitespace-nowrap"
+              style={
                 activeTab === category
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
+                  ? {
+                      borderBottomColor: 'var(--accent-blue)',
+                      color: 'var(--accent-blue)',
+                    }
+                  : {
+                      borderBottomColor: 'transparent',
+                      color: 'var(--text-secondary)',
+                    }
+              }
+              onMouseEnter={
+                activeTab !== category
+                  ? (e) => {
+                      (e.currentTarget as HTMLButtonElement).style.color =
+                        'var(--text-primary)';
+                    }
+                  : undefined
+              }
+              onMouseLeave={
+                activeTab !== category
+                  ? (e) => {
+                      (e.currentTarget as HTMLButtonElement).style.color =
+                        'var(--text-secondary)';
+                    }
+                  : undefined
+              }
             >
               {category.charAt(0).toUpperCase() + category.slice(1)}
             </button>
@@ -103,7 +126,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <div className="flex-1">
                       <Label htmlFor={key}>{setting.label}</Label>
                       {setting.description && (
-                        <p className="text-xs text-gray-600 mt-1">
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
                           {setting.description}
                         </p>
                       )}
@@ -185,7 +208,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               ))}
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-center py-8" style={{ color: 'var(--text-secondary)' }}>
               No settings available for this category
             </p>
           )}

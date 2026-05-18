@@ -7,26 +7,26 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 
-const LOG_LEVEL_COLORS: Record<LogLevel, string> = {
-  [LogLevel.DEBUG]: 'text-gray-500',
-  [LogLevel.INFO]: 'text-blue-600',
-  [LogLevel.WARNING]: 'text-yellow-600',
-  [LogLevel.ERROR]: 'text-red-600',
-  [LogLevel.CRITICAL]: 'text-red-900 font-bold',
+const LOG_LEVEL_COLORS: Record<LogLevel, Record<string, string>> = {
+  [LogLevel.DEBUG]: { color: 'var(--text-muted)' },
+  [LogLevel.INFO]: { color: 'var(--accent-blue)' },
+  [LogLevel.WARNING]: { color: 'var(--color-warning)' },
+  [LogLevel.ERROR]: { color: 'var(--color-bearish)' },
+  [LogLevel.CRITICAL]: { color: 'var(--color-bearish)', fontWeight: 'bold' },
 };
 
-const LOG_EVENT_COLORS: Record<LogEventType, string> = {
-  [LogEventType.TRADE_OPENED]: 'text-green-600',
-  [LogEventType.TRADE_CLOSED]: 'text-blue-600',
-  [LogEventType.TRADE_UPDATED]: 'text-yellow-600',
-  [LogEventType.POSITIONS_SNAPSHOT]: 'text-purple-600',
-  [LogEventType.TRADE_NOT_FOUND]: 'text-red-600',
-  [LogEventType.CONFIG_INITIALIZED]: 'text-green-600',
-  [LogEventType.CONFIG_READ]: 'text-blue-600',
-  [LogEventType.CONFIG_VALIDATED]: 'text-green-600',
-  [LogEventType.ERROR]: 'text-red-600',
-  [LogEventType.WARNING]: 'text-yellow-600',
-  [LogEventType.SUCCESS]: 'text-green-600',
+const LOG_EVENT_COLORS: Record<LogEventType, Record<string, string>> = {
+  [LogEventType.TRADE_OPENED]: { color: 'var(--color-bullish)' },
+  [LogEventType.TRADE_CLOSED]: { color: 'var(--accent-blue)' },
+  [LogEventType.TRADE_UPDATED]: { color: 'var(--color-warning)' },
+  [LogEventType.POSITIONS_SNAPSHOT]: { color: 'var(--accent-cyan)' },
+  [LogEventType.TRADE_NOT_FOUND]: { color: 'var(--color-bearish)' },
+  [LogEventType.CONFIG_INITIALIZED]: { color: 'var(--color-bullish)' },
+  [LogEventType.CONFIG_READ]: { color: 'var(--accent-blue)' },
+  [LogEventType.CONFIG_VALIDATED]: { color: 'var(--color-bullish)' },
+  [LogEventType.ERROR]: { color: 'var(--color-bearish)' },
+  [LogEventType.WARNING]: { color: 'var(--color-warning)' },
+  [LogEventType.SUCCESS]: { color: 'var(--color-bullish)' },
 };
 
 export interface LogViewerPanelProps {
@@ -118,11 +118,35 @@ export const LogViewerPanel: React.FC<LogViewerPanelProps> = ({
                 <button
                   key={level}
                   onClick={() => toggleLogLevel(level)}
-                  className={`px-3 py-1 rounded text-sm transition-colors ${
+                  className="px-3 py-1 rounded text-sm transition-colors"
+                  style={
                     selectedLevels.has(level)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
+                      ? {
+                          backgroundColor: 'var(--accent-blue)',
+                          color: 'white',
+                        }
+                      : {
+                          backgroundColor: 'var(--bg-panel)',
+                          color: 'var(--text-secondary)',
+                          border: '1px solid var(--border-default)',
+                        }
+                  }
+                  onMouseEnter={
+                    !selectedLevels.has(level)
+                      ? (e) => {
+                          (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                            'var(--bg-panel-raised)';
+                        }
+                      : undefined
+                  }
+                  onMouseLeave={
+                    !selectedLevels.has(level)
+                      ? (e) => {
+                          (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                            'var(--bg-panel)';
+                        }
+                      : undefined
+                  }
                   disabled={disabled}
                 >
                   {level}
@@ -174,28 +198,39 @@ export const LogViewerPanel: React.FC<LogViewerPanelProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="bg-gray-900 rounded-lg font-mono text-sm h-96 overflow-y-auto p-3 space-y-1">
+          <div
+            className="rounded-lg font-mono text-sm h-96 overflow-y-auto p-3 space-y-1"
+            style={{ backgroundColor: 'var(--bg-panel)' }}
+          >
             {filteredLogs.length > 0 ? (
               <>
                 {filteredLogs.map((log, idx) => (
                   <div
                     key={idx}
-                    className={`whitespace-pre-wrap break-words text-gray-100 ${
-                      LOG_LEVEL_COLORS[log.level] || LOG_EVENT_COLORS[log.eventType!] || ''
-                    }`}
+                    className="whitespace-pre-wrap break-words"
+                    style={{
+                      color: 'var(--text-primary)',
+                      ...(LOG_LEVEL_COLORS[log.level] || LOG_EVENT_COLORS[log.eventType!] || {}),
+                    }}
                   >
-                    <span className="text-gray-500">
+                    <span style={{ color: 'var(--text-muted)' }}>
                       {log.timestamp.toLocaleTimeString()}
                     </span>{' '}
                     <span className="font-semibold">[{log.level}]</span>{' '}
-                    {log.source && <span className="text-gray-400">({log.source})</span>}{' '}
+                    {log.source && (
+                      <span style={{ color: 'var(--text-secondary)' }}>
+                        ({log.source})
+                      </span>
+                    )}{' '}
                     {log.message}
                   </div>
                 ))}
                 <div ref={logEndRef} />
               </>
             ) : (
-              <div className="text-gray-500 text-center py-8">No logs to display</div>
+              <div className="text-center py-8" style={{ color: 'var(--text-secondary)' }}>
+                No logs to display
+              </div>
             )}
           </div>
         </CardContent>

@@ -13,11 +13,26 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   const baseStyles = 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
 
-  const variantStyles = {
-    default: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-    destructive: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-    secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500',
-    ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
+  const variantStyles: Record<string, React.CSSProperties> = {
+    default: {
+      backgroundColor: 'var(--accent-blue)',
+      color: 'white',
+    },
+    destructive: {
+      backgroundColor: 'transparent',
+      color: 'var(--color-bearish)',
+      border: '1px solid var(--color-bearish)',
+    },
+    secondary: {
+      backgroundColor: 'var(--bg-panel)',
+      color: 'var(--text-secondary)',
+      border: '1px solid var(--border-default)',
+    },
+    ghost: {
+      backgroundColor: 'transparent',
+      color: 'var(--text-secondary)',
+      border: '1px solid var(--border-default)',
+    },
   };
 
   const sizeStyles = {
@@ -28,7 +43,8 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <button
-      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className || ''}`}
+      className={`${baseStyles} ${sizeStyles[size]} ${className || ''}`}
+      style={variantStyles[variant]}
       {...props}
     />
   );

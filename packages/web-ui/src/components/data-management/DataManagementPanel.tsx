@@ -47,24 +47,70 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
         <button
           onClick={() => setActiveTab('sources')}
-          className={`px-4 py-2 border-b-2 font-medium transition-colors ${
+          className="px-4 py-2 border-b-2 font-medium transition-colors"
+          style={
             activeTab === 'sources'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-600 hover:text-gray-900'
-          }`}
+              ? {
+                  borderBottomColor: 'var(--accent-blue)',
+                  color: 'var(--accent-blue)',
+                }
+              : {
+                  borderBottomColor: 'transparent',
+                  color: 'var(--text-secondary)',
+                }
+          }
+          onMouseEnter={
+            activeTab !== 'sources'
+              ? (e) => {
+                  (e.currentTarget as HTMLButtonElement).style.color =
+                    'var(--text-primary)';
+                }
+              : undefined
+          }
+          onMouseLeave={
+            activeTab !== 'sources'
+              ? (e) => {
+                  (e.currentTarget as HTMLButtonElement).style.color =
+                    'var(--text-secondary)';
+                }
+              : undefined
+          }
         >
           Data Sources
         </button>
         <button
           onClick={() => setActiveTab('verification')}
-          className={`px-4 py-2 border-b-2 font-medium transition-colors ${
+          className="px-4 py-2 border-b-2 font-medium transition-colors"
+          style={
             activeTab === 'verification'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-600 hover:text-gray-900'
-          }`}
+              ? {
+                  borderBottomColor: 'var(--accent-blue)',
+                  color: 'var(--accent-blue)',
+                }
+              : {
+                  borderBottomColor: 'transparent',
+                  color: 'var(--text-secondary)',
+                }
+          }
+          onMouseEnter={
+            activeTab !== 'verification'
+              ? (e) => {
+                  (e.currentTarget as HTMLButtonElement).style.color =
+                    'var(--text-primary)';
+                }
+              : undefined
+          }
+          onMouseLeave={
+            activeTab !== 'verification'
+              ? (e) => {
+                  (e.currentTarget as HTMLButtonElement).style.color =
+                    'var(--text-secondary)';
+                }
+              : undefined
+          }
         >
           Verification
         </button>
@@ -83,24 +129,40 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
                   {dataSources.map((source) => (
                     <div
                       key={source.id}
-                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+                      className="flex items-center justify-between p-3 rounded-lg"
+                      style={{
+                        border: '1px solid var(--border-subtle)',
+                        backgroundColor: 'var(--bg-panel)',
+                      }}
                     >
                       <div className="flex-1">
-                        <p className="font-medium text-gray-900">{source.name}</p>
-                        <p className="text-sm text-gray-600">{source.type}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                          {source.name}
+                        </p>
+                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                          {source.type}
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                           Last updated: {source.lastUpdated.toLocaleString()}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            source.status === 'active'
-                              ? 'bg-green-100 text-green-800'
-                              : source.status === 'inactive'
-                              ? 'bg-gray-100 text-gray-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                          style={{
+                            backgroundColor:
+                              source.status === 'active'
+                                ? 'var(--bg-panel-raised)'
+                                : source.status === 'inactive'
+                                  ? 'var(--bg-panel-raised)'
+                                  : 'var(--bg-panel-raised)',
+                            color:
+                              source.status === 'active'
+                                ? 'var(--color-bullish)'
+                                : source.status === 'inactive'
+                                  ? 'var(--text-secondary)'
+                                  : 'var(--color-bearish)',
+                          }}
                         >
                           {source.status}
                         </span>
@@ -116,7 +178,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-8">No data sources configured</p>
+                <p className="text-center py-8" style={{ color: 'var(--text-secondary)' }}>
+                  No data sources configured
+                </p>
               )}
             </CardContent>
           </Card>
@@ -171,33 +235,54 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
                   )}
 
                   {result.gaps.length > 0 && (
-                    <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
+                    <div className="max-h-64 overflow-y-auto rounded-lg" style={{ border: '1px solid var(--border-subtle)' }}>
                       <table className="w-full text-sm">
-                        <thead className="bg-gray-50 sticky top-0">
+                        <thead style={{ backgroundColor: 'var(--bg-panel-raised)', position: 'sticky', top: 0 }}>
                           <tr>
-                            <th className="px-3 py-2 text-left font-medium text-gray-700">Start</th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-700">End</th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-700">Bars</th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-700">Status</th>
+                            <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-primary)' }}>
+                              Start
+                            </th>
+                            <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-primary)' }}>
+                              End
+                            </th>
+                            <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-primary)' }}>
+                              Bars
+                            </th>
+                            <th className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-primary)' }}>
+                              Status
+                            </th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200">
+                        <tbody style={{ borderTop: '1px solid var(--border-subtle)' }}>
                           {result.gaps.map((gap, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50">
-                              <td className="px-3 py-2 text-gray-900">
+                            <tr
+                              key={idx}
+                              style={{
+                                borderBottom: '1px solid var(--border-subtle)',
+                              }}
+                              onMouseEnter={(e) => {
+                                (e.currentTarget as HTMLTableRowElement).style.backgroundColor = 'var(--bg-panel-raised)';
+                              }}
+                              onMouseLeave={(e) => {
+                                (e.currentTarget as HTMLTableRowElement).style.backgroundColor = 'transparent';
+                              }}
+                            >
+                              <td className="px-3 py-2" style={{ color: 'var(--text-primary)' }}>
                                 {gap.startTime.toLocaleDateString()}
                               </td>
-                              <td className="px-3 py-2 text-gray-900">
+                              <td className="px-3 py-2" style={{ color: 'var(--text-primary)' }}>
                                 {gap.endTime.toLocaleDateString()}
                               </td>
-                              <td className="px-3 py-2 text-gray-700">{gap.missingBars}</td>
+                              <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>
+                                {gap.missingBars}
+                              </td>
                               <td className="px-3 py-2">
                                 <span
-                                  className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
-                                    gap.repairable
-                                      ? 'bg-green-100 text-green-800'
-                                      : 'bg-orange-100 text-orange-800'
-                                  }`}
+                                  className="inline-flex px-2 py-1 rounded text-xs font-medium"
+                                  style={{
+                                    backgroundColor: 'var(--bg-panel-raised)',
+                                    color: gap.repairable ? 'var(--color-bullish)' : 'var(--color-warning)',
+                                  }}
                                 >
                                   {gap.repairable ? 'Repairable' : 'Too Old'}
                                 </span>
@@ -214,7 +299,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
           ) : (
             <Card>
               <CardContent className="py-8">
-                <p className="text-gray-500 text-center">
+                <p className="text-center" style={{ color: 'var(--text-secondary)' }}>
                   Run verification to check data integrity
                 </p>
               </CardContent>
