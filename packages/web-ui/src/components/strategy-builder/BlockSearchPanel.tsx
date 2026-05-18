@@ -14,17 +14,21 @@ const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   [BlockType.POSITION_SIZING]:  'SIZE',
 };
 
-// Standard mode hides status/error/ambiguous signals that aren't actionable trading signals.
-// Advanced mode shows all signals including ERROR, INSUFFICIENT_DATA, NEUTRAL, etc.
-function isAdvancedSignal(name: string): boolean {
+// ERROR and INSUFFICIENT_* signals are never useful for strategy building — always hidden.
+function isAlwaysHidden(name: string): boolean {
+  const n = name.toUpperCase();
+  return n === 'ERROR' || n.startsWith('INSUFFICIENT');
+}
+
+// Standard mode additionally hides ambiguous/status signals that aren't clear trading signals.
+// Advanced mode shows these but still hides the always-hidden set above.
+function isAdvancedOnlySignal(name: string): boolean {
   const n = name.toUpperCase();
   return (
-    n === 'ERROR' ||
     n === 'NO_PATTERN' ||
     n === 'NO_SIGNAL' ||
     n === 'NEUTRAL' ||
     n === 'NEUTRAL_MOMENTUM' ||
-    n.startsWith('INSUFFICIENT') ||
     n.includes('UNCERTAIN')
   );
 }
@@ -73,7 +77,9 @@ function BlockItem({ definition, onAdd, advancedMode }: BlockItemProps) {
   const [addedSignals, setAddedSignals] = useState<Set<string>>(new Set());
 
   const signals = definition.signals ?? [];
-  const visibleSignals = advancedMode ? signals : signals.filter(s => !isAdvancedSignal(s.name));
+  const visibleSignals = signals
+    .filter(s => !isAlwaysHidden(s.name))
+    .filter(s => advancedMode || !isAdvancedOnlySignal(s.name));
   const ext = definition as unknown as Record<string, unknown>;
   const weight = ext.weight as number | undefined;
   const typeLabel = BLOCK_TYPE_LABELS[definition.type] ?? (definition.type as string).replace('_', ' ').toUpperCase();

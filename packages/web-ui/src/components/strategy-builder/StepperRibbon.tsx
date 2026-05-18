@@ -30,7 +30,7 @@ function stepClasses(status: StepStatus, clickable: boolean): string {
     case 'error':
       return `${base} ${cursor} bg-red-950 border-red-800 text-red-400 hover:bg-red-900`;
     default:
-      return `${base} ${cursor} bg-zinc-800 border-zinc-700 text-zinc-400 hover:bg-zinc-700`;
+      return `${base} ${cursor} bg-[#2A2F3A] border-[#3C4149] text-[#9AA0A6] hover:bg-[#3C4149]`;
   }
 }
 
@@ -75,7 +75,7 @@ export function StepperRibbon({
           </button>
         </InfoTooltip>
         {idx < STEPS.length - 1 && (
-          <span className="text-zinc-600 text-sm" aria-hidden="true">→</span>
+          <span className="text-sm" style={{ color: '#6B7280' }} aria-hidden="true">→</span>
         )}
       </div>
     );

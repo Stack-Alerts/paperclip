@@ -168,7 +168,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   }, []);
 
   // Resizable splitter
-  const [leftPercent, setLeftPercent] = useState(65);
+  const [leftPercent, setLeftPercent] = useState(68);
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -176,7 +176,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       if (!isDragging.current || !containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const pct = ((e.clientX - rect.left) / rect.width) * 100;
-      setLeftPercent(Math.max(22, Math.min(68, pct)));
+      setLeftPercent(Math.max(22, Math.min(75, pct)));
     };
     const onMouseUp = () => { isDragging.current = false; };
     document.addEventListener('mousemove', onMouseMove);

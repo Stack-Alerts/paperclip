@@ -59,11 +59,17 @@ function makeDefaultStrategy(name: string, description = ''): Strategy {
 }
 
 // Eagerly initialize the current strategy so the UI never shows "No strategy loaded" on first render.
-// On server (SSR) this returns null; on client it loads the most recent saved strategy or creates a fresh default.
+// On server (SSR) this returns null; on client it loads the most recently *modified* strategy
+// (sorted by updatedAt DESC) so renames and edits persist across page reloads.
 function initCurrentStrategy(): { current: Strategy | null; list: Strategy[] } {
   if (typeof window === 'undefined') return { current: null, list: [] };
   const saved = loadFromStorage();
-  if (saved.length > 0) return { current: saved[saved.length - 1], list: saved };
+  if (saved.length > 0) {
+    const mostRecent = [...saved].sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    )[0];
+    return { current: mostRecent, list: saved };
+  }
   const fresh = makeDefaultStrategy('New_Strategy');
   saveToStorage([fresh]);
   return { current: fresh, list: [fresh] };
