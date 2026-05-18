@@ -173,21 +173,21 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
         ))}
         {stats && (
           <>
-            <span className="text-zinc-700 mx-0.5">|</span>
+            <span className="text-zinc-600 mx-0.5">|</span>
             <span className="text-zinc-500">Required:</span>
-            <span className={`font-bold ${stats.required > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>{stats.required}</span>
-            <span className="text-zinc-700">|</span>
+            <span className={`font-bold ${stats.required > 0 ? 'text-emerald-400' : 'text-zinc-400'}`}>{stats.required}</span>
+            <span className="text-zinc-600">|</span>
             <span className="text-zinc-500">Optional:</span>
-            <span className={`font-bold ${stats.optional > 0 ? 'text-blue-400' : 'text-zinc-600'}`}>{stats.optional}</span>
-            <span className="text-zinc-700">|</span>
+            <span className={`font-bold ${stats.optional > 0 ? 'text-blue-400' : 'text-zinc-400'}`}>{stats.optional}</span>
+            <span className="text-zinc-600">|</span>
             <span className="text-zinc-500">Rechecked:</span>
-            <span className={`font-bold ${stats.rechecked > 0 ? 'text-amber-400' : 'text-zinc-600'}`}>{stats.rechecked}</span>
-            <span className="text-zinc-700">|</span>
+            <span className={`font-bold ${stats.rechecked > 0 ? 'text-amber-400' : 'text-zinc-400'}`}>{stats.rechecked}</span>
+            <span className="text-zinc-600">|</span>
             <span className="text-zinc-500">Exit Conditions:</span>
-            <span className={`font-bold ${stats.exits > 0 ? 'text-red-400' : 'text-zinc-600'}`}>{stats.exits}</span>
-            <span className="text-zinc-700">|</span>
+            <span className={`font-bold ${stats.exits > 0 ? 'text-red-400' : 'text-zinc-400'}`}>{stats.exits}</span>
+            <span className="text-zinc-600">|</span>
             <span className="text-zinc-500">Time Constraint:</span>
-            <span className={`font-bold ${stats.timeConstrained > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>
+            <span className={`font-bold ${stats.timeConstrained > 0 ? 'text-emerald-400' : 'text-zinc-400'}`}>
               {stats.timeConstrained > 0 ? 'Yes' : 'No'}
             </span>
           </>

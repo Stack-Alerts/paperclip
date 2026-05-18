@@ -14,9 +14,6 @@ const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   [BlockType.POSITION_SIZING]:  'SIZE',
 };
 
-// ─────────────────────────────────────────────
-// Preset management (localStorage)
-// ─────────────────────────────────────────────
 interface FilterPreset {
   name: string;
   search: string;
@@ -43,23 +40,47 @@ function savePresets(presets: FilterPreset[]) {
 // ─────────────────────────────────────────────
 interface BlockItemProps {
   definition: BlockDefinition;
-  onAdd: (def: BlockDefinition, logic: 'AND' | 'OR' | 'EXIT') => void;
+  onAdd: (def: BlockDefinition, logic: 'AND' | 'OR' | 'EXIT', selectedSignals: string[]) => void;
 }
 
 function BlockItem({ definition, onAdd }: BlockItemProps) {
   const [signalsOpen, setSignalsOpen] = useState(false);
+  const [checkedSignals, setCheckedSignals] = useState<Set<string>>(new Set());
+  const [addedSignals, setAddedSignals] = useState<Set<string>>(new Set());
+
   const signals = definition.signals ?? [];
   const ext = definition as unknown as Record<string, unknown>;
   const weight = ext.weight as number | undefined;
   const typeLabel = BLOCK_TYPE_LABELS[definition.type] ?? (definition.type as string).replace('_', ' ').toUpperCase();
 
+  const toggleSignal = (name: string) => {
+    setCheckedSignals(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  const handleAdd = (logic: 'AND' | 'OR' | 'EXIT') => {
+    const selected = checkedSignals.size > 0 ? [...checkedSignals] : signals.map(s => s.name);
+    // Mark selected signals as added
+    setAddedSignals(prev => {
+      const next = new Set(prev);
+      selected.forEach(s => next.add(s));
+      return next;
+    });
+    setCheckedSignals(new Set());
+    onAdd(definition, logic, selected);
+  };
+
   return (
     <div className="rounded border border-zinc-800 bg-zinc-900/80 mb-1.5">
-      {/* Block header: icon + name + Show/Hide signals button */}
+      {/* Block header */}
       <div className="px-3 pt-2.5 pb-1.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-zinc-500 text-sm flex-shrink-0">⬛</span>
+            <span className="text-base flex-shrink-0">📊</span>
             <span className="text-sm font-semibold text-zinc-100 leading-tight">{definition.name}</span>
           </div>
           {signals.length > 0 && (
@@ -72,95 +93,82 @@ function BlockItem({ definition, onAdd }: BlockItemProps) {
           )}
         </div>
         {/* Category | Type | Weight meta line */}
-        <div className="text-xs text-zinc-500 mt-0.5 ml-5">
+        <div className="text-xs text-zinc-500 mt-0.5 ml-6">
           Category: {definition.category}
           {typeLabel && ` | Type: ${typeLabel}`}
           {weight != null && ` | Weight: ${weight} points`}
         </div>
       </div>
 
-      {/* Expanded: signals list + add buttons (only when signalsOpen) */}
+      {/* Expanded: signals list + add buttons */}
       {signalsOpen && signals.length > 0 && (
         <div className="border-t border-zinc-800 px-3 pb-2">
-          {/* Signal list */}
-          <div className="pt-2 space-y-2">
-            {signals.map((sig, i) => (
-              <div key={i} className="text-xs pl-2 border-l border-zinc-700">
-                <div className="text-zinc-300 font-medium">
-                  {sig.name}
-                  {sig.occurrences != null && (
-                    <span className="text-zinc-500 font-normal ml-1.5">
-                      ({sig.occurrences.toLocaleString()} found{sig.occurrence_percentage != null && `, ${sig.occurrence_percentage.toFixed(1)}%`})
-                    </span>
-                  )}
+          {/* Header */}
+          <p className="text-xs font-semibold text-sky-400 pt-2 pb-1">Select signals to add:</p>
+
+          {/* Signal list with checkboxes */}
+          <div className="space-y-2">
+            {signals.map((sig, i) => {
+              const isAdded = addedSignals.has(sig.name);
+              const isChecked = checkedSignals.has(sig.name);
+              return (
+                <div key={i} className={`pl-1 ${isAdded ? 'opacity-50' : ''}`}>
+                  <label className={`flex items-start gap-2 cursor-pointer ${isAdded ? 'cursor-default' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      disabled={isAdded}
+                      onChange={() => !isAdded && toggleSignal(sig.name)}
+                      className="mt-0.5 flex-shrink-0 accent-sky-400 w-3.5 h-3.5"
+                    />
+                    <div className="min-w-0">
+                      <span className={`text-xs font-semibold ${isAdded ? 'line-through text-zinc-500' : 'text-zinc-200'}`}>
+                        {sig.name}
+                      </span>
+                      {sig.occurrences != null && (
+                        <span className="text-zinc-500 font-normal text-xs ml-1.5">
+                          ({sig.occurrences.toLocaleString()} found, {sig.occurrence_percentage != null ? sig.occurrence_percentage.toFixed(1) : '?'}%)
+                        </span>
+                      )}
+                      {sig.description && (
+                        <div className="text-zinc-600 text-xs mt-0.5 italic leading-relaxed">{sig.description}</div>
+                      )}
+                    </div>
+                  </label>
                 </div>
-                {sig.description && (
-                  <div className="text-zinc-600 mt-0.5 leading-relaxed italic">{sig.description}</div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {/* Add buttons — only visible when expanded */}
+          {/* Add buttons */}
           <div className="flex gap-1.5 mt-3">
             <button
-              onClick={() => onAdd(definition, 'AND')}
-              className="flex-1 text-xs py-1 rounded border border-emerald-800 bg-emerald-900/30 hover:bg-emerald-900/60 text-emerald-300 transition-colors"
+              onClick={() => handleAdd('AND')}
+              className="flex-1 text-xs py-1.5 rounded border border-emerald-800 bg-emerald-900/40 hover:bg-emerald-900/70 text-emerald-300 font-medium transition-colors"
               title={`Add "${definition.name}" as required (AND)`}
             >
-              + Add Required Signal
+              ➕ Add as AND (Required)
             </button>
             <button
-              onClick={() => onAdd(definition, 'OR')}
-              className="flex-1 text-xs py-1 rounded border border-blue-800 bg-blue-900/30 hover:bg-blue-900/60 text-blue-300 transition-colors"
+              onClick={() => handleAdd('OR')}
+              className="flex-1 text-xs py-1.5 rounded border border-blue-800 bg-blue-900/30 hover:bg-blue-900/60 text-blue-300 font-medium transition-colors"
               title={`Add "${definition.name}" as optional (OR)`}
             >
-              + Add as OR (Optional)
+              ➕ Add as OR (Optional)
             </button>
             <button
-              onClick={() => onAdd(definition, 'EXIT')}
-              className="flex-1 text-xs py-1 rounded border border-red-800 bg-red-900/30 hover:bg-red-900/60 text-red-300 transition-colors"
+              onClick={() => handleAdd('EXIT')}
+              className="flex-1 text-xs py-1.5 rounded border border-red-800 bg-red-900/30 hover:bg-red-900/60 text-red-300 font-medium transition-colors"
               title={`Add "${definition.name}" as exit condition`}
             >
-              + Add as Exit
+              ➕ Add as Exit
             </button>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
-// ─────────────────────────────────────────────
-// CategorySection
-// ─────────────────────────────────────────────
-interface CategorySectionProps {
-  category: string;
-  blocks: BlockDefinition[];
-  onAdd: (def: BlockDefinition, logic: 'AND' | 'OR' | 'EXIT') => void;
-}
-
-function CategorySection({ category, blocks, onAdd }: CategorySectionProps) {
-  const [expanded, setExpanded] = useState(true);
-
-  return (
-    <div className="mb-2">
-      <button
-        className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-zinc-300 bg-zinc-800/60 hover:bg-zinc-800 rounded border border-zinc-700 transition-colors"
-        onClick={() => setExpanded(v => !v)}
-        aria-expanded={expanded}
-      >
-        <span className="flex items-center gap-1.5">
-          <span>{expanded ? '▾' : '▸'}</span>
-          <span>{category}</span>
-        </span>
-        <span className="text-zinc-500 font-normal">{blocks.length}</span>
-      </button>
-      {expanded && (
-        <div className="mt-1 ml-1">
-          {blocks.map(block => (
-            <BlockItem key={block.id} definition={block} onAdd={onAdd} />
-          ))}
+          {/* Data note */}
+          <p className="text-xs text-zinc-600 italic mt-2">
+            Note: Signal counts based on last 180 days of BTC data
+          </p>
         </div>
       )}
     </div>
@@ -215,33 +223,27 @@ export function BlockSearchPanel() {
     setSelectedPreset('');
   }, [presets, selectedPreset]);
 
-  // Filtered blocks
+  // Filtered blocks — flat, sorted by category then name
   const filteredBlocks = useMemo(() => {
     const q = searchText.toLowerCase();
-    return blockLibrary.filter(b => {
-      const matchSearch = !q ||
-        b.name.toLowerCase().includes(q) ||
-        b.description.toLowerCase().includes(q) ||
-        (b.signals ?? []).some(s => s.name.toLowerCase().includes(q));
-      const matchCat = selectedCategory === 'all' || b.category === selectedCategory;
-      const matchType = selectedType === 'all' || b.type === selectedType;
-      return matchSearch && matchCat && matchType;
-    });
+    return blockLibrary
+      .filter(b => {
+        const matchSearch = !q ||
+          b.name.toLowerCase().includes(q) ||
+          b.description.toLowerCase().includes(q) ||
+          (b.signals ?? []).some(s => s.name.toLowerCase().includes(q));
+        const matchCat = selectedCategory === 'all' || b.category === selectedCategory;
+        const matchType = selectedType === 'all' || b.type === selectedType;
+        return matchSearch && matchCat && matchType;
+      })
+      .sort((a, b) => {
+        if (a.category < b.category) return -1;
+        if (a.category > b.category) return 1;
+        return a.name.localeCompare(b.name);
+      });
   }, [blockLibrary, searchText, selectedCategory, selectedType]);
 
-  // Group by category
-  const grouped = useMemo(() => {
-    const groups: Record<string, BlockDefinition[]> = {};
-    for (const b of filteredBlocks) {
-      if (!groups[b.category]) groups[b.category] = [];
-      groups[b.category].push(b);
-    }
-    return groups;
-  }, [filteredBlocks]);
-
-  const categoryNames = useMemo(() => Object.keys(grouped).sort(), [grouped]);
-
-  // All categories for dropdown (from library, not filtered)
+  // All categories for dropdown
   const allCategories = useMemo(() => {
     if (blockCategories.length > 0) return blockCategories.map(c => ({ id: c.id, name: c.name }));
     const cats = new Set(blockLibrary.map(b => b.category));
@@ -250,17 +252,21 @@ export function BlockSearchPanel() {
 
   // Add block to strategy
   const handleAdd = useCallback(
-    (definition: BlockDefinition, logic: 'AND' | 'OR' | 'EXIT') => {
+    (definition: BlockDefinition, logic: 'AND' | 'OR' | 'EXIT', selectedSignals: string[]) => {
       const state = useStrategyStore.getState();
       const position = state.currentStrategy?.blocks.length ?? 0;
       const blockType = logic === 'EXIT' ? BlockType.EXIT_CONDITION : definition.type;
       addBlock(blockType, position);
+      const allSignals = definition.signals ?? [];
+      const signalsToAdd = selectedSignals.length > 0
+        ? allSignals.filter(s => selectedSignals.includes(s.name))
+        : allSignals;
       updateBlock(position, {
         name: definition.name,
         definitionId: definition.id,
         category: definition.category,
         logic: logic,
-        signals: (definition.signals ?? []).map(s => ({
+        signals: signalsToAdd.map(s => ({
           name: s.name,
           description: s.description ?? '',
           recheckEnabled: false,
@@ -279,9 +285,9 @@ export function BlockSearchPanel() {
         </h2>
       </div>
 
-      {/* Search + Filters */}
+      {/* Search + Filters — 2 rows */}
       <div className="px-3 pt-3 pb-2 space-y-2 flex-shrink-0 border-b border-zinc-800">
-        {/* Row 1 - Search only */}
+        {/* Row 1: Search */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-zinc-500 flex-shrink-0">🔍 Search:</span>
           <input
@@ -293,7 +299,7 @@ export function BlockSearchPanel() {
           />
         </div>
 
-        {/* Row 2 - Category, Type, and Preset buttons all in one row */}
+        {/* Row 2: Category, Type, Preset buttons */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <label className="text-xs text-zinc-500 flex-shrink-0">Category:</label>
           <select
@@ -351,20 +357,18 @@ export function BlockSearchPanel() {
         </div>
       </div>
 
-      {/* Block list by category */}
+      {/* Block list — flat, sorted */}
       <div className="flex-1 overflow-y-auto px-3 py-3">
         {isLoadingLibrary ? (
-          <p className="text-xs text-zinc-500 text-center py-8">Loading block library…</p>
+          <div className="flex flex-col items-center justify-center py-10 gap-2">
+            <div className="w-6 h-6 border-2 border-zinc-600 border-t-sky-400 rounded-full animate-spin" />
+            <p className="text-xs text-zinc-500">Loading block library…</p>
+          </div>
         ) : filteredBlocks.length === 0 ? (
           <p className="text-xs text-zinc-500 text-center py-8">No blocks match the current filters</p>
         ) : (
-          categoryNames.map(cat => (
-            <CategorySection
-              key={cat}
-              category={cat}
-              blocks={grouped[cat]}
-              onAdd={handleAdd}
-            />
+          filteredBlocks.map(block => (
+            <BlockItem key={block.id} definition={block} onAdd={handleAdd} />
           ))
         )}
       </div>

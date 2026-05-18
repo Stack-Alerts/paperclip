@@ -113,9 +113,12 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     backTestInProgress,
   } = useStrategyStore();
 
+  const [mounted, setMounted] = useState(false);
+
   // Load specific strategy by URL param; block library always loaded on mount.
   // Default strategy is pre-initialized in the Zustand store so no createStrategy() needed here.
   useEffect(() => {
+    setMounted(true);
     if (strategyId) {
       loadStrategy(strategyId).catch(console.error);
     }
@@ -399,7 +402,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         />
 
         {/* Strategy name + dirty indicator */}
-        {currentStrategy && (
+        {mounted && currentStrategy && (
           <span className="ml-auto text-xs text-zinc-400 truncate max-w-xs pr-2">
             BTC Trade Engine — Strategy Builder —{' '}
             <span className="text-zinc-200">{currentStrategy.name}</span>
@@ -408,32 +411,39 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         )}
       </div>
 
-      {/* ── Toolbar + Stepper (single row) ─────────────────────────────── */}
-      <div className="flex items-center gap-1 bg-zinc-900 border-b border-zinc-700 px-3 py-1.5 flex-shrink-0 flex-wrap">
-        <ToolbarButton label="New"  title="New Strategy (Ctrl+N)"  onClick={() => open('newStrategy')} />
-        <ToolbarButton label="Open" title="Open Strategy (Ctrl+O)" onClick={() => open('strategyBrowser')} />
-        <ToolbarButton
-          label={isModified ? 'Save ●' : 'Save'}
-          title="Save (Ctrl+S)"
-          onClick={handleSave}
-          active={isModified}
-        />
-        <div className="w-px h-5 bg-zinc-700 mx-1 flex-shrink-0" />
-        <ToolbarButton
-          label={backTestInProgress ? '▶ Running…' : '▶ Quick Preview'}
-          title="Run Quick Preview backtest (30 days)"
-          onClick={handleQuickPreview}
-          disabled={!currentStrategy || backTestInProgress}
-          accent
-        />
-        <div className="w-px h-5 bg-zinc-700 mx-1 flex-shrink-0" />
-        <StepperRibbon
-          currentStep={currentStep}
-          completedSteps={completedSteps}
-          errorSteps={errorSteps}
-          onStepClick={setCurrentStep}
-          inline
-        />
+      {/* ── Toolbar + Stepper (3-column: left tools | center stepper | right spacer) ── */}
+      <div className="flex items-center bg-zinc-900 border-b border-zinc-700 px-3 py-1.5 flex-shrink-0">
+        {/* Left: toolbar buttons */}
+        <div className="flex items-center gap-1">
+          <ToolbarButton label="New"  title="New Strategy (Ctrl+N)"  onClick={() => open('newStrategy')} />
+          <ToolbarButton label="Open" title="Open Strategy (Ctrl+O)" onClick={() => open('strategyBrowser')} />
+          <ToolbarButton
+            label={isModified ? 'Save ●' : 'Save'}
+            title="Save (Ctrl+S)"
+            onClick={handleSave}
+            active={isModified}
+          />
+          <div className="w-px h-5 bg-zinc-700 mx-1 flex-shrink-0" />
+          <ToolbarButton
+            label={backTestInProgress ? '▶ Running…' : '▶ Quick Preview'}
+            title="Run Quick Preview backtest (30 days)"
+            onClick={handleQuickPreview}
+            disabled={!currentStrategy || backTestInProgress}
+            accent
+          />
+        </div>
+        {/* Center: stepper ribbon */}
+        <div className="flex-1 flex justify-center items-center gap-2">
+          <StepperRibbon
+            currentStep={currentStep}
+            completedSteps={completedSteps}
+            errorSteps={errorSteps}
+            onStepClick={setCurrentStep}
+            inline
+          />
+        </div>
+        {/* Right: spacer to balance left side (approx same width) */}
+        <div style={{ minWidth: 200 }} />
       </div>
 
       {/* ── Main Content Area (40% left / 60% right) ────────────────────── */}

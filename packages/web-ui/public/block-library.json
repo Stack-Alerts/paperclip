@@ -11,32 +11,32 @@
         {
           "name": "BREAKOUT_CONFIRMED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7,
+          "occurrence_percentage": 0.04
         },
         {
           "name": "CUP_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 518,
+          "occurrence_percentage": 3.01
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 335,
+          "occurrence_percentage": 1.95
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16321,
+          "occurrence_percentage": 94.99
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 860,
+          "occurrence_percentage": 5.01
         },
         {
           "name": "BEARISH",
@@ -47,8 +47,8 @@
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16321,
+          "occurrence_percentage": 94.99
         },
         {
           "name": "ERROR",
@@ -77,26 +77,26 @@
         {
           "name": "PATTERN_CONFIRMED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 241,
+          "occurrence_percentage": 1.4
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 764,
+          "occurrence_percentage": 4.45
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16176,
+          "occurrence_percentage": 94.15
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1005,
+          "occurrence_percentage": 5.85
         },
         {
           "name": "BEARISH",
@@ -107,8 +107,8 @@
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16176,
+          "occurrence_percentage": 94.15
         },
         {
           "name": "ERROR",
@@ -137,26 +137,26 @@
         {
           "name": "BULLISH_BREAKOUT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 143,
+          "occurrence_percentage": 0.83
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1107,
+          "occurrence_percentage": 6.44
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15931,
+          "occurrence_percentage": 92.72
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1250,
+          "occurrence_percentage": 7.28
         },
         {
           "name": "BEARISH",
@@ -167,8 +167,8 @@
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15931,
+          "occurrence_percentage": 92.72
         },
         {
           "name": "ERROR",
@@ -197,20 +197,20 @@
         {
           "name": "BEARISH_BREAKDOWN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 218,
+          "occurrence_percentage": 1.27
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 653,
+          "occurrence_percentage": 3.8
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16310,
+          "occurrence_percentage": 94.93
         },
         {
           "name": "BULLISH",
@@ -221,14 +221,14 @@
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 871,
+          "occurrence_percentage": 5.07
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16310,
+          "occurrence_percentage": 94.93
         },
         {
           "name": "ERROR",
@@ -257,20 +257,20 @@
         {
           "name": "BEARISH_BREAKDOWN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 29,
+          "occurrence_percentage": 0.17
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3121,
+          "occurrence_percentage": 18.17
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 14031,
+          "occurrence_percentage": 81.67
         },
         {
           "name": "BULLISH",
@@ -281,8 +281,8 @@
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3150,
+          "occurrence_percentage": 18.33
         },
         {
           "name": "NEUTRAL",
@@ -317,20 +317,20 @@
         {
           "name": "BEARISH_BREAKDOWN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 152,
+          "occurrence_percentage": 0.88
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2212,
+          "occurrence_percentage": 12.87
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 14817,
+          "occurrence_percentage": 86.24
         },
         {
           "name": "BULLISH",
@@ -341,8 +341,8 @@
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2364,
+          "occurrence_percentage": 13.76
         },
         {
           "name": "NEUTRAL",
@@ -377,44 +377,44 @@
         {
           "name": "BULLISH_BREAKOUT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 483,
+          "occurrence_percentage": 2.81
         },
         {
           "name": "BEARISH_BREAKOUT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 466,
+          "occurrence_percentage": 2.71
         },
         {
           "name": "ABOVE_IB",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7352,
+          "occurrence_percentage": 42.79
         },
         {
           "name": "BELOW_IB",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6456,
+          "occurrence_percentage": 37.58
         },
         {
           "name": "INSIDE_IB",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1586,
+          "occurrence_percentage": 9.23
         },
         {
           "name": "LOWER_IB",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 628,
+          "occurrence_percentage": 3.66
         },
         {
           "name": "IB_FORMED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 210,
+          "occurrence_percentage": 1.22
         },
         {
           "name": "NO_IB",
@@ -425,20 +425,20 @@
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 483,
+          "occurrence_percentage": 2.81
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1094,
+          "occurrence_percentage": 6.37
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1586,
+          "occurrence_percentage": 9.23
         },
         {
           "name": "ERROR",
@@ -467,26 +467,26 @@
         {
           "name": "BULLISH_BREAKOUT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 241,
+          "occurrence_percentage": 1.4
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 989,
+          "occurrence_percentage": 5.76
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15951,
+          "occurrence_percentage": 92.84
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1230,
+          "occurrence_percentage": 7.16
         },
         {
           "name": "BEARISH",
@@ -497,8 +497,8 @@
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15951,
+          "occurrence_percentage": 92.84
         },
         {
           "name": "ERROR",
@@ -527,44 +527,44 @@
         {
           "name": "BEARISH_BREAKOUT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 282,
+          "occurrence_percentage": 1.64
         },
         {
           "name": "BULLISH_BREAKOUT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 203,
+          "occurrence_percentage": 1.18
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 662,
+          "occurrence_percentage": 3.85
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16034,
+          "occurrence_percentage": 93.32
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 503,
+          "occurrence_percentage": 2.93
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 644,
+          "occurrence_percentage": 3.75
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16034,
+          "occurrence_percentage": 93.32
         },
         {
           "name": "ERROR",
@@ -593,26 +593,26 @@
         {
           "name": "BULLISH_BREAKOUT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 380,
+          "occurrence_percentage": 2.21
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3139,
+          "occurrence_percentage": 18.27
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 13662,
+          "occurrence_percentage": 79.52
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3519,
+          "occurrence_percentage": 20.48
         },
         {
           "name": "BEARISH",
@@ -623,8 +623,8 @@
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 13662,
+          "occurrence_percentage": 79.52
         },
         {
           "name": "ERROR",
@@ -653,32 +653,32 @@
         {
           "name": "BEARISH_BREAKOUT_SEQUENCE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 308,
+          "occurrence_percentage": 1.79
         },
         {
           "name": "BULLISH_BREAKOUT_SEQUENCE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 293,
+          "occurrence_percentage": 1.71
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 293,
+          "occurrence_percentage": 1.71
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 308,
+          "occurrence_percentage": 1.79
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16580,
+          "occurrence_percentage": 96.5
         },
         {
           "name": "ERROR",
@@ -707,32 +707,32 @@
         {
           "name": "BULLISH_C2_CLOSE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 167,
+          "occurrence_percentage": 0.97
         },
         {
           "name": "BEARISH_C2_CLOSE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 157,
+          "occurrence_percentage": 0.91
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 167,
+          "occurrence_percentage": 0.97
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 157,
+          "occurrence_percentage": 0.91
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16857,
+          "occurrence_percentage": 98.11
         },
         {
           "name": "ERROR",
@@ -761,26 +761,26 @@
         {
           "name": "BULLISH_BREAKOUT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 141,
+          "occurrence_percentage": 0.82
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1328,
+          "occurrence_percentage": 7.73
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15712,
+          "occurrence_percentage": 91.45
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1469,
+          "occurrence_percentage": 8.55
         },
         {
           "name": "BEARISH",
@@ -791,8 +791,8 @@
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15712,
+          "occurrence_percentage": 91.45
         },
         {
           "name": "ERROR",
@@ -821,20 +821,20 @@
         {
           "name": "PATTERN_CONFIRMED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 388,
+          "occurrence_percentage": 5.88
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1946,
+          "occurrence_percentage": 29.48
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4268,
+          "occurrence_percentage": 64.65
         },
         {
           "name": "BULLISH",
@@ -845,14 +845,14 @@
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2334,
+          "occurrence_percentage": 35.35
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4268,
+          "occurrence_percentage": 64.65
         },
         {
           "name": "ERROR",
@@ -881,26 +881,26 @@
         {
           "name": "BREAKOUT_CONFIRMED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1884,
+          "occurrence_percentage": 10.97
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 19,
+          "occurrence_percentage": 0.11
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15278,
+          "occurrence_percentage": 88.92
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1903,
+          "occurrence_percentage": 11.08
         },
         {
           "name": "BEARISH",
@@ -941,44 +941,44 @@
         {
           "name": "BEARISH_PIVOT_HIGH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 279,
+          "occurrence_percentage": 1.62
         },
         {
           "name": "BULLISH_PIVOT_LOW",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 260,
+          "occurrence_percentage": 1.51
         },
         {
           "name": "PIVOT_HIGH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6,
+          "occurrence_percentage": 0.03
         },
         {
           "name": "PIVOT_LOW",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4,
+          "occurrence_percentage": 0.02
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 264,
+          "occurrence_percentage": 1.54
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 285,
+          "occurrence_percentage": 1.66
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16632,
+          "occurrence_percentage": 96.8
         },
         {
           "name": "ERROR",
@@ -1007,44 +1007,44 @@
         {
           "name": "BEARISH_BREAKOUT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 61,
+          "occurrence_percentage": 0.36
         },
         {
           "name": "BULLISH_BREAKOUT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 31,
+          "occurrence_percentage": 0.18
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1001,
+          "occurrence_percentage": 5.83
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16088,
+          "occurrence_percentage": 93.64
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 506,
+          "occurrence_percentage": 2.95
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 587,
+          "occurrence_percentage": 3.42
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16027,
+          "occurrence_percentage": 93.28
         },
         {
           "name": "ERROR",
@@ -1073,44 +1073,44 @@
         {
           "name": "BEARISH_BREAKOUT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 25,
+          "occurrence_percentage": 0.15
         },
         {
           "name": "BULLISH_BREAKOUT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 27,
+          "occurrence_percentage": 0.16
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5833,
+          "occurrence_percentage": 33.95
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 11296,
+          "occurrence_percentage": 65.75
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 27,
+          "occurrence_percentage": 0.16
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 25,
+          "occurrence_percentage": 0.15
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 17129,
+          "occurrence_percentage": 99.7
         },
         {
           "name": "ERROR",
@@ -1139,32 +1139,32 @@
         {
           "name": "BULLISH_3BAR",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 364,
+          "occurrence_percentage": 2.12
         },
         {
           "name": "BEARISH_3BAR",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 319,
+          "occurrence_percentage": 1.86
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 364,
+          "occurrence_percentage": 2.12
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 319,
+          "occurrence_percentage": 1.86
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16498,
+          "occurrence_percentage": 96.02
         },
         {
           "name": "ERROR",
@@ -1193,20 +1193,20 @@
         {
           "name": "BEARISH_BREAKDOWN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 644,
+          "occurrence_percentage": 3.75
         },
         {
           "name": "PATTERN_FORMING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1119,
+          "occurrence_percentage": 6.51
         },
         {
           "name": "NO_PATTERN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15418,
+          "occurrence_percentage": 89.74
         },
         {
           "name": "BULLISH",
@@ -1217,14 +1217,14 @@
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1763,
+          "occurrence_percentage": 10.26
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15418,
+          "occurrence_percentage": 89.74
         },
         {
           "name": "ERROR",
@@ -1253,44 +1253,44 @@
         {
           "name": "BEARISH_DIVERGENCE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3151,
+          "occurrence_percentage": 18.34
         },
         {
           "name": "BULLISH_DIVERGENCE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3895,
+          "occurrence_percentage": 22.67
         },
         {
           "name": "OVERBOUGHT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 597,
+          "occurrence_percentage": 3.47
         },
         {
           "name": "OVERSOLD",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 682,
+          "occurrence_percentage": 3.97
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4577,
+          "occurrence_percentage": 26.64
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3748,
+          "occurrence_percentage": 21.81
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8856,
+          "occurrence_percentage": 51.55
         },
         {
           "name": "ERROR",
@@ -1313,56 +1313,56 @@
         {
           "name": "BULLISH_DIVERGENCE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8766,
+          "occurrence_percentage": 51.02
         },
         {
           "name": "BEARISH_DIVERGENCE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5503,
+          "occurrence_percentage": 32.03
         },
         {
           "name": "BULLISH_ZERO_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 40,
+          "occurrence_percentage": 0.23
         },
         {
           "name": "BEARISH_ZERO_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 35,
+          "occurrence_percentage": 0.2
         },
         {
           "name": "BULLISH_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 142,
+          "occurrence_percentage": 0.83
         },
         {
           "name": "BEARISH_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 139,
+          "occurrence_percentage": 0.81
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8948,
+          "occurrence_percentage": 52.08
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5677,
+          "occurrence_percentage": 33.04
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2556,
+          "occurrence_percentage": 14.88
         },
         {
           "name": "ERROR",
@@ -1391,50 +1391,50 @@
         {
           "name": "BEARISH_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2080,
+          "occurrence_percentage": 12.11
         },
         {
           "name": "BULLISH_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2087,
+          "occurrence_percentage": 12.15
         },
         {
           "name": "NEUTRAL_HIGH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5576,
+          "occurrence_percentage": 32.45
         },
         {
           "name": "NEUTRAL_LOW",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5529,
+          "occurrence_percentage": 32.18
         },
         {
           "name": "NO_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1909,
+          "occurrence_percentage": 11.11
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7616,
+          "occurrence_percentage": 44.33
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7656,
+          "occurrence_percentage": 44.56
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1909,
+          "occurrence_percentage": 11.11
         },
         {
           "name": "ERROR",
@@ -1463,44 +1463,44 @@
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6439,
+          "occurrence_percentage": 37.48
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2145,
+          "occurrence_percentage": 12.48
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8597,
+          "occurrence_percentage": 50.04
         },
         {
           "name": "HOD_REJECTION",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 48,
+          "occurrence_percentage": 0.28
         },
         {
           "name": "AT_HOD",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1381,
+          "occurrence_percentage": 8.04
         },
         {
           "name": "BELOW_HOD",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 13467,
+          "occurrence_percentage": 78.38
         },
         {
           "name": "ABOVE_HOD",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2145,
+          "occurrence_percentage": 12.48
         },
         {
           "name": "ERROR",
@@ -1523,44 +1523,44 @@
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6408,
+          "occurrence_percentage": 37.3
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1653,
+          "occurrence_percentage": 9.62
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 9120,
+          "occurrence_percentage": 53.08
         },
         {
           "name": "LOD_BOUNCE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 45,
+          "occurrence_percentage": 0.26
         },
         {
           "name": "AT_LOD",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 769,
+          "occurrence_percentage": 4.48
         },
         {
           "name": "ABOVE_LOD",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 14267,
+          "occurrence_percentage": 83.04
         },
         {
           "name": "BELOW_LOD",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1653,
+          "occurrence_percentage": 9.62
         },
         {
           "name": "ERROR",
@@ -1583,44 +1583,44 @@
         {
           "name": "BULLISH_BREAK",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1459,
+          "occurrence_percentage": 8.49
         },
         {
           "name": "BEARISH_REJECTION",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 352,
+          "occurrence_percentage": 2.05
         },
         {
           "name": "AT_IHOD",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 756,
+          "occurrence_percentage": 4.4
         },
         {
           "name": "BELOW_IHOD",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 9652,
+          "occurrence_percentage": 56.18
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1459,
+          "occurrence_percentage": 8.49
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 352,
+          "occurrence_percentage": 2.05
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15370,
+          "occurrence_percentage": 89.46
         },
         {
           "name": "ERROR",
@@ -1643,44 +1643,44 @@
         {
           "name": "BEARISH_BREAK",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1518,
+          "occurrence_percentage": 8.84
         },
         {
           "name": "BULLISH_BOUNCE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 240,
+          "occurrence_percentage": 1.4
         },
         {
           "name": "AT_ILOD",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 630,
+          "occurrence_percentage": 3.67
         },
         {
           "name": "ABOVE_ILOD",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 10572,
+          "occurrence_percentage": 61.53
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 240,
+          "occurrence_percentage": 1.4
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1518,
+          "occurrence_percentage": 8.84
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15423,
+          "occurrence_percentage": 89.77
         },
         {
           "name": "ERROR",
@@ -1703,44 +1703,44 @@
         {
           "name": "ABOVE_EQUILIBRIUM",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6061,
+          "occurrence_percentage": 35.28
         },
         {
           "name": "BELOW_EQUILIBRIUM",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5545,
+          "occurrence_percentage": 32.27
         },
         {
           "name": "AT_EQUILIBRIUM",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1800,
+          "occurrence_percentage": 10.48
         },
         {
           "name": "REJECTION_AT_EQ",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 589,
+          "occurrence_percentage": 3.43
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6377,
+          "occurrence_percentage": 37.12
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5818,
+          "occurrence_percentage": 33.86
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4986,
+          "occurrence_percentage": 29.02
         },
         {
           "name": "ERROR",
@@ -1763,44 +1763,44 @@
         {
           "name": "ABOVE_INTRA_EQ",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3199,
+          "occurrence_percentage": 18.62
         },
         {
           "name": "BELOW_INTRA_EQ",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3223,
+          "occurrence_percentage": 18.76
         },
         {
           "name": "AT_INTRA_EQ",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4287,
+          "occurrence_percentage": 24.95
         },
         {
           "name": "REJECTION_AT_INTRA_EQ",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1307,
+          "occurrence_percentage": 7.61
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3869,
+          "occurrence_percentage": 22.52
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3860,
+          "occurrence_percentage": 22.47
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 9452,
+          "occurrence_percentage": 55.01
         },
         {
           "name": "ERROR",
@@ -1823,38 +1823,38 @@
         {
           "name": "BELOW_HOW",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16963,
+          "occurrence_percentage": 98.73
         },
         {
           "name": "BREAKING_OUT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 88,
+          "occurrence_percentage": 0.51
         },
         {
           "name": "BREAKOUT_CONFIRMED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 128,
+          "occurrence_percentage": 0.75
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 128,
+          "occurrence_percentage": 0.75
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4426,
+          "occurrence_percentage": 25.76
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 12627,
+          "occurrence_percentage": 73.49
         },
         {
           "name": "ERROR",
@@ -1883,38 +1883,38 @@
         {
           "name": "ABOVE_SETTLEMENT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7078,
+          "occurrence_percentage": 41.86
         },
         {
           "name": "BELOW_SETTLEMENT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6128,
+          "occurrence_percentage": 36.24
         },
         {
           "name": "AT_SETTLEMENT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3702,
+          "occurrence_percentage": 21.89
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5164,
+          "occurrence_percentage": 30.54
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4285,
+          "occurrence_percentage": 25.34
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7459,
+          "occurrence_percentage": 44.12
         },
         {
           "name": "ERROR",
@@ -1943,44 +1943,44 @@
         {
           "name": "ABOVE_LOW",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 12795,
+          "occurrence_percentage": 74.47
         },
         {
           "name": "AT_LOW",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4148,
+          "occurrence_percentage": 24.14
         },
         {
           "name": "BREAKDOWN_CONFIRMED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 144,
+          "occurrence_percentage": 0.84
         },
         {
           "name": "BREAKING_DOWN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 94,
+          "occurrence_percentage": 0.55
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4148,
+          "occurrence_percentage": 24.14
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 144,
+          "occurrence_percentage": 0.84
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 12889,
+          "occurrence_percentage": 75.02
         },
         {
           "name": "NO_LOW",
@@ -2021,38 +2021,38 @@
         {
           "name": "ABOVE_ASIA_50",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6285,
+          "occurrence_percentage": 36.58
         },
         {
           "name": "AT_ASIA_50",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5150,
+          "occurrence_percentage": 29.97
         },
         {
           "name": "BELOW_ASIA_50",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5746,
+          "occurrence_percentage": 33.44
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1270,
+          "occurrence_percentage": 7.39
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1203,
+          "occurrence_percentage": 7.0
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 14708,
+          "occurrence_percentage": 85.61
         },
         {
           "name": "ERROR",
@@ -2081,38 +2081,38 @@
         {
           "name": "LONDON_KZ",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1961,
+          "occurrence_percentage": 11.41
         },
         {
           "name": "NY_AM_KZ",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1966,
+          "occurrence_percentage": 11.44
         },
         {
           "name": "NY_PM_KZ",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2148,
+          "occurrence_percentage": 12.5
         },
         {
           "name": "ASIAN_KZ",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2148,
+          "occurrence_percentage": 12.5
         },
         {
           "name": "LONDON_OPEN_KZ",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1432,
+          "occurrence_percentage": 8.33
         },
         {
           "name": "PRIME_TIME",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 366,
+          "occurrence_percentage": 2.13
         },
         {
           "name": "WAIT",
@@ -2123,26 +2123,26 @@
         {
           "name": "NO_KZ",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7160,
+          "occurrence_percentage": 41.67
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4293,
+          "occurrence_percentage": 24.99
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7160,
+          "occurrence_percentage": 41.67
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5728,
+          "occurrence_percentage": 33.34
         },
         {
           "name": "ERROR",
@@ -2165,26 +2165,26 @@
         {
           "name": "PEAK_HOURS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2148,
+          "occurrence_percentage": 12.5
         },
         {
           "name": "ACTIVE_SESSION",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7157,
+          "occurrence_percentage": 41.66
         },
         {
           "name": "MODERATE_SESSION",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5728,
+          "occurrence_percentage": 33.34
         },
         {
           "name": "QUIET_SESSION",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2148,
+          "occurrence_percentage": 12.5
         },
         {
           "name": "OFF_SESSION",
@@ -2195,14 +2195,14 @@
         {
           "name": "ACTIVE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15033,
+          "occurrence_percentage": 87.5
         },
         {
           "name": "INACTIVE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2148,
+          "occurrence_percentage": 12.5
         },
         {
           "name": "NO_SIGNAL",
@@ -2249,32 +2249,32 @@
         {
           "name": "GOLDEN_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 409,
+          "occurrence_percentage": 2.38
         },
         {
           "name": "DEATH_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 411,
+          "occurrence_percentage": 2.39
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 409,
+          "occurrence_percentage": 2.38
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 411,
+          "occurrence_percentage": 2.39
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16361,
+          "occurrence_percentage": 95.23
         },
         {
           "name": "ERROR",
@@ -2303,44 +2303,44 @@
         {
           "name": "BULLISH_CLIMAX",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 101,
+          "occurrence_percentage": 0.59
         },
         {
           "name": "BEARISH_CLIMAX",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 122,
+          "occurrence_percentage": 0.71
         },
         {
           "name": "BULLISH_PSEUDO",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 61,
+          "occurrence_percentage": 0.36
         },
         {
           "name": "BEARISH_PSEUDO",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 59,
+          "occurrence_percentage": 0.34
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 162,
+          "occurrence_percentage": 0.94
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 181,
+          "occurrence_percentage": 1.05
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16838,
+          "occurrence_percentage": 98.0
         },
         {
           "name": "ERROR",
@@ -2351,8 +2351,8 @@
         {
           "name": "INSUFFICIENT_DATA",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 139,
+          "occurrence_percentage": 0.81
         }
       ],
       "direction": "BULLISH",
@@ -2369,38 +2369,38 @@
         {
           "name": "STRONG_UPTREND",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5909,
+          "occurrence_percentage": 34.39
         },
         {
           "name": "EARLY_UPTREND",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2854,
+          "occurrence_percentage": 16.61
         },
         {
           "name": "STRONG_DOWNTREND",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5549,
+          "occurrence_percentage": 32.3
         },
         {
           "name": "EARLY_DOWNTREND",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2869,
+          "occurrence_percentage": 16.7
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8759,
+          "occurrence_percentage": 50.98
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8422,
+          "occurrence_percentage": 49.02
         },
         {
           "name": "NEUTRAL",
@@ -2435,44 +2435,44 @@
         {
           "name": "BULLISH_CLIMAX",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 158,
+          "occurrence_percentage": 0.92
         },
         {
           "name": "BEARISH_CLIMAX",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 200,
+          "occurrence_percentage": 1.16
         },
         {
           "name": "BULLISH_PSEUDO",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4,
+          "occurrence_percentage": 0.02
         },
         {
           "name": "BEARISH_PSEUDO",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4,
+          "occurrence_percentage": 0.02
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 162,
+          "occurrence_percentage": 0.94
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 204,
+          "occurrence_percentage": 1.19
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16815,
+          "occurrence_percentage": 97.87
         },
         {
           "name": "ERROR",
@@ -2501,50 +2501,50 @@
         {
           "name": "BULLISH_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 294,
+          "occurrence_percentage": 1.73
         },
         {
           "name": "BEARISH_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 280,
+          "occurrence_percentage": 1.64
         },
         {
           "name": "ABOVE_200EMA",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5473,
+          "occurrence_percentage": 32.11
         },
         {
           "name": "BELOW_200EMA",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5775,
+          "occurrence_percentage": 33.89
         },
         {
           "name": "AT_200EMA",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5220,
+          "occurrence_percentage": 30.63
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 294,
+          "occurrence_percentage": 1.73
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 280,
+          "occurrence_percentage": 1.64
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16468,
+          "occurrence_percentage": 96.63
         },
         {
           "name": "INSUFFICIENT_DATA",
@@ -2573,44 +2573,44 @@
         {
           "name": "BULLISH_CLIMAX",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 35,
+          "occurrence_percentage": 0.2
         },
         {
           "name": "BEARISH_CLIMAX",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 37,
+          "occurrence_percentage": 0.22
         },
         {
           "name": "BULLISH_PSEUDO",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 10,
+          "occurrence_percentage": 0.06
         },
         {
           "name": "BEARISH_PSEUDO",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 26,
+          "occurrence_percentage": 0.15
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 45,
+          "occurrence_percentage": 0.26
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 63,
+          "occurrence_percentage": 0.37
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 17073,
+          "occurrence_percentage": 99.37
         },
         {
           "name": "ERROR",
@@ -2621,8 +2621,8 @@
         {
           "name": "INSUFFICIENT_DATA",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 609,
+          "occurrence_percentage": 3.54
         }
       ],
       "direction": "NEUTRAL",
@@ -2639,44 +2639,44 @@
         {
           "name": "BULLISH_CLIMAX",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 146,
+          "occurrence_percentage": 0.85
         },
         {
           "name": "BEARISH_CLIMAX",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 176,
+          "occurrence_percentage": 1.02
         },
         {
           "name": "BULLISH_PSEUDO",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5,
+          "occurrence_percentage": 0.03
         },
         {
           "name": "BEARISH_PSEUDO",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5,
+          "occurrence_percentage": 0.03
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 151,
+          "occurrence_percentage": 0.88
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 181,
+          "occurrence_percentage": 1.05
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16849,
+          "occurrence_percentage": 98.07
         },
         {
           "name": "ERROR",
@@ -2705,26 +2705,26 @@
         {
           "name": "NEAR_BUY_SIDE_LIQUIDITY",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 9013,
+          "occurrence_percentage": 52.46
         },
         {
           "name": "NEAR_SELL_SIDE_LIQUIDITY",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8168,
+          "occurrence_percentage": 47.54
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8168,
+          "occurrence_percentage": 47.54
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 9013,
+          "occurrence_percentage": 52.46
         },
         {
           "name": "NEUTRAL",
@@ -2759,38 +2759,38 @@
         {
           "name": "PRICE_IN_PREMIUM",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8695,
+          "occurrence_percentage": 50.61
         },
         {
           "name": "PRICE_IN_DISCOUNT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7812,
+          "occurrence_percentage": 45.47
         },
         {
           "name": "PRICE_AT_EQUILIBRIUM",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 674,
+          "occurrence_percentage": 3.92
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7812,
+          "occurrence_percentage": 45.47
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8695,
+          "occurrence_percentage": 50.61
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 674,
+          "occurrence_percentage": 3.92
         },
         {
           "name": "INSUFFICIENT_DATA",
@@ -2819,44 +2819,44 @@
         {
           "name": "BULLISH_ZONE_REJECTION",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 126,
+          "occurrence_percentage": 0.73
         },
         {
           "name": "BEARISH_ZONE_REJECTION",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 162,
+          "occurrence_percentage": 0.94
         },
         {
           "name": "BULLISH_ZONE_BREAK",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 453,
+          "occurrence_percentage": 2.64
         },
         {
           "name": "BEARISH_ZONE_BREAK",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 356,
+          "occurrence_percentage": 2.07
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 579,
+          "occurrence_percentage": 3.37
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 518,
+          "occurrence_percentage": 3.01
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16084,
+          "occurrence_percentage": 93.62
         },
         {
           "name": "ERROR",
@@ -2885,98 +2885,98 @@
         {
           "name": "UPTREND_LOW",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 890,
+          "occurrence_percentage": 5.18
         },
         {
           "name": "UPTREND_MODERATE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1167,
+          "occurrence_percentage": 6.79
         },
         {
           "name": "UPTREND_HIGH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2149,
+          "occurrence_percentage": 12.51
         },
         {
           "name": "UPTREND_EXTREME",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2136,
+          "occurrence_percentage": 12.43
         },
         {
           "name": "DOWNTREND_LOW",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 689,
+          "occurrence_percentage": 4.01
         },
         {
           "name": "DOWNTREND_MODERATE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1515,
+          "occurrence_percentage": 8.82
         },
         {
           "name": "DOWNTREND_HIGH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1157,
+          "occurrence_percentage": 6.73
         },
         {
           "name": "DOWNTREND_EXTREME",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3614,
+          "occurrence_percentage": 21.03
         },
         {
           "name": "RANGING_LOW",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1542,
+          "occurrence_percentage": 8.98
         },
         {
           "name": "RANGING_MODERATE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 490,
+          "occurrence_percentage": 2.85
         },
         {
           "name": "RANGING_HIGH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 667,
+          "occurrence_percentage": 3.88
         },
         {
           "name": "RANGING_EXTREME",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 849,
+          "occurrence_percentage": 4.94
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6342,
+          "occurrence_percentage": 36.91
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6975,
+          "occurrence_percentage": 40.6
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3864,
+          "occurrence_percentage": 22.49
         },
         {
           "name": "INSUFFICIENT_POWER_HOURS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 316,
+          "occurrence_percentage": 1.84
         },
         {
           "name": "ERROR",
@@ -3005,62 +3005,62 @@
         {
           "name": "BUYSIDE_ZONE_TOUCH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2210,
+          "occurrence_percentage": 12.86
         },
         {
           "name": "SELLSIDE_ZONE_TOUCH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1565,
+          "occurrence_percentage": 9.11
         },
         {
           "name": "BUYSIDE_BREACH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2026,
+          "occurrence_percentage": 11.79
         },
         {
           "name": "SELLSIDE_BREACH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1848,
+          "occurrence_percentage": 10.76
         },
         {
           "name": "VOID_DETECTED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3352,
+          "occurrence_percentage": 19.51
         },
         {
           "name": "NEAR_BUYSIDE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4503,
+          "occurrence_percentage": 26.21
         },
         {
           "name": "NEAR_SELLSIDE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1170,
+          "occurrence_percentage": 6.81
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5523,
+          "occurrence_percentage": 32.15
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5478,
+          "occurrence_percentage": 31.88
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6180,
+          "occurrence_percentage": 35.97
         },
         {
           "name": "ERROR",
@@ -3089,38 +3089,38 @@
         {
           "name": "SWING_HIGH_DETECTED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4686,
+          "occurrence_percentage": 27.27
         },
         {
           "name": "SWING_LOW_DETECTED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3907,
+          "occurrence_percentage": 22.74
         },
         {
           "name": "MINOR_SWING_HIGH_DETECTED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16,
+          "occurrence_percentage": 0.09
         },
         {
           "name": "MINOR_SWING_LOW_DETECTED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 13,
+          "occurrence_percentage": 0.08
         },
         {
           "name": "MAJOR_SWING_HIGH_DETECTED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4164,
+          "occurrence_percentage": 24.24
         },
         {
           "name": "MAJOR_SWING_LOW_DETECTED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4395,
+          "occurrence_percentage": 25.58
         },
         {
           "name": "NO_SWINGS",
@@ -3131,14 +3131,14 @@
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8315,
+          "occurrence_percentage": 48.4
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8866,
+          "occurrence_percentage": 51.6
         },
         {
           "name": "NEUTRAL",
@@ -3173,104 +3173,104 @@
         {
           "name": "ABOVE_UPPER",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 88,
+          "occurrence_percentage": 0.51
         },
         {
           "name": "NEAR_UPPER",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 416,
+          "occurrence_percentage": 2.42
         },
         {
           "name": "UPPER_HALF",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1260,
+          "occurrence_percentage": 7.33
         },
         {
           "name": "LOWER_HALF",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1134,
+          "occurrence_percentage": 6.6
         },
         {
           "name": "NEAR_LOWER",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1128,
+          "occurrence_percentage": 6.57
         },
         {
           "name": "BELOW_LOWER",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 509,
+          "occurrence_percentage": 2.96
         },
         {
           "name": "BULLISH_REVERSAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 450,
+          "occurrence_percentage": 2.62
         },
         {
           "name": "BEARISH_REVERSAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 428,
+          "occurrence_percentage": 2.49
         },
         {
           "name": "UPPER_BAND_WALK",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2931,
+          "occurrence_percentage": 17.06
         },
         {
           "name": "LOWER_BAND_WALK",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2985,
+          "occurrence_percentage": 17.37
         },
         {
           "name": "SQUEEZE_BREAKOUT_BULL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 186,
+          "occurrence_percentage": 1.08
         },
         {
           "name": "SQUEEZE_BREAKOUT_BEAR",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 172,
+          "occurrence_percentage": 1.0
         },
         {
           "name": "MEDIUM_HIGH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2344,
+          "occurrence_percentage": 13.64
         },
         {
           "name": "MEDIUM_LOW",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3027,
+          "occurrence_percentage": 17.62
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 9885,
+          "occurrence_percentage": 57.53
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7296,
+          "occurrence_percentage": 42.47
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 123,
+          "occurrence_percentage": 0.72
         },
         {
           "name": "ERROR",
@@ -3299,80 +3299,80 @@
         {
           "name": "CALM",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3351,
+          "occurrence_percentage": 19.5
         },
         {
           "name": "NORMAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2975,
+          "occurrence_percentage": 17.32
         },
         {
           "name": "ELEVATED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 192,
+          "occurrence_percentage": 1.12
         },
         {
           "name": "HIGH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 238,
+          "occurrence_percentage": 1.39
         },
         {
           "name": "EXTREME",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 117,
+          "occurrence_percentage": 0.68
         },
         {
           "name": "VOLATILE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 161,
+          "occurrence_percentage": 0.94
         },
         {
           "name": "NEAR_ADR",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 732,
+          "occurrence_percentage": 4.26
         },
         {
           "name": "ABOVE_ADR",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2037,
+          "occurrence_percentage": 11.86
         },
         {
           "name": "BELOW_ADR",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4442,
+          "occurrence_percentage": 25.85
         },
         {
           "name": "WITHIN_ADR",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2936,
+          "occurrence_percentage": 17.09
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5228,
+          "occurrence_percentage": 30.43
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8052,
+          "occurrence_percentage": 46.87
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3901,
+          "occurrence_percentage": 22.71
         },
         {
           "name": "ERROR",
@@ -3401,68 +3401,68 @@
         {
           "name": "EXTREME",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 30,
+          "occurrence_percentage": 0.17
         },
         {
           "name": "VERY_HIGH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 337,
+          "occurrence_percentage": 1.96
         },
         {
           "name": "HIGH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3363,
+          "occurrence_percentage": 19.57
         },
         {
           "name": "NORMAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5609,
+          "occurrence_percentage": 32.65
         },
         {
           "name": "CALM",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1200,
+          "occurrence_percentage": 6.98
         },
         {
           "name": "EXTREME_HIGH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1280,
+          "occurrence_percentage": 7.45
         },
         {
           "name": "EXTREME_LOW",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2209,
+          "occurrence_percentage": 12.86
         },
         {
           "name": "VERY_LOW",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3153,
+          "occurrence_percentage": 18.35
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3069,
+          "occurrence_percentage": 17.86
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3834,
+          "occurrence_percentage": 22.32
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 10278,
+          "occurrence_percentage": 59.82
         },
         {
           "name": "ERROR",
@@ -3491,38 +3491,38 @@
         {
           "name": "HIGH_LIQUIDITY",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4821,
+          "occurrence_percentage": 28.06
         },
         {
           "name": "NORMAL_LIQUIDITY",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 9438,
+          "occurrence_percentage": 54.93
         },
         {
           "name": "LOW_LIQUIDITY",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2922,
+          "occurrence_percentage": 17.01
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4821,
+          "occurrence_percentage": 28.06
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2922,
+          "occurrence_percentage": 17.01
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 9438,
+          "occurrence_percentage": 54.93
         },
         {
           "name": "ERROR",
@@ -3551,38 +3551,38 @@
         {
           "name": "BUY_IMBALANCE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3723,
+          "occurrence_percentage": 21.67
         },
         {
           "name": "SELL_IMBALANCE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3663,
+          "occurrence_percentage": 21.32
         },
         {
           "name": "BALANCED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 9795,
+          "occurrence_percentage": 57.01
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3723,
+          "occurrence_percentage": 21.67
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3663,
+          "occurrence_percentage": 21.32
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 9795,
+          "occurrence_percentage": 57.01
         },
         {
           "name": "ERROR",
@@ -3611,44 +3611,44 @@
         {
           "name": "GOLDEN_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 50,
+          "occurrence_percentage": 0.29
         },
         {
           "name": "DEATH_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 50,
+          "occurrence_percentage": 0.29
         },
         {
           "name": "BULLISH_ALIGNMENT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8373,
+          "occurrence_percentage": 48.73
         },
         {
           "name": "BEARISH_ALIGNMENT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8609,
+          "occurrence_percentage": 50.11
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8423,
+          "occurrence_percentage": 49.03
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8659,
+          "occurrence_percentage": 50.4
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 99,
+          "occurrence_percentage": 0.58
         },
         {
           "name": "ERROR",
@@ -3659,8 +3659,8 @@
         {
           "name": "INSUFFICIENT_DATA",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 99,
+          "occurrence_percentage": 0.58
         }
       ],
       "direction": "NEUTRAL",
@@ -3677,38 +3677,38 @@
         {
           "name": "ABOVE_VWAP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8232,
+          "occurrence_percentage": 47.91
         },
         {
           "name": "BELOW_VWAP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8775,
+          "occurrence_percentage": 51.07
         },
         {
           "name": "AT_VWAP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 174,
+          "occurrence_percentage": 1.01
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8232,
+          "occurrence_percentage": 47.91
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8775,
+          "occurrence_percentage": 51.07
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 174,
+          "occurrence_percentage": 1.01
         },
         {
           "name": "ERROR",
@@ -3737,44 +3737,44 @@
         {
           "name": "AT_VWAP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3230,
+          "occurrence_percentage": 18.8
         },
         {
           "name": "NEAR_VWAP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 12284,
+          "occurrence_percentage": 71.5
         },
         {
           "name": "ABOVE_ANCHORED_VWAP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 839,
+          "occurrence_percentage": 4.88
         },
         {
           "name": "BELOW_ANCHORED_VWAP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 828,
+          "occurrence_percentage": 4.82
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 839,
+          "occurrence_percentage": 4.88
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 828,
+          "occurrence_percentage": 4.82
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15514,
+          "occurrence_percentage": 90.3
         },
         {
           "name": "ERROR",
@@ -3803,38 +3803,38 @@
         {
           "name": "BEARISH_MSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6304,
+          "occurrence_percentage": 36.69
         },
         {
           "name": "BEARISH_RETEST",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2268,
+          "occurrence_percentage": 13.2
         },
         {
           "name": "BULLISH_MSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6076,
+          "occurrence_percentage": 35.36
         },
         {
           "name": "BULLISH_RETEST",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2533,
+          "occurrence_percentage": 14.74
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8609,
+          "occurrence_percentage": 50.11
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8572,
+          "occurrence_percentage": 49.89
         },
         {
           "name": "NEUTRAL",
@@ -3869,38 +3869,38 @@
         {
           "name": "IN_RANGE_LOW",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 870,
+          "occurrence_percentage": 5.06
         },
         {
           "name": "IN_RANGE_HIGH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1007,
+          "occurrence_percentage": 5.86
         },
         {
           "name": "NOT_IN_RANGE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15304,
+          "occurrence_percentage": 89.08
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 870,
+          "occurrence_percentage": 5.06
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1007,
+          "occurrence_percentage": 5.86
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15304,
+          "occurrence_percentage": 89.08
         },
         {
           "name": "ERROR",
@@ -3929,32 +3929,32 @@
         {
           "name": "BEARISH_BOS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7712,
+          "occurrence_percentage": 44.89
         },
         {
           "name": "BULLISH_BOS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7907,
+          "occurrence_percentage": 46.02
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7907,
+          "occurrence_percentage": 46.02
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 7712,
+          "occurrence_percentage": 44.89
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1562,
+          "occurrence_percentage": 9.09
         },
         {
           "name": "ERROR",
@@ -3983,32 +3983,32 @@
         {
           "name": "BEARISH_MITIGATION",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5662,
+          "occurrence_percentage": 32.96
         },
         {
           "name": "BULLISH_MITIGATION",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5926,
+          "occurrence_percentage": 34.49
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5926,
+          "occurrence_percentage": 34.49
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5662,
+          "occurrence_percentage": 32.96
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5593,
+          "occurrence_percentage": 32.55
         },
         {
           "name": "ERROR",
@@ -4037,32 +4037,32 @@
         {
           "name": "BEARISH_SFP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1125,
+          "occurrence_percentage": 6.55
         },
         {
           "name": "BULLISH_SFP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1334,
+          "occurrence_percentage": 7.76
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1334,
+          "occurrence_percentage": 7.76
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1125,
+          "occurrence_percentage": 6.55
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 14722,
+          "occurrence_percentage": 85.69
         },
         {
           "name": "ERROR",
@@ -4091,32 +4091,32 @@
         {
           "name": "BEARISH_CHOCH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 315,
+          "occurrence_percentage": 1.83
         },
         {
           "name": "BULLISH_CHOCH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 360,
+          "occurrence_percentage": 2.1
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 360,
+          "occurrence_percentage": 2.1
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 315,
+          "occurrence_percentage": 1.83
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16506,
+          "occurrence_percentage": 96.07
         },
         {
           "name": "ERROR",
@@ -4145,32 +4145,32 @@
         {
           "name": "BEARISH_INDUCEMENT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 553,
+          "occurrence_percentage": 3.22
         },
         {
           "name": "BULLISH_INDUCEMENT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 646,
+          "occurrence_percentage": 3.76
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 646,
+          "occurrence_percentage": 3.76
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 553,
+          "occurrence_percentage": 3.22
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15982,
+          "occurrence_percentage": 93.02
         },
         {
           "name": "ERROR",
@@ -4199,32 +4199,32 @@
         {
           "name": "BEARISH_OTE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1448,
+          "occurrence_percentage": 8.43
         },
         {
           "name": "BULLISH_OTE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1115,
+          "occurrence_percentage": 6.49
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1115,
+          "occurrence_percentage": 6.49
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1448,
+          "occurrence_percentage": 8.43
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 14618,
+          "occurrence_percentage": 85.08
         },
         {
           "name": "ERROR",
@@ -4253,32 +4253,32 @@
         {
           "name": "BEARISH_DISPLACEMENT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 539,
+          "occurrence_percentage": 3.14
         },
         {
           "name": "BULLISH_DISPLACEMENT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 519,
+          "occurrence_percentage": 3.02
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 519,
+          "occurrence_percentage": 3.02
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 539,
+          "occurrence_percentage": 3.14
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16123,
+          "occurrence_percentage": 93.84
         },
         {
           "name": "ERROR",
@@ -4307,62 +4307,62 @@
         {
           "name": "BEARISH_DIVERGENCE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2049,
+          "occurrence_percentage": 11.93
         },
         {
           "name": "BULLISH_DIVERGENCE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1853,
+          "occurrence_percentage": 10.79
         },
         {
           "name": "BEARISH_MOMENTUM_INCREASING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3483,
+          "occurrence_percentage": 20.27
         },
         {
           "name": "BEARISH_MOMENTUM_WEAKENING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3017,
+          "occurrence_percentage": 17.56
         },
         {
           "name": "BULLISH_MOMENTUM_INCREASING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3578,
+          "occurrence_percentage": 20.83
         },
         {
           "name": "BULLISH_MOMENTUM_WEAKENING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3188,
+          "occurrence_percentage": 18.56
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8619,
+          "occurrence_percentage": 50.17
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8549,
+          "occurrence_percentage": 49.76
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 13,
+          "occurrence_percentage": 0.08
         },
         {
           "name": "NEUTRAL_MOMENTUM",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 13,
+          "occurrence_percentage": 0.08
         },
         {
           "name": "ERROR",
@@ -4391,86 +4391,86 @@
         {
           "name": "WAVE_1_BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5377,
+          "occurrence_percentage": 31.3
         },
         {
           "name": "WAVE_1_BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3721,
+          "occurrence_percentage": 21.66
         },
         {
           "name": "WAVE_2_BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 112,
+          "occurrence_percentage": 0.65
         },
         {
           "name": "WAVE_2_BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 240,
+          "occurrence_percentage": 1.4
         },
         {
           "name": "WAVE_3_BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2326,
+          "occurrence_percentage": 13.54
         },
         {
           "name": "WAVE_3_BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2719,
+          "occurrence_percentage": 15.83
         },
         {
           "name": "WAVE_4_BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 304,
+          "occurrence_percentage": 1.77
         },
         {
           "name": "WAVE_4_BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 64,
+          "occurrence_percentage": 0.37
         },
         {
           "name": "WAVE_5_BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 33,
+          "occurrence_percentage": 0.19
         },
         {
           "name": "WAVE_5_BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16,
+          "occurrence_percentage": 0.09
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8152,
+          "occurrence_percentage": 47.45
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6760,
+          "occurrence_percentage": 39.35
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2269,
+          "occurrence_percentage": 13.21
         },
         {
           "name": "WAVE_UNCERTAIN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 400,
+          "occurrence_percentage": 2.33
         },
         {
           "name": "INSUFFICIENT_PIVOTS",
@@ -4493,8 +4493,8 @@
         {
           "name": "INSUFFICIENT_DATA",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1869,
+          "occurrence_percentage": 10.88
         }
       ],
       "direction": "NEUTRAL",
@@ -4511,56 +4511,56 @@
         {
           "name": "AT_FIB_23",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2425,
+          "occurrence_percentage": 14.11
         },
         {
           "name": "AT_FIB_38",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1675,
+          "occurrence_percentage": 9.75
         },
         {
           "name": "AT_FIB_50",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1441,
+          "occurrence_percentage": 8.39
         },
         {
           "name": "AT_FIB_61",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 994,
+          "occurrence_percentage": 5.79
         },
         {
           "name": "AT_FIB_78",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 692,
+          "occurrence_percentage": 4.03
         },
         {
           "name": "BETWEEN_LEVELS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 9954,
+          "occurrence_percentage": 57.94
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3759,
+          "occurrence_percentage": 21.88
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3468,
+          "occurrence_percentage": 20.19
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 9954,
+          "occurrence_percentage": 57.94
         },
         {
           "name": "ERROR",
@@ -4589,38 +4589,38 @@
         {
           "name": "BEARISH_SWEEP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4414,
+          "occurrence_percentage": 25.69
         },
         {
           "name": "BULLISH_SWEEP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4489,
+          "occurrence_percentage": 26.13
         },
         {
           "name": "NO_SWEEP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8278,
+          "occurrence_percentage": 48.18
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4489,
+          "occurrence_percentage": 26.13
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4414,
+          "occurrence_percentage": 25.69
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8278,
+          "occurrence_percentage": 48.18
         },
         {
           "name": "ERROR",
@@ -4649,38 +4649,38 @@
         {
           "name": "BEARISH_OB",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 353,
+          "occurrence_percentage": 2.05
         },
         {
           "name": "BULLISH_OB",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 354,
+          "occurrence_percentage": 2.06
         },
         {
           "name": "NO_OB",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16474,
+          "occurrence_percentage": 95.88
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 354,
+          "occurrence_percentage": 2.06
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 353,
+          "occurrence_percentage": 2.05
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16474,
+          "occurrence_percentage": 95.88
         },
         {
           "name": "ERROR",
@@ -4709,38 +4709,38 @@
         {
           "name": "BEARISH_BREAKER",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5674,
+          "occurrence_percentage": 33.02
         },
         {
           "name": "BULLISH_BREAKER",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5895,
+          "occurrence_percentage": 34.31
         },
         {
           "name": "NO_BREAKER",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5612,
+          "occurrence_percentage": 32.66
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5895,
+          "occurrence_percentage": 34.31
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5674,
+          "occurrence_percentage": 33.02
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5612,
+          "occurrence_percentage": 32.66
         },
         {
           "name": "ERROR",
@@ -4769,38 +4769,38 @@
         {
           "name": "BEARISH_FVG",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 136,
+          "occurrence_percentage": 0.79
         },
         {
           "name": "BULLISH_FVG",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 116,
+          "occurrence_percentage": 0.68
         },
         {
           "name": "NO_FVG",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16929,
+          "occurrence_percentage": 98.53
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 116,
+          "occurrence_percentage": 0.68
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 136,
+          "occurrence_percentage": 0.79
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16929,
+          "occurrence_percentage": 98.53
         },
         {
           "name": "ERROR",
@@ -4829,8 +4829,8 @@
         {
           "name": "STOP_TRIGGERED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6572,
+          "occurrence_percentage": 38.25
         },
         {
           "name": "STOP_UPDATED",
@@ -4841,8 +4841,8 @@
         {
           "name": "STOP_ACTIVE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 10609,
+          "occurrence_percentage": 61.75
         },
         {
           "name": "NO_STOP",
@@ -4853,14 +4853,14 @@
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 14083,
+          "occurrence_percentage": 81.97
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3098,
+          "occurrence_percentage": 18.03
         },
         {
           "name": "NEUTRAL",
@@ -4895,44 +4895,44 @@
         {
           "name": "BEARISH_FVG_IN_ZONE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1772,
+          "occurrence_percentage": 10.31
         },
         {
           "name": "BEARISH_FVG_RETEST",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1525,
+          "occurrence_percentage": 8.88
         },
         {
           "name": "BULLISH_FVG_IN_ZONE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1945,
+          "occurrence_percentage": 11.32
         },
         {
           "name": "BULLISH_FVG_RETEST",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1475,
+          "occurrence_percentage": 8.59
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3420,
+          "occurrence_percentage": 19.91
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3297,
+          "occurrence_percentage": 19.19
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 10464,
+          "occurrence_percentage": 60.9
         },
         {
           "name": "ERROR",
@@ -4961,50 +4961,50 @@
         {
           "name": "ABOVE_VWAP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8037,
+          "occurrence_percentage": 46.78
         },
         {
           "name": "BELOW_VWAP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8468,
+          "occurrence_percentage": 49.29
         },
         {
           "name": "AT_VWAP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 674,
+          "occurrence_percentage": 3.92
         },
         {
           "name": "VWAP_CROSS_UP",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1,
+          "occurrence_percentage": 0.01
         },
         {
           "name": "VWAP_CROSS_DOWN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1,
+          "occurrence_percentage": 0.01
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8038,
+          "occurrence_percentage": 46.78
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8469,
+          "occurrence_percentage": 49.29
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 674,
+          "occurrence_percentage": 3.92
         },
         {
           "name": "ERROR",
@@ -5033,44 +5033,44 @@
         {
           "name": "BEARISH_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1437,
+          "occurrence_percentage": 8.36
         },
         {
           "name": "BEARISH_DIVERGENCE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 326,
+          "occurrence_percentage": 1.9
         },
         {
           "name": "BULLISH_CROSS",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1436,
+          "occurrence_percentage": 8.36
         },
         {
           "name": "BULLISH_DIVERGENCE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 306,
+          "occurrence_percentage": 1.78
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1742,
+          "occurrence_percentage": 10.14
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1763,
+          "occurrence_percentage": 10.26
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 13676,
+          "occurrence_percentage": 79.6
         },
         {
           "name": "ERROR",
@@ -5099,32 +5099,32 @@
         {
           "name": "BEARISH_FORECAST",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 670,
+          "occurrence_percentage": 3.9
         },
         {
           "name": "BULLISH_FORECAST",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 670,
+          "occurrence_percentage": 3.9
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 670,
+          "occurrence_percentage": 3.9
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 670,
+          "occurrence_percentage": 3.9
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15841,
+          "occurrence_percentage": 92.2
         },
         {
           "name": "ERROR",
@@ -5153,50 +5153,50 @@
         {
           "name": "DEMAND_ZONE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 821,
+          "occurrence_percentage": 4.78
         },
         {
           "name": "SUPPLY_ZONE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1091,
+          "occurrence_percentage": 6.35
         },
         {
           "name": "NEAR_DEMAND",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5049,
+          "occurrence_percentage": 29.39
         },
         {
           "name": "NEAR_SUPPLY",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 10209,
+          "occurrence_percentage": 59.42
         },
         {
           "name": "NO_ZONE",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 11,
+          "occurrence_percentage": 0.06
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5870,
+          "occurrence_percentage": 34.17
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 11300,
+          "occurrence_percentage": 65.77
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 11,
+          "occurrence_percentage": 0.06
         },
         {
           "name": "ERROR",
@@ -5225,20 +5225,20 @@
         {
           "name": "WEAK_UPTREND",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4327,
+          "occurrence_percentage": 25.18
         },
         {
           "name": "MODERATE_UPTREND",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3543,
+          "occurrence_percentage": 20.62
         },
         {
           "name": "STRONG_UPTREND",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 400,
+          "occurrence_percentage": 2.33
         },
         {
           "name": "VERY_STRONG_UPTREND",
@@ -5249,50 +5249,50 @@
         {
           "name": "WEAK_DOWNTREND",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4361,
+          "occurrence_percentage": 25.38
         },
         {
           "name": "MODERATE_DOWNTREND",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3863,
+          "occurrence_percentage": 22.48
         },
         {
           "name": "STRONG_DOWNTREND",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 531,
+          "occurrence_percentage": 3.09
         },
         {
           "name": "VERY_STRONG_DOWNTREND",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 13,
+          "occurrence_percentage": 0.08
         },
         {
           "name": "RANGING",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 143,
+          "occurrence_percentage": 0.83
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 3943,
+          "occurrence_percentage": 22.95
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4407,
+          "occurrence_percentage": 25.65
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 8831,
+          "occurrence_percentage": 51.4
         },
         {
           "name": "ERROR",
@@ -5321,38 +5321,38 @@
         {
           "name": "ABOVE_CLOUD",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6452,
+          "occurrence_percentage": 37.55
         },
         {
           "name": "BELOW_CLOUD",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6639,
+          "occurrence_percentage": 38.64
         },
         {
           "name": "IN_CLOUD",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4090,
+          "occurrence_percentage": 23.81
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6452,
+          "occurrence_percentage": 37.55
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 6639,
+          "occurrence_percentage": 38.64
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4090,
+          "occurrence_percentage": 23.81
         },
         {
           "name": "ERROR",
@@ -5381,44 +5381,44 @@
         {
           "name": "BREAKOUT_CONTINUATION",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 60,
+          "occurrence_percentage": 0.35
         },
         {
           "name": "REACCUMULATION_DETECTED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1968,
+          "occurrence_percentage": 11.45
         },
         {
           "name": "SPRING_DETECTED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 57,
+          "occurrence_percentage": 0.33
         },
         {
           "name": "NO_REACCUMULATION",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15096,
+          "occurrence_percentage": 87.86
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 2085,
+          "occurrence_percentage": 12.14
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 86,
+          "occurrence_percentage": 0.5
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15010,
+          "occurrence_percentage": 87.36
         },
         {
           "name": "ERROR",
@@ -5447,8 +5447,8 @@
         {
           "name": "SOW_BREAKDOWN",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 74,
+          "occurrence_percentage": 0.43
         },
         {
           "name": "UTAD_DETECTED",
@@ -5459,38 +5459,38 @@
         {
           "name": "DISTRIBUTION_PHASE_A",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1016,
+          "occurrence_percentage": 5.91
         },
         {
           "name": "DISTRIBUTION_PHASE_B",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 4943,
+          "occurrence_percentage": 28.77
         },
         {
           "name": "NO_DISTRIBUTION",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 10863,
+          "occurrence_percentage": 63.23
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 884,
+          "occurrence_percentage": 5.15
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1090,
+          "occurrence_percentage": 6.34
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15207,
+          "occurrence_percentage": 88.51
         },
         {
           "name": "ERROR",
@@ -5501,8 +5501,8 @@
         {
           "name": "INSUFFICIENT_DATA",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 285,
+          "occurrence_percentage": 1.66
         }
       ],
       "direction": "BEARISH",
@@ -5519,50 +5519,50 @@
         {
           "name": "SOS_BREAKOUT",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 42,
+          "occurrence_percentage": 0.24
         },
         {
           "name": "SPRING_DETECTED",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 16,
+          "occurrence_percentage": 0.09
         },
         {
           "name": "ACCUMULATION_PHASE_A",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 824,
+          "occurrence_percentage": 4.8
         },
         {
           "name": "ACCUMULATION_PHASE_B",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 5135,
+          "occurrence_percentage": 29.89
         },
         {
           "name": "NO_ACCUMULATION",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 10879,
+          "occurrence_percentage": 63.32
         },
         {
           "name": "BULLISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 882,
+          "occurrence_percentage": 5.13
         },
         {
           "name": "BEARISH",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 1269,
+          "occurrence_percentage": 7.39
         },
         {
           "name": "NEUTRAL",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 15030,
+          "occurrence_percentage": 87.48
         },
         {
           "name": "ERROR",
@@ -5573,8 +5573,8 @@
         {
           "name": "INSUFFICIENT_DATA",
           "description": "",
-          "occurrences": 100,
-          "occurrence_percentage": 50.0
+          "occurrences": 285,
+          "occurrence_percentage": 1.66
         }
       ],
       "direction": "BULLISH",
