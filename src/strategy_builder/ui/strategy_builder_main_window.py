@@ -2732,8 +2732,41 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
         # Qt may reapply stylesheets after showEvent, so delay cursor setting
         QTimer.singleShot(200, lambda: apply_hand_cursor_to_buttons(self))
     
+    def _cleanup_threads_and_timers(self):
+        """Stop all background threads and timers to prevent resource leaks."""
+        logger.info("[Cleanup] Stopping background threads and timers...")
+
+        # Stop candle check timer
+        if self.candle_check_timer is not None:
+            self.candle_check_timer.stop()
+            logger.info("[Cleanup] Candle check timer stopped")
+
+        # Stop retry timer if running
+        if self.retry_timer is not None:
+            self.retry_timer.stop()
+            logger.info("[Cleanup] Retry timer stopped")
+
+        # Stop countdown timer
+        if self.countdown_timer is not None:
+            self.countdown_timer.stop()
+            logger.info("[Cleanup] Countdown timer stopped")
+
+        # Stop runtime update thread if running
+        if self._runtime_update_thread is not None and self._runtime_update_thread.isRunning():
+            logger.info("[Cleanup] Waiting for runtime update thread to finish...")
+            self._runtime_update_thread.quit()
+            # Wait up to 5 seconds for thread to finish gracefully
+            if not self._runtime_update_thread.wait(5000):
+                logger.warning("[Cleanup] Runtime update thread did not stop gracefully, forcing termination")
+                self._runtime_update_thread.terminate()
+                self._runtime_update_thread.wait(1000)
+            logger.info("[Cleanup] Runtime update thread stopped")
+
     def closeEvent(self, event):
         """Handle window close event."""
+        # Cleanup threads and timers first (before save dialog)
+        self._cleanup_threads_and_timers()
+
         # Check if current strategy should be saved (skip if empty)
         if self.is_modified and not self._is_strategy_empty():
             reply = ask_question(
@@ -2742,7 +2775,7 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
                 "Unsaved Changes",
                 "You have unsaved changes. Do you want to save before exiting?"
             )
-            
+
             if reply == 'yes':
                 if self._on_save_strategy():
                     self._save_settings()
