@@ -8,6 +8,8 @@ Monitors for stalled workflows in:
 - signal_timeout: Signal generation pipelines stalled >3h
 - orphan_checkout: Checked-out issues with no live run >6h
 - agent_paused_stalled: Paused agents with in_progress work >2h
+
+Uses Paperclip API for workflow detection (no database required).
 """
 
 import argparse
@@ -18,8 +20,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 import json
 import requests
-
-import psycopg
 
 
 @dataclass
@@ -34,42 +34,53 @@ class StalledWorkflow:
 
 
 class RecoveryMonitor:
-    """Monitor PaperClip recovery actions and stalled workflows."""
+    """Monitor PaperClip recovery actions and stalled workflows using API."""
 
-    def __init__(self, db_url: Optional[str] = None, api_url: Optional[str] = None, api_key: Optional[str] = None):
-        """Initialize monitor with database connection and API credentials."""
-        self.db_url = db_url or os.environ.get(
-            "DATABASE_URL",
-            "postgres://paperclip:paperclip@localhost:5432/paperclip"
-        )
+    def __init__(self, api_url: Optional[str] = None, api_key: Optional[str] = None, company_id: Optional[str] = None):
+        """Initialize monitor with API credentials only (no database required)."""
         self.api_url = api_url or os.environ.get("PAPERCLIP_API_URL", "http://localhost:3100")
         self.api_key = api_key or os.environ.get("PAPERCLIP_API_KEY", "")
+        self.company_id = company_id or os.environ.get("PAPERCLIP_COMPANY_ID", "")
         self.run_id = os.environ.get("PAPERCLIP_RUN_ID", "")
-        self.conn: Optional[psycopg.Connection] = None
         self.stalled_matches: list[StalledWorkflow] = []
         self.recovery_actions: list[dict] = []
 
-    def connect(self):
-        """Establish database connection."""
-        try:
-            self.conn = psycopg.connect(self.db_url)
-        except psycopg.Error as e:
-            print(f"Failed to connect to database: {e}", file=sys.stderr)
-            sys.exit(1)
-
     def close(self):
-        """Close database connection."""
-        if self.conn:
-            self.conn.close()
+        """Cleanup (no-op for API-based monitor)."""
+        pass
+
+    def _api_request(self, method: str, endpoint: str, data: Optional[dict] = None) -> Optional[dict]:
+        """Make a request to the Paperclip API."""
+        url = f"{self.api_url}{endpoint}"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        if self.run_id:
+            headers["X-Paperclip-Run-Id"] = self.run_id
+
+        try:
+            if method == "GET":
+                response = requests.get(url, headers=headers, timeout=10)
+            elif method == "POST":
+                response = requests.post(url, headers=headers, json=data, timeout=10)
+            else:
+                return None
+
+            if response.status_code in (200, 201):
+                return response.json()
+            else:
+                print(f"Warning: API request failed ({response.status_code}): {response.text[:200]}", file=sys.stderr)
+                return None
+        except Exception as e:
+            print(f"Warning: API request exception: {str(e)}", file=sys.stderr)
+            return None
 
     def find_matches(self) -> list[StalledWorkflow]:
         """Find all stalled workflow matches across configured scenarios."""
-        if not self.conn:
-            self.connect()
-
         self.stalled_matches = []
 
-        # Check each scenario
+        # Check each scenario via API
         self._check_exchange_api_timeout()
         self._check_position_mismatch()
         self._check_signal_timeout()
@@ -79,182 +90,164 @@ class RecoveryMonitor:
         return self.stalled_matches
 
     def _check_exchange_api_timeout(self):
-        """Check for exchange API calls stalled >2h."""
+        """Check for exchange API calls stalled >2h via API."""
         try:
-            with self.conn.cursor() as cur:
-                # Look for issues tagged with exchange operations that have stalled runs
-                cur.execute("""
-                    SELECT
-                        i.id,
-                        i.assignee_agent_id,
-                        EXTRACT(EPOCH FROM (now() - COALESCE(hr.last_output_at, hr.updated_at)))/60 as stalled_minutes,
-                        COALESCE(hr.last_output_at, hr.updated_at) as last_activity,
-                        hr.status
-                    FROM issues i
-                    LEFT JOIN heartbeat_runs hr ON i.execution_run_id = hr.id
-                    WHERE i.title LIKE '%exchange%'
-                        AND i.status IN ('in_progress', 'blocked')
-                        AND hr.status IN ('running', 'queued', 'scheduled_retry')
-                        AND (now() - COALESCE(hr.last_output_at, hr.updated_at)) > INTERVAL '2 hours'
-                    ORDER BY COALESCE(hr.last_output_at, hr.updated_at) ASC
-                    LIMIT 100
-                """)
+            now = datetime.now(timezone.utc)
+            stale_before = now - timedelta(hours=2)
 
-                for row in cur.fetchall():
-                    if row and len(row) >= 4:
-                        issue_id, agent_id, stalled_minutes, last_activity, status = row
-                        self.stalled_matches.append(StalledWorkflow(
-                            scenario="exchange_api_timeout",
-                            issue_id=str(issue_id) if issue_id else None,
-                            agent_id=str(agent_id) if agent_id else None,
-                            stalled_duration_minutes=int(stalled_minutes) if stalled_minutes else 0,
-                            last_activity=last_activity,
-                            details={"status": status}
-                        ))
-        except psycopg.Error as e:
+            issues = self._api_request(
+                "GET",
+                f"/api/companies/{self.company_id}/issues?q=exchange&status=in_progress,blocked"
+            )
+
+            if not issues or not isinstance(issues, list):
+                return
+
+            for issue in issues:
+                updated_at = datetime.fromisoformat(issue.get("updatedAt", "").replace("Z", "+00:00"))
+                stalled_minutes = int((now - updated_at).total_seconds() / 60)
+
+                if updated_at < stale_before:
+                    self.stalled_matches.append(StalledWorkflow(
+                        scenario="exchange_api_timeout",
+                        issue_id=issue.get("id") or issue.get("identifier"),
+                        agent_id=issue.get("assigneeAgentId"),
+                        stalled_duration_minutes=stalled_minutes,
+                        last_activity=updated_at,
+                        details={"status": issue.get("status")}
+                    ))
+        except Exception as e:
             print(f"Warning: Failed to check exchange_api_timeout: {e}", file=sys.stderr)
 
     def _check_position_mismatch(self):
-        """Check for position reconciliation issues stalled >1h."""
+        """Check for position reconciliation issues stalled >1h via API."""
         try:
-            with self.conn.cursor() as cur:
-                # Look for issues tagged with position/reconciliation that have stalled runs
-                cur.execute("""
-                    SELECT
-                        i.id,
-                        i.assignee_agent_id,
-                        EXTRACT(EPOCH FROM (now() - COALESCE(hr.last_output_at, hr.updated_at)))/60 as stalled_minutes,
-                        COALESCE(hr.last_output_at, hr.updated_at) as last_activity,
-                        hr.status
-                    FROM issues i
-                    LEFT JOIN heartbeat_runs hr ON i.execution_run_id = hr.id
-                    WHERE (i.title LIKE '%position%' OR i.title LIKE '%reconcil%')
-                        AND i.status IN ('in_progress', 'blocked')
-                        AND hr.status IN ('running', 'queued', 'scheduled_retry')
-                        AND (now() - COALESCE(hr.last_output_at, hr.updated_at)) > INTERVAL '1 hour'
-                    ORDER BY COALESCE(hr.last_output_at, hr.updated_at) ASC
-                    LIMIT 100
-                """)
+            now = datetime.now(timezone.utc)
+            stale_before = now - timedelta(hours=1)
 
-                for row in cur.fetchall():
-                    if row and len(row) >= 4:
-                        issue_id, agent_id, stalled_minutes, last_activity, status = row
+            for keyword in ["position", "reconcil"]:
+                issues = self._api_request(
+                    "GET",
+                    f"/api/companies/{self.company_id}/issues?q={keyword}&status=in_progress,blocked"
+                )
+
+                if not issues or not isinstance(issues, list):
+                    continue
+
+                for issue in issues:
+                    updated_at = datetime.fromisoformat(issue.get("updatedAt", "").replace("Z", "+00:00"))
+                    stalled_minutes = int((now - updated_at).total_seconds() / 60)
+
+                    if updated_at < stale_before:
                         self.stalled_matches.append(StalledWorkflow(
                             scenario="position_mismatch",
-                            issue_id=str(issue_id) if issue_id else None,
-                            agent_id=str(agent_id) if agent_id else None,
-                            stalled_duration_minutes=int(stalled_minutes) if stalled_minutes else 0,
-                            last_activity=last_activity,
-                            details={"status": status}
+                            issue_id=issue.get("id") or issue.get("identifier"),
+                            agent_id=issue.get("assigneeAgentId"),
+                            stalled_duration_minutes=stalled_minutes,
+                            last_activity=updated_at,
+                            details={"status": issue.get("status")}
                         ))
-        except psycopg.Error as e:
+        except Exception as e:
             print(f"Warning: Failed to check position_mismatch: {e}", file=sys.stderr)
 
     def _check_signal_timeout(self):
-        """Check for signal generation pipelines stalled >3h."""
+        """Check for signal generation pipelines stalled >3h via API."""
         try:
-            with self.conn.cursor() as cur:
-                # Look for issues tagged with signal generation that have stalled runs
-                cur.execute("""
-                    SELECT
-                        i.id,
-                        i.assignee_agent_id,
-                        EXTRACT(EPOCH FROM (now() - COALESCE(hr.last_output_at, hr.updated_at)))/60 as stalled_minutes,
-                        COALESCE(hr.last_output_at, hr.updated_at) as last_activity,
-                        hr.status
-                    FROM issues i
-                    LEFT JOIN heartbeat_runs hr ON i.execution_run_id = hr.id
-                    WHERE (i.title LIKE '%signal%' OR i.title LIKE '%pipeline%')
-                        AND i.status IN ('in_progress', 'blocked')
-                        AND hr.status IN ('running', 'queued', 'scheduled_retry')
-                        AND (now() - COALESCE(hr.last_output_at, hr.updated_at)) > INTERVAL '3 hours'
-                    ORDER BY COALESCE(hr.last_output_at, hr.updated_at) ASC
-                    LIMIT 100
-                """)
+            now = datetime.now(timezone.utc)
+            stale_before = now - timedelta(hours=3)
 
-                for row in cur.fetchall():
-                    if row and len(row) >= 4:
-                        issue_id, agent_id, stalled_minutes, last_activity, status = row
+            for keyword in ["signal", "pipeline"]:
+                issues = self._api_request(
+                    "GET",
+                    f"/api/companies/{self.company_id}/issues?q={keyword}&status=in_progress,blocked"
+                )
+
+                if not issues or not isinstance(issues, list):
+                    continue
+
+                for issue in issues:
+                    updated_at = datetime.fromisoformat(issue.get("updatedAt", "").replace("Z", "+00:00"))
+                    stalled_minutes = int((now - updated_at).total_seconds() / 60)
+
+                    if updated_at < stale_before:
                         self.stalled_matches.append(StalledWorkflow(
                             scenario="signal_timeout",
-                            issue_id=str(issue_id) if issue_id else None,
-                            agent_id=str(agent_id) if agent_id else None,
-                            stalled_duration_minutes=int(stalled_minutes) if stalled_minutes else 0,
-                            last_activity=last_activity,
-                            details={"status": status}
+                            issue_id=issue.get("id") or issue.get("identifier"),
+                            agent_id=issue.get("assigneeAgentId"),
+                            stalled_duration_minutes=stalled_minutes,
+                            last_activity=updated_at,
+                            details={"status": issue.get("status")}
                         ))
-        except psycopg.Error as e:
+        except Exception as e:
             print(f"Warning: Failed to check signal_timeout: {e}", file=sys.stderr)
 
     def _check_orphan_checkout(self):
-        """Check for checked-out issues with no live run >6h."""
+        """Check for checked-out issues with no live run >6h via API."""
         try:
-            with self.conn.cursor() as cur:
-                # Look for issues checked out with no active heartbeat run
-                cur.execute("""
-                    SELECT
-                        i.id,
-                        i.assignee_agent_id,
-                        EXTRACT(EPOCH FROM (now() - COALESCE(hr.last_output_at, i.updated_at)))/60 as stalled_minutes,
-                        COALESCE(hr.last_output_at, i.updated_at) as last_activity,
-                        i.status
-                    FROM issues i
-                    LEFT JOIN heartbeat_runs hr ON i.execution_run_id = hr.id
-                        AND hr.status IN ('running', 'queued', 'scheduled_retry')
-                    WHERE i.checkout_run_id IS NOT NULL
-                        AND hr.id IS NULL
-                        AND (now() - COALESCE(hr.last_output_at, i.updated_at)) > INTERVAL '6 hours'
-                    ORDER BY COALESCE(hr.last_output_at, i.updated_at) ASC
-                    LIMIT 100
-                """)
+            now = datetime.now(timezone.utc)
+            stale_before = now - timedelta(hours=6)
 
-                for row in cur.fetchall():
-                    if row and len(row) >= 4:
-                        issue_id, agent_id, stalled_minutes, last_activity, status = row
+            issues = self._api_request(
+                "GET",
+                f"/api/companies/{self.company_id}/issues?status=in_progress,blocked"
+            )
+
+            if not issues or not isinstance(issues, list):
+                return
+
+            for issue in issues:
+                if issue.get("checkoutRunId") and not issue.get("executionRunId"):
+                    updated_at = datetime.fromisoformat(issue.get("updatedAt", "").replace("Z", "+00:00"))
+                    stalled_minutes = int((now - updated_at).total_seconds() / 60)
+
+                    if updated_at < stale_before:
                         self.stalled_matches.append(StalledWorkflow(
                             scenario="orphan_checkout",
-                            issue_id=str(issue_id) if issue_id else None,
-                            agent_id=str(agent_id) if agent_id else None,
-                            stalled_duration_minutes=int(stalled_minutes) if stalled_minutes else 0,
-                            last_activity=last_activity,
-                            details={"status": status}
+                            issue_id=issue.get("id") or issue.get("identifier"),
+                            agent_id=issue.get("assigneeAgentId"),
+                            stalled_duration_minutes=stalled_minutes,
+                            last_activity=updated_at,
+                            details={"status": issue.get("status")}
                         ))
-        except psycopg.Error as e:
+        except Exception as e:
             print(f"Warning: Failed to check orphan_checkout: {e}", file=sys.stderr)
 
     def _check_agent_paused_stalled(self):
-        """Check for paused agents with in_progress work >2h."""
+        """Check for paused agents with in_progress work >2h via API."""
         try:
-            with self.conn.cursor() as cur:
-                # Look for paused agents with stalled in_progress issues
-                cur.execute("""
-                    SELECT
-                        i.id,
-                        a.id as agent_id,
-                        EXTRACT(EPOCH FROM (now() - i.updated_at))/60 as stalled_minutes,
-                        i.updated_at,
-                        i.status
-                    FROM issues i
-                    JOIN agents a ON i.assignee_agent_id = a.id
-                    WHERE a.paused_at IS NOT NULL
-                        AND i.status = 'in_progress'
-                        AND (now() - i.updated_at) > INTERVAL '2 hours'
-                    ORDER BY i.updated_at ASC
-                    LIMIT 100
-                """)
+            now = datetime.now(timezone.utc)
+            stale_before = now - timedelta(hours=2)
 
-                for row in cur.fetchall():
-                    if row and len(row) >= 4:
-                        issue_id, agent_id, stalled_minutes, last_activity, status = row
-                        self.stalled_matches.append(StalledWorkflow(
-                            scenario="agent_paused_stalled",
-                            issue_id=str(issue_id) if issue_id else None,
-                            agent_id=str(agent_id) if agent_id else None,
-                            stalled_duration_minutes=int(stalled_minutes) if stalled_minutes else 0,
-                            last_activity=last_activity,
-                            details={"status": status}
-                        ))
-        except psycopg.Error as e:
+            issues = self._api_request(
+                "GET",
+                f"/api/companies/{self.company_id}/issues?status=in_progress"
+            )
+
+            if not issues or not isinstance(issues, list):
+                return
+
+            for issue in issues:
+                agent_id = issue.get("assigneeAgentId")
+                if not agent_id:
+                    continue
+
+                agent_details = self._api_request("GET", f"/api/agents/{agent_id}")
+                if not agent_details or not agent_details.get("pausedAt"):
+                    continue
+
+                updated_at = datetime.fromisoformat(issue.get("updatedAt", "").replace("Z", "+00:00"))
+                stalled_minutes = int((now - updated_at).total_seconds() / 60)
+
+                if updated_at < stale_before:
+                    self.stalled_matches.append(StalledWorkflow(
+                        scenario="agent_paused_stalled",
+                        issue_id=issue.get("id") or issue.get("identifier"),
+                        agent_id=agent_id,
+                        stalled_duration_minutes=stalled_minutes,
+                        last_activity=updated_at,
+                        details={"status": issue.get("status")}
+                    ))
+        except Exception as e:
             print(f"Warning: Failed to check agent_paused_stalled: {e}", file=sys.stderr)
 
     def report_matches(self) -> str:
@@ -558,7 +551,7 @@ Please review and act."""
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="PaperClip Recovery Monitor - Check for stalled workflows"
+        description="PaperClip Recovery Monitor - Check for stalled workflows (API-based)"
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
@@ -567,11 +560,6 @@ def main():
     matches_parser = subparsers.add_parser(
         "matches",
         help="List stalled workflows matching recovery scenarios"
-    )
-    matches_parser.add_argument(
-        "--db-url",
-        default=None,
-        help="Database URL (default: DATABASE_URL env var)"
     )
     matches_parser.add_argument(
         "--json",
@@ -589,19 +577,25 @@ def main():
         action="store_true",
         help="Preview actions without executing"
     )
-    run_parser.add_argument(
-        "--db-url",
-        default=None,
-        help="Database URL (default: DATABASE_URL env var)"
-    )
 
     args = parser.parse_args()
+
+    # Verify required environment variables
+    if not os.environ.get("PAPERCLIP_API_URL"):
+        print("Error: PAPERCLIP_API_URL environment variable not set", file=sys.stderr)
+        sys.exit(1)
+    if not os.environ.get("PAPERCLIP_API_KEY"):
+        print("Error: PAPERCLIP_API_KEY environment variable not set", file=sys.stderr)
+        sys.exit(1)
+    if not os.environ.get("PAPERCLIP_COMPANY_ID"):
+        print("Error: PAPERCLIP_COMPANY_ID environment variable not set", file=sys.stderr)
+        sys.exit(1)
 
     if not args.command:
         parser.print_help()
         sys.exit(0)
 
-    monitor = RecoveryMonitor(db_url=args.db_url)
+    monitor = RecoveryMonitor()
 
     try:
         if args.command == "matches":
