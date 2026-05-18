@@ -5,14 +5,14 @@ import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BlockDefinition, BlockType } from '@/lib/strategy-builder/types';
 import { ExitConditionDialog, ExitConditionConfig, AvailableBlock } from './ExitConditionDialog';
 
-const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
-  [BlockType.ENTRY_CONDITION]:  'ENTRY',
-  [BlockType.EXIT_CONDITION]:   'EXIT',
-  [BlockType.RISK_MANAGEMENT]:  'RISK',
-  [BlockType.TIME_CONSTRAINT]:  'TIME',
-  [BlockType.FILTER]:           'FILTER',
-  [BlockType.INDICATOR]:        'IND',
-  [BlockType.POSITION_SIZING]:  'SIZE',
+const BLOCK_TYPE_LABELS: Record<string, string> = {
+  [BlockType.ENTRY_CONDITION]:  'Entry Condition',
+  [BlockType.EXIT_CONDITION]:   'Exit Condition',
+  [BlockType.RISK_MANAGEMENT]:  'Risk Management',
+  [BlockType.TIME_CONSTRAINT]:  'Time Constraint',
+  [BlockType.FILTER]:           'Filter',
+  [BlockType.INDICATOR]:        'Indicator',
+  [BlockType.POSITION_SIZING]:  'Position Sizing',
 };
 
 // ui_visible=false signals are hidden in Standard mode (matches desktop app behaviour).
@@ -197,7 +197,13 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode }: BlockItemProp
                       checked={isChecked}
                       disabled={isAdded}
                       onChange={() => !isAdded && toggleSignal(sig.name)}
-                      className="mt-0.5 flex-shrink-0 accent-sky-400 w-3.5 h-3.5"
+                      className="mt-0.5 flex-shrink-0 appearance-none w-3.5 h-3.5 rounded-sm border border-[#5A6070] cursor-pointer disabled:opacity-50"
+                      style={isChecked ? {
+                        background: '#0ea5e9',
+                        borderColor: '#0ea5e9',
+                        backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='white'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e\")",
+                        backgroundSize: '100% 100%',
+                      } : { background: 'transparent' }}
                     />
                     <div className="min-w-0">
                       <span
@@ -340,6 +346,15 @@ export function BlockSearchPanel() {
     const cats = new Set(blockLibrary.map(b => b.category));
     return [...cats].sort().map(c => ({ id: c, name: c }));
   }, [blockCategories, blockLibrary]);
+
+  // Only show types that actually exist in the library (not all enum values)
+  const allTypes = useMemo(() => {
+    const types = new Set(blockLibrary.map(b => b.type));
+    return [...types].sort().map(t => ({
+      value: t,
+      label: BLOCK_TYPE_LABELS[t] ?? t.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+    }));
+  }, [blockLibrary]);
 
   // Add block to strategy.
   // Standard mode: signals from the same block definition + logic are merged
@@ -487,12 +502,12 @@ export function BlockSearchPanel() {
           <select
             value={selectedType}
             onChange={e => setSelectedType(e.target.value as BlockType | 'all')}
-            className="flex-1 min-w-[80px] max-w-[120px] px-1.5 py-1 rounded border text-xs focus:outline-none"
+            className="flex-1 min-w-[80px] max-w-[140px] px-1.5 py-1 rounded border text-xs focus:outline-none"
             style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
           >
             <option value="all">All Types</option>
-            {Object.entries(BLOCK_TYPE_LABELS).map(([type, label]) => (
-              <option key={type} value={type}>{label}</option>
+            {allTypes.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
             ))}
           </select>
           <select
