@@ -227,22 +227,38 @@ def scan(
     done_issues = _fetch_done_issues(days_back)
     log.info("Found %d done fix/bug issues", len(done_issues))
 
-    # Count gated vs. ungated
-    gated_count = 0
+    # Count gated vs. ungated and break down gated by status
+    gated_by_status = {"pass": 0, "fail": 0, "bypassed": 0, "error": 0, "skipped": 0}
     ungated_issues = []
     for issue in done_issues:
         issue_id = issue.get("id", "")
         if not issue_id:
             continue
         if issue_id in muted:
-            gated_count += 1
+            status = muted[issue_id].lower()
+            # Map gate status to the expected keys
+            if status == "pass":
+                gated_by_status["pass"] += 1
+            elif status == "fail":
+                gated_by_status["fail"] += 1
+            elif status == "bypassed":
+                gated_by_status["bypassed"] += 1
+            elif status == "error":
+                gated_by_status["error"] += 1
+            elif status == "skipped":
+                gated_by_status["skipped"] += 1
+            else:
+                # Unknown status, count as skipped
+                gated_by_status["skipped"] += 1
         else:
             ungated_issues.append(issue)
 
+    gated_count = sum(gated_by_status.values())
     ungated_count = len(ungated_issues)
     log.info(
-        "Gated: %d, Ungated: %d (out of %d done issues)",
+        "Gated: %d (%s), Ungated: %d (out of %d done issues)",
         gated_count,
+        gated_by_status,
         ungated_count,
         len(done_issues),
     )
@@ -253,9 +269,10 @@ def scan(
     result = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "total_done_fix_issues": len(done_issues),
-        "gated": gated_count,
+        "gated": gated_by_status,
         "ungated_count": ungated_count,
         "last_24h": last_24h_count,
+        "days_back": days_back,
     }
 
     # Optionally run retroactive gates on ungated issues
