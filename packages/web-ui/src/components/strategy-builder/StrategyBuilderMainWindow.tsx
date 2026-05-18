@@ -168,7 +168,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   }, []);
 
   // Resizable splitter
-  const [leftPercent, setLeftPercent] = useState(68);
+  const [leftPercent, setLeftPercent] = useState(60);
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {

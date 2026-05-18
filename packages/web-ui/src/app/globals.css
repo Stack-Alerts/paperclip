@@ -25,26 +25,28 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Thin scrollbars matching desktop theme */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #3C4149 transparent;
-}
+/* Thin scrollbars matching desktop theme — applied in @layer base for Tailwind v4 */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3C4149 transparent;
+  }
 
-*::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
 
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
 
-*::-webkit-scrollbar-thumb {
-  background-color: #3C4149;
-  border-radius: 2px;
-}
+  *::-webkit-scrollbar-thumb {
+    background-color: #3C4149;
+    border-radius: 2px;
+  }
 
-*::-webkit-scrollbar-thumb:hover {
-  background-color: #9AA0A6;
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: #9AA0A6;
+  }
 }

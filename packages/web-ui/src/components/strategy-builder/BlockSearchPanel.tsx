@@ -14,24 +14,8 @@ const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   [BlockType.POSITION_SIZING]:  'SIZE',
 };
 
-// ERROR and INSUFFICIENT_* signals are never useful for strategy building — always hidden.
-function isAlwaysHidden(name: string): boolean {
-  const n = name.toUpperCase();
-  return n === 'ERROR' || n.startsWith('INSUFFICIENT');
-}
-
-// Standard mode additionally hides ambiguous/status signals that aren't clear trading signals.
-// Advanced mode shows these but still hides the always-hidden set above.
-function isAdvancedOnlySignal(name: string): boolean {
-  const n = name.toUpperCase();
-  return (
-    n === 'NO_PATTERN' ||
-    n === 'NO_SIGNAL' ||
-    n === 'NEUTRAL' ||
-    n === 'NEUTRAL_MOMENTUM' ||
-    n.includes('UNCERTAIN')
-  );
-}
+// ui_visible=false signals are hidden in Standard mode (matches desktop app behaviour).
+// Advanced mode shows all signals including ui_visible=false for debugging/exploration.
 
 // Convert WAVE_1_BULLISH → Wave 1 Bullish
 function formatSignalName(name: string): string {
@@ -63,6 +47,54 @@ function savePresets(presets: FilterPreset[]) {
 }
 
 // ─────────────────────────────────────────────
+// SavePresetModal
+// ─────────────────────────────────────────────
+interface SavePresetModalProps {
+  open: boolean;
+  onSave: (name: string) => void;
+  onCancel: () => void;
+}
+
+function SavePresetModal({ open, onSave, onCancel }: SavePresetModalProps) {
+  const [value, setValue] = useState('');
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="rounded-lg shadow-2xl border p-5 w-80" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
+        <h3 className="text-sm font-semibold mb-3" style={{ color: '#A0AEC0' }}>Save Filter Preset</h3>
+        <input
+          autoFocus
+          type="text"
+          placeholder="Preset name…"
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && value.trim()) onSave(value.trim()); if (e.key === 'Escape') onCancel(); }}
+          className="w-full px-2.5 py-1.5 rounded border text-sm focus:outline-none mb-4"
+          style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+        />
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="text-xs px-3 py-1.5 rounded border transition-colors"
+            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#9AA0A6' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { if (value.trim()) onSave(value.trim()); }}
+            disabled={!value.trim()}
+            className="text-xs px-3 py-1.5 rounded border transition-colors disabled:opacity-40"
+            style={{ background: '#1a3a4a', borderColor: '#0ea5e9', color: '#38bdf8' }}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // BlockItem
 // ─────────────────────────────────────────────
 interface BlockItemProps {
@@ -77,9 +109,11 @@ function BlockItem({ definition, onAdd, advancedMode }: BlockItemProps) {
   const [addedSignals, setAddedSignals] = useState<Set<string>>(new Set());
 
   const signals = definition.signals ?? [];
-  const visibleSignals = signals
-    .filter(s => !isAlwaysHidden(s.name))
-    .filter(s => advancedMode || !isAdvancedOnlySignal(s.name));
+  // Standard: only signals the desktop shows (ui_visible !== false from registry)
+  // Advanced: all signals
+  const visibleSignals = advancedMode
+    ? signals
+    : signals.filter(s => s.ui_visible !== false);
   const ext = definition as unknown as Record<string, unknown>;
   const weight = ext.weight as number | undefined;
   const typeLabel = BLOCK_TYPE_LABELS[definition.type] ?? (definition.type as string).replace('_', ' ').toUpperCase();
@@ -94,7 +128,7 @@ function BlockItem({ definition, onAdd, advancedMode }: BlockItemProps) {
   };
 
   const handleAdd = (logic: 'AND' | 'OR' | 'EXIT') => {
-    const selected = checkedSignals.size > 0 ? [...checkedSignals] : signals.map(s => s.name);
+    const selected = checkedSignals.size > 0 ? [...checkedSignals] : visibleSignals.map(s => s.name);
     // Mark selected signals as added
     setAddedSignals(prev => {
       const next = new Set(prev);
@@ -228,16 +262,20 @@ export function BlockSearchPanel() {
   // Presets
   const [presets, setPresets] = useState<FilterPreset[]>([]);
   const [selectedPreset, setSelectedPreset] = useState('');
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
   useEffect(() => { setPresets(loadPresets()); }, []);
 
   const handleSavePreset = useCallback(() => {
-    const name = window.prompt('Save preset as:', '');
-    if (!name?.trim()) return;
-    const preset: FilterPreset = { name: name.trim(), search: searchText, category: selectedCategory, type: selectedType };
+    setSaveModalOpen(true);
+  }, []);
+
+  const handleConfirmSavePreset = useCallback((name: string) => {
+    const preset: FilterPreset = { name, search: searchText, category: selectedCategory, type: selectedType };
     const updated = [...presets.filter(p => p.name !== preset.name), preset];
     savePresets(updated);
     setPresets(updated);
-    setSelectedPreset(preset.name);
+    setSelectedPreset(name);
+    setSaveModalOpen(false);
   }, [searchText, selectedCategory, selectedType, presets]);
 
   const handleLoadPreset = useCallback(() => {
@@ -444,6 +482,12 @@ export function BlockSearchPanel() {
           </p>
         )}
       </div>
+
+      <SavePresetModal
+        open={saveModalOpen}
+        onSave={handleConfirmSavePreset}
+        onCancel={() => setSaveModalOpen(false)}
+      />
     </div>
   );
 }
