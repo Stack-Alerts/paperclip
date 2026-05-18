@@ -197,12 +197,12 @@ const TEAL_BTN: React.CSSProperties = {
   fontSize: 13, cursor: 'pointer', flexShrink: 0,
 };
 
-// Two-tone duplicate icon (green back page + sky-blue front page)
+// Two-tone copy icon: teal-outlined back page, sky-blue-outlined front page
 function DupIcon() {
   return (
-    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="0" width="9" height="9" rx="1.2" fill="#10B981" opacity="0.75"/>
-      <rect x="0" y="3" width="9" height="9" rx="1.2" fill="#38bdf8"/>
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3.5" y="0.5" width="8" height="8" rx="1.2" stroke="#14a0a5" strokeWidth="1.1"/>
+      <rect x="0.5" y="3.5" width="8" height="8" rx="1.2" stroke="#38bdf8" strokeWidth="1.1" fill="rgba(10,20,35,0.85)"/>
     </svg>
   );
 }
@@ -507,7 +507,9 @@ export function StrategyBlocksPanel() {
       if (!block) return;
       const position = exitGlobalIndex + 1;
       addBlock(BlockType.EXIT_CONDITION, position);
-      updateBlock(position, { ...block.data });
+      // Deep-clone so the duplicate's exitConfig is fully independent from the original
+      const clonedData = JSON.parse(JSON.stringify(block.data)) as typeof block.data;
+      updateBlock(position, clonedData);
     },
     [blocks, addBlock, updateBlock]
   );
@@ -542,10 +544,11 @@ export function StrategyBlocksPanel() {
   const handleExitConfigSave = useCallback(
     (config: ExitConditionConfig) => {
       if (editingExitIndex === null) return;
-      updateBlock(editingExitIndex, { ...(blocks[editingExitIndex]?.data ?? {}), exitConfig: config });
+      const latestBlocks = useStrategyStore.getState().currentStrategy?.blocks ?? [];
+      updateBlock(editingExitIndex, { ...(latestBlocks[editingExitIndex]?.data ?? {}), exitConfig: config });
       setEditingExitIndex(null);
     },
-    [editingExitIndex, blocks, updateBlock]
+    [editingExitIndex, updateBlock]
   );
 
   // ── Exit bucket separation (Issues #3, #6) ──
