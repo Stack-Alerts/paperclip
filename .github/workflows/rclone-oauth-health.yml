@@ -19,7 +19,7 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.0
 
       - name: Set up Python
         run: python3 --version
@@ -91,7 +91,7 @@ jobs:
 
       - name: Upload monitor logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: rclone-oauth-health-logs
           path: ~/.paperclip/rclone_oauth_health.log
@@ -99,7 +99,7 @@ jobs:
 
       - name: Upload monitor state
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: rclone-oauth-health-state
           path: ~/.paperclip/rclone_oauth_health_state.json
@@ -107,7 +107,7 @@ jobs:
 
       - name: Upload summary artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: rclone-oauth-health-summary
           path: /tmp/rclone-oauth-summary.json

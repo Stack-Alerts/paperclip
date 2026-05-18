@@ -19,7 +19,7 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.0
 
       - name: Run backup health check
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.skip_health_check != 'true'
@@ -54,7 +54,7 @@ jobs:
 
       - name: Upload backup log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: backup-to-drive-log
           path: ${{ env.HOME }}/.paperclip/instances/default/logs/backup-to-drive.log
@@ -62,7 +62,7 @@ jobs:
 
       - name: Upload backup state
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: backup-state
           path: ${{ env.HOME }}/.paperclip/instances/default/backup-state/last-success.json

@@ -27,7 +27,7 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.0
 
       - name: Set up Python
         run: python3 --version
@@ -133,7 +133,7 @@ jobs:
       - name: Upload monitor logs
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: recovery-monitor-logs
           path: ~/.paperclip/recovery_monitor.log
@@ -142,7 +142,7 @@ jobs:
       - name: Upload recovery state
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: recovery-monitor-state
           path: ~/.paperclip/recovery_monitor_state.json
@@ -151,7 +151,7 @@ jobs:
       - name: Upload summary artifact
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: recovery-monitor-summary
           path: |

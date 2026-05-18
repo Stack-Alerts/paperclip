@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.0
 
       - name: Set up Python
         run: python3 --version
@@ -84,7 +84,7 @@ jobs:
 
       - name: Upload monitor logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: deadman-switch-monitor-logs
           path: ~/.paperclip/deadman_switch_monitor.log
@@ -92,7 +92,7 @@ jobs:
 
       - name: Upload monitor state
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: deadman-switch-monitor-state
           path: ~/.paperclip/deadman_switch_monitor_state.json
@@ -100,7 +100,7 @@ jobs:
 
       - name: Upload summary artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: deadman-switch-monitor-summary
           path: /tmp/deadman-monitor-summary.json

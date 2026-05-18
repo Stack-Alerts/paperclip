@@ -38,7 +38,7 @@ jobs:
       PAPERCLIP_RUN_ID: ${{ github.run_id }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.0
         with:
           fetch-depth: 0
 

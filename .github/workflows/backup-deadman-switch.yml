@@ -26,7 +26,7 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.0
 
       - name: Set up Python
         run: python3 --version
@@ -84,7 +84,7 @@ jobs:
 
       - name: Upload deadman logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: deadman-switch-logs
           path: ~/.paperclip/backup_deadman_switch.log
@@ -92,7 +92,7 @@ jobs:
 
       - name: Upload deadman state
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: deadman-switch-state
           path: ~/.paperclip/backup_deadman_switch_state.json
@@ -100,7 +100,7 @@ jobs:
 
       - name: Upload summary artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: deadman-switch-summary
           path: /tmp/deadman-summary.json

@@ -36,7 +36,7 @@ jobs:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.0
 
       - name: Set up Python
         run: python3 --version
@@ -93,7 +93,7 @@ jobs:
 
       - name: Upload monitor report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: traceability-monitor-report
           path: /tmp/monitor-summary.json

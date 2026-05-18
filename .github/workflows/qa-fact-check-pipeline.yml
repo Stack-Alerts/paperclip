@@ -26,7 +26,7 @@ jobs:
       PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.0
 
       - name: Set up Python
         run: python3 --version
@@ -51,7 +51,7 @@ jobs:
 
       - name: Upload scan output artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: fact-check-scan-output
           path: /tmp/fact-check-output.json
@@ -87,7 +87,7 @@ jobs:
     runs-on: self-hosted
     needs: []
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.0
 
       - name: Set up Python
         run: python3 --version
@@ -108,7 +108,7 @@ jobs:
 
       - name: Upload check output artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: fact-check-results
           path: /tmp/fact-check-results.json
