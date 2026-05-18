@@ -319,7 +319,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   loadBlockLibrary: async () => {
     set({ isLoadingLibrary: true });
     try {
-      const response = await fetch('/block-library.json');
+      const response = await fetch('/block-library.json', { cache: 'no-store' });
       if (!response.ok) throw new Error('Failed to load block library');
       const data = await response.json() as {
         blocks: BlockDefinition[];
