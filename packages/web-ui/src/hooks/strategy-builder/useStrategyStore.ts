@@ -70,7 +70,7 @@ function initCurrentStrategy(): { current: Strategy | null; list: Strategy[] } {
     )[0];
     return { current: mostRecent, list: saved };
   }
-  const fresh = makeDefaultStrategy('New_Strategy');
+  const fresh = makeDefaultStrategy('');
   saveToStorage([fresh]);
   return { current: fresh, list: [fresh] };
 }
