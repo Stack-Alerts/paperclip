@@ -5,6 +5,13 @@ import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { Block, BlockType } from '@/lib/strategy-builder/types';
 import { TimingConstraintDialog, TimingConstraint } from './TimingConstraintDialog';
 
+function formatSignalName(name: string): string {
+  return name
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
 // Display label for block type (fallback when no name stored in data)
 const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   [BlockType.ENTRY_CONDITION]:  'Entry Condition',
@@ -77,7 +84,7 @@ function BlockCard({
         </span>
 
         {/* Block name */}
-        <span className="flex-1 text-sm font-semibold truncate" style={{ color: '#E8EAED' }} title={blockName}>
+        <span className="flex-1 text-sm font-semibold truncate" style={{ color: '#A0AEC0' }} title={blockName}>
           {blockName}
         </span>
 
@@ -119,7 +126,7 @@ function BlockCard({
             return (
               <div key={si} className="flex items-center gap-2 text-xs">
                 <span className="flex-1 truncate" style={{ color: '#9AA0A6' }} title={sig.name}>
-                  {si + 1}. {sig.name}
+                  {si + 1}. {formatSignalName(sig.name)}
                   {hasTiming && (
                     <span className="text-amber-400 ml-1">
                       ⏱ within {sig.timing_constraint?.max_candles} bars

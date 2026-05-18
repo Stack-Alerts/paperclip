@@ -14,6 +14,29 @@ const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   [BlockType.POSITION_SIZING]:  'SIZE',
 };
 
+// Standard mode hides status/error/ambiguous signals that aren't actionable trading signals.
+// Advanced mode shows all signals including ERROR, INSUFFICIENT_DATA, NEUTRAL, etc.
+function isAdvancedSignal(name: string): boolean {
+  const n = name.toUpperCase();
+  return (
+    n === 'ERROR' ||
+    n === 'NO_PATTERN' ||
+    n === 'NO_SIGNAL' ||
+    n === 'NEUTRAL' ||
+    n === 'NEUTRAL_MOMENTUM' ||
+    n.startsWith('INSUFFICIENT') ||
+    n.includes('UNCERTAIN')
+  );
+}
+
+// Convert WAVE_1_BULLISH → Wave 1 Bullish
+function formatSignalName(name: string): string {
+  return name
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
 interface FilterPreset {
   name: string;
   search: string;
@@ -41,14 +64,16 @@ function savePresets(presets: FilterPreset[]) {
 interface BlockItemProps {
   definition: BlockDefinition;
   onAdd: (def: BlockDefinition, logic: 'AND' | 'OR' | 'EXIT', selectedSignals: string[]) => void;
+  advancedMode: boolean;
 }
 
-function BlockItem({ definition, onAdd }: BlockItemProps) {
+function BlockItem({ definition, onAdd, advancedMode }: BlockItemProps) {
   const [signalsOpen, setSignalsOpen] = useState(false);
   const [checkedSignals, setCheckedSignals] = useState<Set<string>>(new Set());
   const [addedSignals, setAddedSignals] = useState<Set<string>>(new Set());
 
   const signals = definition.signals ?? [];
+  const visibleSignals = advancedMode ? signals : signals.filter(s => !isAdvancedSignal(s.name));
   const ext = definition as unknown as Record<string, unknown>;
   const weight = ext.weight as number | undefined;
   const typeLabel = BLOCK_TYPE_LABELS[definition.type] ?? (definition.type as string).replace('_', ' ').toUpperCase();
@@ -79,11 +104,9 @@ function BlockItem({ definition, onAdd }: BlockItemProps) {
       {/* Block name + meta */}
       <div className="px-3 pt-2.5 pb-1.5">
         <div className="flex items-center gap-1.5">
-          {/* text_primary: #E8EAED — slightly off-white like desktop, not harsh pure-white */}
-          <span className="text-sm font-semibold leading-tight" style={{ color: '#E8EAED' }}>{definition.name}</span>
+          <span className="text-sm font-semibold leading-tight" style={{ color: '#A0AEC0' }}>{definition.name}</span>
         </div>
-        {/* text_label: #A0AEC0 */}
-        <div className="text-xs mt-0.5 ml-6" style={{ color: '#A0AEC0' }}>
+        <div className="text-xs mt-0.5 ml-6" style={{ color: '#9AA0A6' }}>
           Category: {definition.category}
           {typeLabel && ` | Type: ${typeLabel}`}
           {weight != null && ` | Weight: ${weight} points`}
@@ -91,25 +114,25 @@ function BlockItem({ definition, onAdd }: BlockItemProps) {
       </div>
 
       {/* Full-width expand/collapse button (below meta, matches desktop) */}
-      {signals.length > 0 && (
+      {visibleSignals.length > 0 && (
         <button
           onClick={() => setSignalsOpen(v => !v)}
           className="w-full px-5 py-2.5 text-left text-sm font-bold bg-[#2D3748] border-t border-[#374151] hover:bg-[#374151] hover:border-sky-400 transition-colors"
           style={{ color: '#A0AEC0' }}
         >
-          {signalsOpen ? `▼ Hide Signals (${signals.length})` : `▶ Show Signals (${signals.length})`}
+          {signalsOpen ? `▼ Hide Signals (${visibleSignals.length})` : `▶ Show Signals (${visibleSignals.length})`}
         </button>
       )}
 
       {/* Expanded: signals list + add buttons */}
-      {signalsOpen && signals.length > 0 && (
+      {signalsOpen && visibleSignals.length > 0 && (
         <div className="px-3 pb-2 bg-[#15191E]">
-          {/* Header — text_primary cyan from desktop */}
+          {/* Header */}
           <p className="text-xs font-semibold text-sky-400 pt-2 pb-1">Select signals to add:</p>
 
           {/* Signal list with checkboxes */}
           <div className="space-y-2">
-            {signals.map((sig, i) => {
+            {visibleSignals.map((sig, i) => {
               const isAdded = addedSignals.has(sig.name);
               const isChecked = checkedSignals.has(sig.name);
               return (
@@ -123,21 +146,19 @@ function BlockItem({ definition, onAdd }: BlockItemProps) {
                       className="mt-0.5 flex-shrink-0 accent-sky-400 w-3.5 h-3.5"
                     />
                     <div className="min-w-0">
-                      {/* text_muted: #9AA0A6 for signal names, strikethrough when added */}
                       <span
                         className={`text-xs font-semibold ${isAdded ? 'line-through' : ''}`}
                         style={{ color: isAdded ? '#6B7280' : '#9AA0A6' }}
                       >
-                        {sig.name}
+                        {formatSignalName(sig.name)}
                       </span>
                       {sig.occurrences != null && (
                         <span className="font-normal text-xs ml-1.5" style={{ color: '#6B7280' }}>
                           ({sig.occurrences.toLocaleString()} found, {sig.occurrence_percentage != null ? sig.occurrence_percentage.toFixed(1) : '?'}%)
                         </span>
                       )}
-                      {/* Description always rendered when present — text_label #A0AEC0 italic */}
                       {sig.description ? (
-                        <div className="text-xs mt-0.5 italic leading-relaxed" style={{ color: '#A0AEC0' }}>{sig.description}</div>
+                        <div className="text-xs mt-0.5 italic leading-relaxed" style={{ color: '#9AA0A6' }}>{sig.description}</div>
                       ) : null}
                     </div>
                   </label>
@@ -171,8 +192,7 @@ function BlockItem({ definition, onAdd }: BlockItemProps) {
             </button>
           </div>
 
-          {/* Data note */}
-          <p className="text-xs text-zinc-600 italic mt-2">
+          <p className="text-xs italic mt-2" style={{ color: '#6B7280' }}>
             Note: Signal counts based on last 180 days of BTC data
           </p>
         </div>
@@ -197,6 +217,7 @@ export function BlockSearchPanel() {
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedType, setSelectedType] = useState<BlockType | 'all'>('all');
+  const [advancedMode, setAdvancedMode] = useState(false);
 
   // Presets
   const [presets, setPresets] = useState<FilterPreset[]>([]);
@@ -284,11 +305,31 @@ export function BlockSearchPanel() {
 
   return (
     <div className="flex flex-col h-full border-l border-[#3C4149]" style={{ background: '#15191E' }}>
-      {/* Panel header */}
-      <div className="px-4 py-2.5 border-b border-[#3C4149] flex-shrink-0" style={{ background: '#1E2128' }}>
+      {/* Panel header with Standard / Advanced toggle */}
+      <div className="px-4 py-2 border-b border-[#3C4149] flex-shrink-0 flex items-center justify-between" style={{ background: '#1E2128' }}>
         <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#A0AEC0' }}>
           Available Building Blocks
         </h2>
+        <div className="flex items-center" style={{ border: '1px solid #3C4149', borderRadius: 4, overflow: 'hidden' }}>
+          <button
+            onClick={() => setAdvancedMode(false)}
+            className="text-xs px-2.5 py-1 transition-colors"
+            style={!advancedMode
+              ? { background: '#1a3a4a', color: '#38bdf8', fontWeight: 600 }
+              : { background: '#2A2F3A', color: '#6B7280' }}
+          >
+            Standard
+          </button>
+          <button
+            onClick={() => setAdvancedMode(true)}
+            className="text-xs px-2.5 py-1 transition-colors border-l border-[#3C4149]"
+            style={advancedMode
+              ? { background: '#1a3a4a', color: '#38bdf8', fontWeight: 600 }
+              : { background: '#2A2F3A', color: '#6B7280' }}
+          >
+            Advanced
+          </button>
+        </div>
       </div>
 
       {/* Search + Filters — 2 rows */}
@@ -381,7 +422,7 @@ export function BlockSearchPanel() {
           <p className="text-xs text-center py-8" style={{ color: '#9AA0A6' }}>No blocks match the current filters</p>
         ) : (
           filteredBlocks.map(block => (
-            <BlockItem key={block.id} definition={block} onAdd={handleAdd} />
+            <BlockItem key={block.id} definition={block} onAdd={handleAdd} advancedMode={advancedMode} />
           ))
         )}
       </div>
