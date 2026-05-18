@@ -298,8 +298,8 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
         </RichTooltip>
       </div>
 
-      {/* Strategy Type + Meta stats — all inline */}
-      <div className="flex items-center gap-2 flex-wrap text-xs">
+      {/* Strategy Type + Meta stats — no-wrap; clips rather than wraps when panel is narrow */}
+      <div className="flex items-center gap-2 text-xs overflow-hidden" style={{ flexWrap: 'nowrap' }}>
         <span className="flex-shrink-0" style={{ color: '#9AA0A6' }}>Strategy Type:</span>
         {(['Bullish', 'Bearish'] as const).map(type => (
           <RichTooltip key={type} content={type === 'Bullish' ? TT_BULLISH : TT_BEARISH}>

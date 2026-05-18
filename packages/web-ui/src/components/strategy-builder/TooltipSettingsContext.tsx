@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 
 const LS_KEY = 'sb_tooltip_settings';
 
@@ -11,41 +12,44 @@ export interface TooltipSettings {
 
 const DEFAULT: TooltipSettings = { enabled: true, delayMs: 350 };
 
-interface TooltipSettingsCtx {
-  settings: TooltipSettings;
-  update: (patch: Partial<TooltipSettings>) => void;
+// Module-level singleton — all useTooltipSettings() instances on the same page
+// share one state object and update together. This avoids React Context hierarchy
+// issues (provider not found, wrong tree position, etc.).
+let _current: TooltipSettings = { ...DEFAULT };
+const _subs = new Set<(s: TooltipSettings) => void>();
+
+function _publish(next: TooltipSettings) {
+  _current = next;
+  try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {}
+  _subs.forEach(fn => fn({ ...next }));
 }
 
-export const TooltipSettingsContext = createContext<TooltipSettingsCtx>({
-  settings: DEFAULT,
-  update: () => {},
-});
-
-export function useTooltipSettings(): TooltipSettingsCtx {
-  return useContext(TooltipSettingsContext);
-}
-
-export function TooltipSettingsProvider({ children }: { children: React.ReactNode }) {
-  const [settings, setSettings] = useState<TooltipSettings>(DEFAULT);
+export function useTooltipSettings() {
+  const [settings, setSettings] = useState<TooltipSettings>({ ..._current });
 
   useEffect(() => {
+    // Hydrate from localStorage on first mount and broadcast to all instances.
     try {
       const raw = localStorage.getItem(LS_KEY);
-      if (raw) setSettings({ ...DEFAULT, ...JSON.parse(raw) });
+      if (raw) {
+        const loaded: TooltipSettings = { ...DEFAULT, ...JSON.parse(raw) };
+        _current = loaded;
+        _subs.forEach(fn => fn({ ...loaded }));
+      }
     } catch {}
+
+    _subs.add(setSettings);
+    return () => { _subs.delete(setSettings); };
   }, []);
 
   const update = useCallback((patch: Partial<TooltipSettings>) => {
-    setSettings(prev => {
-      const next = { ...prev, ...patch };
-      try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {}
-      return next;
-    });
+    _publish({ ..._current, ...patch });
   }, []);
 
-  return (
-    <TooltipSettingsContext.Provider value={{ settings, update }}>
-      {children}
-    </TooltipSettingsContext.Provider>
-  );
+  return { settings, update };
+}
+
+// Kept for backward-compat with page.tsx import — now a simple pass-through.
+export function TooltipSettingsProvider({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }

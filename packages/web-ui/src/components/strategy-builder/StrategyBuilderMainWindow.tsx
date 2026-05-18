@@ -186,16 +186,31 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     return () => clearInterval(timer);
   }, []);
 
-  // Resizable splitter
-  const [leftPercent, setLeftPercent] = useState(60);
+  // Resizable splitter — persists position to localStorage.
+  const SPLIT_MIN = 40; // prevents left panel from getting narrow enough to wrap the stats row
+  const [leftPercent, setLeftPercent] = useState(40);
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Restore saved split position after mount (avoids SSR hydration mismatch).
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('sb_panel_split');
+      if (saved) {
+        const val = parseFloat(saved);
+        if (!isNaN(val) && val >= SPLIT_MIN && val <= 75) setLeftPercent(val);
+      }
+    } catch {}
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
       if (!isDragging.current || !containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const pct = ((e.clientX - rect.left) / rect.width) * 100;
-      setLeftPercent(Math.max(22, Math.min(75, pct)));
+      const clamped = Math.max(SPLIT_MIN, Math.min(75, pct));
+      setLeftPercent(clamped);
+      try { localStorage.setItem('sb_panel_split', String(clamped)); } catch {}
     };
     const onMouseUp = () => { isDragging.current = false; };
     document.addEventListener('mousemove', onMouseMove);
@@ -204,7 +219,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const open = useCallback((key: DialogKey) => setActiveDialog(key), []);
   const close = useCallback(() => setActiveDialog(null), []);
