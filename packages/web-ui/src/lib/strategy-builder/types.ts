@@ -160,6 +160,11 @@ export interface BacktestConfigFull extends BacktestConfig {
   riskPerTradePct: number;
   minRiskRewardRatio: number;
   maxBarsHeld: number;
+  lookbackDays?: number;
+  trainingDays?: number;
+  testingDays?: number;
+  maxLeverage?: number;
+  confluenceThreshold?: number;
 }
 
 export interface BacktestStatusMessage {

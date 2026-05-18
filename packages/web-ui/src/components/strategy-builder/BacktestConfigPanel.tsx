@@ -25,6 +25,19 @@ function fmt(n: number, decimals = 2) {
 
 const PRESET_DAYS = [30, 60, 90, 120, 180, 240, 360];
 
+const PRESET_INITIAL_CAPITAL = [500, 1000, 2000, 5000, 10000, 25000, 50000];
+const PRESET_RISK_PCT = [1, 2, 5, 7, 10, 12, 15];
+const PRESET_RR_RATIO = [1.2, 1.5, 2.0, 2.2, 2.5, 2.7, 3.0];
+const PRESET_MAX_BARS = [15, 20, 25, 30, 40, 50, 75];
+const PRESET_DELAY_BARS = [1, 3, 5, 7, 10, 15, 20];
+const PRESET_EMERGENCY_SL = [1, 2, 3, 4, 5, 7, 10];
+const PRESET_VOL_LOOKBACK = [10, 14, 20, 30, 50, 75, 100];
+const PRESET_VOL_MULTIPLIER = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 5.0];
+const PRESET_MIN_SL = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 5.0];
+const PRESET_MAX_SL = [2, 3, 5, 7, 10, 12, 15];
+const PRESET_MAX_LEVERAGE = [3, 5, 10, 15, 20, 25, 30];
+const PRESET_CONFLUENCE = [20, 30, 40, 50, 60];
+
 const ADAPTIVE_SL_PRESETS: Record<string, Partial<BacktestConfigFull['adaptiveSL']> & { emergencySlPct: number; volatilityMultiplier: number; delayBars: number; minSlPct: number; maxSlPct: number }> = {
   conservative: { delayEnabled: true, delayBars: 3, emergencySlPct: 3, volatilityLookback: 20, volatilityMultiplier: 1.5, minSlPct: 1.0, maxSlPct: 2.5 },
   balanced:     { delayEnabled: true, delayBars: 2, emergencySlPct: 2, volatilityLookback: 14, volatilityMultiplier: 1.2, minSlPct: 0.7, maxSlPct: 2.0 },
@@ -36,7 +49,7 @@ const defaultConfig: BacktestConfigFull = {
   startDate: daysAgo(90),
   endDate: today(),
   initialCapital: 10000,
-  commissionPercentage: 0.001,
+  commissionPercentage: 0.0004,
   mode: 'historical',
   tpslMode: 'fibonacci',
   slAdjustmentMode: 'adaptiveV2',
@@ -55,6 +68,11 @@ const defaultConfig: BacktestConfigFull = {
   riskPerTradePct: 1.0,
   minRiskRewardRatio: 1.2,
   maxBarsHeld: 50,
+  lookbackDays: 180,
+  trainingDays: 90,
+  testingDays: 30,
+  maxLeverage: 10,
+  confluenceThreshold: 40,
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -136,6 +154,35 @@ function MetricCard({ label, value, sub }: { label: string; value: string; sub?:
   );
 }
 
+function PresetButtonRow({
+  label,
+  values,
+  onSelect,
+  format,
+}: {
+  label: string;
+  values: number[];
+  onSelect: (v: number) => void;
+  format?: (v: number) => string;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-zinc-400">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {values.map((v) => (
+          <button
+            key={v}
+            onClick={() => onSelect(v)}
+            className="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium border border-zinc-700 transition-colors"
+          >
+            {format ? format(v) : v}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 export interface BacktestConfigPanelProps {
@@ -160,10 +207,21 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
   const [compareConfig, setCompareConfig] = useState<BacktestConfigFull | null>(null);
   const [aiRequest, setAiRequest] = useState('');
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (logsEndRef.current) logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
+
+  useEffect(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      localStorage.setItem('backtest-config', JSON.stringify(config));
+    }, 500);
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [config]);
 
   // Update strategyId when strategy changes
   useEffect(() => {
@@ -234,6 +292,11 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
         riskPerTradePct: config.riskPerTradePct,
         minRiskRewardRatio: config.minRiskRewardRatio,
         maxBarsHeld: config.maxBarsHeld,
+        lookbackDays: config.lookbackDays,
+        trainingDays: config.trainingDays,
+        testingDays: config.testingDays,
+        maxLeverage: config.maxLeverage,
+        confluenceThreshold: config.confluenceThreshold,
       });
       addLog('✅ Backtest complete.', 'SYSTEM');
     } catch (e) {
@@ -283,6 +346,22 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
           </h2>
           <div className="flex items-center gap-2">
             {/* Controls */}
+            <button
+              onClick={() => addLog('🔍 Config Discovery started...', 'SYSTEM')}
+              disabled={backTestInProgress}
+              title="Run N config permutations and rank results"
+              className="px-3 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium disabled:opacity-40 transition-colors"
+            >
+              🔍 Config Discovery
+            </button>
+            <button
+              onClick={() => setActiveTab(1)}
+              disabled={!backTestResult}
+              title="View most recent backtest results"
+              className="px-3 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium disabled:opacity-40 transition-colors"
+            >
+              💠 View Live Results
+            </button>
             <button
               onClick={handleRun}
               disabled={!canRun}
@@ -340,29 +419,85 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
 
           {/* ── Tab 0: Config ── */}
           {activeTab === 0 && (
-            <div className="p-5 space-y-5">
+            <div className="p-5 space-y-5 overflow-y-auto max-h-full">
               {error && <p className="text-xs text-red-400">{error}</p>}
 
-              {/* Lookback preset buttons */}
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide">Lookback Preset</p>
-                <div className="flex flex-wrap gap-2">
-                  {PRESET_DAYS.map((d) => (
-                    <button
-                      key={d}
-                      onClick={() => applyPresetDays(d)}
-                      className="px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium border border-zinc-700 transition-colors"
-                    >
-                      {d}d
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <div className="grid grid-cols-4 gap-5">
+                {/* Column 1: Lookback / Training / Testing Windows */}
+                <div className="space-y-4">
+                  <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">Time Windows</p>
 
-              <div className="grid grid-cols-3 gap-5">
-                {/* Column 1: Basic Settings */}
-                <div className="space-y-3">
+                  <SpinField
+                    label="Historical Data Lookback"
+                    value={config.lookbackDays ?? 180}
+                    onChange={(v) => patch('lookbackDays', v)}
+                    min={1}
+                    max={365}
+                    suffix="days"
+                  />
+                  <PresetButtonRow
+                    label="Quick-set"
+                    values={PRESET_DAYS}
+                    onSelect={(v) => patch('lookbackDays', v)}
+                    format={(v) => `${v}d`}
+                  />
+
+                  <SpinField
+                    label="Strategy Training Window"
+                    value={config.trainingDays ?? 90}
+                    onChange={(v) => patch('trainingDays', v)}
+                    min={1}
+                    max={365}
+                    suffix="days"
+                  />
+                  <PresetButtonRow
+                    label="Quick-set"
+                    values={PRESET_DAYS}
+                    onSelect={(v) => patch('trainingDays', v)}
+                    format={(v) => `${v}d`}
+                  />
+
+                  <SpinField
+                    label="Out-of-Sample Testing"
+                    value={config.testingDays ?? 30}
+                    onChange={(v) => patch('testingDays', v)}
+                    min={1}
+                    max={365}
+                    suffix="days"
+                  />
+                  <PresetButtonRow
+                    label="Quick-set"
+                    values={PRESET_DAYS}
+                    onSelect={(v) => patch('testingDays', v)}
+                    format={(v) => `${v}d`}
+                  />
+
+                  <div className="border-t border-zinc-700 pt-3 space-y-2">
+                    <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">Mode</p>
+                    <div className="flex flex-col gap-2">
+                      {[
+                        { label: 'Mode 1 — Historical', value: 'historical' },
+                        { label: 'Mode 2 — Live Replay', value: 'live_replay' },
+                      ].map((option) => (
+                        <label key={option.value} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="mode"
+                            checked={config.mode === option.value}
+                            onChange={() => patch('mode', option.value as 'historical' | 'live_replay')}
+                            className="accent-purple-500"
+                          />
+                          <span className="text-xs text-zinc-300">{option.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 2: Basic Settings & Capital */}
+                <div className="space-y-4">
                   <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">Basic Settings</p>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs text-zinc-400">Start Date</label>
@@ -383,15 +518,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                       />
                     </div>
                   </div>
-                  <SelectField
-                    label="Mode"
-                    value={config.mode}
-                    onChange={(v) => patch('mode', v)}
-                    options={[
-                      { label: 'Mode 1 — Historical', value: 'historical' },
-                      { label: 'Mode 2 — Live Replay', value: 'live_replay' },
-                    ]}
-                  />
+
                   <SelectField
                     label="TP/SL Mode"
                     value={config.tpslMode}
@@ -402,6 +529,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                       { label: 'Fixed', value: 'fixed' },
                     ]}
                   />
+
                   <SelectField
                     label="SL Adjustment"
                     value={config.slAdjustmentMode}
@@ -411,12 +539,40 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                       { label: 'Static', value: 'static' },
                     ]}
                   />
-                  <SpinField label="Initial Capital (USD)" value={config.initialCapital} onChange={(v) => patch('initialCapital', v)} min={500} step={1000} />
-                  <SpinField label="Commission" value={config.commissionPercentage ?? 0} onChange={(v) => patch('commissionPercentage', v)} min={0} max={0.05} step={0.0001} suffix="fraction" />
+
+                  <div className="space-y-1">
+                    <label className="text-xs text-zinc-400">Initial Capital (USD)</label>
+                    <div className="space-y-1.5">
+                      <input
+                        type="number"
+                        value={config.initialCapital}
+                        onChange={(e) => patch('initialCapital', parseFloat(e.target.value))}
+                        min={500}
+                        step={1000}
+                        className="w-full px-2 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500"
+                      />
+                      <div className="text-xs text-zinc-500">Current: ${config.initialCapital.toLocaleString('en-US')}</div>
+                    </div>
+                  </div>
+                  <PresetButtonRow
+                    label="Quick-set"
+                    values={PRESET_INITIAL_CAPITAL}
+                    onSelect={(v) => patch('initialCapital', v)}
+                    format={(v) => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`}
+                  />
+
+                  <SpinField
+                    label="Commission (fraction)"
+                    value={config.commissionPercentage ?? 0.0004}
+                    onChange={(v) => patch('commissionPercentage', v)}
+                    min={0}
+                    max={0.05}
+                    step={0.0001}
+                  />
                 </div>
 
-                {/* Column 2: Adaptive SL v2.0 */}
-                <div className="space-y-3">
+                {/* Column 3: Adaptive SL v2.0 */}
+                <div className="space-y-4">
                   <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">Adaptive SL v2.0</p>
 
                   {/* Preset radio buttons */}
@@ -462,11 +618,50 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                   </label>
 
                   <SpinField label="Delay Bars" value={config.adaptiveSL.delayBars} onChange={(v) => patchAdaptiveSL('delayBars', v)} min={0} max={20} />
+                  <PresetButtonRow
+                    label="Quick-set"
+                    values={PRESET_DELAY_BARS}
+                    onSelect={(v) => patchAdaptiveSL('delayBars', v)}
+                  />
+
                   <SpinField label="Emergency SL %" value={config.adaptiveSL.emergencySlPct} onChange={(v) => patchAdaptiveSL('emergencySlPct', v)} min={0.5} max={10} step={0.1} suffix="%" />
+                  <PresetButtonRow
+                    label="Quick-set"
+                    values={PRESET_EMERGENCY_SL}
+                    onSelect={(v) => patchAdaptiveSL('emergencySlPct', v)}
+                    format={(v) => `${v}%`}
+                  />
+
                   <SpinField label="Vol Lookback" value={config.adaptiveSL.volatilityLookback} onChange={(v) => patchAdaptiveSL('volatilityLookback', v)} min={5} max={100} />
+                  <PresetButtonRow
+                    label="Quick-set"
+                    values={PRESET_VOL_LOOKBACK}
+                    onSelect={(v) => patchAdaptiveSL('volatilityLookback', v)}
+                  />
+
                   <SpinField label="Vol Multiplier" value={config.adaptiveSL.volatilityMultiplier} onChange={(v) => patchAdaptiveSL('volatilityMultiplier', v)} min={0.5} max={10} step={0.1} suffix="×" />
+                  <PresetButtonRow
+                    label="Quick-set"
+                    values={PRESET_VOL_MULTIPLIER}
+                    onSelect={(v) => patchAdaptiveSL('volatilityMultiplier', v)}
+                    format={(v) => `${v}×`}
+                  />
+
                   <SpinField label="Min SL %" value={config.adaptiveSL.minSlPct} onChange={(v) => patchAdaptiveSL('minSlPct', v)} min={0} max={10} step={0.1} suffix="%" />
+                  <PresetButtonRow
+                    label="Quick-set"
+                    values={PRESET_MIN_SL}
+                    onSelect={(v) => patchAdaptiveSL('minSlPct', v)}
+                    format={(v) => `${v}%`}
+                  />
+
                   <SpinField label="Max SL %" value={config.adaptiveSL.maxSlPct} onChange={(v) => patchAdaptiveSL('maxSlPct', v)} min={0} max={20} step={0.1} suffix="%" />
+                  <PresetButtonRow
+                    label="Quick-set"
+                    values={PRESET_MAX_SL}
+                    onSelect={(v) => patchAdaptiveSL('maxSlPct', v)}
+                    format={(v) => `${v}%`}
+                  />
 
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -479,23 +674,95 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                   </label>
                 </div>
 
-                {/* Column 3: Risk / Reward */}
-                <div className="space-y-3">
+                {/* Column 4: Risk / Reward + Advanced */}
+                <div className="space-y-4">
                   <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">Risk / Reward</p>
+
                   <SpinField label="Risk per Trade %" value={config.riskPerTradePct} onChange={(v) => patch('riskPerTradePct', v)} min={0.1} max={10} step={0.1} suffix="%" />
+                  <PresetButtonRow
+                    label="Quick-set"
+                    values={PRESET_RISK_PCT}
+                    onSelect={(v) => patch('riskPerTradePct', v)}
+                    format={(v) => `${v}%`}
+                  />
+
                   <SpinField label="Min R:R Ratio" value={config.minRiskRewardRatio} onChange={(v) => patch('minRiskRewardRatio', v)} min={0.5} max={10} step={0.1} />
+                  <PresetButtonRow
+                    label="Quick-set"
+                    values={PRESET_RR_RATIO}
+                    onSelect={(v) => patch('minRiskRewardRatio', v)}
+                    format={(v) => `1:${(v).toFixed(1)}`}
+                  />
+
                   <SpinField label="Max Bars Held" value={config.maxBarsHeld} onChange={(v) => patch('maxBarsHeld', v)} min={1} max={500} />
+                  <PresetButtonRow
+                    label="Quick-set"
+                    values={PRESET_MAX_BARS}
+                    onSelect={(v) => patch('maxBarsHeld', v)}
+                  />
+
+                  <div className="border-t border-zinc-700 pt-3 space-y-3">
+                    <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">Advanced</p>
+
+                    <SpinField label="Max Leverage" value={config.maxLeverage ?? 10} onChange={(v) => patch('maxLeverage', v)} min={1} max={100} suffix="x" />
+                    <PresetButtonRow
+                      label="Quick-set"
+                      values={PRESET_MAX_LEVERAGE}
+                      onSelect={(v) => patch('maxLeverage', v)}
+                      format={(v) => `${v}x`}
+                    />
+
+                    <SpinField label="Confluence Threshold" value={config.confluenceThreshold ?? 40} onChange={(v) => patch('confluenceThreshold', v)} min={0} max={100} suffix="pts" />
+                    <div className="space-y-1">
+                      <p className="text-xs text-zinc-400">Adjust</p>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => patch('confluenceThreshold', Math.max(0, (config.confluenceThreshold ?? 40) - 2))}
+                          className="flex-1 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium border border-zinc-700 transition-colors"
+                        >
+                          [-2]
+                        </button>
+                        <button
+                          onClick={() => patch('confluenceThreshold', Math.max(0, (config.confluenceThreshold ?? 40) - 1))}
+                          className="flex-1 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium border border-zinc-700 transition-colors"
+                        >
+                          [-1]
+                        </button>
+                        <button
+                          onClick={() => patch('confluenceThreshold', Math.min(100, (config.confluenceThreshold ?? 40) + 1))}
+                          className="flex-1 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium border border-zinc-700 transition-colors"
+                        >
+                          [+1]
+                        </button>
+                        <button
+                          onClick={() => patch('confluenceThreshold', Math.min(100, (config.confluenceThreshold ?? 40) + 2))}
+                          className="flex-1 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium border border-zinc-700 transition-colors"
+                        >
+                          [+2]
+                        </button>
+                      </div>
+                    </div>
+                    <PresetButtonRow
+                      label="Quick-set"
+                      values={PRESET_CONFLUENCE}
+                      onSelect={(v) => patch('confluenceThreshold', v)}
+                    />
+                    <button
+                      onClick={() => addLog('🔄 Reset From Strategy — calculating recommended confluence threshold...', 'SYSTEM')}
+                      className="w-full px-3 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium transition-colors"
+                    >
+                      🔄 Reset From Strategy
+                    </button>
+                  </div>
 
                   <div className="border-t border-zinc-700 pt-3">
                     <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wide mb-2">Actions</p>
-                    <div className="flex flex-col gap-2">
-                      <button
-                        onClick={saveAsCompare}
-                        className="px-3 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium transition-colors"
-                      >
-                        📋 Save as Compare Baseline
-                      </button>
-                    </div>
+                    <button
+                      onClick={saveAsCompare}
+                      className="w-full px-3 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium transition-colors"
+                    >
+                      📋 Save as Compare Baseline
+                    </button>
                   </div>
                 </div>
               </div>
@@ -725,22 +992,29 @@ function ConfigSummary({ cfg }: { cfg: BacktestConfigFull }) {
   const rows: Array<[string, string]> = [
     ['Start Date', cfg.startDate],
     ['End Date', cfg.endDate],
+    ['Lookback Days', String(cfg.lookbackDays ?? 180)],
+    ['Training Days', String(cfg.trainingDays ?? 90)],
+    ['Testing Days', String(cfg.testingDays ?? 30)],
     ['Mode', cfg.mode === 'historical' ? 'Mode 1 — Historical' : 'Mode 2 — Live Replay'],
     ['TP/SL Mode', cfg.tpslMode],
     ['SL Adjustment', cfg.slAdjustmentMode],
     ['SL Preset', cfg.adaptiveSLPreset],
     ['Initial Capital', `$${cfg.initialCapital.toLocaleString()}`],
-    ['Commission', `${((cfg.commissionPercentage ?? 0) * 100).toFixed(3)}%`],
+    ['Commission', `${((cfg.commissionPercentage ?? 0) * 100).toFixed(4)}%`],
     ['Risk per Trade', `${cfg.riskPerTradePct}%`],
     ['Min R:R', String(cfg.minRiskRewardRatio)],
     ['Max Bars Held', String(cfg.maxBarsHeld)],
+    ['Max Leverage', `${cfg.maxLeverage ?? 10}x`],
+    ['Confluence Threshold', `${cfg.confluenceThreshold ?? 40} pts`],
+    ['Delay Bars', String(cfg.adaptiveSL.delayBars)],
     ['Emergency SL', `${cfg.adaptiveSL.emergencySlPct}%`],
+    ['Vol Lookback', String(cfg.adaptiveSL.volatilityLookback)],
     ['Vol Multiplier', `${cfg.adaptiveSL.volatilityMultiplier}×`],
     ['Min SL', `${cfg.adaptiveSL.minSlPct}%`],
     ['Max SL', `${cfg.adaptiveSL.maxSlPct}%`],
   ];
   return (
-    <div className="bg-zinc-800 rounded p-3 space-y-1">
+    <div className="bg-zinc-800 rounded p-3 space-y-1 max-h-96 overflow-y-auto">
       {rows.map(([label, value]) => (
         <div key={label} className="flex justify-between text-xs">
           <span className="text-zinc-400">{label}</span>
