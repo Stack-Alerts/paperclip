@@ -63,7 +63,7 @@ function TooltipPopup({ content, triggerRect }: { content: TooltipContent; trigg
     >
       {/* Title */}
       <div style={{
-        color: '#F0F4F8',
+        color: '#A8BBCA',
         fontWeight: 700,
         fontSize: 12.5,
         marginBottom: content.body || hasSections ? 5 : 0,
@@ -74,7 +74,7 @@ function TooltipPopup({ content, triggerRect }: { content: TooltipContent; trigg
 
       {/* Body */}
       {content.body && (
-        <div style={{ color: '#CBD5E0', marginBottom: hasSections ? 7 : 0 }}>
+        <div style={{ color: '#7A8F9E', marginBottom: hasSections ? 7 : 0 }}>
           {content.body}
         </div>
       )}
@@ -83,16 +83,16 @@ function TooltipPopup({ content, triggerRect }: { content: TooltipContent; trigg
       {content.sections?.map((sec, i) => (
         <div key={i} style={{ marginTop: i === 0 ? 0 : 7 }}>
           {sec.header && (
-            <div style={{ color: '#A0AEC0', fontWeight: 600, marginBottom: 3 }}>
+            <div style={{ color: '#6E8494', fontWeight: 600, marginBottom: 3 }}>
               {sec.header}
             </div>
           )}
           {sec.items.map((item, j) => (
             <div
               key={j}
-              style={{ color: '#CBD5E0', display: 'flex', gap: 5, alignItems: 'flex-start', marginBottom: 2 }}
+              style={{ color: '#7A8F9E', display: 'flex', gap: 5, alignItems: 'flex-start', marginBottom: 2 }}
             >
-              <span style={{ color: '#718096', flexShrink: 0, marginTop: 1 }}>•</span>
+              <span style={{ color: '#4A5E6A', flexShrink: 0, marginTop: 1 }}>•</span>
               <span>{item}</span>
             </div>
           ))}

@@ -142,6 +142,12 @@ function computeStats(blocks: Block[]): BlockStats {
   return { required, optional, exits, rechecked, timeConstrained, reqSignals, optSignals };
 }
 
+function blockLabel(b: Block): string {
+  const name = (b.data.name as string) || b.type;
+  const signals = (b.data.signals as Array<Record<string, unknown>> | undefined) ?? [];
+  return signals.length > 0 ? `${name} (${signals.length} signal${signals.length > 1 ? 's' : ''})` : name;
+}
+
 function generateDescription(blocks: Block[]): string {
   if (blocks.length === 0) {
     return 'Description will be auto-generated when you add building blocks...\n\nExample:\nMoving Average crossover with momentum confirmation. Entry on golden cross with volume confirmation within 5 candles...';
@@ -150,17 +156,40 @@ function generateDescription(blocks: Block[]): string {
   const optional = blocks.filter(b => (b.data.logic as string) === 'OR');
   const exits = blocks.filter(b => b.type === BlockType.EXIT_CONDITION);
   const parts: string[] = [];
+
   if (required.length > 0) {
-    const names = required.map(b => (b.data.name as string) || b.type).slice(0, 3).join(', ');
-    parts.push(`Entry requires: ${names}${required.length > 3 ? ` +${required.length - 3} more` : ''}`);
+    const labels = required.map(blockLabel).slice(0, 4);
+    const overflow = required.length > 4 ? ` +${required.length - 4} more` : '';
+    parts.push(`Entry fires when ALL confirm (AND): ${labels.join(', ')}${overflow}`);
   }
+
   if (optional.length > 0) {
-    const names = optional.map(b => (b.data.name as string) || b.type).slice(0, 2).join(', ');
-    parts.push(`Optional boosters: ${names}${optional.length > 2 ? ` +${optional.length - 2} more` : ''}`);
+    const labels = optional.map(blockLabel).slice(0, 3);
+    const overflow = optional.length > 3 ? ` +${optional.length - 3} more` : '';
+    parts.push(`Optional boosters (any 1 of): ${labels.join(', ')}${overflow}`);
   }
+
   if (exits.length > 0) {
-    parts.push(`${exits.length} exit condition(s) configured`);
+    parts.push(`${exits.length} exit condition${exits.length > 1 ? 's' : ''} protecting open positions`);
+  } else {
+    parts.push('No exit conditions configured — manual exits only');
   }
+
+  // Recheck / timing extras
+  let recheckCount = 0, timingCount = 0;
+  for (const block of [...required, ...optional]) {
+    const signals = (block.data.signals as Array<Record<string, unknown>> | undefined) ?? [];
+    for (const sig of signals) {
+      const rc = sig.recheck_config as Record<string, unknown> | undefined;
+      if (sig.recheckEnabled || rc?.enabled) recheckCount++;
+      if (sig.timing_constraint) timingCount++;
+    }
+  }
+  const extras: string[] = [];
+  if (recheckCount > 0) extras.push(`${recheckCount} RECHECK-validated signal${recheckCount > 1 ? 's' : ''}`);
+  if (timingCount > 0) extras.push(`${timingCount} timing-constrained signal${timingCount > 1 ? 's' : ''}`);
+  if (extras.length > 0) parts.push(extras.join(', '));
+
   return parts.join('.\n') + '.';
 }
 
@@ -183,9 +212,10 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
 
   const descLabel = useMemo(() => {
     if (!stats || !currentStrategy) return '';
-    const blockCount = currentStrategy.blocks.length;
+    const entryBlocks = stats.required + stats.optional;
     const totalSigs = stats.reqSignals + stats.optSignals;
-    return `${blockCount} block(s) (${stats.required} required, ${stats.optional} optional), ${totalSigs} signal(s) (${stats.reqSignals} required, ${stats.optSignals} optional)`;
+    const exitPart = stats.exits > 0 ? `, ${stats.exits} exit condition(s)` : '';
+    return `${entryBlocks} entry block(s) (${stats.required} required, ${stats.optional} optional)${exitPart}, ${totalSigs} signal(s)`;
   }, [stats, currentStrategy]);
 
   const handleNameChange = useCallback(

@@ -5,6 +5,7 @@ import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BlockDefinition, BlockType } from '@/lib/strategy-builder/types';
 import { ExitConditionDialog, ExitConditionConfig, AvailableBlock } from './ExitConditionDialog';
 import { RichTooltip, TooltipContent } from './RichTooltip';
+import { QuestionDialog } from './AlertDialog';
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   [BlockType.ENTRY_CONDITION]:  'Entry Condition',
@@ -507,6 +508,7 @@ export function BlockSearchPanel() {
   const [presets, setPresets] = useState<FilterPreset[]>([]);
   const [selectedPreset, setSelectedPreset] = useState('');
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   useEffect(() => { setPresets(loadPresets()); }, []);
 
   const handleSavePreset = useCallback(() => {
@@ -531,7 +533,13 @@ export function BlockSearchPanel() {
   }, [presets, selectedPreset]);
 
   const handleDeletePreset = useCallback(() => {
-    if (!selectedPreset || !window.confirm(`Delete preset "${selectedPreset}"?`)) return;
+    if (!selectedPreset) return;
+    setDeleteConfirmOpen(true);
+  }, [selectedPreset]);
+
+  const handleConfirmDeletePreset = useCallback((result: 'yes' | 'no' | 'cancel') => {
+    setDeleteConfirmOpen(false);
+    if (result !== 'yes') return;
     const updated = presets.filter(p => p.name !== selectedPreset);
     savePresets(updated);
     setPresets(updated);
@@ -816,6 +824,15 @@ export function BlockSearchPanel() {
         open={saveModalOpen}
         onSave={handleConfirmSavePreset}
         onCancel={() => setSaveModalOpen(false)}
+      />
+
+      <QuestionDialog
+        open={deleteConfirmOpen}
+        icon="⚠️"
+        title="Delete Filter Preset"
+        heading={`Delete "${selectedPreset}"?`}
+        message="This preset will be permanently removed from local storage and cannot be recovered."
+        onResult={handleConfirmDeletePreset}
       />
 
       {exitPending && (() => {
