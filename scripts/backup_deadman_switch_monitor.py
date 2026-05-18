@@ -46,7 +46,7 @@ ALERT_SEARCH_QUERY = "Backup dead-man's-switch monitor alert"
 CTO_AGENT_ID = "41b5ede6-e209-40ba-b923-dc969c722e6d"
 
 MONITOR_INTERVAL_MINUTES = 30
-MONITOR_THRESHOLD_MINUTES = 60
+MONITOR_THRESHOLD_MINUTES = 90  # GH Actions cron misses ~18% of slots; 90min suppresses those while still catching true failures
 
 MONITOR_LOG.parent.mkdir(parents=True, exist_ok=True)
 

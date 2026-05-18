@@ -12,7 +12,7 @@ on:
       threshold:
         description: 'Alert threshold in minutes'
         required: false
-        default: '60'
+        default: '90'
 
 permissions:
   contents: read
