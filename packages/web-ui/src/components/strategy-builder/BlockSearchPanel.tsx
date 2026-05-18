@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BlockDefinition, BlockType } from '@/lib/strategy-builder/types';
 import { ExitConditionDialog, ExitConditionConfig, AvailableBlock } from './ExitConditionDialog';
@@ -352,34 +353,44 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
   return (
     <div
       ref={itemRef}
-      className="rounded border mb-1.5 transition-all duration-300"
+      className="rounded-md border mb-1.5 transition-all duration-300"
       style={{
-        background: isHighlighted ? 'color-mix(in srgb, var(--accent-sky-bright) 7%, transparent)' : 'var(--bg-panel)',
-        borderColor: isHighlighted ? 'var(--accent-sky-bright)' : 'var(--border)',
+        background: isHighlighted ? 'color-mix(in srgb, var(--accent-sky-bright) 7%, transparent)' : '#1A2335',
+        borderColor: isHighlighted ? 'var(--accent-sky-bright)' : '#1A2535',
         boxShadow: isHighlighted ? '0 0 0 2px rgba(14,165,233,0.25)' : undefined,
       }}
     >
       {/* Block name + meta */}
       <div className="px-3 pt-2.5 pb-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-dim)' }}>{definition.name}</span>
+          <span className="text-sm font-medium leading-tight" style={{ color: '#E8F2FF' }}>{definition.name}</span>
         </div>
-        <div className="text-xs mt-0.5 ml-6" style={{ color: 'var(--text-secondary)' }}>
+        <div className="text-xs mt-0.5" style={{ color: '#8A9FBF' }}>
           Category: {definition.category}
           {typeLabel && ` | Type: ${typeLabel}`}
-          {weight != null && ` | Weight: ${weight} points`}
+          {weight != null && ` | Weight: ${weight} pts`}
         </div>
       </div>
 
-      {/* Full-width expand/collapse button (below meta, matches desktop) */}
+      {/* Show/hide signals link row */}
       {visibleSignals.length > 0 && (
         <RichTooltip content={TT_SHOW_SIGNALS}>
           <button
             onClick={() => setSignalsOpen(v => !v)}
-            className="w-full px-5 py-2.5 text-left text-sm font-bold bg-[var(--border-subtle)] border-t border-[var(--bg-hover)] hover:bg-[var(--bg-hover)] hover:border-sky-400 transition-colors"
-            style={{ color: 'var(--text-dim)' }}
+            className="w-full px-3 pb-2.5 text-left text-xs flex items-center justify-between hover:opacity-80 transition-opacity"
+            style={{ color: '#2E8CFF' }}
           >
-            {signalsOpen ? `▼ Hide Signals (${visibleSignals.length})` : `▶ Show Signals (${visibleSignals.length})`}
+            <span>{signalsOpen ? `Hide Signals (${visibleSignals.length})` : `Show Signals (${visibleSignals.length})`}</span>
+            <ChevronRight
+              style={{
+                width: 13,
+                height: 13,
+                flexShrink: 0,
+                color: '#2E8CFF',
+                transform: signalsOpen ? 'rotate(90deg)' : 'none',
+                transition: 'transform 0.2s',
+              }}
+            />
           </button>
         </RichTooltip>
       )}
@@ -721,7 +732,7 @@ export function BlockSearchPanel() {
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
               className="flex-1 px-2.5 py-1.5 rounded border text-xs focus:outline-none"
-              style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
+              style={{ background: '#111720', borderColor: '#253040', color: 'var(--input-text)' }}
             />
           </RichTooltip>
         </div>
@@ -734,7 +745,7 @@ export function BlockSearchPanel() {
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
               className="flex-[1.5] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
-              style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
+              style={{ background: '#111720', borderColor: '#253040', color: 'var(--input-text)' }}
             >
               <option value="all">All Categories</option>
               {allCategories.map(c => (
@@ -747,7 +758,7 @@ export function BlockSearchPanel() {
               value={selectedType}
               onChange={e => setSelectedType(e.target.value as 'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all')}
               className="flex-[0.75] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
-              style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
+              style={{ background: '#111720', borderColor: '#253040', color: 'var(--input-text)' }}
             >
               <option value="all">All Types</option>
               {allTypes.map(({ value, label }) => (
