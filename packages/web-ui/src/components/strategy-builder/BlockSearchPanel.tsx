@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BlockDefinition, BlockType } from '@/lib/strategy-builder/types';
 import { ExitConditionDialog, ExitConditionConfig, AvailableBlock } from './ExitConditionDialog';
+import { RichTooltip, TooltipContent } from './RichTooltip';
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   [BlockType.ENTRY_CONDITION]:  'Entry Condition',
@@ -41,6 +42,160 @@ const SIGNAL_TYPE_TOOLTIPS: Record<string, string> = {
     'CONTEXT blocks provide persistent market-state awareness that runs in the background at all times. They do not generate individual trade triggers; instead they describe the current environment (e.g. active Fibonacci zones, session type, key price levels) so other blocks can interpret their signals correctly.',
   HYBRID:
     'HYBRID blocks combine event-detection with continuous state tracking. They fire specific signals AND maintain background context simultaneously (e.g. ICT / SMC concepts, Wyckoff phases, Elliott Wave count). Useful when a single analysis framework handles both role.',
+};
+
+// ─── Structured tooltip content (replaces native title attributes) ────────────
+const TT_SEARCH: TooltipContent = {
+  title: 'Search Building Blocks',
+  body: 'Full-text search across block names, signal names, and descriptions.',
+  sections: [
+    { header: 'Comma-stacking:', items: [
+      'Separate terms with commas to match ANY of them',
+      'Example: "50, asia, hod" returns blocks mentioning 50 OR asia OR hod',
+    ]},
+    { header: 'Tip:', items: ['Partial terms work — you do not need exact block names'] },
+  ],
+};
+const TT_CATEGORY: TooltipContent = {
+  title: 'Category Filter',
+  body: 'Narrows the library to blocks sharing the same market analysis domain.',
+  sections: [
+    { header: 'Examples:', items: [
+      'PATTERNS — classical chart formations (Cup & Handle, Double Top)',
+      'OSCILLATORS — momentum-based indicators (RSI, MACD, Stochastic)',
+      'SESSIONS — time-of-day context (London, New York, Asia killzones)',
+    ]},
+    { header: 'Tip:', items: ['Combine with the Type filter to target a specific block role'] },
+  ],
+};
+const TT_TYPE: TooltipContent = {
+  title: 'Block Type Filter',
+  body: 'Controls how a block participates in your strategy execution.',
+  sections: [
+    { header: 'Types:', items: [
+      'EVENT — fires once on discrete occurrences (pattern completions, structure breaks)',
+      'SIGNAL — continuous indicator scoring directional bias (MACD, RSI, EMA cross)',
+      'CONTEXT — always-active background state (sessions, Fibonacci zones, price levels)',
+      'HYBRID — combines event detection with continuous state (ICT/SMC, Wyckoff, Elliott Wave)',
+    ]},
+    { header: 'Tip:', items: [
+      'Use EVENT as primary triggers, SIGNAL as confirmation, CONTEXT to qualify the market environment',
+    ]},
+  ],
+};
+const TT_PRESET: TooltipContent = {
+  title: 'Filter Presets',
+  body: 'Saved combinations of search text, category, and type filters for one-click restore.',
+  sections: [
+    { header: 'How to use:', items: [
+      'Select a preset in this dropdown, then click 📂 to apply it',
+      'Click 💾 to save the current filter state under a new name',
+    ]},
+    { header: 'Tip:', items: ['Create presets for views you use often, e.g. "ICT blocks" or "Bullish patterns"'] },
+  ],
+};
+const TT_PRESET_SAVE: TooltipContent = {
+  title: 'Save Filter Preset',
+  body: 'Captures the current search text, category, and type filter as a named preset.',
+  sections: [
+    { header: 'Stored in:', items: ['Browser local storage — persists across sessions on this device'] },
+    { header: 'Tip:', items: ['Name presets descriptively, e.g. "ICT + HYBRID" or "Pattern EVENT blocks"'] },
+  ],
+};
+const TT_PRESET_LOAD: TooltipContent = {
+  title: 'Load Filter Preset',
+  body: 'Applies the saved search text, category, and type filter from the selected preset.',
+  sections: [
+    { header: 'How to use:', items: ['Select a preset in the dropdown first, then click here to activate it'] },
+    { header: 'Note:', items: ['Overwrites the current filter state — unsaved filters will be lost'] },
+  ],
+};
+const TT_PRESET_DELETE: TooltipContent = {
+  title: 'Delete Filter Preset',
+  body: 'Permanently removes the selected preset from local storage.',
+  sections: [
+    { header: 'How to use:', items: ['Select a preset in the dropdown first, then click here to delete it'] },
+    { header: 'Warning:', items: ['This action cannot be undone'] },
+  ],
+};
+const TT_STANDARD: TooltipContent = {
+  title: 'Standard Mode',
+  body: 'Each block definition can appear only once per logic slot (AND or OR) in your strategy.',
+  sections: [
+    { header: 'Behaviour:', items: [
+      'Signals from the same block are merged into the existing card rather than creating a duplicate',
+      'Already-added signals are greyed out and disabled in the library',
+    ]},
+    { header: 'Recommendation:', items: [
+      'Use Standard mode for most strategies — keeps the board clean and prevents redundant evaluations',
+    ]},
+  ],
+};
+const TT_ADVANCED: TooltipContent = {
+  title: 'Advanced Mode',
+  body: 'Removes deduplication — the same block can be added multiple times with different configurations.',
+  sections: [
+    { header: 'Use when:', items: [
+      'Building layered or ensemble strategies',
+      'Stacking the same indicator at different periods (e.g. two EMA blocks at different lengths)',
+    ]},
+    { header: 'Note:', items: ['All signals remain selectable regardless of prior additions'] },
+  ],
+};
+const TT_SHOW_SIGNALS: TooltipContent = {
+  title: 'Signals',
+  body: 'Specific named outputs this block emits during backtesting and live trading.',
+  sections: [
+    { header: 'Selecting signals:', items: [
+      'Check individual signals to include only specific outputs in your strategy',
+      'Unchecked signals are excluded when you click Add AND / Add OR / Add Exit',
+      'No selection = all visible signals are included automatically',
+    ]},
+    { header: 'Occurrence counts:', items: [
+      'Shows how often each signal fired over the last 180 days of BTC data',
+      'Higher occurrence % = more frequent signal = more trade opportunities per period',
+    ]},
+  ],
+};
+const TT_ADD_AND: TooltipContent = {
+  title: 'Add as AND (Required)',
+  body: "This block's selected signals must ALL be present for the strategy entry to trigger.",
+  sections: [
+    { header: 'Use when:', items: [
+      'This is a must-have confirmation for your trade setup',
+      'You will not enter a trade without this block confirming',
+    ]},
+    { header: 'Behaviour:', items: [
+      'In Standard mode, signals from the same block+AND slot are merged into one card',
+      'AND enforces strict simultaneous confirmation across all required blocks',
+    ]},
+  ],
+};
+const TT_ADD_OR: TooltipContent = {
+  title: 'Add as OR (Optional)',
+  body: "This block's signals satisfy the entry condition independently — the strategy enters when this OR any other OR-logic block fires.",
+  sections: [
+    { header: 'Use when:', items: [
+      'This is a supporting confluence condition',
+      'You want multiple alternative confirmation paths to the same entry',
+    ]},
+    { header: 'Tip:', items: ['Use OR for secondary indicators that strengthen but do not gate the trade setup'] },
+  ],
+};
+const TT_ADD_EXIT: TooltipContent = {
+  title: 'Add as Exit Condition',
+  body: 'Opens the Exit Condition dialog to configure how and when this block triggers a position close.',
+  sections: [
+    { header: 'Exit modes:', items: [
+      'ABSOLUTE — closes the position at a fixed profit or loss percentage',
+      'FLEXIBLE — uses TP proximity and reversal trigger thresholds for dynamic management',
+    ]},
+    { header: 'Binding levels:', items: [
+      'Strategy — this exit applies to the entire strategy',
+      'Block — applies to signals within this specific block only',
+      'Signal — applies to one specific signal output',
+    ]},
+  ],
 };
 
 // ui_visible=false signals are hidden in Standard mode (matches desktop app behaviour).
@@ -217,14 +372,15 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
 
       {/* Full-width expand/collapse button (below meta, matches desktop) */}
       {visibleSignals.length > 0 && (
-        <button
-          onClick={() => setSignalsOpen(v => !v)}
-          title={`${signalsOpen ? 'Collapse' : 'Expand'} the signal list for "${definition.name}". Each signal is a specific named output this block can emit during backtesting and live trading. You can select individual signals to add granular control over which outputs trigger strategy entries or exits. Unchecked signals are not included when you click Add AND / Add OR / Add Exit. Signal occurrence counts show how often each signal fired over the last 180 days of BTC data.`}
-          className="w-full px-5 py-2.5 text-left text-sm font-bold bg-[#2D3748] border-t border-[#374151] hover:bg-[#374151] hover:border-sky-400 transition-colors"
-          style={{ color: '#A0AEC0' }}
-        >
-          {signalsOpen ? `▼ Hide Signals (${visibleSignals.length})` : `▶ Show Signals (${visibleSignals.length})`}
-        </button>
+        <RichTooltip content={TT_SHOW_SIGNALS}>
+          <button
+            onClick={() => setSignalsOpen(v => !v)}
+            className="w-full px-5 py-2.5 text-left text-sm font-bold bg-[#2D3748] border-t border-[#374151] hover:bg-[#374151] hover:border-sky-400 transition-colors"
+            style={{ color: '#A0AEC0' }}
+          >
+            {signalsOpen ? `▼ Hide Signals (${visibleSignals.length})` : `▶ Show Signals (${visibleSignals.length})`}
+          </button>
+        </RichTooltip>
       )}
 
       {/* Expanded: signals list + add buttons */}
@@ -278,27 +434,30 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
 
           {/* Add buttons */}
           <div className="flex gap-1.5 mt-3">
-            <button
-              onClick={() => handleAdd('AND')}
-              className="flex-1 text-xs py-1.5 rounded border border-emerald-800 bg-emerald-900/40 hover:bg-emerald-900/70 text-emerald-300 font-medium transition-colors"
-              title={`Add "${definition.name}" as AND (Required) — this block's selected signals must ALL fire for the strategy entry condition to be met. AND logic enforces strict confirmation: every signal you add with AND logic must be present simultaneously. Use AND for your highest-conviction conditions where you will not enter a trade unless this specific block confirms. In Standard mode, signals from the same block+AND slot are merged into a single card.`}
-            >
-              ➕ Add as AND (Required)
-            </button>
-            <button
-              onClick={() => handleAdd('OR')}
-              className="flex-1 text-xs py-1.5 rounded border border-blue-800 bg-blue-900/30 hover:bg-blue-900/60 text-blue-300 font-medium transition-colors"
-              title={`Add "${definition.name}" as OR (Optional) — this block's selected signals can satisfy the entry condition when any one of them fires, even if other blocks do not confirm. OR logic broadens your entry criteria: the strategy enters when this block OR any other OR-logic block fires. Use OR for supporting confluence conditions that strengthen but do not gate the trade setup.`}
-            >
-              ➕ Add as OR (Optional)
-            </button>
-            <button
-              onClick={handleAddExit}
-              className="flex-1 text-xs py-1.5 rounded border border-red-800 bg-red-900/30 hover:bg-red-900/60 text-red-300 font-medium transition-colors"
-              title={`Configure "${definition.name}" as Exit Condition — opens the Exit Condition dialog where you set the exit percentage, exit mode (ABSOLUTE or FLEXIBLE), and binding level (Strategy / Block / Signal). ABSOLUTE exits close the position at a fixed profit or loss percentage. FLEXIBLE exits use TP proximity and reversal trigger thresholds for dynamic position management. Binding level controls which scope of the strategy this exit applies to.`}
-            >
-              ➕ Add as Exit
-            </button>
+            <RichTooltip content={TT_ADD_AND}>
+              <button
+                onClick={() => handleAdd('AND')}
+                className="flex-1 text-xs py-1.5 rounded border border-emerald-800 bg-emerald-900/40 hover:bg-emerald-900/70 text-emerald-300 font-medium transition-colors"
+              >
+                ➕ Add as AND (Required)
+              </button>
+            </RichTooltip>
+            <RichTooltip content={TT_ADD_OR}>
+              <button
+                onClick={() => handleAdd('OR')}
+                className="flex-1 text-xs py-1.5 rounded border border-blue-800 bg-blue-900/30 hover:bg-blue-900/60 text-blue-300 font-medium transition-colors"
+              >
+                ➕ Add as OR (Optional)
+              </button>
+            </RichTooltip>
+            <RichTooltip content={TT_ADD_EXIT}>
+              <button
+                onClick={handleAddExit}
+                className="flex-1 text-xs py-1.5 rounded border border-red-800 bg-red-900/30 hover:bg-red-900/60 text-red-300 font-medium transition-colors"
+              >
+                ➕ Add as Exit
+              </button>
+            </RichTooltip>
           </div>
 
           <p className="text-xs italic mt-2" style={{ color: '#6B7280' }}>
@@ -424,7 +583,6 @@ export function BlockSearchPanel() {
     return (['CONTEXT', 'EVENT', 'HYBRID', 'SIGNAL'] as const).filter(t => seen.has(t)).map(t => ({
       value: t,
       label: t.charAt(0) + t.slice(1).toLowerCase(),
-      tooltip: SIGNAL_TYPE_TOOLTIPS[t],
     }));
   }, [blockLibrary]);
 
@@ -518,26 +676,28 @@ export function BlockSearchPanel() {
           Available Building Blocks
         </h2>
         <div className="flex items-center" style={{ border: '1px solid #3C4149', borderRadius: 4, overflow: 'hidden' }}>
-          <button
-            onClick={() => setAdvancedMode(false)}
-            title="Standard mode — each block definition can appear only once per logic slot (AND or OR) in your strategy. When you click Add AND or Add OR, signals from the same block are merged into the existing card rather than creating a duplicate. This is the recommended mode for most strategies because it keeps the strategy board clean and prevents redundant evaluations. Signals already added to the strategy are greyed out in the library."
-            className="text-xs px-2.5 py-1 transition-colors"
-            style={!advancedMode
-              ? { background: '#1a3a4a', color: '#38bdf8', fontWeight: 600 }
-              : { background: '#2A2F3A', color: '#6B7280' }}
-          >
-            Standard
-          </button>
-          <button
-            onClick={() => setAdvancedMode(true)}
-            title="Advanced mode — removes the deduplication constraint and allows the same building block to be added multiple times, each with a different signal selection, weight, or logic role. Use this when building layered or ensemble strategies that intentionally stack the same indicator at different parameter levels (e.g. two separate EMA blocks with different period settings). All signals remain selectable regardless of prior additions."
-            className="text-xs px-2.5 py-1 transition-colors border-l border-[#3C4149]"
-            style={advancedMode
-              ? { background: '#1a3a4a', color: '#38bdf8', fontWeight: 600 }
-              : { background: '#2A2F3A', color: '#6B7280' }}
-          >
-            Advanced
-          </button>
+          <RichTooltip content={TT_STANDARD}>
+            <button
+              onClick={() => setAdvancedMode(false)}
+              className="text-xs px-2.5 py-1 transition-colors"
+              style={!advancedMode
+                ? { background: '#1a3a4a', color: '#38bdf8', fontWeight: 600 }
+                : { background: '#2A2F3A', color: '#6B7280' }}
+            >
+              Standard
+            </button>
+          </RichTooltip>
+          <RichTooltip content={TT_ADVANCED}>
+            <button
+              onClick={() => setAdvancedMode(true)}
+              className="text-xs px-2.5 py-1 transition-colors border-l border-[#3C4149]"
+              style={advancedMode
+                ? { background: '#1a3a4a', color: '#38bdf8', fontWeight: 600 }
+                : { background: '#2A2F3A', color: '#6B7280' }}
+            >
+              Advanced
+            </button>
+          </RichTooltip>
         </div>
       </div>
 
@@ -546,68 +706,73 @@ export function BlockSearchPanel() {
         {/* Row 1: Search */}
         <div className="flex items-center gap-2">
           <span className="text-xs flex-shrink-0 text-right" style={{ color: '#9AA0A6', width: 68 }}>🔍 Search:</span>
-          <input
-            type="text"
-            placeholder="Search name, signal, description… or stack with commas: 50, asia, hod"
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            title="Full-text search across block names, signal names, and descriptions. Stack multiple independent search terms using commas — the panel returns blocks that match ANY of the terms. Example: typing '50, asia, hod' returns all blocks that mention '50', OR 'asia', OR 'hod' in their name, signals, or description. This lets you quickly build a broad candidate list from memory-based terms without knowing exact block names."
-            className="flex-1 px-2.5 py-1.5 rounded border text-xs focus:outline-none"
-            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
-          />
+          <RichTooltip content={TT_SEARCH}>
+            <input
+              type="text"
+              placeholder="Search name, signal, description… or stack with commas: 50, asia, hod"
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              className="flex-1 px-2.5 py-1.5 rounded border text-xs focus:outline-none"
+              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+            />
+          </RichTooltip>
         </div>
 
         {/* Row 2: Category + Type dropdowns — same label width so controls align with search input */}
         <div className="flex items-center gap-1.5">
           <span className="text-xs flex-shrink-0 text-right" style={{ color: '#9AA0A6', width: 68 }}>🏷 Filter:</span>
-          <select
-            value={selectedCategory}
-            onChange={e => setSelectedCategory(e.target.value)}
-            title="Filter by analytical category — narrows the library to blocks that share the same market analysis domain. Categories group blocks by the price phenomenon they analyse (e.g. PATTERNS = classical chart formations, OSCILLATORS = momentum-based indicators, SESSIONS = time-of-day context). Use category filters when you know the analysis domain you want to cover in your strategy."
-            className="flex-[2] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
-            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
-          >
-            <option value="all">All Categories</option>
-            {allCategories.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-          <select
-            value={selectedType}
-            onChange={e => setSelectedType(e.target.value as 'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all')}
-            title={selectedType === 'all'
-              ? 'Filter by block execution type — controls how a block participates in your strategy. EVENT: fires once when a discrete market event occurs (e.g. pattern completion). SIGNAL: indicator-based confirmation that runs continuously. CONTEXT: always-active background state (e.g. session, Fibonacci zone). HYBRID: combines event and context roles. Hover each option for a detailed definition.'
-              : SIGNAL_TYPE_TOOLTIPS[selectedType]}
-            className="flex-[1.5] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
-            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
-          >
-            <option value="all">All Types</option>
-            {allTypes.map(({ value, label, tooltip }) => (
-              <option key={value} value={value} title={tooltip}>{label}</option>
-            ))}
-          </select>
-          <select
-            value={selectedPreset}
-            onChange={e => setSelectedPreset(e.target.value)}
-            title="Filter presets — saved combinations of search text, category, and type filters. Presets let you instantly restore a specific view of the library that you use repeatedly. Select a preset here, then click 📂 to apply it to the current filters."
-            className="flex-1 min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
-            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}
-          >
-            <option value="">— Preset —</option>
-            {presets.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-          </select>
-          <button onClick={handleSavePreset}
-            title="Save preset — captures the current search text, category, and type filter as a named preset you can reload later. Useful for frequently used filter combinations (e.g. 'Bullish patterns only', 'ICT context blocks')."
-            className="text-xs px-1.5 py-1 rounded border flex-shrink-0 hover:opacity-80"
-            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>💾</button>
-          <button onClick={handleLoadPreset} disabled={!selectedPreset}
-            title="Load preset — applies the saved search text, category, and type filter from the selected preset, overwriting the current filter state. Select a preset in the dropdown first, then click here to activate it."
-            className="text-xs px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
-            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>📂</button>
-          <button onClick={handleDeletePreset} disabled={!selectedPreset}
-            title="Delete preset — permanently removes the selected preset from local storage. This action cannot be undone. Select the preset in the dropdown first, then click here to delete it."
-            className="text-xs px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
-            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>🗑</button>
+          <RichTooltip content={TT_CATEGORY}>
+            <select
+              value={selectedCategory}
+              onChange={e => setSelectedCategory(e.target.value)}
+              className="flex-[2] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
+              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+            >
+              <option value="all">All Categories</option>
+              {allCategories.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </RichTooltip>
+          <RichTooltip content={TT_TYPE}>
+            <select
+              value={selectedType}
+              onChange={e => setSelectedType(e.target.value as 'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all')}
+              className="flex-[1.5] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
+              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+            >
+              <option value="all">All Types</option>
+              {allTypes.map(({ value, label }) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </RichTooltip>
+          <RichTooltip content={TT_PRESET}>
+            <select
+              value={selectedPreset}
+              onChange={e => setSelectedPreset(e.target.value)}
+              className="flex-1 min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
+              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}
+            >
+              <option value="">— Preset —</option>
+              {presets.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+            </select>
+          </RichTooltip>
+          <RichTooltip content={TT_PRESET_SAVE}>
+            <button onClick={handleSavePreset}
+              className="text-xs px-1.5 py-1 rounded border flex-shrink-0 hover:opacity-80"
+              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>💾</button>
+          </RichTooltip>
+          <RichTooltip content={TT_PRESET_LOAD}>
+            <button onClick={handleLoadPreset} disabled={!selectedPreset}
+              className="text-xs px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
+              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>📂</button>
+          </RichTooltip>
+          <RichTooltip content={TT_PRESET_DELETE}>
+            <button onClick={handleDeletePreset} disabled={!selectedPreset}
+              className="text-xs px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
+              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#A0AEC0' }}>🗑</button>
+          </RichTooltip>
         </div>
       </div>
 
