@@ -45,8 +45,8 @@ function TooltipPopup({ content, triggerRect }: { content: TooltipContent; trigg
         position: 'fixed',
         zIndex: 9999,
         pointerEvents: 'none',
-        maxWidth: 380,
-        minWidth: 220,
+        maxWidth: 420,
+        minWidth: 240,
         left: pos.left,
         top: pos.top,
         opacity: pos.opacity,
@@ -55,9 +55,9 @@ function TooltipPopup({ content, triggerRect }: { content: TooltipContent; trigg
         border: '1px solid #2D3748',
         color: '#E2E8F0',
         borderRadius: 6,
-        padding: '10px 13px',
-        fontSize: 11.5,
-        lineHeight: 1.55,
+        padding: '10px 14px',
+        fontSize: 13,
+        lineHeight: 1.6,
         boxShadow: '0 8px 32px rgba(0,0,0,0.65), 0 2px 8px rgba(0,0,0,0.4)',
         fontFamily: 'inherit',
       }}
@@ -66,7 +66,7 @@ function TooltipPopup({ content, triggerRect }: { content: TooltipContent; trigg
       <div style={{
         color: '#A8BBCA',
         fontWeight: 700,
-        fontSize: 12.5,
+        fontSize: 14,
         marginBottom: content.body || hasSections ? 5 : 0,
         letterSpacing: 0.1,
       }}>
@@ -118,6 +118,14 @@ export function RichTooltip({ content, children }: RichTooltipProps) {
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  // Dismiss any active or pending tooltip immediately when user disables tooltips.
+  useEffect(() => {
+    if (!settings.enabled) {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      setTriggerRect(null);
+    }
+  }, [settings.enabled]);
 
   const show = useCallback((e: React.MouseEvent<HTMLElement>) => {
     if (!settings.enabled) return;

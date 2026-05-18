@@ -460,16 +460,16 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             inline
           />
         </div>
-        {/* Right: tooltip settings control */}
-        <div className="flex items-center gap-2 flex-shrink-0" style={{ minWidth: 200, justifyContent: 'flex-end' }}>
-          <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs" style={{ color: '#9AA0A6' }}>
+        {/* Right: tooltip settings control — muted to blend with toolbar chrome */}
+        <div className="flex items-center gap-1.5 flex-shrink-0 text-xs" style={{ minWidth: 200, justifyContent: 'flex-end', color: '#4B5563' }}>
+          <label className="flex items-center gap-1 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={tooltipSettings.enabled}
               onChange={e => updateTooltipSettings({ enabled: e.target.checked })}
-              style={{ accentColor: '#3B82F6' }}
+              style={{ accentColor: '#5A6472', width: 11, height: 11 }}
             />
-            💬 Tooltips
+            Tooltips
           </label>
           {tooltipSettings.enabled && (
             <>
@@ -480,9 +480,9 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
                 step={100}
                 value={tooltipSettings.delayMs}
                 onChange={e => updateTooltipSettings({ delayMs: Number(e.target.value) })}
-                style={{ width: 64, accentColor: '#3B82F6' }}
+                style={{ width: 54, accentColor: '#5A6472', cursor: 'pointer', opacity: 0.75 }}
               />
-              <span className="text-xs tabular-nums" style={{ color: '#6B7280', minWidth: 28, textAlign: 'right' }}>
+              <span style={{ minWidth: 24, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                 {(tooltipSettings.delayMs / 1000).toFixed(1)}s
               </span>
             </>
