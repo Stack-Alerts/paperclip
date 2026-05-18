@@ -187,8 +187,8 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   }, []);
 
   // Resizable splitter — persists position to localStorage.
-  const SPLIT_MIN = 40; // prevents left panel from getting narrow enough to wrap the stats row
-  const [leftPercent, setLeftPercent] = useState(40);
+  const SPLIT_MIN = 30; // default and max-left: right panel (block library) dominates
+  const [leftPercent, setLeftPercent] = useState(30);
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 

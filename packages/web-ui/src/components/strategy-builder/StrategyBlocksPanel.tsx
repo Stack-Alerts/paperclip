@@ -307,20 +307,31 @@ interface ExitPillProps {
   onEdit: (index: number) => void;
   onRemove: (index: number) => void;
   onDuplicate: (index: number) => void;
+  onHighlightInLibrary?: (definitionId: string) => void;
 }
 
-function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate }: ExitPillProps) {
+function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate, onHighlightInLibrary }: ExitPillProps) {
   const name = (block.data.name as string | undefined) || 'Exit';
   const cfg = block.data.exitConfig as StoredExitConfig | undefined;
+  const definitionId = block.data.definitionId as string | undefined;
+  const canHighlight = !!(definitionId && onHighlightInLibrary);
   const pct = cfg?.percentage != null ? `${Math.round(cfg.percentage * 100)}%` : '50%';
   const mode = cfg?.exitMode ?? 'ABSOLUTE';
   return (
     <div className="flex items-center gap-2 ml-3 mt-1 text-xs pl-2 py-1 rounded border border-red-900/50" style={{ background: 'rgba(220,38,38,0.07)' }}>
       <span style={{ color: '#DC2626' }}>↳ 🔴</span>
       <span className="flex-1 min-w-0 truncate" style={{ color: '#FCA5A5' }}>
-        <span className="font-semibold">{name}</span>
+        <span
+          className={`font-semibold${canHighlight ? ' hover:text-sky-300 transition-colors' : ''}`}
+          style={{ cursor: canHighlight ? 'pointer' : 'default' }}
+          onClick={() => { if (canHighlight) onHighlightInLibrary!(definitionId!); }}
+        >{name}</span>
         {cfg?.signalName && cfg.signalName !== name && (
-          <span className="ml-1" style={{ color: '#A0AEC0' }}>→ {formatSignalName(cfg.signalName)}</span>
+          <span
+            className={`ml-1${canHighlight ? ' hover:text-sky-300 transition-colors' : ''}`}
+            style={{ color: '#A0AEC0', cursor: canHighlight ? 'pointer' : 'default' }}
+            onClick={() => { if (canHighlight) onHighlightInLibrary!(definitionId!); }}
+          >→ {formatSignalName(cfg.signalName)}</span>
         )}
       </span>
       <span style={{ color: '#10B981' }}>{pct}</span>
@@ -559,7 +570,7 @@ function BlockCard({
                   </div>
 
                   {sigExits.map(({ block: eb, globalIndex: gi }) => (
-                    <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} onDuplicate={onDuplicateExit} />
+                    <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} onDuplicate={onDuplicateExit} onHighlightInLibrary={onHighlightInLibrary} />
                   ))}
 
                   {hasRecheck && (
@@ -591,7 +602,7 @@ function BlockCard({
         <div className="mx-3 mb-3 rounded border border-[#3C4149]/60 px-3 py-2 space-y-1" style={{ background: '#15191E' }}>
           <div className="text-xs font-semibold mb-1" style={{ color: '#9AA0A6' }}>Block Exit Conditions:</div>
           {blockExits.map(({ block: eb, globalIndex: gi }) => (
-            <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} onDuplicate={onDuplicateExit} />
+            <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} onDuplicate={onDuplicateExit} onHighlightInLibrary={onHighlightInLibrary} />
           ))}
         </div>
       )}
@@ -607,9 +618,10 @@ interface ExitConditionsSectionProps {
   onRemove: (index: number) => void;
   onEdit: (index: number) => void;
   onDuplicate: (index: number) => void;
+  onHighlightInLibrary: (definitionId: string) => void;
 }
 
-function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate }: ExitConditionsSectionProps) {
+function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate, onHighlightInLibrary }: ExitConditionsSectionProps) {
   return (
     <div className="border-t flex-shrink-0" style={{ borderColor: '#3C4149' }}>
       <div className="px-4 py-2 flex items-center justify-between" style={{ background: 'rgba(30,33,40,0.6)' }}>
@@ -629,17 +641,24 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate }:
               const name = (block.data.name as string | undefined) || 'Exit Condition';
               const signals = (block.data.signals as BlockSignal[] | undefined) ?? [];
               const cfg = block.data.exitConfig as StoredExitConfig | undefined;
+              const defId = block.data.definitionId as string | undefined;
               const pct = cfg?.percentage != null ? `${Math.round(cfg.percentage * 100)}%` : '50%';
               const mode = cfg?.exitMode ?? 'ABSOLUTE';
               return (
                 <div key={block.id} className="rounded border border-red-900/40 px-3 py-2" style={{ background: 'rgba(42,47,58,0.6)' }}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <span className="text-red-300 font-semibold text-xs flex-shrink-0">🔴 {name}</span>
+                      <span
+                        className={`text-red-300 font-semibold text-xs flex-shrink-0${defId ? ' hover:text-sky-300 transition-colors' : ''}`}
+                        style={{ cursor: defId ? 'pointer' : 'default' }}
+                        onClick={() => { if (defId) onHighlightInLibrary(defId); }}
+                      >🔴 {name}</span>
                       {cfg?.signalName && cfg.signalName !== name && (
-                        <span className="text-xs truncate" style={{ color: '#A0AEC0' }}>
-                          → {formatSignalName(cfg.signalName)}
-                        </span>
+                        <span
+                          className={`text-xs truncate${defId ? ' hover:text-sky-300 transition-colors' : ''}`}
+                          style={{ color: '#A0AEC0', cursor: defId ? 'pointer' : 'default' }}
+                          onClick={() => { if (defId) onHighlightInLibrary(defId); }}
+                        >→ {formatSignalName(cfg.signalName)}</span>
                       )}
                       {(cfg?.blockName) && (
                         <span className="text-xs px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(59,130,246,0.1)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.2)' }}>
@@ -991,6 +1010,7 @@ export function StrategyBlocksPanel() {
         onRemove={handleRemove}
         onEdit={setEditingExitIndex}
         onDuplicate={handleDuplicateExit}
+        onHighlightInLibrary={highlightLibraryBlock}
       />
 
       {/* Timing Constraint Dialog */}
