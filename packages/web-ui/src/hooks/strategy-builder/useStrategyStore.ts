@@ -104,7 +104,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   strategyError: null,
   blockLibrary: [],
   blockCategories: [],
-  isLoadingLibrary: false,
+  isLoadingLibrary: true,
   selectedBlockIndex: null,
   validationMessages: [],
   isValidating: false,
