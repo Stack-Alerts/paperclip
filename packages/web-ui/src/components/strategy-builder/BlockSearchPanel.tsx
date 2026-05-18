@@ -2,518 +2,398 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
-import { BlockDefinition, BlockType, BlockSignal } from '@/lib/strategy-builder/types';
-import {
-  getSignalStatistics,
-  saveFilterPreset,
-  loadAllFilterPresets,
-  deleteFilterPreset,
-  FilterPreset,
-} from '@/lib/strategy-builder/api';
-import { InfoTooltip } from './InfoTooltip';
-import { ExitConditionDialog } from './ExitConditionDialog';
+import { BlockDefinition, BlockType } from '@/lib/strategy-builder/types';
 
 const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
-  [BlockType.ENTRY_CONDITION]: 'Entry',
-  [BlockType.EXIT_CONDITION]: 'Exit',
-  [BlockType.RISK_MANAGEMENT]: 'Risk',
-  [BlockType.TIME_CONSTRAINT]: 'Time',
-  [BlockType.FILTER]: 'Filter',
-  [BlockType.INDICATOR]: 'Indicator',
-  [BlockType.POSITION_SIZING]: 'Sizing',
+  [BlockType.ENTRY_CONDITION]:  'ENTRY',
+  [BlockType.EXIT_CONDITION]:   'EXIT',
+  [BlockType.RISK_MANAGEMENT]:  'RISK',
+  [BlockType.TIME_CONSTRAINT]:  'TIME',
+  [BlockType.FILTER]:           'FILTER',
+  [BlockType.INDICATOR]:        'IND',
+  [BlockType.POSITION_SIZING]:  'SIZE',
 };
 
-const TYPE_COLORS: Record<BlockType, string> = {
-  [BlockType.ENTRY_CONDITION]: 'text-emerald-400 bg-emerald-950 border-emerald-800',
-  [BlockType.EXIT_CONDITION]: 'text-red-400 bg-red-950 border-red-800',
-  [BlockType.RISK_MANAGEMENT]: 'text-amber-400 bg-amber-950 border-amber-800',
-  [BlockType.TIME_CONSTRAINT]: 'text-blue-400 bg-blue-950 border-blue-800',
-  [BlockType.FILTER]: 'text-purple-400 bg-purple-950 border-purple-800',
-  [BlockType.INDICATOR]: 'text-cyan-400 bg-cyan-950 border-cyan-800',
-  [BlockType.POSITION_SIZING]: 'text-orange-400 bg-orange-950 border-orange-800',
+const TYPE_BADGE: Record<BlockType, string> = {
+  [BlockType.ENTRY_CONDITION]:  'text-emerald-400 bg-emerald-950 border-emerald-800',
+  [BlockType.EXIT_CONDITION]:   'text-red-400 bg-red-950 border-red-800',
+  [BlockType.RISK_MANAGEMENT]:  'text-amber-400 bg-amber-950 border-amber-800',
+  [BlockType.TIME_CONSTRAINT]:  'text-blue-400 bg-blue-950 border-blue-800',
+  [BlockType.FILTER]:           'text-purple-400 bg-purple-950 border-purple-800',
+  [BlockType.INDICATOR]:        'text-cyan-400 bg-cyan-950 border-cyan-800',
+  [BlockType.POSITION_SIZING]:  'text-orange-400 bg-orange-950 border-orange-800',
 };
 
-interface SignalStatisticsCache {
-  [blockId: string]: {
-    [signalName: string]: {
-      occurrences: number;
-      percentage: number;
-      total_candles: number;
-    };
-  };
+// ─────────────────────────────────────────────
+// Preset management (localStorage)
+// ─────────────────────────────────────────────
+interface FilterPreset {
+  name: string;
+  search: string;
+  category: string;
+  type: string;
 }
 
-import type { ExitConditionConfig } from './ExitConditionDialog';
+const PRESETS_KEY = 'sb_filter_presets';
 
-interface BlockCardProps {
-  block: BlockDefinition;
-  onAddSignals: (blockName: string, signals: BlockSignal[], logic: 'AND' | 'OR') => void;
-  onAddExit: (blockName: string, signal: BlockSignal, config: ExitConditionConfig) => void;
-  onAddSimple: (block: BlockDefinition) => void;
-  strategyBlocks: any[];
+function loadPresets(): FilterPreset[] {
+  try {
+    return JSON.parse(localStorage.getItem(PRESETS_KEY) ?? '[]') as FilterPreset[];
+  } catch {
+    return [];
+  }
 }
 
-function BlockCard({
-  block,
-  onAddSignals,
-  onAddExit,
-  onAddSimple,
-  strategyBlocks,
-}: BlockCardProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [selectedSignals, setSelectedSignals] = useState<Set<string>>(new Set());
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [addedSignals, setAddedSignals] = useState<Set<string>>(new Set());
-  const [showExitDialog, setShowExitDialog] = useState(false);
-  const [exitSignalName, setExitSignalName] = useState<string>('');
+function savePresets(presets: FilterPreset[]) {
+  localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+}
 
-  const typeColor = TYPE_COLORS[block.type] ?? 'text-zinc-400 bg-zinc-800 border-zinc-700';
-  const typeLabel = BLOCK_TYPE_LABELS[block.type] ?? block.type;
-  const visibleSignals = (block.signals ?? []).filter((s) => s.ui_visible !== false);
+// ─────────────────────────────────────────────
+// BlockItem
+// ─────────────────────────────────────────────
+interface BlockItemProps {
+  definition: BlockDefinition;
+  onAdd: (def: BlockDefinition, logic: 'AND' | 'OR' | 'EXIT') => void;
+}
 
-  const strategyHasBlocks = strategyBlocks.length > 0;
-
-  useEffect(() => {
-    if (expanded && visibleSignals.length > 0 && !block.signals?.[0]?.occurrences) {
-      loadSignalStats();
-    }
-  }, [expanded]);
-
-  const loadSignalStats = async () => {
-    if (!visibleSignals.length) return;
-    setStatsLoading(true);
-    try {
-      const signalNames = visibleSignals.map((s) => s.name);
-      const stats = await getSignalStatistics(block.name, signalNames);
-      // Update block signals with stats (in place mutation)
-      visibleSignals.forEach((signal) => {
-        if (stats[signal.name]) {
-          signal.occurrences = stats[signal.name].count;
-          signal.occurrence_percentage = stats[signal.name].percentage;
-          signal.total_candles = stats[signal.name].total_candles;
-        }
-      });
-    } catch (error) {
-      console.warn('Failed to load signal statistics:', error);
-    } finally {
-      setStatsLoading(false);
-    }
-  };
-
-  const handleExpandClick = async () => {
-    setExpanded(!expanded);
-    if (!expanded && visibleSignals.length > 0 && !block.signals?.[0]?.occurrences) {
-      await loadSignalStats();
-    }
-  };
-
-  const toggleSignal = (signalName: string) => {
-    if (addedSignals.has(signalName)) return;
-    const newSelected = new Set(selectedSignals);
-    if (newSelected.has(signalName)) {
-      newSelected.delete(signalName);
-    } else {
-      newSelected.add(signalName);
-    }
-    setSelectedSignals(newSelected);
-  };
-
-  const handleAddAND = () => {
-    if (selectedSignals.size === 0) return;
-    const selected = visibleSignals.filter((s) => selectedSignals.has(s.name));
-    onAddSignals(block.name, selected, 'AND');
-    markSignalsAdded([...selectedSignals]);
-    setSelectedSignals(new Set());
-  };
-
-  const handleAddOR = () => {
-    if (!strategyHasBlocks || selectedSignals.size === 0) return;
-    const selected = visibleSignals.filter((s) => selectedSignals.has(s.name));
-    onAddSignals(block.name, selected, 'OR');
-    markSignalsAdded([...selectedSignals]);
-    setSelectedSignals(new Set());
-  };
-
-  const handleAddExit = () => {
-    if (selectedSignals.size !== 1) return;
-    const signalName = [...selectedSignals][0];
-    setExitSignalName(signalName);
-    setShowExitDialog(true);
-  };
-
-  const handleExitDialogSave = (config: ExitConditionConfig) => {
-    const signal = visibleSignals.find((s) => s.name === exitSignalName);
-    if (signal) {
-      onAddExit(block.name, signal, config);
-      markSignalsAdded([exitSignalName]);
-      setSelectedSignals(new Set());
-    }
-    setShowExitDialog(false);
-    setExitSignalName('');
-  };
-
-  const markSignalsAdded = (signalNames: string[]) => {
-    setAddedSignals(new Set([...addedSignals, ...signalNames]));
-  };
-
-  const getExpandButtonText = () => {
-    const total = visibleSignals.length;
-    const added = addedSignals.size;
-    const available = total - added;
-    if (available === 0) return `✓ All Signals Added (${total})`;
-    if (added > 0) return `Show/Hide Signals (${available} available, ${added} added)`;
-    return `Show/Hide Signals (${total})`;
-  };
+function BlockItem({ definition, onAdd }: BlockItemProps) {
+  const [signalsOpen, setSignalsOpen] = useState(false);
+  const signals = definition.signals ?? [];
+  const typeBadge = TYPE_BADGE[definition.type] ?? 'text-zinc-400 bg-zinc-800 border-zinc-700';
+  const typeLabel = BLOCK_TYPE_LABELS[definition.type] ?? definition.type;
 
   return (
-    <div className="rounded border border-zinc-700 bg-zinc-900 mb-3">
-      <button
-        className="w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-zinc-800 transition-colors"
-        onClick={handleExpandClick}
-        aria-expanded={expanded}
-      >
-        <span className={`text-xs px-1.5 py-0.5 rounded border font-mono flex-shrink-0 mt-0.5 ${typeColor}`}>
+    <div className="rounded border border-zinc-800 bg-zinc-900 mb-2">
+      {/* Block header */}
+      <div className="px-3 py-2 flex items-start gap-2">
+        {/* Type badge */}
+        <span className={`text-xs px-1.5 py-0.5 rounded border font-mono flex-shrink-0 mt-0.5 ${typeBadge}`}>
           {typeLabel}
         </span>
-        <div className="flex-1">
-          <span className="text-sm font-medium text-zinc-100">{block.name}</span>
+        {/* Name + meta */}
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-zinc-100 leading-tight">{definition.name}</div>
+          <div className="text-xs text-zinc-500 mt-0.5 truncate">
+            {definition.category}
+            {(definition as unknown as Record<string, unknown>).defaultWeight != null && (
+              <span className="ml-1">· {String((definition as unknown as Record<string, unknown>).defaultWeight)} pts</span>
+            )}
+          </div>
         </div>
-        <span className="text-zinc-500 text-xs flex-shrink-0">{expanded ? '▴' : '▾'}</span>
-      </button>
+        {/* Show/Hide signals */}
+        {signals.length > 0 && (
+          <button
+            onClick={() => setSignalsOpen(v => !v)}
+            className="flex-shrink-0 text-xs px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors whitespace-nowrap"
+          >
+            {signalsOpen ? `Hide Signals (${signals.length})` : `Show Signals (${signals.length})`}
+          </button>
+        )}
+      </div>
 
-      {expanded && (
-        <div className="px-4 pb-4 space-y-3 border-t border-zinc-800 bg-zinc-800/50">
-          <p className="text-xs text-zinc-400 leading-relaxed">{block.description}</p>
-
-          {visibleSignals.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-xs font-semibold text-cyan-400">Select signals to add:</div>
-              {statsLoading ? (
-                <p className="text-xs text-zinc-500">Loading signal statistics…</p>
-              ) : (
-                <div className="space-y-1 max-h-64 overflow-y-auto">
-                  {visibleSignals.map((signal) => (
-                    <div key={signal.name}>
-                      <label className="flex items-start gap-2 cursor-pointer hover:bg-zinc-700/50 p-1 rounded">
-                        <input
-                          type="checkbox"
-                          checked={selectedSignals.has(signal.name)}
-                          onChange={() => toggleSignal(signal.name)}
-                          disabled={addedSignals.has(signal.name)}
-                          className="mt-1 w-4 h-4 rounded accent-cyan-400 disabled:opacity-50"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div
-                            className={`text-xs font-medium ${
-                              addedSignals.has(signal.name)
-                                ? 'line-through text-zinc-600'
-                                : 'text-zinc-100'
-                            }`}
-                          >
-                            {signal.name}
-                            {signal.occurrences !== undefined && (
-                              <span className="text-zinc-500">
-                                {' '}({signal.occurrences.toLocaleString()} found,{' '}
-                                {(signal.occurrence_percentage || 0).toFixed(1)}%)
-                              </span>
-                            )}
-                          </div>
-                          {signal.description && (
-                            <p className="text-xs text-zinc-500 italic ml-6 mt-0.5">
-                              {signal.description}
-                            </p>
-                          )}
-                        </div>
-                      </label>
-                    </div>
-                  ))}
+      {/* Signals */}
+      {signalsOpen && signals.length > 0 && (
+        <div className="px-3 pb-2 space-y-1">
+          {signals.map((sig, i) => (
+            <div key={i} className="text-xs text-zinc-400 pl-2 border-l border-zinc-700 py-0.5">
+              <div className="text-zinc-300">{sig.name}</div>
+              {sig.description && (
+                <div className="text-zinc-600 italic mt-0.5">{sig.description}</div>
+              )}
+              {sig.occurrences != null && (
+                <div className="text-zinc-600 mt-0.5">
+                  {sig.occurrences.toLocaleString()} occurrences
+                  {sig.occurrence_percentage != null && ` (${sig.occurrence_percentage.toFixed(1)}%)`}
                 </div>
               )}
-
-              <div className="text-xs text-zinc-500 italic pt-2">
-                Note: Signal counts based on last 180 days of BTC data
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={handleAddAND}
-                  disabled={selectedSignals.size === 0}
-                  className="flex-1 px-2 py-1.5 rounded text-xs font-medium bg-emerald-700 hover:bg-emerald-600 disabled:bg-zinc-700 disabled:text-zinc-600 text-white transition-colors"
-                  title="Add as required signal (AND logic)"
-                >
-                  ➕ AND
-                </button>
-                <button
-                  onClick={handleAddOR}
-                  disabled={!strategyHasBlocks || selectedSignals.size === 0}
-                  className="flex-1 px-2 py-1.5 rounded text-xs font-medium bg-amber-700 hover:bg-amber-600 disabled:bg-zinc-700 disabled:text-zinc-600 text-white transition-colors"
-                  title="Add as optional signal (OR logic)"
-                >
-                  ➕ OR
-                </button>
-                <button
-                  onClick={handleAddExit}
-                  disabled={selectedSignals.size !== 1}
-                  className="flex-1 px-2 py-1.5 rounded text-xs font-medium bg-red-700 hover:bg-red-600 disabled:bg-zinc-700 disabled:text-zinc-600 text-white transition-colors"
-                  title="Add as exit condition"
-                >
-                  ➕ EXIT
-                </button>
-              </div>
             </div>
-          )}
-
-          {visibleSignals.length === 0 && (
-            <button
-              className="w-full py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors"
-              onClick={() => onAddSimple(block)}
-            >
-              + Add to Strategy
-            </button>
-          )}
+          ))}
         </div>
       )}
 
-      <ExitConditionDialog
-        open={showExitDialog}
-        signalName={exitSignalName}
-        onClose={() => {
-          setShowExitDialog(false);
-          setExitSignalName('');
-        }}
-        onSave={handleExitDialogSave}
-      />
+      {/* Add buttons */}
+      <div className="flex gap-1.5 px-3 pb-3 pt-1">
+        <button
+          onClick={() => onAdd(definition, 'AND')}
+          className="flex-1 text-xs py-1 rounded border border-emerald-800 bg-emerald-900/30 hover:bg-emerald-900/60 text-emerald-300 transition-colors"
+          title={`Add "${definition.name}" as a required (AND) block`}
+        >
+          + AND (Required)
+        </button>
+        <button
+          onClick={() => onAdd(definition, 'OR')}
+          className="flex-1 text-xs py-1 rounded border border-blue-800 bg-blue-900/30 hover:bg-blue-900/60 text-blue-300 transition-colors"
+          title={`Add "${definition.name}" as an optional (OR) block`}
+        >
+          + OR (Optional)
+        </button>
+        <button
+          onClick={() => onAdd(definition, 'EXIT')}
+          className="flex-1 text-xs py-1 rounded border border-red-800 bg-red-900/30 hover:bg-red-900/60 text-red-300 transition-colors"
+          title={`Add "${definition.name}" as an exit condition`}
+        >
+          + Exit
+        </button>
+      </div>
     </div>
   );
 }
 
+// ─────────────────────────────────────────────
+// CategorySection
+// ─────────────────────────────────────────────
+interface CategorySectionProps {
+  category: string;
+  blocks: BlockDefinition[];
+  onAdd: (def: BlockDefinition, logic: 'AND' | 'OR' | 'EXIT') => void;
+}
+
+function CategorySection({ category, blocks, onAdd }: CategorySectionProps) {
+  const [expanded, setExpanded] = useState(true);
+
+  return (
+    <div className="mb-2">
+      <button
+        className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-zinc-300 bg-zinc-800/60 hover:bg-zinc-800 rounded border border-zinc-700 transition-colors"
+        onClick={() => setExpanded(v => !v)}
+        aria-expanded={expanded}
+      >
+        <span className="flex items-center gap-1.5">
+          <span>{expanded ? '▾' : '▸'}</span>
+          <span>{category}</span>
+        </span>
+        <span className="text-zinc-500 font-normal">{blocks.length}</span>
+      </button>
+      {expanded && (
+        <div className="mt-1 ml-1">
+          {blocks.map(block => (
+            <BlockItem key={block.id} definition={block} onAdd={onAdd} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// BlockSearchPanel (main export)
+// ─────────────────────────────────────────────
 export function BlockSearchPanel() {
-  const { blockLibrary, blockCategories, isLoadingLibrary, addBlock, currentStrategy } =
-    useStrategyStore();
-  const updateBlock = useStrategyStore((s) => s.updateBlock);
+  const {
+    blockLibrary,
+    blockCategories,
+    isLoadingLibrary,
+    addBlock,
+    updateBlock,
+    currentStrategy,
+  } = useStrategyStore();
 
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedType, setSelectedType] = useState<BlockType | 'all'>('all');
+
+  // Presets
   const [presets, setPresets] = useState<FilterPreset[]>([]);
+  const [selectedPreset, setSelectedPreset] = useState('');
+  useEffect(() => { setPresets(loadPresets()); }, []);
 
-  useEffect(() => {
-    setPresets(loadAllFilterPresets());
-  }, []);
+  const handleSavePreset = useCallback(() => {
+    const name = window.prompt('Save preset as:', '');
+    if (!name?.trim()) return;
+    const preset: FilterPreset = { name: name.trim(), search: searchText, category: selectedCategory, type: selectedType };
+    const updated = [...presets.filter(p => p.name !== preset.name), preset];
+    savePresets(updated);
+    setPresets(updated);
+    setSelectedPreset(preset.name);
+  }, [searchText, selectedCategory, selectedType, presets]);
 
+  const handleLoadPreset = useCallback(() => {
+    const preset = presets.find(p => p.name === selectedPreset);
+    if (!preset) return;
+    setSearchText(preset.search);
+    setSelectedCategory(preset.category);
+    setSelectedType(preset.type as BlockType | 'all');
+  }, [presets, selectedPreset]);
+
+  const handleDeletePreset = useCallback(() => {
+    if (!selectedPreset || !window.confirm(`Delete preset "${selectedPreset}"?`)) return;
+    const updated = presets.filter(p => p.name !== selectedPreset);
+    savePresets(updated);
+    setPresets(updated);
+    setSelectedPreset('');
+  }, [presets, selectedPreset]);
+
+  // Filtered blocks
   const filteredBlocks = useMemo(() => {
-    return blockLibrary.filter((b) => {
-      const blockNameMatch = b.name.toLowerCase().includes(searchText.toLowerCase());
-      const descMatch = b.description.toLowerCase().includes(searchText.toLowerCase());
-      const signalMatch =
-        (b.signals ?? []).some((s) => s.name.toLowerCase().includes(searchText.toLowerCase())) &&
-        searchText.length > 0;
-      const matchesSearch =
-        !searchText || blockNameMatch || descMatch || signalMatch;
-      const matchesCategory = selectedCategory === 'all' || b.category === selectedCategory;
-      const matchesType = selectedType === 'all' || b.type === selectedType;
-      return matchesSearch && matchesCategory && matchesType;
+    const q = searchText.toLowerCase();
+    return blockLibrary.filter(b => {
+      const matchSearch = !q ||
+        b.name.toLowerCase().includes(q) ||
+        b.description.toLowerCase().includes(q) ||
+        (b.signals ?? []).some(s => s.name.toLowerCase().includes(q));
+      const matchCat = selectedCategory === 'all' || b.category === selectedCategory;
+      const matchType = selectedType === 'all' || b.type === selectedType;
+      return matchSearch && matchCat && matchType;
     });
   }, [blockLibrary, searchText, selectedCategory, selectedType]);
 
-  const handleAddSignals = useCallback(
-    (blockName: string, signals: BlockSignal[], logic: 'AND' | 'OR') => {
-      const strategy = useStrategyStore.getState().currentStrategy;
-      const position = strategy?.blocks.length ?? 0;
-      addBlock(BlockType.ENTRY_CONDITION, position);
-      useStrategyStore.getState().updateBlock(position, {
-        name: blockName,
-        logic,
-        signals: signals.map((s) => ({ name: s.name, logic })),
-      });
-    },
-    [addBlock]
-  );
-
-  const handleAddExit = useCallback(
-    (blockName: string, signal: BlockSignal, config: ExitConditionConfig) => {
-      const strategy = useStrategyStore.getState().currentStrategy;
-      const position = strategy?.blocks.length ?? 0;
-      addBlock(BlockType.EXIT_CONDITION, position);
-      useStrategyStore.getState().updateBlock(position, {
-        name: blockName,
-        logic: 'AND',
-        signals: [{ name: signal.name, logic: 'AND' }],
-        exitConfig: {
-          percentage: config.percentage,
-          exitMode: config.exitMode,
-          tpProximity: config.tpProximity,
-          reversalTrigger: config.reversalTrigger,
-          recheckEnabled: config.recheckEnabled,
-          recheckBarDelay: config.recheckBarDelay,
-        },
-      });
-    },
-    [addBlock]
-  );
-
-  const handleAddSimple = useCallback(
-    (block: BlockDefinition) => {
-      const strategy = useStrategyStore.getState().currentStrategy;
-      const position = strategy?.blocks.length ?? 0;
-      addBlock(block.type, position);
-    },
-    [addBlock]
-  );
-
-  const handleSavePreset = () => {
-    const name = prompt('Preset name:');
-    if (!name) return;
-    const preset: FilterPreset = {
-      name,
-      searchText,
-      category: selectedCategory,
-      blockType: selectedType,
-    };
-    saveFilterPreset(preset);
-    setPresets(loadAllFilterPresets());
-  };
-
-  const handleLoadPreset = (preset: FilterPreset) => {
-    setSearchText(preset.searchText);
-    setSelectedCategory(preset.category);
-    setSelectedType(preset.blockType as BlockType | 'all');
-  };
-
-  const handleDeletePreset = (name: string) => {
-    if (confirm(`Delete preset "${name}"?`)) {
-      deleteFilterPreset(name);
-      setPresets(loadAllFilterPresets());
+  // Group by category
+  const grouped = useMemo(() => {
+    const groups: Record<string, BlockDefinition[]> = {};
+    for (const b of filteredBlocks) {
+      if (!groups[b.category]) groups[b.category] = [];
+      groups[b.category].push(b);
     }
-  };
+    return groups;
+  }, [filteredBlocks]);
+
+  const categoryNames = useMemo(() => Object.keys(grouped).sort(), [grouped]);
+
+  // All categories for dropdown (from library, not filtered)
+  const allCategories = useMemo(() => {
+    if (blockCategories.length > 0) return blockCategories.map(c => ({ id: c.id, name: c.name }));
+    const cats = new Set(blockLibrary.map(b => b.category));
+    return [...cats].sort().map(c => ({ id: c, name: c }));
+  }, [blockCategories, blockLibrary]);
+
+  // Add block to strategy
+  const handleAdd = useCallback(
+    (definition: BlockDefinition, logic: 'AND' | 'OR' | 'EXIT') => {
+      const state = useStrategyStore.getState();
+      const position = state.currentStrategy?.blocks.length ?? 0;
+      const blockType = logic === 'EXIT' ? BlockType.EXIT_CONDITION : definition.type;
+      addBlock(blockType, position);
+      updateBlock(position, {
+        name: definition.name,
+        definitionId: definition.id,
+        category: definition.category,
+        logic: logic,
+        signals: (definition.signals ?? []).map(s => ({
+          name: s.name,
+          description: s.description ?? '',
+          recheckEnabled: false,
+        })),
+      });
+    },
+    [addBlock, updateBlock]
+  );
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-zinc-800 flex-shrink-0">
-        <h2 className="text-sm font-semibold text-zinc-50">Available Building Blocks</h2>
+    <div className="flex flex-col h-full bg-zinc-950 border-l border-zinc-800">
+      {/* Panel header */}
+      <div className="px-4 py-2.5 border-b border-zinc-800 bg-zinc-900/50 flex-shrink-0">
+        <h2 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+          Available Building Blocks
+        </h2>
       </div>
 
-      {/* Filters */}
-      <div className="px-3 py-2 space-y-2 flex-shrink-0 border-b border-zinc-800">
-        <InfoTooltip id="block-search-input">
-          <input
-            type="text"
-            placeholder="Search blocks or signals…"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="w-full px-2 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-cyan-500"
-          />
-        </InfoTooltip>
+      {/* Search + Filters */}
+      <div className="px-3 pt-3 pb-2 space-y-2 flex-shrink-0 border-b border-zinc-800">
+        {/* Search input */}
+        <input
+          type="text"
+          placeholder="Search by block name, description, or signal…"
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
+          className="w-full px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
+        />
 
-        <div className="flex gap-1">
-          <InfoTooltip id="block-category-filter">
+        {/* Category + Type row */}
+        <div className="flex gap-2">
+          <div className="flex-1 flex items-center gap-1.5">
+            <label className="text-xs text-zinc-500 flex-shrink-0">Category:</label>
             <select
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="flex-1 px-2 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 focus:outline-none"
+              onChange={e => setSelectedCategory(e.target.value)}
+              className="flex-1 min-w-0 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 focus:outline-none"
             >
               <option value="all">All Categories</option>
-              {blockCategories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
+              {allCategories.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-          </InfoTooltip>
-
-          <InfoTooltip id="block-type-filter">
+          </div>
+          <div className="flex-1 flex items-center gap-1.5">
+            <label className="text-xs text-zinc-500 flex-shrink-0">Type:</label>
             <select
               value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value as BlockType | 'all')}
-              className="flex-1 px-2 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 focus:outline-none"
+              onChange={e => setSelectedType(e.target.value as BlockType | 'all')}
+              className="flex-1 min-w-0 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 focus:outline-none"
             >
               <option value="all">All Types</option>
               {Object.entries(BLOCK_TYPE_LABELS).map(([type, label]) => (
-                <option key={type} value={type}>
-                  {label}
-                </option>
+                <option key={type} value={type}>{label}</option>
               ))}
             </select>
-          </InfoTooltip>
+          </div>
         </div>
 
-        <div className="flex gap-1">
+        {/* Preset management row */}
+        <div className="flex items-center gap-1.5">
+          <select
+            value={selectedPreset}
+            onChange={e => setSelectedPreset(e.target.value)}
+            className="flex-1 min-w-0 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-400 focus:outline-none"
+          >
+            <option value="">— Select preset —</option>
+            {presets.map(p => (
+              <option key={p.name} value={p.name}>{p.name}</option>
+            ))}
+          </select>
           <button
             onClick={handleSavePreset}
-            className="flex-1 px-2 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-xs text-zinc-100 transition-colors"
-            title="Save current filters as preset"
+            title="Save current filter as preset"
+            className="text-xs px-2 py-1 rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors whitespace-nowrap"
           >
-            💾 Save
+            Save
           </button>
-          <div className="relative flex-1">
-            {presets.length > 0 ? (
-              <select
-                onChange={(e) => {
-                  const preset = presets.find((p) => p.name === e.target.value);
-                  if (preset) handleLoadPreset(preset);
-                }}
-                defaultValue=""
-                className="w-full px-2 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-xs text-zinc-100 focus:outline-none cursor-pointer"
-              >
-                <option value="">📂 Load</option>
-                {presets.map((p) => (
-                  <option key={p.name} value={p.name}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <button
-                disabled
-                className="w-full px-2 py-1 rounded bg-zinc-700 text-xs text-zinc-600 cursor-not-allowed"
-              >
-                📂 Load
-              </button>
-            )}
-          </div>
-          {presets.length > 0 && (
-            <button
-              onClick={() => {
-                const name = prompt('Delete preset:');
-                if (name && presets.find((p) => p.name === name)) {
-                  handleDeletePreset(name);
-                }
-              }}
-              className="flex-1 px-2 py-1 rounded bg-red-900 hover:bg-red-800 text-xs text-red-100 transition-colors"
-              title="Delete a saved preset"
-            >
-              🗑 Del
-            </button>
-          )}
+          <button
+            onClick={handleLoadPreset}
+            disabled={!selectedPreset}
+            title="Load selected preset"
+            className="text-xs px-2 py-1 rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+          >
+            Load
+          </button>
+          <button
+            onClick={handleDeletePreset}
+            disabled={!selectedPreset}
+            title="Delete selected preset"
+            className="text-xs px-2 py-1 rounded border border-zinc-700 bg-zinc-800 hover:bg-red-900/40 hover:border-red-800 text-zinc-400 hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+          >
+            Del
+          </button>
         </div>
       </div>
 
-      {/* Block List */}
+      {/* Block list by category */}
       <div className="flex-1 overflow-y-auto px-3 py-3">
         {isLoadingLibrary ? (
-          <p className="text-xs text-zinc-500 text-center py-4">Loading…</p>
+          <p className="text-xs text-zinc-500 text-center py-8">Loading block library…</p>
         ) : filteredBlocks.length === 0 ? (
-          <p className="text-xs text-zinc-500 text-center py-4">No blocks match filters</p>
+          <p className="text-xs text-zinc-500 text-center py-8">No blocks match the current filters</p>
         ) : (
-          filteredBlocks.map((block) => (
-            <BlockCard
-              key={block.id}
-              block={block}
-              onAddSignals={handleAddSignals}
-              onAddExit={handleAddExit}
-              onAddSimple={handleAddSimple}
-              strategyBlocks={currentStrategy?.blocks ?? []}
+          categoryNames.map(cat => (
+            <CategorySection
+              key={cat}
+              category={cat}
+              blocks={grouped[cat]}
+              onAdd={handleAdd}
             />
           ))
         )}
       </div>
 
       {/* Footer count */}
-      <div className="px-3 py-2 border-t border-zinc-800 flex-shrink-0">
+      <div className="px-3 py-2 border-t border-zinc-800 flex-shrink-0 flex items-center justify-between bg-zinc-900/40">
         <p className="text-xs text-zinc-500">
           {filteredBlocks.length} / {blockLibrary.length} blocks
         </p>
+        {currentStrategy && (
+          <p className="text-xs text-zinc-600">
+            {currentStrategy.blocks.length} in strategy
+          </p>
+        )}
       </div>
     </div>
   );

@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { StrategyBuilder } from './StrategyBuilder';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { NewStrategyDialog } from './NewStrategyDialog';
 import { StrategyBrowserDialog } from './StrategyBrowserDialog';
 import { BacktestConfigDialog } from './BacktestConfigDialog';
@@ -12,7 +11,9 @@ import { SettingsDialog } from './SettingsDialog';
 import { AlertDialog, QuestionDialog } from './AlertDialog';
 import { AdminPinDialog } from './AdminPinDialog';
 import { StepperRibbon } from './StepperRibbon';
-import { LogViewerWindow } from './LogViewerWindow';
+import { StrategyInfoPanel } from './StrategyInfoPanel';
+import { StrategyBlocksPanel } from './StrategyBlocksPanel';
+import { BlockSearchPanel } from './BlockSearchPanel';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import * as api from '@/lib/strategy-builder/api';
 import type { BacktestResult, BacktestConfig, Strategy } from '@/lib/strategy-builder/types';
@@ -33,7 +34,7 @@ type DialogKey =
   | null;
 
 // ---------------------------------------------------------------------------
-// QuickPreviewResultsDialog — inline, does not exist as a standalone component
+// QuickPreviewResultsDialog
 // ---------------------------------------------------------------------------
 interface QuickPreviewResultsDialogProps {
   open: boolean;
@@ -44,35 +45,42 @@ interface QuickPreviewResultsDialogProps {
 function QuickPreviewResultsDialog({ open, result, onClose }: QuickPreviewResultsDialogProps) {
   if (!open || !result) return null;
 
-  const rows: [string, string][] = [
-    ['Win Rate',       `${(result.winRate * 100).toFixed(1)}%`],
-    ['Total Return',   `${result.returnPercentage >= 0 ? '+' : ''}${result.returnPercentage.toFixed(2)}%`],
-    ['Total Trades',   String(result.totalTrades)],
-    ['Winning Trades', String(result.winningTrades)],
-    ['Max Drawdown',   `${result.maxDrawdown.toFixed(2)}%`],
-    ['Sharpe Ratio',   result.sharpeRatio.toFixed(2)],
-    ['Profit Factor',  result.profitFactor.toFixed(2)],
+  const winRate = result.winRate * 100;
+  const rows: [string, string, string][] = [
+    ['Win Rate',       `${winRate.toFixed(1)}%`,         winRate >= 50 ? 'text-emerald-400' : 'text-red-400'],
+    ['Total Trades',   String(result.totalTrades),        'text-zinc-100'],
+    ['Winning Trades', String(result.winningTrades),      'text-emerald-400'],
+    ['Total Return',   `${result.returnPercentage >= 0 ? '+' : ''}${result.returnPercentage.toFixed(2)}%`,
+      result.returnPercentage >= 0 ? 'text-emerald-400' : 'text-red-400'],
+    ['Max Drawdown',   `${result.maxDrawdown.toFixed(2)}%`,  'text-red-400'],
+    ['Sharpe Ratio',   result.sharpeRatio.toFixed(2),     'text-zinc-100'],
+    ['Profit Factor',  result.profitFactor.toFixed(2),    'text-zinc-100'],
   ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-96 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-zinc-100">Quick Preview Results</h2>
+          <h2 className="text-base font-semibold text-zinc-100">30-Day Backtest Summary</h2>
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 text-xl leading-none">✕</button>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          {rows.map(([label, value]) => (
-            <div key={label} className="bg-zinc-800 rounded p-3">
-              <div className="text-xs text-zinc-500 mb-1">{label}</div>
-              <div className="text-sm font-semibold text-zinc-100">{value}</div>
+        <div className="space-y-1.5">
+          {rows.map(([label, value, color]) => (
+            <div key={label} className="flex items-center justify-between py-1">
+              <span className="text-sm text-zinc-500">{label}:</span>
+              <span className={`text-sm font-semibold ${color}`}>{value}</span>
             </div>
           ))}
         </div>
+        {result.totalTrades === 0 && (
+          <p className="mt-3 text-xs text-zinc-500">
+            No trades found in this 30-day period. Try lowering the confluence threshold.
+          </p>
+        )}
         <div className="mt-4 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-1.5 text-sm bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded transition-colors"
+            className="px-4 py-1.5 text-sm bg-blue-700 hover:bg-blue-600 text-white rounded transition-colors"
           >
             Close
           </button>
@@ -94,24 +102,43 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 }) => {
   const {
     currentStrategy,
-    saveStrategy,
+    isLoadingStrategy,
+    strategyError,
+    loadStrategy,
+    createStrategy,
     loadBlockLibrary,
+    saveStrategy,
     runBacktest,
+    validateStrategy,
     setCurrentStrategy,
     backTestInProgress,
   } = useStrategyStore();
 
+  // Data loading on mount / strategyId change
+  const hasLoaded = useRef(false);
+  useEffect(() => {
+    if (hasLoaded.current) return;
+    hasLoaded.current = true;
+    if (strategyId) {
+      loadStrategy(strategyId).catch(console.error);
+    } else if (!currentStrategy) {
+      createStrategy('New_Strategy', '').catch(console.error);
+    }
+    loadBlockLibrary().catch(console.error);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Dialog state
   const [activeDialog, setActiveDialog] = useState<DialogKey>(null);
   const [quickPreviewResult, setQuickPreviewResult] = useState<BacktestResult | null>(null);
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
   const [consoleEnabled, setConsoleEnabled] = useState(false);
 
-  // Stepper state: tracks Design→Validate→Test/Optimize→Publish workflow
+  // Stepper state
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [errorSteps, setErrorSteps] = useState<Set<number>>(new Set());
 
-  // Dirty-flag: snapshot-based, reset on load or save.
+  // Dirty-flag
   const [cleanSnapshot, setCleanSnapshot] = useState<string>('');
   const strategySnapshot = useMemo(
     () =>
@@ -123,17 +150,80 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   const isModified = !!currentStrategy && strategySnapshot !== cleanSnapshot;
   const isSavingRef = useRef(false);
 
+  // Status bar countdown
+  const [statusText, setStatusText] = useState('Ready');
+  const nextCheckRef = useRef<Date>(new Date(Date.now() + 15 * 60 * 1000));
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const diff = Math.max(0, nextCheckRef.current.getTime() - Date.now());
+      if (diff === 0) {
+        nextCheckRef.current = new Date(Date.now() + 15 * 60 * 1000);
+        setStatusText('Checking data…');
+        setTimeout(() => setStatusText('Data check complete'), 2000);
+      } else {
+        const mins = Math.floor(diff / 60000);
+        const secs = Math.floor((diff % 60000) / 1000);
+        setStatusText(`Next data check in ${mins}m ${secs}s`);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Resizable splitter
+  const [leftPercent, setLeftPercent] = useState(40);
+  const isDragging = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const pct = ((e.clientX - rect.left) / rect.width) * 100;
+      setLeftPercent(Math.max(22, Math.min(68, pct)));
+    };
+    const onMouseUp = () => { isDragging.current = false; };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
   const open = useCallback((key: DialogKey) => setActiveDialog(key), []);
   const close = useCallback(() => setActiveDialog(null), []);
+
+  // -------------------------------------------------------------------------
+  // Keyboard shortcuts
+  // -------------------------------------------------------------------------
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'S') {
+      e.preventDefault();
+      handleSaveAs();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      handleSave();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      e.preventDefault();
+      open('newStrategy');
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+      e.preventDefault();
+      open('strategyBrowser');
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // -------------------------------------------------------------------------
   // File menu handlers
   // -------------------------------------------------------------------------
   const handleSave = useCallback(async () => {
+    if (isSavingRef.current) return;
     isSavingRef.current = true;
     try {
       await saveStrategy();
       setCleanSnapshot(strategySnapshot);
+      setStatusText('Strategy saved');
+      setTimeout(() => setStatusText('Ready'), 2000);
+    } catch (e) {
+      setStatusText('Save failed');
     } finally {
       isSavingRef.current = false;
     }
@@ -143,17 +233,14 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     if (!currentStrategy) return;
     const newName = window.prompt('Save strategy as:', `${currentStrategy.name} (copy)`);
     if (!newName?.trim()) return;
-    const copy: Strategy = {
+    const saved = await api.post<Strategy>('/strategies', {
       ...currentStrategy,
-      id: `${Date.now()}-copy`,
+      id: undefined,
       name: newName.trim(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setCurrentStrategy(copy);
-    await saveStrategy();
-    setCleanSnapshot(JSON.stringify({ id: copy.id, blocks: copy.blocks, name: copy.name }));
-  }, [currentStrategy, setCurrentStrategy, saveStrategy]);
+    });
+    setCurrentStrategy(saved);
+    setCleanSnapshot(JSON.stringify({ id: saved.id, blocks: saved.blocks, name: saved.name }));
+  }, [currentStrategy, setCurrentStrategy]);
 
   const handleExit = useCallback(() => {
     if (isModified && !window.confirm('You have unsaved changes. Exit without saving?')) return;
@@ -161,7 +248,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   }, [isModified]);
 
   // -------------------------------------------------------------------------
-  // Edit menu handlers
+  // Edit handlers
   // -------------------------------------------------------------------------
   const handleClearBlocks = useCallback(() => {
     if (!currentStrategy) return;
@@ -170,7 +257,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   }, [currentStrategy, setCurrentStrategy]);
 
   // -------------------------------------------------------------------------
-  // Tools menu handlers
+  // Tools handlers
   // -------------------------------------------------------------------------
   const handleRefreshBlocks = useCallback(() => {
     loadBlockLibrary().catch(console.error);
@@ -180,16 +267,27 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     await api.post('/data/update', { startDate, endDate });
   }, []);
 
-  const handleVerifyData = useCallback(async (): Promise<Record<string, TimeframeVerifyResult>> => {
-    return api.post<Record<string, TimeframeVerifyResult>>('/data/verify', {});
+  const handleVerifyData = useCallback(async () => {
+    return await api.post<Record<string, TimeframeVerifyResult>>('/data/verify', {});
   }, []);
 
   const handleRepairData = useCallback(async (timeframe: string): Promise<void> => {
     await api.post('/data/repair', { timeframe });
   }, []);
 
+  const handleValidate = useCallback(async () => {
+    try {
+      await validateStrategy();
+      setCompletedSteps(prev => new Set([...prev, 1]));
+      setErrorSteps(prev => { const s = new Set(prev); s.delete(1); return s; });
+      setCurrentStep(1);
+    } catch {
+      setErrorSteps(prev => new Set([...prev, 1]));
+    }
+  }, [validateStrategy]);
+
   const handleQuickPreview = useCallback(async () => {
-    if (!currentStrategy) return;
+    if (!currentStrategy || backTestInProgress) return;
     const endDate = new Date().toISOString().slice(0, 10);
     const startDate = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
     const config: BacktestConfig = {
@@ -199,13 +297,17 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       initialCapital: 10_000,
       timeframe: currentStrategy.settings?.timeframe || '1h',
     };
-    const result = await runBacktest(config);
-    setQuickPreviewResult(result);
-    open('quickPreview');
-  }, [currentStrategy, runBacktest, open]);
+    try {
+      const result = await runBacktest(config);
+      setQuickPreviewResult(result);
+      open('quickPreview');
+    } catch (e) {
+      setStatusText('Quick preview failed');
+    }
+  }, [currentStrategy, runBacktest, open, backTestInProgress]);
 
   // -------------------------------------------------------------------------
-  // Strategy browser: record clean snapshot on load, clear workspace on delete
+  // Strategy browser
   // -------------------------------------------------------------------------
   const handleStrategySelect = useCallback(
     (strategy: Strategy) => {
@@ -231,17 +333,41 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     URL.revokeObjectURL(url);
   }, [consoleLogs]);
 
+  // -------------------------------------------------------------------------
+  // Loading / error states
+  // -------------------------------------------------------------------------
+  if (isLoadingStrategy) {
+    return (
+      <div className="flex items-center justify-center h-full bg-zinc-950">
+        <div className="text-zinc-400 text-sm">Loading strategy…</div>
+      </div>
+    );
+  }
+  if (strategyError) {
+    return (
+      <div className="flex items-center justify-center h-full bg-zinc-950">
+        <div className="text-red-400 text-sm">Error: {strategyError}</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-full bg-zinc-950">
-      {/* ── Menu Bar ────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 bg-zinc-900 border-b border-zinc-800 px-4 py-1.5 flex-shrink-0">
+    <div
+      className="flex flex-col h-full bg-zinc-950 select-none"
+      onKeyDown={handleKeyDown}
+      tabIndex={-1}
+      style={{ outline: 'none' }}
+    >
+      {/* ── Window title / Menu Bar ─────────────────────────────────────── */}
+      <div className="flex items-center gap-0.5 bg-zinc-900 border-b border-zinc-800 px-2 py-1 flex-shrink-0">
         <MenuDropdown
           label="File"
           items={[
-            { label: 'New Strategy',     onClick: () => open('newStrategy') },
-            { label: 'Open Strategy…',   onClick: () => open('strategyBrowser') },
-            { label: 'Save',             onClick: handleSave, shortcut: 'Ctrl+S' },
-            { label: 'Save As…',         onClick: handleSaveAs, shortcut: 'Ctrl+Shift+S' },
+            { label: 'New Strategy',     onClick: () => open('newStrategy'),      shortcut: 'Ctrl+N' },
+            { label: 'Open Strategy…',   onClick: () => open('strategyBrowser'),  shortcut: 'Ctrl+O' },
+            { label: '—', onClick: () => {} },
+            { label: 'Save',             onClick: handleSave,                     shortcut: 'Ctrl+S' },
+            { label: 'Save As…',         onClick: handleSaveAs,                   shortcut: 'Ctrl+Shift+S' },
             { label: '—', onClick: () => {} },
             { label: 'Exit',             onClick: handleExit },
           ]}
@@ -255,19 +381,19 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         <MenuDropdown
           label="Tools"
           items={[
-            { label: 'Backtest…',          onClick: () => open('backtestConfig') },
-            { label: 'Validate…',          onClick: () => open('validation') },
-            { label: 'Update Data…',       onClick: () => open('dataUpdate') },
-            { label: 'Verify Data…',       onClick: () => open('dataVerify') },
-            { label: 'Refresh Blocks',     onClick: handleRefreshBlocks },
+            { label: 'Backtest…',      onClick: () => open('backtestConfig') },
+            { label: 'Validate…',      onClick: handleValidate },
+            { label: 'Update Data…',   onClick: () => open('dataUpdate') },
+            { label: 'Verify Data…',   onClick: () => open('dataVerify') },
+            { label: 'Refresh Blocks', onClick: handleRefreshBlocks },
             { label: '—', onClick: () => {} },
-            { label: 'Settings…',          onClick: () => open('settings') },
+            { label: 'Settings…',      onClick: () => open('settings') },
             { label: '—', onClick: () => {} },
             { label: consoleEnabled ? '✓ Console Output' : 'Console Output',
               onClick: () => setConsoleEnabled(v => !v) },
-            { label: 'Clear Logs',         onClick: () => setConsoleLogs([]) },
-            { label: 'View Log…',          onClick: () => open('logViewer') },
-            { label: 'Download Log…',      onClick: handleDownloadLogs },
+            { label: 'Clear Logs',     onClick: () => setConsoleLogs([]) },
+            { label: 'View Log…',      onClick: () => open('logViewer') },
+            { label: 'Download Log…',  onClick: handleDownloadLogs },
           ]}
         />
         <MenuDropdown
@@ -277,17 +403,18 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
           ]}
         />
 
-        {/* Modified indicator + strategy name */}
+        {/* Strategy name + dirty indicator */}
         {currentStrategy && (
-          <span className="ml-auto text-xs text-zinc-400 truncate max-w-xs">
-            {isModified && <span className="text-amber-400 mr-1" title="Unsaved changes">●</span>}
-            {currentStrategy.name}
+          <span className="ml-auto text-xs text-zinc-400 truncate max-w-xs pr-2">
+            BTC Trade Engine — Strategy Builder —{' '}
+            <span className="text-zinc-200">{currentStrategy.name}</span>
+            {isModified && <span className="text-amber-400 ml-1" title="Unsaved changes">●</span>}
           </span>
         )}
       </div>
 
-      {/* ── Toolbar ─────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 bg-zinc-900 border-b border-zinc-700 px-3 py-1 flex-shrink-0">
+      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-1 bg-zinc-900 border-b border-zinc-700 px-3 py-1.5 flex-shrink-0">
         <ToolbarButton label="New"  title="New Strategy (Ctrl+N)"  onClick={() => open('newStrategy')} />
         <ToolbarButton label="Open" title="Open Strategy (Ctrl+O)" onClick={() => open('strategyBrowser')} />
         <ToolbarButton
@@ -306,7 +433,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         />
       </div>
 
-      {/* ── StepperRibbon ───────────────────────────────────────────── */}
+      {/* ── Stepper Ribbon ──────────────────────────────────────────────── */}
       <StepperRibbon
         currentStep={currentStep}
         completedSteps={completedSteps}
@@ -314,12 +441,46 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         onStepClick={setCurrentStep}
       />
 
-      {/* ── Main content ────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-hidden">
-        <StrategyBuilder strategyId={strategyId} />
+      {/* ── Main Content Area (40% left / 60% right) ────────────────────── */}
+      <div ref={containerRef} className="flex flex-1 overflow-hidden min-h-0">
+        {/* LEFT PANEL: Strategy Info + Blocks */}
+        <div
+          className="flex flex-col overflow-hidden border-r border-zinc-800"
+          style={{ width: `${leftPercent}%` }}
+        >
+          {/* Section 1: Strategy Information (compact top) */}
+          <div className="flex-shrink-0 border-b border-zinc-700">
+            <StrategyInfoPanel compact />
+          </div>
+
+          {/* Section 2+3: Strategy Blocks + Exit Conditions (scrollable) */}
+          <div className="flex-1 overflow-hidden min-h-0">
+            <StrategyBlocksPanel />
+          </div>
+        </div>
+
+        {/* Drag handle */}
+        <div
+          className="w-2 bg-zinc-800 hover:bg-blue-700 transition-colors cursor-col-resize flex-shrink-0 flex flex-col items-center justify-center gap-0.5"
+          onMouseDown={() => { isDragging.current = true; }}
+        >
+          {[0, 1, 2].map(i => (
+            <div key={i} className="w-0.5 h-3 bg-zinc-600 rounded-full" />
+          ))}
+        </div>
+
+        {/* RIGHT PANEL: Block Library */}
+        <div className="flex flex-col overflow-hidden flex-1 min-w-0">
+          <BlockSearchPanel />
+        </div>
       </div>
 
-      {/* ── Dialogs ─────────────────────────────────────────────────── */}
+      {/* ── Status Bar ──────────────────────────────────────────────────── */}
+      <div className="h-6 bg-zinc-900 border-t border-zinc-800 px-3 flex items-center flex-shrink-0">
+        <span className="text-xs text-zinc-500">{statusText}</span>
+      </div>
+
+      {/* ── Dialogs ─────────────────────────────────────────────────────── */}
       <NewStrategyDialog open={activeDialog === 'newStrategy'} onClose={close} />
 
       <StrategyBrowserDialog
@@ -353,15 +514,26 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         onClose={close}
       />
 
-      <LogViewerWindow
-        open={activeDialog === 'logViewer'}
-        onClose={close}
-        logs={consoleLogs.map((line) => {
-          const lvl = /^\[(ERROR|WARNING|SYSTEM|DEBUG|TRADE_OPENED|TRADE_CLOSED)\]/.exec(line);
-          return { message: line, level: lvl ? lvl[1] : 'INFO', timestamp: new Date().toISOString() };
-        })}
-        onClear={() => setConsoleLogs([])}
-      />
+      {activeDialog === 'logViewer' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-2/3 max-h-[70vh] flex flex-col p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold text-zinc-100">Debug Log Viewer</h2>
+              <div className="flex gap-2 items-center">
+                <button onClick={() => setConsoleLogs([])} className="text-xs px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded">Clear</button>
+                <button onClick={handleDownloadLogs} className="text-xs px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded">Download</button>
+                <button onClick={close} className="text-zinc-500 hover:text-zinc-300 text-xl leading-none ml-2">✕</button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto bg-zinc-950 rounded border border-zinc-800 p-3 font-mono text-xs text-zinc-400">
+              {consoleLogs.length === 0
+                ? <span className="text-zinc-600">No log entries.</span>
+                : consoleLogs.map((line, i) => <div key={i}>{line}</div>)
+              }
+            </div>
+          </div>
+        </div>
+      )}
 
       <AlertDialog
         open={activeDialog === 'alert'}
@@ -410,7 +582,7 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, title, onClick, di
       disabled
         ? 'text-zinc-600 bg-zinc-900 border-zinc-800 cursor-not-allowed'
         : accent
-        ? 'text-white bg-blue-700 border-blue-600 hover:bg-blue-600'
+        ? 'text-white bg-blue-700 border-blue-600 hover:bg-blue-600 font-medium'
         : active
         ? 'text-amber-300 bg-zinc-800 border-zinc-600 hover:bg-zinc-700'
         : 'text-zinc-300 bg-zinc-800 border-zinc-700 hover:bg-zinc-700 hover:text-zinc-100'
@@ -435,7 +607,7 @@ const MenuDropdown: React.FC<{ label: string; items: MenuItem[] }> = ({ label, i
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(v => !v)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         className="px-3 py-1 text-sm text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 rounded transition-colors"
       >
@@ -445,12 +617,12 @@ const MenuDropdown: React.FC<{ label: string; items: MenuItem[] }> = ({ label, i
         <div className="absolute top-full left-0 mt-0.5 bg-zinc-800 border border-zinc-700 rounded shadow-xl z-50 min-w-max">
           {items.map((item, i) =>
             item.label === '—' ? (
-              <div key={i} className="border-t border-zinc-700 my-1" />
+              <div key={i} className="border-t border-zinc-700 my-0.5" />
             ) : (
               <button
                 key={i}
                 onClick={() => { setOpen(false); item.onClick(); }}
-                className="flex items-center justify-between w-full px-4 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700 transition-colors text-left gap-8"
+                className="flex items-center justify-between w-full px-4 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700 transition-colors text-left gap-8 whitespace-nowrap"
               >
                 <span>{item.label}</span>
                 {item.shortcut && (
