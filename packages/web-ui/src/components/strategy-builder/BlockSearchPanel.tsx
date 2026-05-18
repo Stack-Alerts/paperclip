@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BlockDefinition, BlockType } from '@/lib/strategy-builder/types';
 import { ExitConditionDialog, ExitConditionConfig, AvailableBlock } from './ExitConditionDialog';
@@ -103,17 +103,29 @@ interface BlockItemProps {
   onAdd: (def: BlockDefinition, logic: 'AND' | 'OR', selectedSignals: string[]) => void;
   onAddExit: (def: BlockDefinition, selectedSignals: string[]) => void;
   advancedMode: boolean;
+  isHighlighted?: boolean;
+  onHighlightCleared?: () => void;
 }
 
-function BlockItem({ definition, onAdd, onAddExit, advancedMode }: BlockItemProps) {
+function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, onHighlightCleared }: BlockItemProps) {
+  const itemRef = useRef<HTMLDivElement>(null);
   const [signalsOpen, setSignalsOpen] = useState(false);
   const [checkedSignals, setCheckedSignals] = useState<Set<string>>(new Set());
   const [addedSignals, setAddedSignals] = useState<Set<string>>(new Set());
 
   const signals = definition.signals ?? [];
-  // Always use standard signal visibility (ui_visible !== false).
-  // Advanced mode only controls whether duplicate block adds are allowed.
   const visibleSignals = signals.filter(s => s.ui_visible !== false);
+
+  // Auto-expand and scroll into view when highlighted from the strategy panel
+  useEffect(() => {
+    if (!isHighlighted) return;
+    setSignalsOpen(true);
+    setTimeout(() => {
+      itemRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+    const t = setTimeout(() => onHighlightCleared?.(), 3500);
+    return () => clearTimeout(t);
+  }, [isHighlighted]); // eslint-disable-line react-hooks/exhaustive-deps
   const ext = definition as unknown as Record<string, unknown>;
   const weight = ext.weight as number | undefined;
   const typeLabel = BLOCK_TYPE_LABELS[definition.type] ?? (definition.type as string).replace('_', ' ').toUpperCase();
@@ -154,7 +166,15 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode }: BlockItemProp
   };
 
   return (
-    <div className="rounded border border-[#3C4149] bg-[#1E2128] mb-1.5">
+    <div
+      ref={itemRef}
+      className="rounded border mb-1.5 transition-all duration-300"
+      style={{
+        background: isHighlighted ? 'rgba(14,165,233,0.07)' : '#1E2128',
+        borderColor: isHighlighted ? '#0ea5e9' : '#3C4149',
+        boxShadow: isHighlighted ? '0 0 0 2px rgba(14,165,233,0.25)' : undefined,
+      }}
+    >
       {/* Block name + meta */}
       <div className="px-3 pt-2.5 pb-1.5">
         <div className="flex items-center gap-1.5">
@@ -272,6 +292,8 @@ export function BlockSearchPanel() {
     addBlock,
     updateBlock,
     currentStrategy,
+    highlightedLibraryBlockId,
+    highlightLibraryBlock,
   } = useStrategyStore();
 
   const [searchText, setSearchText] = useState('');
@@ -284,6 +306,14 @@ export function BlockSearchPanel() {
     definition: BlockDefinition;
     selectedSignals: string[];
   } | null>(null);
+
+  // When a block is highlighted from the strategy panel, clear filters so it's visible
+  useEffect(() => {
+    if (!highlightedLibraryBlockId) return;
+    setSearchText('');
+    setSelectedCategory('all');
+    setSelectedType('all');
+  }, [highlightedLibraryBlockId]);
 
   // Presets
   const [presets, setPresets] = useState<FilterPreset[]>([]);
@@ -559,7 +589,15 @@ export function BlockSearchPanel() {
           <p className="text-xs text-center py-8" style={{ color: '#9AA0A6' }}>No blocks match the current filters</p>
         ) : (
           filteredBlocks.map(block => (
-            <BlockItem key={block.id} definition={block} onAdd={handleAdd} onAddExit={handleAddExit} advancedMode={advancedMode} />
+            <BlockItem
+              key={block.id}
+              definition={block}
+              onAdd={handleAdd}
+              onAddExit={handleAddExit}
+              advancedMode={advancedMode}
+              isHighlighted={highlightedLibraryBlockId === block.id}
+              onHighlightCleared={() => highlightLibraryBlock(null)}
+            />
           ))
         )}
       </div>

@@ -112,6 +112,8 @@ interface StrategyStoreState {
   setCurrentStrategy: (strategy: Strategy | null) => void;
   updateStrategySettings: (settings: Partial<StrategySettings>) => void;
   pollBacktestResult: (runId: string) => Promise<BacktestResult | undefined>;
+  highlightedLibraryBlockId: string | null;
+  highlightLibraryBlock: (definitionId: string | null) => void;
 }
 
 export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
@@ -365,6 +367,11 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   // Set current strategy directly
   setCurrentStrategy: (strategy: Strategy | null) => {
     set({ currentStrategy: strategy });
+  },
+
+  highlightedLibraryBlockId: null,
+  highlightLibraryBlock: (definitionId) => {
+    set({ highlightedLibraryBlockId: definitionId });
   },
 
   // Update strategy settings

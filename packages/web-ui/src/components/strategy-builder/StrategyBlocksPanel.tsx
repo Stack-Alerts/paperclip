@@ -46,24 +46,26 @@ interface StoredExitConfig {
 }
 
 // ─────────────────────────────────────────────
-// RecheckConfigModal  (Issue #2: 620px wide)
+// RecheckConfigModal — always opened via ⚙, includes enable/disable toggle
 // ─────────────────────────────────────────────
 interface RecheckConfigModalProps {
   open: boolean;
   signalName: string;
+  enabled: boolean;
   barDelay: number;
   mode: string;
-  onSave: (barDelay: number, mode: string) => void;
+  onSave: (enabled: boolean, barDelay: number, mode: string) => void;
   onCancel: () => void;
 }
 
-function RecheckConfigModal({ open, signalName, barDelay, mode, onSave, onCancel }: RecheckConfigModalProps) {
+function RecheckConfigModal({ open, signalName, enabled, barDelay, mode, onSave, onCancel }: RecheckConfigModalProps) {
+  const [isEnabled, setIsEnabled] = useState(enabled);
   const [delay, setDelay] = useState(barDelay);
   const [recheckMode, setRecheckMode] = useState(mode);
 
   useEffect(() => {
-    if (open) { setDelay(barDelay); setRecheckMode(mode); }
-  }, [open, barDelay, mode]);
+    if (open) { setIsEnabled(enabled); setDelay(barDelay); setRecheckMode(mode); }
+  }, [open, enabled, barDelay, mode]);
 
   if (!open) return null;
 
@@ -87,44 +89,65 @@ function RecheckConfigModal({ open, signalName, barDelay, mode, onSave, onCancel
 
         {/* Body */}
         <div className="px-4 pt-4 pb-3 space-y-3">
-          <div className="text-base font-bold" style={{ color: '#E8EAED' }}>Signal: {signalName}</div>
-          <p className="text-xs" style={{ color: '#9AA0A6' }}>
-            Enter number of bars within which signal must reoccur for validation:
-          </p>
-          <input
-            type="number" min={1} max={200} value={delay}
-            onChange={e => setDelay(Math.max(1, parseInt(e.target.value) || 1))}
-            className="w-full px-3 py-2 rounded border text-sm focus:outline-none"
-            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
-          />
-          <div className="text-sm font-bold" style={{ color: '#E8EAED' }}>RECHECK Mode:</div>
-          <div className="rounded border overflow-hidden" style={{ borderColor: '#3C4149' }}>
-            {MODES.map((opt, i) => {
-              const selected = recheckMode === opt.value;
-              return (
-                <div
-                  key={opt.value}
-                  className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:opacity-90 transition-opacity"
-                  style={{
-                    background: selected ? 'rgba(16,185,129,0.08)' : '#2A2F3A',
-                    borderBottom: i < MODES.length - 1 ? '1px solid #3C4149' : undefined,
-                  }}
-                  onClick={() => setRecheckMode(opt.value)}
-                >
-                  <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0" style={{ borderColor: selected ? '#10B981' : '#6B7280' }}>
-                    {selected && <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#10B981' }} />}
-                  </div>
-                  <span className="text-sm font-semibold whitespace-nowrap" style={{ color: selected ? '#E8EAED' : '#9AA0A6' }}>{opt.label}</span>
-                </div>
-              );
-            })}
+          <div className="text-base font-bold" style={{ color: '#E8EAED' }}>Signal: {formatSignalName(signalName)}</div>
+
+          {/* Enable toggle */}
+          <div
+            className="flex items-center gap-3 px-3 py-2.5 rounded border cursor-pointer"
+            style={{ background: isEnabled ? 'rgba(16,185,129,0.08)' : '#2A2F3A', borderColor: isEnabled ? '#10B981' : '#3C4149' }}
+            onClick={() => setIsEnabled(v => !v)}
+          >
+            <div className="w-10 h-5 rounded-full flex items-center px-0.5 transition-colors flex-shrink-0"
+              style={{ background: isEnabled ? '#10B981' : '#4B5563' }}>
+              <div className="w-4 h-4 rounded-full bg-white shadow transition-transform"
+                style={{ transform: isEnabled ? 'translateX(20px)' : 'translateX(0)' }} />
+            </div>
+            <span className="text-sm font-semibold" style={{ color: isEnabled ? '#E8EAED' : '#9AA0A6' }}>
+              {isEnabled ? 'RECHECK Enabled' : 'RECHECK Disabled — click to enable'}
+            </span>
           </div>
+
+          {isEnabled && (
+            <>
+              <p className="text-xs" style={{ color: '#9AA0A6' }}>
+                Enter number of bars within which signal must reoccur for validation:
+              </p>
+              <input
+                type="number" min={1} max={200} value={delay}
+                onChange={e => setDelay(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-full px-3 py-2 rounded border text-sm focus:outline-none"
+                style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+              />
+              <div className="text-sm font-bold" style={{ color: '#E8EAED' }}>RECHECK Mode:</div>
+              <div className="rounded border overflow-hidden" style={{ borderColor: '#3C4149' }}>
+                {MODES.map((opt, i) => {
+                  const selected = recheckMode === opt.value;
+                  return (
+                    <div
+                      key={opt.value}
+                      className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:opacity-90 transition-opacity"
+                      style={{
+                        background: selected ? 'rgba(16,185,129,0.08)' : '#2A2F3A',
+                        borderBottom: i < MODES.length - 1 ? '1px solid #3C4149' : undefined,
+                      }}
+                      onClick={() => setRecheckMode(opt.value)}
+                    >
+                      <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0" style={{ borderColor: selected ? '#10B981' : '#6B7280' }}>
+                        {selected && <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#10B981' }} />}
+                      </div>
+                      <span className="text-sm font-semibold whitespace-nowrap" style={{ color: selected ? '#E8EAED' : '#9AA0A6' }}>{opt.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Footer */}
         <div className="flex border-t rounded-b overflow-hidden" style={{ borderColor: '#3C4149' }}>
           <button onClick={onCancel} className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90" style={{ background: '#C35252', color: '#ffffff' }}>✕ Cancel</button>
-          <button onClick={() => onSave(delay, recheckMode)} className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90" style={{ background: '#10B981', color: '#ffffff' }}>✓ OK</button>
+          <button onClick={() => onSave(isEnabled, delay, recheckMode)} className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90" style={{ background: '#10B981', color: '#ffffff' }}>✓ OK</button>
         </div>
       </div>
     </div>
@@ -152,6 +175,7 @@ function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate }: ExitPil
     <div className="flex items-center gap-2 ml-4 mt-1 text-xs px-2 py-1 rounded border border-red-900/50" style={{ background: 'rgba(220,38,38,0.07)' }}>
       <span style={{ color: '#DC2626' }}>↳ 🔴</span>
       <span className="font-semibold flex-1 truncate" style={{ color: '#FCA5A5' }}>{name}</span>
+      {cfg?.signalName && <span className="truncate" style={{ color: '#9AA0A6' }}>({formatSignalName(cfg.signalName)})</span>}
       <span style={{ color: '#10B981' }}>{pct}</span>
       <span style={{ color: mode === 'FLEXIBLE' ? '#3B82F6' : '#9AA0A6' }}>{mode}</span>
       {cfg?.recheckEnabled && <span style={{ color: '#14a0a5' }}>RCHK:{cfg.recheckBarDelay ?? 3}</span>}
@@ -166,29 +190,34 @@ function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate }: ExitPil
 }
 
 // ─────────────────────────────────────────────
-// BlockCard  (Issues #3, #6: exit hierarchy)
+// BlockCard
 // ─────────────────────────────────────────────
 interface BlockCardProps {
   block: Block;
   index: number;
-  total: number;
+  mainIndex: number;
+  mainTotal: number;
   onMoveUp: (index: number) => void;
   onMoveDown: (index: number) => void;
   onRemove: (index: number) => void;
   onConfig: (index: number) => void;
-  onToggleRecheck: (blockIndex: number, signalIndex: number) => void;
   onConfigRecheck: (blockIndex: number, signalIndex: number) => void;
   onRemoveRecheck: (blockIndex: number, signalIndex: number) => void;
   onDuplicateSignal: (blockIndex: number, signalIndex: number) => void;
   onRemoveSignal: (blockIndex: number, signalIndex: number) => void;
-  // Exits bound to this block (BLOCK-level binding)
+  onHighlightInLibrary: (definitionId: string) => void;
   blockExits: { block: Block; globalIndex: number }[];
-  // Exits bound to a specific signal in this block: key = signal name
   signalExits: Map<string, { block: Block; globalIndex: number }[]>;
   onEditExit: (index: number) => void;
   onRemoveExit: (index: number) => void;
   onDuplicateExit: (index: number) => void;
 }
+
+const BTN: React.CSSProperties = {
+  height: 28, borderRadius: 4,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  fontSize: 12, cursor: 'pointer', flexShrink: 0, padding: '0 10px', fontWeight: 600,
+};
 
 const TEAL_BTN: React.CSSProperties = {
   background: '#0d7377', color: '#ffffff', border: '1px solid #14a0a5',
@@ -197,7 +226,6 @@ const TEAL_BTN: React.CSSProperties = {
   fontSize: 13, cursor: 'pointer', flexShrink: 0,
 };
 
-// Two-tone copy icon: teal-outlined back page, sky-blue-outlined front page
 function DupIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -208,15 +236,17 @@ function DupIcon() {
 }
 
 function BlockCard({
-  block, index, total,
+  block, index, mainIndex, mainTotal,
   onMoveUp, onMoveDown, onRemove, onConfig,
-  onToggleRecheck, onConfigRecheck, onRemoveRecheck, onDuplicateSignal, onRemoveSignal,
+  onConfigRecheck, onRemoveRecheck, onDuplicateSignal, onRemoveSignal,
+  onHighlightInLibrary,
   blockExits, signalExits, onEditExit, onRemoveExit, onDuplicateExit,
 }: BlockCardProps) {
   const blockName = (block.data.name as string | undefined) || BLOCK_TYPE_LABELS[block.type] || block.type;
   const logic = (block.data.logic as string | undefined) ?? 'AND';
   const signals = (block.data.signals as BlockSignal[] | undefined) ?? [];
   const isExit = block.type === BlockType.EXIT_CONDITION || logic === 'EXIT';
+  const definitionId = block.data.definitionId as string | undefined;
 
   const badgeStyle: React.CSSProperties = isExit
     ? { background: 'rgba(153,27,27,0.6)', color: '#FCA5A5', border: '1px solid #7F1D1D' }
@@ -229,48 +259,58 @@ function BlockCard({
   const cardBg = isExit
     ? 'rgba(40,10,10,0.95)'
     : logic === 'OR'
-    ? 'rgba(10,30,20,0.95)'
-    : 'rgba(10,20,40,0.95)';
+    ? 'rgba(12,28,22,0.95)'
+    : 'rgba(25,30,38,0.95)';
 
   return (
     <div className="rounded border border-[#3C4149] mb-3" style={{ background: cardBg, borderLeft: `4px solid ${leftBorderColor}` }}>
-      {/* Header: icon + name + badge + arrows */}
+      {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#3C4149]/60">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="flex-shrink-0">
           <rect x="1" y="9" width="4" height="6" rx="0.5" fill="#3B82F6"/>
           <rect x="6" y="5" width="4" height="10" rx="0.5" fill="#10B981"/>
           <rect x="11" y="7" width="4" height="8" rx="0.5" fill="#3B82F6" opacity="0.55"/>
         </svg>
-        <span className="flex-1 text-sm font-semibold truncate" style={{ color: '#A0AEC0' }} title={blockName}>{blockName}</span>
+        <span
+          className="flex-1 text-sm font-semibold truncate hover:text-sky-300 transition-colors"
+          style={{ color: '#A0AEC0', cursor: definitionId ? 'pointer' : 'default' }}
+          title={definitionId ? `Click to find "${blockName}" in library` : blockName}
+          onClick={() => { if (definitionId) onHighlightInLibrary(definitionId); }}
+        >
+          {blockName}
+        </span>
         <span className="text-xs px-2 py-0.5 rounded font-mono flex-shrink-0" style={badgeStyle}>{badgeLabel}</span>
         <div className="flex items-center gap-0.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
-          <button onClick={() => onMoveUp(index)} disabled={index === 0} title="Move block up"
+          <button onClick={() => onMoveUp(index)} disabled={mainIndex === 0} title="Move block up"
             className="p-1 rounded hover:text-[#E8EAED] hover:bg-[#2A2F3A] disabled:opacity-25 disabled:cursor-not-allowed text-xs transition-colors"
             style={{ color: '#9AA0A6' }}>▲</button>
-          <button onClick={() => onMoveDown(index)} disabled={index === total - 1} title="Move block down"
+          <button onClick={() => onMoveDown(index)} disabled={mainIndex === mainTotal - 1} title="Move block down"
             className="p-1 rounded hover:text-[#E8EAED] hover:bg-[#2A2F3A] disabled:opacity-25 disabled:cursor-not-allowed text-xs transition-colors"
             style={{ color: '#9AA0A6' }}>▼</button>
         </div>
       </div>
 
-      {/* Position # + Config (2+) + Remove */}
+      {/* Action row: # + Config (always shown) + Remove */}
       <div className="flex items-center gap-2 px-3 pt-2 pb-1">
-        <span className="text-sm font-bold" style={{ color: '#2a5eb8' }}>#{index + 1}</span>
+        <span className="text-sm font-bold" style={{ color: '#2a5eb8' }}>#{mainIndex + 1}</span>
         <div className="flex-1" />
-        {index > 0 && (
-          <button onClick={() => onConfig(index)} title="Configure timing constraint"
-            className="text-xs px-3 py-1.5 rounded font-medium transition-colors hover:opacity-80 flex-shrink-0"
-            style={{ background: '#2a5eb8', color: '#ffffff', border: '1px solid #1a4a9a' }}>⚙ Config</button>
-        )}
-        <button onClick={() => onRemove(index)} title="Remove this block"
-          className="text-xs px-3 py-1.5 rounded font-medium transition-colors hover:opacity-80 flex-shrink-0"
-          style={{ background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252' }}>✕ Remove</button>
+        <button
+          onClick={() => onConfig(index)}
+          disabled={mainIndex === 0}
+          title={mainIndex === 0 ? 'Timing constraints require a prior block' : 'Configure timing constraint'}
+          className="hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition-opacity flex-shrink-0"
+          style={{ ...BTN, background: '#2a5eb8', color: '#ffffff', border: '1px solid #1a4a9a' }}
+        >⚙ Config</button>
+        <button
+          onClick={() => onRemove(index)}
+          title="Remove this block"
+          className="hover:opacity-80 transition-opacity flex-shrink-0"
+          style={{ ...BTN, background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252' }}
+        >✕ Remove</button>
       </div>
 
-      {/* Signals count */}
       <div className="px-3 pb-2 text-xs" style={{ color: '#9AA0A6' }}>Signals: {signals.length}</div>
 
-      {/* Signals inner box */}
       {signals.length > 0 && (
         <div className="mx-3 mb-2 rounded border border-[#3C4149]/60" style={{ background: '#15191E' }}>
           <div className="px-3 py-2.5 space-y-2">
@@ -284,10 +324,15 @@ function BlockCard({
 
               return (
                 <div key={si} className="space-y-1">
-                  {/* Signal row — ⚙/<DupIcon />/✕ always visible */}
                   <div className="flex items-center gap-1.5 text-xs">
                     <span className="flex-1 min-w-0">
-                      <span style={{ color: '#E8EAED' }}>{si + 1}. {formatSignalName(sig.name)}</span>
+                      <span
+                        className="hover:text-sky-300 transition-colors"
+                        style={{ color: '#E8EAED', cursor: definitionId ? 'pointer' : 'default' }}
+                        onClick={() => { if (definitionId) onHighlightInLibrary(definitionId); }}
+                      >
+                        {si + 1}. {formatSignalName(sig.name)}
+                      </span>
                       <span className="font-mono font-semibold ml-1.5" style={{ color: logicColor }}>[{sigLogic}]</span>
                       {hasTiming && (
                         <span className="ml-2" style={{ color: '#FFA500' }}>
@@ -296,17 +341,15 @@ function BlockCard({
                         </span>
                       )}
                     </span>
-                    {/* ⚙: open recheck config if active, else enable recheck */}
                     <button
-                      onClick={() => hasRecheck ? onConfigRecheck(index, si) : onToggleRecheck(index, si)}
-                      title={hasRecheck ? 'Configure recheck' : 'Enable recheck on delayed candles'}
-                      style={TEAL_BTN}>⚙</button>
+                      onClick={() => onConfigRecheck(index, si)}
+                      title="Configure recheck"
+                      style={{ ...TEAL_BTN, background: hasRecheck ? '#0d7377' : '#2A2F3A', border: hasRecheck ? '1px solid #14a0a5' : '1px solid #3C4149' }}>⚙</button>
                     <button onClick={() => onDuplicateSignal(index, si)} title="Duplicate signal" style={TEAL_BTN}><DupIcon /></button>
                     <button onClick={() => onRemoveSignal(index, si)} title="Remove signal"
                       style={{ ...TEAL_BTN, background: 'rgba(153,27,27,0.7)', border: '1px solid #C35252' }}>✕</button>
                   </div>
 
-                  {/* Recheck status sub-row (no buttons — managed via ⚙ above) */}
                   {hasRecheck && (
                     <div className="flex items-center gap-1.5 ml-3 text-xs">
                       <span style={{ color: '#14a0a5' }}>↳</span>
@@ -318,7 +361,6 @@ function BlockCard({
                     </div>
                   )}
 
-                  {/* Signal-level exit conditions */}
                   {sigExits.map(({ block: eb, globalIndex: gi }) => (
                     <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} onDuplicate={onDuplicateExit} />
                   ))}
@@ -335,7 +377,6 @@ function BlockCard({
         </div>
       )}
 
-      {/* Block-level exit conditions (Issue #6) */}
       {blockExits.length > 0 && (
         <div className="mx-3 mb-3 space-y-1">
           <div className="text-xs font-semibold" style={{ color: '#9AA0A6' }}>Block Exit Conditions:</div>
@@ -349,7 +390,7 @@ function BlockCard({
 }
 
 // ─────────────────────────────────────────────
-// ExitConditionsSection (Issue #4: add ⚙ edit button; only STRATEGY exits)
+// ExitConditionsSection
 // ─────────────────────────────────────────────
 interface ExitConditionsSectionProps {
   strategyExits: { block: Block; globalIndex: number }[];
@@ -383,17 +424,29 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate }:
               return (
                 <div key={block.id} className="rounded border border-red-900/40 px-3 py-2" style={{ background: 'rgba(42,47,58,0.6)' }}>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-red-300 font-semibold text-xs truncate">🔴 {name}</span>
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <span className="text-red-300 font-semibold text-xs truncate">🔴 {name}</span>
+                      {cfg?.signalName && (
+                        <span className="text-xs truncate" style={{ color: '#9AA0A6' }}>
+                          → {formatSignalName(cfg.signalName)}
+                        </span>
+                      )}
+                      {(cfg?.blockName) && (
+                        <span className="text-xs px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(59,130,246,0.1)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.2)' }}>
+                          {cfg.blockName}{cfg.parentSignalName ? ` → ${formatSignalName(cfg.parentSignalName)}` : ''}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <button onClick={() => onEdit(globalIndex)} title="Configure exit condition"
                         className="hover:opacity-80"
-                        style={{ background: '#0d7377', color: '#fff', border: '1px solid #14a0a5', width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>⚙</button>
+                        style={{ background: '#0d7377', color: '#fff', border: '1px solid #14a0a5', width: 28, height: 28, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>⚙</button>
                       <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition"
                         className="hover:opacity-80"
-                        style={{ background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9', width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}><DupIcon /></button>
+                        style={{ background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9', width: 28, height: 28, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}><DupIcon /></button>
                       <button onClick={() => onRemove(globalIndex)} title="Remove exit condition"
                         className="hover:opacity-80"
-                        style={{ background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252', width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>✕</button>
+                        style={{ background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252', width: 28, height: 28, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 mt-1 flex-wrap text-xs" style={{ color: '#9AA0A6' }}>
@@ -413,49 +466,105 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate }:
 }
 
 // ─────────────────────────────────────────────
+// ReorderConfirmModal
+// ─────────────────────────────────────────────
+interface ReorderConfirmProps {
+  fromName: string;
+  toName: string;
+  direction: 'up' | 'down';
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ReorderConfirmModal({ fromName, toName, direction, onConfirm, onCancel }: ReorderConfirmProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="rounded border shadow-2xl w-[480px]" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
+        <div className="px-4 py-3 border-b" style={{ borderColor: '#3C4149', background: '#2A2F3A' }}>
+          <span className="text-sm font-semibold" style={{ color: '#E8EAED' }}>Reorder Building Blocks</span>
+        </div>
+        <div className="px-4 py-4 space-y-2.5">
+          <p className="text-sm" style={{ color: '#E8EAED' }}>
+            Move <span className="font-semibold" style={{ color: '#38bdf8' }}>{fromName}</span>{' '}
+            {direction === 'up' ? 'before' : 'after'}{' '}
+            <span className="font-semibold" style={{ color: '#38bdf8' }}>{toName}</span>?
+          </p>
+          <p className="text-xs" style={{ color: '#9AA0A6' }}>
+            If either block has timing constraints that reference the other, those constraints will need to be reconfigured to maintain strategy integrity.
+          </p>
+        </div>
+        <div className="flex border-t overflow-hidden" style={{ borderColor: '#3C4149' }}>
+          <button onClick={onCancel} className="flex-1 py-2.5 text-sm font-semibold hover:opacity-80" style={{ background: '#C35252', color: '#fff' }}>✕ Cancel</button>
+          <button onClick={onConfirm} className="flex-1 py-2.5 text-sm font-semibold hover:opacity-80" style={{ background: '#10B981', color: '#fff' }}>✓ Confirm</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // StrategyBlocksPanel (main export)
 // ─────────────────────────────────────────────
 export function StrategyBlocksPanel() {
-  const { currentStrategy, deleteBlock, reorderBlocks, updateBlock, addBlock } = useStrategyStore();
+  const { currentStrategy, deleteBlock, reorderBlocks, updateBlock, addBlock, highlightLibraryBlock } = useStrategyStore();
 
   const blocks: Block[] = currentStrategy?.blocks ?? [];
 
   const [timingDialogIndex, setTimingDialogIndex] = useState<number | null>(null);
   const [recheckTarget, setRecheckTarget] = useState<{ blockIndex: number; signalIndex: number } | null>(null);
-  // Issue #4: editing an exit condition
   const [editingExitIndex, setEditingExitIndex] = useState<number | null>(null);
+  const [reorderConfirm, setReorderConfirm] = useState<{
+    fromIndex: number; toIndex: number; fromName: string; toName: string; direction: 'up' | 'down';
+  } | null>(null);
+
+  // Compute main-block-only global indices for correct up/down behaviour
+  const mainBlockIndices = blocks
+    .map((b, i) => ({ b, i }))
+    .filter(({ b }) => b.type !== BlockType.EXIT_CONDITION && (b.data.logic as string) !== 'EXIT')
+    .map(({ i }) => i);
 
   const handleMoveUp = useCallback(
-    (index: number) => { if (index > 0) reorderBlocks(index, index - 1); },
-    [reorderBlocks]
+    (globalIndex: number) => {
+      const latestBlocks = useStrategyStore.getState().currentStrategy?.blocks ?? [];
+      const mbi = latestBlocks
+        .map((b, i) => ({ b, i }))
+        .filter(({ b }) => b.type !== BlockType.EXIT_CONDITION && (b.data.logic as string) !== 'EXIT')
+        .map(({ i }) => i);
+      const pos = mbi.indexOf(globalIndex);
+      if (pos <= 0) return;
+      const targetIndex = mbi[pos - 1];
+      const fromName = (latestBlocks[globalIndex]?.data.name as string | undefined) || 'Block';
+      const toName = (latestBlocks[targetIndex]?.data.name as string | undefined) || 'Block';
+      setReorderConfirm({ fromIndex: globalIndex, toIndex: targetIndex, fromName, toName, direction: 'up' });
+    },
+    []
   );
+
   const handleMoveDown = useCallback(
-    (index: number) => { if (index < blocks.length - 1) reorderBlocks(index, index + 1); },
-    [blocks.length, reorderBlocks]
+    (globalIndex: number) => {
+      const latestBlocks = useStrategyStore.getState().currentStrategy?.blocks ?? [];
+      const mbi = latestBlocks
+        .map((b, i) => ({ b, i }))
+        .filter(({ b }) => b.type !== BlockType.EXIT_CONDITION && (b.data.logic as string) !== 'EXIT')
+        .map(({ i }) => i);
+      const pos = mbi.indexOf(globalIndex);
+      if (pos < 0 || pos >= mbi.length - 1) return;
+      const targetIndex = mbi[pos + 1];
+      const fromName = (latestBlocks[globalIndex]?.data.name as string | undefined) || 'Block';
+      const toName = (latestBlocks[targetIndex]?.data.name as string | undefined) || 'Block';
+      setReorderConfirm({ fromIndex: globalIndex, toIndex: targetIndex, fromName, toName, direction: 'down' });
+    },
+    []
   );
+
+  const handleConfirmReorder = useCallback(() => {
+    if (!reorderConfirm) return;
+    reorderBlocks(reorderConfirm.fromIndex, reorderConfirm.toIndex);
+    setReorderConfirm(null);
+  }, [reorderConfirm, reorderBlocks]);
+
   const handleRemove = useCallback((index: number) => { deleteBlock(index); }, [deleteBlock]);
   const handleConfig = useCallback((index: number) => { setTimingDialogIndex(index); }, []);
-
-  const handleToggleRecheck = useCallback(
-    (blockIndex: number, signalIndex: number) => {
-      const block = blocks[blockIndex];
-      if (!block) return;
-      const signals = [...((block.data.signals as BlockSignal[] | undefined) ?? [])];
-      if (!signals[signalIndex]) return;
-      const sig = { ...signals[signalIndex] };
-      const current = sig.recheckEnabled || sig.recheck_config?.enabled;
-      if (current) {
-        sig.recheckEnabled = false;
-        sig.recheck_config = { enabled: false };
-      } else {
-        sig.recheckEnabled = true;
-        sig.recheck_config = { enabled: true, bar_delay: 3, mode: 'WITHIN' };
-      }
-      signals[signalIndex] = sig;
-      updateBlock(blockIndex, { signals });
-    },
-    [blocks, updateBlock]
-  );
 
   const handleConfigRecheck = useCallback((blockIndex: number, signalIndex: number) => {
     setRecheckTarget({ blockIndex, signalIndex });
@@ -479,7 +588,6 @@ export function StrategyBlocksPanel() {
       if (!block) return;
       const signals = [...((block.data.signals as BlockSignal[] | undefined) ?? [])];
       if (!signals[signalIndex]) return;
-      // Duplicate the signal WITHOUT carrying over the recheck config
       signals.splice(signalIndex + 1, 0, {
         ...signals[signalIndex],
         recheckEnabled: false,
@@ -507,7 +615,6 @@ export function StrategyBlocksPanel() {
       if (!block) return;
       const position = exitGlobalIndex + 1;
       addBlock(BlockType.EXIT_CONDITION, position);
-      // Deep-clone so the duplicate's exitConfig is fully independent from the original
       const clonedData = JSON.parse(JSON.stringify(block.data)) as typeof block.data;
       updateBlock(position, clonedData);
     },
@@ -515,14 +622,18 @@ export function StrategyBlocksPanel() {
   );
 
   const handleRecheckConfigSave = useCallback(
-    (barDelay: number, mode: string) => {
+    (enabled: boolean, barDelay: number, mode: string) => {
       if (!recheckTarget) return;
       const { blockIndex, signalIndex } = recheckTarget;
       const block = blocks[blockIndex];
       if (!block) return;
       const signals = [...((block.data.signals as BlockSignal[] | undefined) ?? [])];
       if (!signals[signalIndex]) return;
-      signals[signalIndex] = { ...signals[signalIndex], recheckEnabled: true, recheck_config: { enabled: true, bar_delay: barDelay, mode } };
+      signals[signalIndex] = {
+        ...signals[signalIndex],
+        recheckEnabled: enabled,
+        recheck_config: { enabled, ...(enabled ? { bar_delay: barDelay, mode } : {}) },
+      };
       updateBlock(blockIndex, { signals });
       setRecheckTarget(null);
     },
@@ -540,7 +651,6 @@ export function StrategyBlocksPanel() {
     [timingDialogIndex, blocks, updateBlock]
   );
 
-  // Issue #4: save edited exit config
   const handleExitConfigSave = useCallback(
     (config: ExitConditionConfig) => {
       if (editingExitIndex === null) return;
@@ -551,8 +661,7 @@ export function StrategyBlocksPanel() {
     [editingExitIndex, updateBlock]
   );
 
-  // ── Exit bucket separation (Issues #3, #6) ──
-  // Only EXIT_CONDITION blocks are displayed hierarchically based on bindingLevel.
+  // Exit bucket separation
   const exitBlocksAll = blocks
     .map((b, i) => ({ block: b, globalIndex: i }))
     .filter(({ block }) => block.type === BlockType.EXIT_CONDITION || (block.data.logic as string) === 'EXIT');
@@ -562,9 +671,7 @@ export function StrategyBlocksPanel() {
     return !cfg || cfg.bindingLevel === 'STRATEGY' || !cfg.bindingLevel;
   });
 
-  // Per main block: BLOCK-bound exits (keyed by blockName)
   const blockExitsByName = new Map<string, { block: Block; globalIndex: number }[]>();
-  // Per main block+signal: SIGNAL-bound exits (keyed by blockName::signalName)
   const signalExitsByKey = new Map<string, { block: Block; globalIndex: number }[]>();
 
   for (const entry of exitBlocksAll) {
@@ -594,14 +701,12 @@ export function StrategyBlocksPanel() {
       referenceId: b.id,
     }));
 
-  // Build available blocks for exit edit dialog
   const availableBlocksForDialog: AvailableBlock[] = mainBlocks.map(b => ({
     id: b.id,
     name: (b.data.name as string | undefined) ?? b.id,
     signals: ((b.data.signals as Array<{ name: string }> | undefined) ?? []).map(s => s.name),
   }));
 
-  // Existing config for the exit being edited
   const editingExitConfig: ExitConditionConfig | undefined = editingExitIndex !== null
     ? (() => {
         const cfg = blocks[editingExitIndex]?.data.exitConfig as StoredExitConfig | undefined;
@@ -638,11 +743,10 @@ export function StrategyBlocksPanel() {
             <p className="text-xs" style={{ color: '#6B7280' }}>Use the library on the right to add blocks</p>
           </div>
         ) : (
-          mainBlocks.map(block => {
+          mainBlocks.map((block, mi) => {
             const globalIndex = blocks.indexOf(block);
             const bName = (block.data.name as string | undefined) ?? '';
             const bExits = blockExitsByName.get(bName) ?? [];
-            // Build per-signal exit map for this block
             const sigExitMap = new Map<string, { block: Block; globalIndex: number }[]>();
             for (const [key, entries] of signalExitsByKey.entries()) {
               if (key.startsWith(`${bName}::`)) {
@@ -655,16 +759,17 @@ export function StrategyBlocksPanel() {
                 key={block.id}
                 block={block}
                 index={globalIndex}
-                total={blocks.length}
+                mainIndex={mi}
+                mainTotal={mainBlocks.length}
                 onMoveUp={handleMoveUp}
                 onMoveDown={handleMoveDown}
                 onRemove={handleRemove}
                 onConfig={handleConfig}
-                onToggleRecheck={handleToggleRecheck}
                 onConfigRecheck={handleConfigRecheck}
                 onRemoveRecheck={handleRemoveRecheck}
                 onDuplicateSignal={handleDuplicateSignal}
                 onRemoveSignal={handleRemoveSignal}
+                onHighlightInLibrary={highlightLibraryBlock}
                 blockExits={bExits}
                 signalExits={sigExitMap}
                 onEditExit={setEditingExitIndex}
@@ -676,7 +781,6 @@ export function StrategyBlocksPanel() {
         )}
       </div>
 
-      {/* Strategy Exit Conditions (STRATEGY binding only) */}
       <ExitConditionsSection
         strategyExits={strategyExits}
         onRemove={handleRemove}
@@ -704,6 +808,7 @@ export function StrategyBlocksPanel() {
           <RecheckConfigModal
             open={true}
             signalName={sig?.name ?? ''}
+            enabled={!!(sig?.recheckEnabled || sig?.recheck_config?.enabled)}
             barDelay={sig?.recheck_config?.bar_delay ?? 3}
             mode={sig?.recheck_config?.mode ?? 'WITHIN'}
             onSave={handleRecheckConfigSave}
@@ -712,7 +817,7 @@ export function StrategyBlocksPanel() {
         );
       })()}
 
-      {/* Exit Condition Edit Dialog (Issue #4) */}
+      {/* Exit Condition Edit Dialog */}
       {editingExitIndex !== null && (
         <ExitConditionDialog
           open={true}
@@ -721,6 +826,17 @@ export function StrategyBlocksPanel() {
           existing={editingExitConfig}
           onSave={handleExitConfigSave}
           onCancel={() => setEditingExitIndex(null)}
+        />
+      )}
+
+      {/* Reorder Confirmation Modal */}
+      {reorderConfirm && (
+        <ReorderConfirmModal
+          fromName={reorderConfirm.fromName}
+          toName={reorderConfirm.toName}
+          direction={reorderConfirm.direction}
+          onConfirm={handleConfirmReorder}
+          onCancel={() => setReorderConfirm(null)}
         />
       )}
     </div>
