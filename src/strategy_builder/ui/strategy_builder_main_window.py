@@ -1621,21 +1621,31 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
             window.generate_code_requested.connect(self._on_generate_code_from_report)
             window.show()
         elif step == 2:
-            # Test / Optimize step - CHECK PREREQUISITES  
+            # Generate step - CHECK PREREQUISITES
+            if not self._check_generation_prerequisites():
+                return
+
+            self.stepper.set_current_step(2)
+            self._on_generate_code_from_report()
+            self.stepper.mark_step_complete(2)
+            self._update_status("Strategy code generated")
+
+        elif step == 3:
+            # Test / Optimize step - CHECK PREREQUISITES
             if not self._check_test_prerequisites():
                 return  # Prerequisites not met, error shown
-            
-            self.stepper.set_current_step(2)
+
+            self.stepper.set_current_step(3)
             self._on_run_backtest()
             # Mark complete when backtest dialog opens successfully
             self.test_completed = True
-        
-        elif step == 3:
+
+        elif step == 4:
             # Publish step - CHECK PREREQUISITES
             if not self._check_publish_prerequisites():
                 return  # Prerequisites not met, error shown
-            
-            self.stepper.set_current_step(3)
+
+            self.stepper.set_current_step(4)
             QMessageBox.information(
                 self,
                 "Publish Status",

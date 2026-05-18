@@ -1,11 +1,12 @@
 """
 Stepper Ribbon - Workflow Progress Component
 
-Shows the 4-step workflow progression in the toolbar:
+Shows the 5-step workflow progression in the toolbar:
 1. Design Strategy
 2. Validate
-3. Test / Optimize
-4. Publish
+3. Generate
+4. Test / Optimize
+5. Publish
 
 Author: Strategy Builder Team
 Date: 2026-01-17
@@ -33,8 +34,9 @@ class StepperRibbon(QWidget):
     Steps:
     1. Design Strategy
     2. Validate
-    3. Test / Optimize
-    4. Publish Status
+    3. Generate
+    4. Test / Optimize
+    5. Publish Status
 
     Signals:
         step_clicked(int): Emitted when step is clicked
@@ -45,8 +47,9 @@ class StepperRibbon(QWidget):
     STEPS = [
         {"name": "Design", "icon": "📝", "tooltip": "Design your trading strategy"},
         {"name": "Validate", "icon": "✓", "tooltip": "Validate strategy configuration"},
+        {"name": "Generate", "icon": "⚙", "tooltip": "Generate strategy code"},
         {"name": "Test / Optimize", "icon": "🧪", "tooltip": "Run backtest and optimize parameters with Optimizer v3"},
-        {"name": "Publish", "icon": "🚀", "tooltip": "Set publish status"}
+        {"name": "Publish", "icon": "🚀", "tooltip": "Set publish status"},
     ]
 
     BUTTON_MIN_WIDTH = 140
