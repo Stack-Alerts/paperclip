@@ -164,7 +164,7 @@ export function ExitConditionDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div
         className="rounded border shadow-2xl flex flex-col"
-        style={{ background: '#1E2128', borderColor: '#3C4149', width: 580, maxHeight: '90vh' }}
+        style={{ background: '#1E2128', borderColor: '#3C4149', width: 680, maxHeight: '90vh' }}
       >
         {/* Title bar */}
         <div

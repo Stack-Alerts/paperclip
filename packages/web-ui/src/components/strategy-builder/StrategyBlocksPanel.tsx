@@ -209,10 +209,15 @@ function BlockCard({
     : { background: '#2a5eb8', color: '#ffffff', border: '1px solid #1a4a9a' };
 
   const badgeLabel = isExit ? 'EXIT' : logic === 'OR' ? 'OPTIONAL' : 'REQUIRED';
-  const leftBorderColor = isExit ? '#DC2626' : logic === 'OR' ? '#3B82F6' : '#2a5eb8';
+  const leftBorderColor = isExit ? '#DC2626' : logic === 'OR' ? '#10B981' : '#3B82F6';
+  const cardBg = isExit
+    ? 'rgba(40,10,10,0.95)'
+    : logic === 'OR'
+    ? 'rgba(10,30,20,0.95)'
+    : 'rgba(10,20,40,0.95)';
 
   return (
-    <div className="rounded border border-[#3C4149] mb-3" style={{ background: '#1E2128', borderLeft: `4px solid ${leftBorderColor}` }}>
+    <div className="rounded border border-[#3C4149] mb-3" style={{ background: cardBg, borderLeft: `4px solid ${leftBorderColor}` }}>
       {/* Header: icon + name + badge + arrows */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#3C4149]/60">
         <span className="flex-shrink-0 text-base" style={{ color: '#6B7280' }}>📊</span>
@@ -449,7 +454,12 @@ export function StrategyBlocksPanel() {
       if (!block) return;
       const signals = [...((block.data.signals as BlockSignal[] | undefined) ?? [])];
       if (!signals[signalIndex]) return;
-      signals.splice(signalIndex + 1, 0, { ...signals[signalIndex] });
+      // Duplicate the signal WITHOUT carrying over the recheck config
+      signals.splice(signalIndex + 1, 0, {
+        ...signals[signalIndex],
+        recheckEnabled: false,
+        recheck_config: { enabled: false },
+      });
       updateBlock(blockIndex, { signals });
     },
     [blocks, updateBlock]

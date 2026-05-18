@@ -157,14 +157,21 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   const isModified = !!currentStrategy && strategySnapshot !== cleanSnapshot;
   const isSavingRef = useRef(false);
 
-  // Status bar countdown
+  // Status bar countdown — aligns to real 15-minute UTC candle boundaries (+0.2 s)
   const [statusText, setStatusText] = useState('Ready');
-  const nextCheckRef = useRef<Date>(new Date(Date.now() + 15 * 60 * 1000));
+  const nextCheckRef = useRef<Date>(
+    (() => {
+      const now = Date.now();
+      const interval = 15 * 60 * 1000;
+      return new Date((Math.floor(now / interval) + 1) * interval + 200);
+    })()
+  );
   useEffect(() => {
     const timer = setInterval(() => {
       const diff = Math.max(0, nextCheckRef.current.getTime() - Date.now());
-      if (diff === 0) {
-        nextCheckRef.current = new Date(Date.now() + 15 * 60 * 1000);
+      if (diff < 500) {
+        const interval = 15 * 60 * 1000;
+        nextCheckRef.current = new Date((Math.floor(Date.now() / interval) + 1) * interval + 200);
         setStatusText('Checking data…');
         setTimeout(() => setStatusText('Data check complete'), 2000);
       } else {
