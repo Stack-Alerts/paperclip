@@ -158,7 +158,7 @@ function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate }: ExitPil
       <button onClick={() => onEdit(globalIndex)} title="Configure exit" className="hover:opacity-80"
         style={{ ...pillBtn, background: '#0d7377', color: '#fff', border: '1px solid #14a0a5' }}>⚙</button>
       <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition" className="hover:opacity-80"
-        style={{ ...pillBtn, background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9' }}>📋</button>
+        style={{ ...pillBtn, background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9' }}><DupIcon /></button>
       <button onClick={() => onRemove(globalIndex)} title="Remove exit" className="hover:opacity-80"
         style={{ ...pillBtn, background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252' }}>✕</button>
     </div>
@@ -196,6 +196,16 @@ const TEAL_BTN: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   fontSize: 13, cursor: 'pointer', flexShrink: 0,
 };
+
+// Two-tone duplicate icon (green back page + sky-blue front page)
+function DupIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="0" width="9" height="9" rx="1.2" fill="#10B981" opacity="0.75"/>
+      <rect x="0" y="3" width="9" height="9" rx="1.2" fill="#38bdf8"/>
+    </svg>
+  );
+}
 
 function BlockCard({
   block, index, total,
@@ -274,7 +284,7 @@ function BlockCard({
 
               return (
                 <div key={si} className="space-y-1">
-                  {/* Signal row — ⚙/📋/✕ always visible */}
+                  {/* Signal row — ⚙/<DupIcon />/✕ always visible */}
                   <div className="flex items-center gap-1.5 text-xs">
                     <span className="flex-1 min-w-0">
                       <span style={{ color: '#E8EAED' }}>{si + 1}. {formatSignalName(sig.name)}</span>
@@ -291,7 +301,7 @@ function BlockCard({
                       onClick={() => hasRecheck ? onConfigRecheck(index, si) : onToggleRecheck(index, si)}
                       title={hasRecheck ? 'Configure recheck' : 'Enable recheck on delayed candles'}
                       style={TEAL_BTN}>⚙</button>
-                    <button onClick={() => onDuplicateSignal(index, si)} title="Duplicate signal" style={TEAL_BTN}>📋</button>
+                    <button onClick={() => onDuplicateSignal(index, si)} title="Duplicate signal" style={TEAL_BTN}><DupIcon /></button>
                     <button onClick={() => onRemoveSignal(index, si)} title="Remove signal"
                       style={{ ...TEAL_BTN, background: 'rgba(153,27,27,0.7)', border: '1px solid #C35252' }}>✕</button>
                   </div>
@@ -380,7 +390,7 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate }:
                         style={{ background: '#0d7377', color: '#fff', border: '1px solid #14a0a5', width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>⚙</button>
                       <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition"
                         className="hover:opacity-80"
-                        style={{ background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9', width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>📋</button>
+                        style={{ background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9', width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}><DupIcon /></button>
                       <button onClick={() => onRemove(globalIndex)} title="Remove exit condition"
                         className="hover:opacity-80"
                         style={{ background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252', width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>✕</button>
