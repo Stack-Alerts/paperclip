@@ -56,51 +56,95 @@ function RecheckConfigModal({ open, signalName, barDelay, mode, onSave, onCancel
   }, [open, barDelay, mode]);
 
   if (!open) return null;
+
+  const MODES = [
+    { value: 'WITHIN', label: 'WITHIN bar window (signal reoccurs anywhere within N bars)' },
+    { value: 'AT',     label: 'AT exact bar (signal reoccurs at exactly bar N)' },
+  ];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="rounded-lg shadow-2xl border p-5 w-80" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
-        <h3 className="text-sm font-semibold mb-1" style={{ color: '#A0AEC0' }}>Configure Recheck</h3>
-        <p className="text-xs mb-4 truncate" style={{ color: '#6B7280' }}>{signalName}</p>
-        <div className="space-y-3 mb-4">
-          <div>
-            <label className="text-xs block mb-1" style={{ color: '#9AA0A6' }}>Bar Delay:</label>
-            <input
-              type="number"
-              min={1}
-              max={200}
-              value={delay}
-              onChange={e => setDelay(Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-full px-2.5 py-1.5 rounded border text-sm focus:outline-none"
-              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
-            />
-          </div>
-          <div>
-            <label className="text-xs block mb-1" style={{ color: '#9AA0A6' }}>Mode:</label>
-            <select
-              value={recheckMode}
-              onChange={e => setRecheckMode(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded border text-xs focus:outline-none"
-              style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
-            >
-              <option value="WITHIN">WITHIN</option>
-              <option value="AFTER">AFTER</option>
-            </select>
+      <div className="rounded border shadow-2xl w-[460px]" style={{ background: '#1E2128', borderColor: '#3C4149' }}>
+        {/* Title bar */}
+        <div className="flex items-center justify-between px-4 py-2 border-b rounded-t" style={{ background: '#2A2F3A', borderColor: '#3C4149' }}>
+          <span className="text-sm font-semibold" style={{ color: '#E8EAED' }}>Configure RECHECK Validation</span>
+          <div className="flex items-center gap-1">
+            <button className="w-5 h-5 rounded text-xs flex items-center justify-center hover:opacity-80" style={{ background: '#3C4149', color: '#9AA0A6' }}>─</button>
+            <button className="w-5 h-5 rounded text-xs flex items-center justify-center hover:opacity-80" style={{ background: '#3C4149', color: '#9AA0A6' }}>□</button>
+            <button onClick={onCancel} className="w-5 h-5 rounded text-xs flex items-center justify-center hover:opacity-80" style={{ background: '#5C2020', color: '#FCA5A5' }}>✕</button>
           </div>
         </div>
-        <div className="flex justify-end gap-2">
+
+        {/* Body */}
+        <div className="px-4 pt-4 pb-3 space-y-3">
+          {/* Signal name */}
+          <div className="text-base font-bold" style={{ color: '#E8EAED' }}>
+            Signal: {signalName}
+          </div>
+
+          {/* Description */}
+          <p className="text-xs" style={{ color: '#9AA0A6' }}>
+            Enter number of bars within which signal must reoccur for validation:
+          </p>
+
+          {/* Bar count input */}
+          <input
+            type="number"
+            min={1}
+            max={200}
+            value={delay}
+            onChange={e => setDelay(Math.max(1, parseInt(e.target.value) || 1))}
+            className="w-full px-3 py-2 rounded border text-sm focus:outline-none"
+            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#E8EAED' }}
+          />
+
+          {/* Mode label */}
+          <div className="text-sm font-bold" style={{ color: '#E8EAED' }}>RECHECK Mode:</div>
+
+          {/* Radio options */}
+          <div className="rounded border overflow-hidden" style={{ borderColor: '#3C4149' }}>
+            {MODES.map((opt, i) => {
+              const selected = recheckMode === opt.value;
+              return (
+                <label
+                  key={opt.value}
+                  className="flex items-center gap-3 px-3 py-3 cursor-pointer hover:opacity-90 transition-opacity"
+                  style={{
+                    background: selected ? 'rgba(16,185,129,0.08)' : '#2A2F3A',
+                    borderBottom: i < MODES.length - 1 ? '1px solid #3C4149' : undefined,
+                  }}
+                  onClick={() => setRecheckMode(opt.value)}
+                >
+                  <div
+                    className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                    style={{ borderColor: selected ? '#10B981' : '#6B7280' }}
+                  >
+                    {selected && <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#10B981' }} />}
+                  </div>
+                  <span className="text-sm font-semibold" style={{ color: selected ? '#E8EAED' : '#9AA0A6' }}>
+                    {opt.label}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex border-t rounded-b overflow-hidden" style={{ borderColor: '#3C4149' }}>
           <button
             onClick={onCancel}
-            className="text-xs px-3 py-1.5 rounded border transition-colors hover:opacity-80"
-            style={{ background: '#2A2F3A', borderColor: '#3C4149', color: '#9AA0A6' }}
+            className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
+            style={{ background: '#C35252', color: '#ffffff' }}
           >
-            Cancel
+            ✕ Cancel
           </button>
           <button
             onClick={() => onSave(delay, recheckMode)}
-            className="text-xs px-3 py-1.5 rounded border transition-colors hover:opacity-80"
-            style={{ background: '#0d7377', borderColor: '#14a0a5', color: '#ffffff' }}
+            className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
+            style={{ background: '#10B981', color: '#ffffff' }}
           >
-            Save
+            ✓ OK
           </button>
         </div>
       </div>
@@ -270,7 +314,7 @@ function BlockCard({
                     <div className="flex items-center gap-1.5 ml-3 text-xs">
                       <span style={{ color: '#14a0a5' }}>↳</span>
                       <span className="flex-1 font-semibold" style={{ color: '#14a0a5' }}>
-                        RECHECK (WITHIN {sig.recheck_config?.bar_delay ?? 3} bars)
+                        RECHECK ({sig.recheck_config?.mode ?? 'WITHIN'} {sig.recheck_config?.bar_delay ?? 3} bars)
                       </span>
                       <button onClick={() => onConfigRecheck(index, si)} title="Configure recheck settings" style={TEAL_BTN}>⚙</button>
                       <button onClick={() => onDuplicateSignal(index, si)} title="Duplicate this signal" style={TEAL_BTN}>📋</button>
@@ -560,7 +604,7 @@ export function StrategyBlocksPanel() {
         return (
           <RecheckConfigModal
             open={true}
-            signalName={sig ? formatSignalName(sig.name) : ''}
+            signalName={sig?.name ?? ''}
             barDelay={sig?.recheck_config?.bar_delay ?? 3}
             mode={sig?.recheck_config?.mode ?? 'WITHIN'}
             onSave={handleRecheckConfigSave}
