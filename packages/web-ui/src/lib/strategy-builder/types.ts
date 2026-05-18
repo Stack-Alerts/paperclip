@@ -303,3 +303,55 @@ export interface PhaseEventBuffer {
   maxBufferSize: number;
   overflowPolicy: 'drop_oldest' | 'drop_newest' | 'error';
 }
+
+// Validation Report types (P1 Parity - ValidationReportWindow)
+export enum ValidationSeverity {
+  CRITICAL = 'CRITICAL',
+  ERROR = 'ERROR',
+  WARNING = 'WARNING',
+  NOTICE = 'NOTICE',
+  INFO = 'INFO',
+}
+
+export interface ValidationIssue {
+  rule_id: string;
+  rule_name: string;
+  severity: ValidationSeverity;
+  category: string;
+  message: string;
+  location: string; // e.g., "Block::hod::Signal::BELOW_HOD"
+  suggestion?: string;
+  auto_fix_available?: boolean;
+  auto_fix_data?: Record<string, unknown>;
+}
+
+export interface ValidationReport {
+  is_valid: boolean;
+  timestamp: string; // ISO 8601
+  strategy_summary: {
+    name: string;
+    version?: string;
+  };
+  critical_issues: ValidationIssue[];
+  errors: ValidationIssue[];
+  warnings: ValidationIssue[];
+  notices: ValidationIssue[];
+  info: ValidationIssue[];
+  complexity_metrics: {
+    complexity_score: number;
+  };
+  timing_conflicts?: Array<{
+    signal: string;
+    timing_window: number;
+    recheck_delay: number;
+  }>;
+}
+
+export interface WalkforwardResult {
+  tp1_adjustments: number;
+  tp2_adjustments: number;
+  tp3_adjustments: number;
+  sl_adjustments: number;
+  adjustments_per_position: number;
+  total_positions: number;
+}

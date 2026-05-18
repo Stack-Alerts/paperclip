@@ -42,10 +42,34 @@
       "namedRegex": "^/_not\\-found(?:/)?$"
     },
     {
+      "page": "/backtest",
+      "regex": "^/backtest(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/backtest(?:/)?$"
+    },
+    {
+      "page": "/data-management",
+      "regex": "^/data\\-management(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/data\\-management(?:/)?$"
+    },
+    {
       "page": "/favicon.ico",
       "regex": "^/favicon\\.ico(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/favicon\\.ico(?:/)?$"
+    },
+    {
+      "page": "/log-viewer",
+      "regex": "^/log\\-viewer(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/log\\-viewer(?:/)?$"
+    },
+    {
+      "page": "/settings",
+      "regex": "^/settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/settings(?:/)?$"
     },
     {
       "page": "/strategy-builder",
