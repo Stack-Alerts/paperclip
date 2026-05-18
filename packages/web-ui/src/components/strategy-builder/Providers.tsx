@@ -6,29 +6,25 @@ interface TooltipContextType {
   getTooltip: (id: string) => string | undefined;
 }
 
-const TooltipContext = createContext<TooltipContextType | undefined>(undefined);
+const FALLBACK: TooltipContextType = { getTooltip: () => undefined };
 
-export const useTooltipRegistry = () => {
-  const context = useContext(TooltipContext);
-  if (!context) {
-    throw new Error('useTooltipRegistry must be used within TooltipProvider');
-  }
-  return context;
-};
+const TooltipContext = createContext<TooltipContextType>(FALLBACK);
+
+export const useTooltipRegistry = () => useContext(TooltipContext);
 
 interface ProvidersProps {
   children: ReactNode;
-  tooltips: Record<string, string>;
+  tooltips?: Record<string, string>;
 }
 
-export function Providers({ children, tooltips }: ProvidersProps) {
+export function Providers({ children, tooltips = {} }: ProvidersProps) {
   const contextValue: TooltipContextType = {
     getTooltip: (id: string) => tooltips[id],
   };
 
   return (
     <TooltipContext.Provider value={contextValue}>
-      <div className="dark">{children}</div>
+      {children}
     </TooltipContext.Provider>
   );
 }
