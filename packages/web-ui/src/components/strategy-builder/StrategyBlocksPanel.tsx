@@ -180,11 +180,11 @@ function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate }: ExitPil
       {cfg?.recheckEnabled && <span style={{ color: '#14a0a5' }}>RCHK:{cfg.recheckBarDelay ?? 3}</span>}
       <div style={BTN_GROUP}>
         <button onClick={() => onEdit(globalIndex)} title="Configure exit" className="hover:opacity-80"
-          style={{ ...ICON_BTN, background: '#0d7377', color: '#fff', border: '1px solid #14a0a5' }}><GearIcon /></button>
+          style={GEAR_STYLE}><GearIcon /></button>
         <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition" className="hover:opacity-80"
-          style={{ ...ICON_BTN, background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9' }}><DupIcon /></button>
+          style={DUP_STYLE}><DupIcon /></button>
         <button onClick={() => onRemove(globalIndex)} title="Remove exit" className="hover:opacity-80"
-          style={{ ...ICON_BTN, background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid #C35252' }}><XIcon /></button>
+          style={REM_STYLE}><XIcon /></button>
       </div>
     </div>
   );
@@ -227,6 +227,11 @@ const BTN_GROUP: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 6,
   width: 72, flexShrink: 0, justifyContent: 'flex-end',
 };
+
+// Ghost-style button variants — subtle tint so action buttons don't compete with content
+const GEAR_STYLE: React.CSSProperties = { ...ICON_BTN, background: 'rgba(13,115,119,0.14)', color: 'rgba(20,160,165,0.85)', border: '1px solid rgba(20,160,165,0.28)' };
+const DUP_STYLE: React.CSSProperties  = { ...ICON_BTN, background: 'rgba(14,165,233,0.08)', color: 'rgba(56,189,248,0.75)', border: '1px solid rgba(14,165,233,0.22)' };
+const REM_STYLE: React.CSSProperties  = { ...ICON_BTN, background: 'rgba(153,27,27,0.10)', color: 'rgba(252,165,165,0.70)', border: '1px solid rgba(195,82,82,0.22)' };
 
 const BTN: React.CSSProperties = {
   height: 24, borderRadius: 3,
@@ -376,7 +381,7 @@ function BlockCard({
                           onClick={() => onConfigRecheck(index, si)}
                           title={hasRecheck ? 'Configure recheck (active)' : 'Configure recheck'}
                           className="hover:opacity-80"
-                          style={{ ...ICON_BTN, background: '#0d7377', color: '#fff', border: '1px solid #14a0a5' }}>
+                          style={GEAR_STYLE}>
                           <GearIcon />
                         </button>
                         {hasRecheck && (
@@ -384,9 +389,9 @@ function BlockCard({
                         )}
                       </div>
                       <button onClick={() => onDuplicateSignal(index, si)} title="Duplicate signal" className="hover:opacity-80"
-                        style={{ ...ICON_BTN, background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9' }}><DupIcon /></button>
+                        style={DUP_STYLE}><DupIcon /></button>
                       <button onClick={() => onRemoveSignal(index, si)} title="Remove signal" className="hover:opacity-80"
-                        style={{ ...ICON_BTN, background: 'rgba(153,27,27,0.8)', color: '#FCA5A5', border: '1px solid #C35252' }}><XIcon /></button>
+                        style={REM_STYLE}><XIcon /></button>
                     </div>
                   </div>
 
@@ -397,7 +402,7 @@ function BlockCard({
                         RECHECK ({sig.recheck_config?.mode ?? 'WITHIN'} {sig.recheck_config?.bar_delay ?? 3} bars)
                       </span>
                       <button onClick={() => onRemoveRecheck(index, si)} title="Remove recheck" className="hover:opacity-80"
-                        style={{ ...ICON_BTN, background: 'rgba(153,27,27,0.8)', color: '#FCA5A5', border: '1px solid #C35252' }}><XIcon /></button>
+                        style={REM_STYLE}><XIcon /></button>
                     </div>
                   )}
 
@@ -479,11 +484,11 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate }:
                     </div>
                     <div style={BTN_GROUP}>
                       <button onClick={() => onEdit(globalIndex)} title="Configure exit condition" className="hover:opacity-80"
-                        style={{ ...ICON_BTN, background: '#0d7377', color: '#fff', border: '1px solid #14a0a5' }}><GearIcon /></button>
+                        style={GEAR_STYLE}><GearIcon /></button>
                       <button onClick={() => onDuplicate(globalIndex)} title="Duplicate exit condition" className="hover:opacity-80"
-                        style={{ ...ICON_BTN, background: '#1a3a4a', color: '#38bdf8', border: '1px solid #0ea5e9' }}><DupIcon /></button>
+                        style={DUP_STYLE}><DupIcon /></button>
                       <button onClick={() => onRemove(globalIndex)} title="Remove exit condition" className="hover:opacity-80"
-                        style={{ ...ICON_BTN, background: 'rgba(153,27,27,0.8)', color: '#FCA5A5', border: '1px solid #C35252' }}><XIcon /></button>
+                        style={REM_STYLE}><XIcon /></button>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 mt-1 flex-wrap text-xs" style={{ color: '#9AA0A6' }}>

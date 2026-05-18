@@ -377,14 +377,11 @@ export function BlockSearchPanel() {
     return [...cats].sort().map(c => ({ id: c, name: c }));
   }, [blockCategories, blockLibrary]);
 
-  // Only show types that actually exist in the library (not all enum values)
-  const allTypes = useMemo(() => {
-    const types = new Set(blockLibrary.map(b => b.type));
-    return [...types].sort().map(t => ({
-      value: t,
-      label: BLOCK_TYPE_LABELS[t] ?? t.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
-    }));
-  }, [blockLibrary]);
+  // Always show all defined types — matches desktop client which shows all options
+  // regardless of what the current library contains
+  const allTypes = useMemo(() =>
+    Object.entries(BLOCK_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+  []);
 
   // Add block to strategy.
   // Standard mode: signals from the same block definition + logic are merged

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 export interface ExitConditionConfig {
   signalName: string;
@@ -89,44 +89,38 @@ export function ExitConditionDialog({
 }: ExitConditionDialogProps) {
   const isEditMode = !!existing;
 
-  const [bindingLevel, setBindingLevel] = useState<'STRATEGY' | 'BLOCK' | 'SIGNAL'>('STRATEGY');
-  const [selectedBlockName, setSelectedBlockName] = useState('');
-  const [selectedSignalKey, setSelectedSignalKey] = useState('');
-  const [percentage, setPercentage] = useState(50);
-  const [exitMode, setExitMode] = useState<'ABSOLUTE' | 'FLEXIBLE'>('ABSOLUTE');
-  const [tpProximity, setTpProximity] = useState(2.0);
-  const [reversal, setReversal] = useState(5);   // display 1–10, maps to 0.1–1.0 stored
-  const [recheckEnabled, setRecheckEnabled] = useState(false);
-  const [recheckDelay, setRecheckDelay] = useState(3);
-
-  useEffect(() => {
-    if (!open) return;
-    if (existing) {
-      setBindingLevel(existing.bindingLevel);
-      setSelectedBlockName(existing.blockName ?? '');
-      setSelectedSignalKey(
-        existing.blockName && existing.parentSignalName
-          ? `${existing.blockName}::${existing.parentSignalName}`
-          : ''
-      );
-      setPercentage(Math.round(existing.percentage * 100));
-      setExitMode(existing.exitMode);
-      setTpProximity(existing.tpProximityThreshold);
-      setReversal(Math.round(existing.reversalTrigger * 10));
-      setRecheckEnabled(existing.recheckEnabled);
-      setRecheckDelay(existing.recheckBarDelay);
-    } else {
-      setBindingLevel('STRATEGY');
-      setSelectedBlockName('');
-      setSelectedSignalKey('');
-      setPercentage(50);
-      setExitMode('ABSOLUTE');
-      setTpProximity(2.0);
-      setReversal(5);
-      setRecheckEnabled(false);
-      setRecheckDelay(3);
-    }
-  }, [open, existing]);
+  // Lazy initializers run once on mount — component is unmounted/remounted each time
+  // the dialog is opened, so this always captures the correct initial config.
+  // Using useState(fn) instead of useEffect+setState prevents the reset-on-re-render
+  // bug caused by `existing` being a new object reference on every parent render.
+  const [bindingLevel, setBindingLevel] = useState<'STRATEGY' | 'BLOCK' | 'SIGNAL'>(
+    () => existing?.bindingLevel ?? 'STRATEGY'
+  );
+  const [selectedBlockName, setSelectedBlockName] = useState(
+    () => existing?.blockName ?? ''
+  );
+  const [selectedSignalKey, setSelectedSignalKey] = useState(
+    () => existing?.blockName && existing?.parentSignalName
+      ? `${existing.blockName}::${existing.parentSignalName}` : ''
+  );
+  const [percentage, setPercentage] = useState(
+    () => existing ? Math.round(existing.percentage * 100) : 50
+  );
+  const [exitMode, setExitMode] = useState<'ABSOLUTE' | 'FLEXIBLE'>(
+    () => existing?.exitMode ?? 'ABSOLUTE'
+  );
+  const [tpProximity, setTpProximity] = useState(
+    () => existing?.tpProximityThreshold ?? 2.0
+  );
+  const [reversal, setReversal] = useState(
+    () => existing ? Math.round(existing.reversalTrigger * 10) : 5
+  );
+  const [recheckEnabled, setRecheckEnabled] = useState(
+    () => existing?.recheckEnabled ?? false
+  );
+  const [recheckDelay, setRecheckDelay] = useState(
+    () => existing?.recheckBarDelay ?? 3
+  );
 
   if (!open) return null;
 
