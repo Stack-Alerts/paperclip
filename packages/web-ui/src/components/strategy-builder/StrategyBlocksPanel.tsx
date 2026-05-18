@@ -260,7 +260,7 @@ function RecheckConfigModal({ open, signalName, enabled, barDelay, mode, onSave,
                 type="number" min={1} max={200} value={delay}
                 onChange={e => setDelay(Math.max(1, parseInt(e.target.value) || 1))}
                 className="w-full px-3 py-2 rounded border text-sm focus:outline-none"
-                style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
               />
               <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>RECHECK Mode:</div>
               <div className="rounded border overflow-hidden" style={{ borderColor: 'var(--border)' }}>

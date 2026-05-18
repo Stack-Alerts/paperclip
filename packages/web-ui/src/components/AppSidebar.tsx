@@ -29,18 +29,29 @@ export function AppSidebar() {
 
   return (
     <aside
-      className={`flex-shrink-0 bg-gray-900 text-white flex flex-col transition-all duration-300 ${
-        collapsed ? 'w-16' : 'w-56'
-      } border-r border-gray-800`}
+      className={`flex-shrink-0 flex flex-col transition-all duration-300 ${collapsed ? 'w-16' : 'w-56'}`}
+      style={{
+        background: 'var(--sidebar-bg)',
+        borderRight: '1px solid var(--border)',
+        color: 'var(--text-primary)',
+      }}
     >
-      <div className="flex items-center justify-between px-3 py-4 border-b border-gray-800">
+      <div
+        className="flex items-center justify-between px-3 py-4"
+        style={{ borderBottom: '1px solid var(--border)' }}
+      >
         {!collapsed && (
-          <span className="font-bold text-sm truncate text-gray-100">BTC Trade Engine</span>
+          <span className="font-bold text-sm truncate" style={{ color: 'var(--text-primary)' }}>
+            BTC Trade Engine
+          </span>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="p-1 rounded hover:bg-gray-800 text-gray-400 hover:text-white transition-colors flex-shrink-0"
+          className="p-1 rounded transition-colors flex-shrink-0"
+          style={{ color: 'var(--sidebar-item-default)' }}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--sidebar-item-hover)'; (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-hover)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--sidebar-item-default)'; (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
         >
           {collapsed ? <Menu className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
@@ -55,11 +66,31 @@ export function AppSidebar() {
               key={href}
               href={href}
               title={collapsed ? label : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm ${
-                active
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-              }`}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm"
+              style={active
+                ? {
+                    background: 'var(--sidebar-item-active-bg)',
+                    color: 'var(--sidebar-item-hover)',
+                    borderLeft: '2px solid var(--sidebar-item-active-border)',
+                    paddingLeft: 10,
+                  }
+                : {
+                    color: 'var(--sidebar-item-default)',
+                  }}
+              onMouseEnter={e => {
+                if (!active) {
+                  const el = e.currentTarget as HTMLAnchorElement;
+                  el.style.background = 'var(--surface-hover)';
+                  el.style.color = 'var(--sidebar-item-hover)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (!active) {
+                  const el = e.currentTarget as HTMLAnchorElement;
+                  el.style.background = 'transparent';
+                  el.style.color = 'var(--sidebar-item-default)';
+                }
+              }}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
               {!collapsed && <span className="truncate">{label}</span>}
@@ -68,9 +99,11 @@ export function AppSidebar() {
         })}
       </nav>
 
-      <div className="px-3 py-3 border-t border-gray-800">
+      <div className="px-3 py-3" style={{ borderTop: '1px solid var(--border)' }}>
         {!collapsed && (
-          <p className="text-xs text-gray-600 truncate">NautilusTrader v2</p>
+          <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+            NautilusTrader v2
+          </p>
         )}
       </div>
     </aside>

@@ -17,7 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" data-theme="dark">
       <body className={inter.className}>
         <ThemeProvider>
-          <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-panel)' }}>
+          <div className="flex h-screen overflow-hidden" style={{ background: 'var(--app-bg)' }}>
             <AppSidebar />
             <main className="flex-1 overflow-auto">
               {children}

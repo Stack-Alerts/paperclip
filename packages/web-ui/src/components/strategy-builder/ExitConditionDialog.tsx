@@ -218,7 +218,7 @@ export function ExitConditionDialog({
                           value={selectedBlockName}
                           onChange={e => setSelectedBlockName(e.target.value)}
                           className="w-full px-2 py-1.5 rounded border text-xs focus:outline-none"
-                          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                          style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
                         >
                           <option value="">Select block…</option>
                           {(availableBlocks ?? []).map(b => (
@@ -234,7 +234,7 @@ export function ExitConditionDialog({
                           value={selectedSignalKey}
                           onChange={e => setSelectedSignalKey(e.target.value)}
                           className="w-full px-2 py-1.5 rounded border text-xs focus:outline-none"
-                          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                          style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
                         >
                           <option value="">Select signal…</option>
                           {allSignalOptions.map(o => (
@@ -262,7 +262,7 @@ export function ExitConditionDialog({
                     setPercentage(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))
                   }
                   className="w-16 px-2 py-1 rounded border text-sm text-center focus:outline-none"
-                  style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                  style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
                 />
                 {[10, 15, 20, 25, 50, 75, 100].map(p => (
                   <PresetChip key={p} label={`${p}%`} onClick={() => setPercentage(p)} />
@@ -323,7 +323,7 @@ export function ExitConditionDialog({
                       )
                     }
                     className="w-20 px-2 py-1 rounded border text-sm text-center focus:outline-none"
-                    style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                    style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
                   />
                   <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>%</span>
                   {[0.25, 0.5, 1.0, 1.5, 2.0].map(v => (
@@ -343,7 +343,7 @@ export function ExitConditionDialog({
                     value={reversal}
                     onChange={e => setReversal(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))}
                     className="w-20 px-2 py-1 rounded border text-sm text-center focus:outline-none"
-                    style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                    style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
                   />
                   <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>%</span>
                   {[1, 2, 3, 4, 5, 6, 7, 8].map(v => (
@@ -386,7 +386,7 @@ export function ExitConditionDialog({
                     value={recheckDelay}
                     onChange={e => setRecheckDelay(Math.max(1, parseInt(e.target.value) || 1))}
                     className="w-16 px-2 py-1 rounded border text-sm text-center focus:outline-none"
-                    style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                    style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
                   />
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(v => (
                     <PresetChip key={v} label={String(v)} onClick={() => setRecheckDelay(v)} />

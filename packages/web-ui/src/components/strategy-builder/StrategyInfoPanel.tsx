@@ -270,7 +270,7 @@ export function StrategyInfoPanel({ compact: _compact = false }: StrategyInfoPan
             placeholder="e.g., Example_MA_Crossover"
             maxLength={100}
             className="w-full px-2 py-1.5 rounded border text-sm focus:outline-none"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+            style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
           />
         </RichTooltip>
       </div>

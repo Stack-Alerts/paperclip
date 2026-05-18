@@ -255,7 +255,7 @@ function SavePresetModal({ open, onSave, onCancel }: SavePresetModalProps) {
           onChange={e => setValue(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && value.trim()) onSave(value.trim()); if (e.key === 'Escape') onCancel(); }}
           className="w-full px-2.5 py-1.5 rounded border text-sm focus:outline-none mb-4"
-          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+          style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
         />
         <div className="flex justify-end gap-2">
           <button
@@ -721,7 +721,7 @@ export function BlockSearchPanel() {
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
               className="flex-1 px-2.5 py-1.5 rounded border text-xs focus:outline-none"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
             />
           </RichTooltip>
         </div>
@@ -734,7 +734,7 @@ export function BlockSearchPanel() {
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
               className="flex-[1.5] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
             >
               <option value="all">All Categories</option>
               {allCategories.map(c => (
@@ -747,7 +747,7 @@ export function BlockSearchPanel() {
               value={selectedType}
               onChange={e => setSelectedType(e.target.value as 'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all')}
               className="flex-[0.75] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
             >
               <option value="all">All Types</option>
               {allTypes.map(({ value, label }) => (

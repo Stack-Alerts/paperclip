@@ -371,14 +371,14 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // -------------------------------------------------------------------------
   if (isLoadingStrategy) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ background: 'var(--bg-deep)' }}>
+      <div className="flex items-center justify-center h-full" style={{ background: 'var(--shell-bg)' }}>
         <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>Loading strategy…</div>
       </div>
     );
   }
   if (strategyError) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ background: 'var(--bg-deep)' }}>
+      <div className="flex items-center justify-center h-full" style={{ background: 'var(--shell-bg)' }}>
         <div className="text-red-400 text-sm">Error: {strategyError}</div>
       </div>
     );
@@ -389,7 +389,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       className="flex flex-col h-full select-none"
       onKeyDown={handleKeyDown}
       tabIndex={-1}
-      style={{ outline: 'none', background: 'var(--bg-base)' }}
+      style={{ outline: 'none', background: 'var(--shell-bg)' }}
     >
       {/* ── Window title / Menu Bar ─────────────────────────────────────── */}
       <div className="flex items-center gap-0.5 border-b px-2 py-1 flex-shrink-0" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
