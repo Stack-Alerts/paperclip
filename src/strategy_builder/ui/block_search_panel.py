@@ -196,9 +196,9 @@ class BlockListItem(QWidget):
         self.expand_button.setToolTip("Expand to select individual signals from this building block to add to your strategy")
         self.expand_button.setStyleSheet("""
             QPushButton {
-                background-color: #2D3748;
+                background-color: #1A2230;
                 color: #A0AEC0;
-                border: 1px solid #374151;
+                border: 1px solid #253241;
                 border-radius: 6px;
                 padding: 12px 20px;
                 font-size: 11pt;
@@ -206,7 +206,7 @@ class BlockListItem(QWidget):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #374151;
+                background-color: #253241;
                 border-color: #00D9FF;
             }
         """)
@@ -255,9 +255,9 @@ class BlockListItem(QWidget):
                 QCheckBox::indicator {
                     width: 18px;
                     height: 18px;
-                    border: 2px solid #374151;
+                    border: 2px solid #253241;
                     border-radius: 4px;
-                    background-color: #1A202C;
+                    background-color: #0F1319;
                 }
                 QCheckBox::indicator:checked {
                     background-color: #00D9FF;
@@ -334,8 +334,8 @@ class BlockListItem(QWidget):
         # Border for the item - dark theme
         self.setStyleSheet("""
             BlockListItem {
-                background-color: #1E2128;
-                border: 1px solid #3C4149;
+                background-color: #12171F;
+                border: 1px solid #2A3139;
                 border-radius: 8px;
             }
         """)
@@ -412,9 +412,9 @@ class BlockListItem(QWidget):
                 QCheckBox::indicator {
                     width: 18px;
                     height: 18px;
-                    border: 2px solid #3C4149;
+                    border: 2px solid #2A3139;
                     border-radius: 4px;
-                    background-color: #3C4149;
+                    background-color: #2A3139;
                 }
             """)
         
@@ -499,9 +499,9 @@ class BlockListItem(QWidget):
                 QCheckBox::indicator {
                     width: 18px;
                     height: 18px;
-                    border: 2px solid #3C4149;
+                    border: 2px solid #2A3139;
                     border-radius: 4px;
-                    background-color: #3C4149;
+                    background-color: #2A3139;
                 }
             """)
             
@@ -559,9 +559,9 @@ class BlockListItem(QWidget):
                     QCheckBox::indicator {
                         width: 18px;
                         height: 18px;
-                        border: 2px solid #374151;
+                        border: 2px solid #253241;
                         border-radius: 4px;
-                        background-color: #1A202C;
+                        background-color: #0F1319;
                     }
                     QCheckBox::indicator:checked {
                         background-color: #00D9FF;
@@ -725,14 +725,14 @@ class BlockSearchPanel(QWidget):
         self.save_preset_btn.setToolTip("Save current search/filter settings as a named preset")
         self.save_preset_btn.setStyleSheet(""
             "QPushButton {"
-            "  background-color: #2D3748;"
+            "  background-color: #1A2230;"
             "  color: #A0AEC0;"
-            "  border: 1px solid #374151;"
+            "  border: 1px solid #253241;"
             "  border-radius: 4px;"
             "  padding: 4px 12px;"
             "}"
             "QPushButton:hover {"
-            "  background-color: #374151;"
+            "  background-color: #253241;"
             "  border-color: #00D9FF;"
             "}"
         "")
@@ -745,14 +745,14 @@ class BlockSearchPanel(QWidget):
         self.load_preset_btn.setToolTip("Load a previously saved filter preset")
         self.load_preset_btn.setStyleSheet(""
             "QPushButton {"
-            "  background-color: #2D3748;"
+            "  background-color: #1A2230;"
             "  color: #A0AEC0;"
-            "  border: 1px solid #374151;"
+            "  border: 1px solid #253241;"
             "  border-radius: 4px;"
             "  padding: 4px 12px;"
             "}"
             "QPushButton:hover {"
-            "  background-color: #374151;"
+            "  background-color: #253241;"
             "  border-color: #00D9FF;"
             "}"
         "")
@@ -765,14 +765,14 @@ class BlockSearchPanel(QWidget):
         self.delete_preset_btn.setToolTip("Delete a saved filter preset")
         self.delete_preset_btn.setStyleSheet(""
             "QPushButton {"
-            "  background-color: #2D3748;"
+            "  background-color: #1A2230;"
             "  color: #A0AEC0;"
-            "  border: 1px solid #374151;"
+            "  border: 1px solid #253241;"
             "  border-radius: 4px;"
             "  padding: 4px 12px;"
             "}"
             "QPushButton:hover {"
-            "  background-color: #374151;"
+            "  background-color: #253241;"
             "  border-color: #e53e3e;"
             "}"
         "")
@@ -1282,9 +1282,9 @@ class BlockSearchPanel(QWidget):
                                 QCheckBox::indicator {
                                     width: 18px;
                                     height: 18px;
-                                    border: 2px solid #3C4149;
+                                    border: 2px solid #2A3139;
                                     border-radius: 4px;
-                                    background-color: #3C4149;
+                                    background-color: #2A3139;
                                 }
                             """)
                 

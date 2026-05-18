@@ -63,7 +63,7 @@ class CustomTitleBar(QWidget):
         self.setStyleSheet("""
             CustomTitleBar {
                 background-color: #0F1419;
-                border-bottom: 1px solid #3C4149;
+                border-bottom: 1px solid #2A3139;
             }
         """)
         
@@ -106,7 +106,7 @@ class CustomTitleBar(QWidget):
                 background-color: #2A2F3A;
             }
             QPushButton:pressed {
-                background-color: #374151;
+                background-color: #253241;
             }
         """
         

@@ -245,7 +245,7 @@ class ValidationPanel(QWidget):
         section.setStyleSheet(f"""
             QFrame {{
                 background-color: #2A2F3A;
-                border: 1px solid #3C4149;
+                border: 1px solid #2A3139;
                 border-left: 4px solid {color};
                 border-radius: 4px;
                 padding: 8px;
@@ -535,7 +535,7 @@ class ValidationPanel(QWidget):
         section.setStyleSheet(f"""
             QFrame {{
                 background-color: #2A2F3A;
-                border: 1px solid #3C4149;
+                border: 1px solid #2A3139;
                 border-left: 4px solid {color};
                 border-radius: 4px;
                 padding: 8px;
