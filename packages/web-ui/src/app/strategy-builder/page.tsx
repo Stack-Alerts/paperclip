@@ -3,12 +3,17 @@
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { StrategyBuilderMainWindow } from '@/components/strategy-builder/StrategyBuilderMainWindow';
+import { TooltipSettingsProvider } from '@/components/strategy-builder/TooltipSettingsContext';
 
 function StrategyBuilderContent() {
   const searchParams = useSearchParams();
   const strategyId = searchParams.get('id');
 
-  return <StrategyBuilderMainWindow strategyId={strategyId ?? undefined} />;
+  return (
+    <TooltipSettingsProvider>
+      <StrategyBuilderMainWindow strategyId={strategyId ?? undefined} />
+    </TooltipSettingsProvider>
+  );
 }
 
 export function StrategyBuilderPageWrapper() {

@@ -5,6 +5,7 @@ import React, {
   useCallback, useEffect, useRef, useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { useTooltipSettings } from './TooltipSettingsContext';
 
 export interface TooltipSection {
   header?: string;
@@ -109,7 +110,8 @@ interface RichTooltipProps {
   delay?: number;
 }
 
-export function RichTooltip({ content, children, delay = 350 }: RichTooltipProps) {
+export function RichTooltip({ content, children }: RichTooltipProps) {
+  const { settings } = useTooltipSettings();
   const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -118,9 +120,10 @@ export function RichTooltip({ content, children, delay = 350 }: RichTooltipProps
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
   const show = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    if (!settings.enabled) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    timerRef.current = setTimeout(() => setTriggerRect(rect), delay);
-  }, [delay]);
+    timerRef.current = setTimeout(() => setTriggerRect(rect), settings.delayMs);
+  }, [settings.enabled, settings.delayMs]);
 
   const hide = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);

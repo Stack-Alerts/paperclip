@@ -18,6 +18,7 @@ import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import * as api from '@/lib/strategy-builder/api';
 import type { BacktestResult, BacktestConfig, Strategy } from '@/lib/strategy-builder/types';
 import { RichTooltip, TooltipContent } from './RichTooltip';
+import { useTooltipSettings } from './TooltipSettingsContext';
 
 type DialogKey =
   | 'newStrategy'
@@ -116,6 +117,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   } = useStrategyStore();
 
   const [mounted, setMounted] = useState(false);
+  const { settings: tooltipSettings, update: updateTooltipSettings } = useTooltipSettings();
 
   // Load specific strategy by URL param; block library always loaded on mount.
   // Default strategy is pre-initialized in the Zustand store so no createStrategy() needed here.
@@ -458,8 +460,34 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             inline
           />
         </div>
-        {/* Right: spacer to balance left side (approx same width) */}
-        <div style={{ minWidth: 200 }} />
+        {/* Right: tooltip settings control */}
+        <div className="flex items-center gap-2 flex-shrink-0" style={{ minWidth: 200, justifyContent: 'flex-end' }}>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs" style={{ color: '#9AA0A6' }}>
+            <input
+              type="checkbox"
+              checked={tooltipSettings.enabled}
+              onChange={e => updateTooltipSettings({ enabled: e.target.checked })}
+              style={{ accentColor: '#3B82F6' }}
+            />
+            💬 Tooltips
+          </label>
+          {tooltipSettings.enabled && (
+            <>
+              <input
+                type="range"
+                min={300}
+                max={3000}
+                step={100}
+                value={tooltipSettings.delayMs}
+                onChange={e => updateTooltipSettings({ delayMs: Number(e.target.value) })}
+                style={{ width: 64, accentColor: '#3B82F6' }}
+              />
+              <span className="text-xs tabular-nums" style={{ color: '#6B7280', minWidth: 28, textAlign: 'right' }}>
+                {(tooltipSettings.delayMs / 1000).toFixed(1)}s
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ── Main Content Area (40% left / 60% right) ────────────────────── */}
