@@ -64,8 +64,9 @@ const defaultConfig: BacktestConfigFull = {
     minSlPct: 0.7,
     maxSlPct: 2.0,
     useStructureSl: false,
+    structureSources: ['swing_points', 'supply_demand', 'fibonacci'],
   },
-  riskPerTradePct: 1.0,
+  riskPerTradePct: 10,
   minRiskRewardRatio: 1.2,
   maxBarsHeld: 50,
   lookbackDays: 180,
@@ -183,6 +184,51 @@ function PresetButtonRow({
   );
 }
 
+// ── API payload translation (React camelCase → Python snake_case) ─────────────
+
+function buildPythonPayload(config: BacktestConfigFull, strategyId: string): Record<string, unknown> {
+  // Python engine expects mode as int enum: 1 = historical, 2 = live_replay
+  const modeInt = config.mode === 'historical' ? 1 : 2;
+
+  const payload: Record<string, unknown> = {
+    strategyId, // retained so the store can build the API URL path
+    lookback_days: config.lookbackDays ?? 180,
+    mode: modeInt,
+    tpsl_mode: config.tpslMode,
+    sl_mode: config.slAdjustmentMode,
+    start_date: config.startDate,
+    end_date: config.endDate,
+    timeframe: '15m',
+    starting_capital: config.initialCapital,
+    commission_percentage: config.commissionPercentage ?? 0.0004,
+    risk_per_trade_pct: config.riskPerTradePct,
+    min_risk_reward: config.minRiskRewardRatio,
+    max_leverage: config.maxLeverage ?? 10,
+    confluence_threshold: config.confluenceThreshold ?? 40,
+    max_bars_held: config.maxBarsHeld,
+    adaptive_sl: {
+      enabled: config.adaptiveSL.enabled,
+      delay_enabled: config.adaptiveSL.delayEnabled,
+      delay_bars: config.adaptiveSL.delayBars,
+      emergency_sl_pct: config.adaptiveSL.emergencySlPct,
+      volatility_lookback: config.adaptiveSL.volatilityLookback,
+      volatility_multiplier: config.adaptiveSL.volatilityMultiplier,
+      min_sl_pct: config.adaptiveSL.minSlPct,
+      max_sl_pct: config.adaptiveSL.maxSlPct,
+      use_structure_sl: config.adaptiveSL.useStructureSl,
+      structure_sources: config.adaptiveSL.structureSources ?? ['swing_points', 'supply_demand', 'fibonacci'],
+    },
+  };
+
+  // Mode 1 (historical): include training/testing split windows
+  if (modeInt === 1) {
+    payload.training_window = config.trainingDays ?? 90;
+    payload.testing_window = config.testingDays ?? 30;
+  }
+
+  return payload;
+}
+
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 export interface BacktestConfigPanelProps {
@@ -277,27 +323,8 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
       addLog('⚙️ Running auto-calibration...', 'SYSTEM');
       // TODO(P2): Wire calibration endpoint when available
 
-      // Forward full config with all fields to engine
-      await runBacktest({
-        strategyId: currentStrategy.id,
-        startDate: config.startDate,
-        endDate: config.endDate,
-        initialCapital: config.initialCapital,
-        commissionPercentage: config.commissionPercentage,
-        mode: config.mode,
-        tpslMode: config.tpslMode,
-        slAdjustmentMode: config.slAdjustmentMode,
-        adaptiveSLPreset: config.adaptiveSLPreset,
-        adaptiveSL: config.adaptiveSL,
-        riskPerTradePct: config.riskPerTradePct,
-        minRiskRewardRatio: config.minRiskRewardRatio,
-        maxBarsHeld: config.maxBarsHeld,
-        lookbackDays: config.lookbackDays,
-        trainingDays: config.trainingDays,
-        testingDays: config.testingDays,
-        maxLeverage: config.maxLeverage,
-        confluenceThreshold: config.confluenceThreshold,
-      });
+      // Translate React camelCase config → Python snake_case payload before sending
+      await runBacktest(buildPythonPayload(config, currentStrategy.id) as unknown as BacktestConfigFull);
       addLog('✅ Backtest complete.', 'SYSTEM');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Backtest failed.';
@@ -678,7 +705,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                 <div className="space-y-4">
                   <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">Risk / Reward</p>
 
-                  <SpinField label="Risk per Trade %" value={config.riskPerTradePct} onChange={(v) => patch('riskPerTradePct', v)} min={0.1} max={10} step={0.1} suffix="%" />
+                  <SpinField label="Risk per Trade %" value={config.riskPerTradePct} onChange={(v) => patch('riskPerTradePct', v)} min={1} max={100} step={1} suffix="%" />
                   <PresetButtonRow
                     label="Quick-set"
                     values={PRESET_RISK_PCT}

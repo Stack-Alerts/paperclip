@@ -71,6 +71,27 @@ export interface StrategySettings {
   notes?: string;
 }
 
+// Signal definition for block
+export interface BlockSignal {
+  name: string;
+  description?: string;
+  ui_visible?: boolean;
+  occurrences?: number;
+  occurrence_percentage?: number;
+  total_candles?: number;
+}
+
+// Exit condition configuration
+export interface ExitCondition {
+  signalName: string;
+  bindingLevel: string;
+  exitMode: 'percentage' | 'fixed';
+  exitPercentage?: number;
+  tpThreshold?: number;
+  reversal?: boolean;
+  recheck?: boolean;
+}
+
 // Block definition from library
 export interface BlockDefinition {
   id: string;
@@ -78,6 +99,7 @@ export interface BlockDefinition {
   name: string;
   description: string;
   category: string;
+  signals?: BlockSignal[];
   schema?: Record<string, BlockFieldSchema>; // Field definitions for config
   validators?: BlockValidator[];
   metadata?: {
@@ -149,6 +171,7 @@ export interface AdaptiveSLConfig {
   minSlPct: number;
   maxSlPct: number;
   useStructureSl: boolean;
+  structureSources?: string[];
 }
 
 export interface BacktestConfigFull extends BacktestConfig {
