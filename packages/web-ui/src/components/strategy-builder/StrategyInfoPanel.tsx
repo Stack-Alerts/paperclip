@@ -67,7 +67,7 @@ function computeSignalCounts(blocks: Block[]): SignalCounts {
 
 const TIMEFRAMES = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'];
 
-const STRATEGY_TYPES = ['Bullish', 'Bearish'] as const;
+const STRATEGY_TYPES = ['Bullish', 'Bearish', 'Both'] as const;
 type StrategyType = (typeof STRATEGY_TYPES)[number];
 
 function stripVersionSuffix(name: string): string {
@@ -153,7 +153,7 @@ export function StrategyInfoPanel() {
 
   if (!currentStrategy) {
     return (
-      <div className="flex flex-col h-full border-l border-zinc-800 bg-zinc-900 p-6">
+      <div className="flex flex-col border-b border-zinc-800 bg-zinc-900 p-6">
         <p className="text-xs text-zinc-500">No strategy loaded</p>
       </div>
     );
@@ -176,7 +176,7 @@ export function StrategyInfoPanel() {
   };
 
   const currentType: StrategyType =
-    strategyType === 'Bearish' ? 'Bearish' : 'Bullish';
+    strategyType === 'Bearish' ? 'Bearish' : strategyType === 'Both' ? 'Both' : 'Bullish';
 
   const validationBadge = (() => {
     if (validationStatus === 'Pass') return 'bg-emerald-950 text-emerald-400 border-emerald-800';
@@ -185,10 +185,10 @@ export function StrategyInfoPanel() {
   })();
 
   return (
-    <div className="flex flex-col h-full border-l border-zinc-800 bg-zinc-900">
+    <div className="flex flex-col bg-zinc-900">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
-        <h2 className="text-sm font-semibold text-zinc-50">Strategy Info</h2>
+      <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-zinc-50">Strategy Information</h2>
         <div className="flex items-center gap-2">
           {validationStatus && (
             <span className={`text-xs px-1.5 py-0.5 rounded border font-mono ${validationBadge}`}>
@@ -202,7 +202,7 @@ export function StrategyInfoPanel() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="px-4 py-4">
         <dl className="space-y-5">
           {/* Name */}
           <Field label="Name">
@@ -229,11 +229,13 @@ export function StrategyInfoPanel() {
                     currentType === type
                       ? type === 'Bullish'
                         ? 'bg-emerald-900 text-emerald-300 border-emerald-700'
-                        : 'bg-red-900 text-red-300 border-red-700'
+                        : type === 'Bearish'
+                        ? 'bg-red-900 text-red-300 border-red-700'
+                        : 'bg-blue-900 text-blue-300 border-blue-700'
                       : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:border-zinc-500'
                   }`}
                 >
-                  {type === 'Bullish' ? '▲ Bullish' : '▼ Bearish'}
+                  {type === 'Bullish' ? '▲ Bullish' : type === 'Bearish' ? '▼ Bearish' : '↕ Both'}
                 </button>
               ))}
             </div>
