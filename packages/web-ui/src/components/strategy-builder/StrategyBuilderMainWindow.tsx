@@ -119,6 +119,9 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // Default strategy is pre-initialized in the Zustand store so no createStrategy() needed here.
   useEffect(() => {
     setMounted(true);
+    // Establish the clean snapshot on first render so loading a strategy
+    // from localStorage doesn't immediately mark it as modified.
+    setCleanSnapshot(strategySnapshot);
     if (strategyId) {
       loadStrategy(strategyId).catch(console.error);
     }
@@ -418,10 +421,10 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
           <ToolbarButton label="New"  title="New Strategy (Ctrl+N)"  onClick={() => open('newStrategy')} />
           <ToolbarButton label="Open" title="Open Strategy (Ctrl+O)" onClick={() => open('strategyBrowser')} />
           <ToolbarButton
-            label={isModified ? 'Save ●' : 'Save'}
+            label={mounted && isModified ? 'Save ●' : 'Save'}
             title="Save (Ctrl+S)"
             onClick={handleSave}
-            active={isModified}
+            active={mounted && isModified}
           />
           <div className="w-px h-5 mx-1 flex-shrink-0" style={{ background: '#3C4149' }} />
           <ToolbarButton
