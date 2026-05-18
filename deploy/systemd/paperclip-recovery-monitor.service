@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=python3 /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/paperclip_recovery_monitor.py matches
+ExecStart=python3 /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/paperclip_recovery_monitor.py run
 StandardOutput=journal
 StandardError=journal
 Environment=HOME=/home/sirrus
