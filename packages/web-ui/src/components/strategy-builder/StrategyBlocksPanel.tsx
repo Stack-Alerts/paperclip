@@ -171,7 +171,7 @@ function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate }: ExitPil
   const pct = cfg?.percentage != null ? `${Math.round(cfg.percentage * 100)}%` : '50%';
   const mode = cfg?.exitMode ?? 'ABSOLUTE';
   return (
-    <div className="flex items-center gap-2 ml-4 mt-1 text-xs px-2 py-1 rounded border border-red-900/50" style={{ background: 'rgba(220,38,38,0.07)' }}>
+    <div className="flex items-center gap-2 ml-4 mt-1 text-xs pl-2 py-1 rounded border border-red-900/50" style={{ background: 'rgba(220,38,38,0.07)' }}>
       <span style={{ color: '#DC2626' }}>↳ 🔴</span>
       <span className="font-semibold flex-1 truncate" style={{ color: '#FCA5A5' }}>{name}</span>
       {cfg?.signalName && <span className="truncate" style={{ color: '#9AA0A6' }}>({formatSignalName(cfg.signalName)})</span>}
@@ -418,8 +418,8 @@ function BlockCard({
       )}
 
       {blockExits.length > 0 && (
-        <div className="mx-3 mb-3 space-y-1">
-          <div className="text-xs font-semibold" style={{ color: '#9AA0A6' }}>Block Exit Conditions:</div>
+        <div className="mx-3 mb-3 rounded border border-[#3C4149]/60 px-3 py-2 space-y-1" style={{ background: '#15191E' }}>
+          <div className="text-xs font-semibold mb-1" style={{ color: '#9AA0A6' }}>Block Exit Conditions:</div>
           {blockExits.map(({ block: eb, globalIndex: gi }) => (
             <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} onDuplicate={onDuplicateExit} />
           ))}
