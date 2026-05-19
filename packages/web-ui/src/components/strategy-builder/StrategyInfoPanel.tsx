@@ -216,7 +216,7 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
     const entryBlocks = stats.required + stats.optional;
     const totalSigs = stats.reqSignals + stats.optSignals;
     const exitPart = stats.exits > 0 ? `, ${stats.exits} exit condition(s)` : '';
-    return `${entryBlocks} entry block(s) (${stats.required} required, ${stats.optional} optional)${exitPart}, ${totalSigs} signal(s)`;
+    return `${entryBlocks} block(s) (${stats.required} required, ${stats.optional} optional)${exitPart}, ${totalSigs} signal(s) (${stats.reqSignals} required, ${stats.optSignals} optional)`;
   }, [stats, currentStrategy]);
 
   const handleNameChange = useCallback(
@@ -305,17 +305,25 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
           </RichTooltip>
         </div>
 
-        {/* Row 2: description (single truncated line) */}
+        {/* Row 2: description stats label */}
         <RichTooltip content={TT_DESCRIPTION}>
-          <p className="text-[10px] truncate leading-tight cursor-default" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-[10px] leading-tight cursor-default" style={{ color: 'var(--text-muted)' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Description: </span>
             {descLabel ? `${descLabel}.` : autoDescription.split('\n')[0]}
           </p>
         </RichTooltip>
 
+        {/* Row 2b: full auto-description in bordered box */}
+        <div
+          className="rounded text-[10px] px-2 py-1.5 leading-relaxed whitespace-pre-line"
+          style={{ color: 'var(--text-muted)', border: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)' }}
+        >
+          {autoDescription}
+        </div>
+
         {/* Row 3: type buttons + stats */}
         <div className="flex items-center gap-1.5 text-[10px] overflow-hidden flex-nowrap">
-          <span className="flex-shrink-0" style={{ color: 'var(--text-muted)' }}>Type:</span>
+          <span className="flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>Strategy Type:</span>
           {(['Bullish', 'Bearish'] as const).map(type => (
             <RichTooltip key={type} content={type === 'Bullish' ? TT_BULLISH : TT_BEARISH}>
               <button
