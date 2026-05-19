@@ -295,7 +295,7 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
               onBlur={e => handleNameChange(e.target.value)}
               placeholder="Untitled"
               maxLength={100}
-              className="px-1.5 py-0.5 rounded border text-xs focus:outline-none min-w-0 flex-1 max-w-[180px]"
+              className="px-1.5 py-0.5 rounded border text-xs focus:outline-none min-w-0 flex-1"
               style={{
                 background: 'rgba(255,255,255,0.04)',
                 borderColor: 'rgba(255,255,255,0.08)',
