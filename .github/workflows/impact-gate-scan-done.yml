@@ -226,7 +226,7 @@ jobs:
         run: |
           SNAPSHOT=$(ls data_quality_impact_gate_*.json 2>/dev/null | sort | tail -1)
           # Stage all changes (new snapshot, modified state files)
-          git add -A data_quality_impact_gate_*.json .impact_gate_muted_state.json 2>/dev/null || true
+          git add -A data_quality_impact_gate_*.json data/impact_gate_muted_results.json 2>/dev/null || true
 
           # Check for staged changes (covers both new and modified files)
           if git diff --cached --quiet; then
@@ -250,7 +250,7 @@ jobs:
           if [ -n "$SNAPSHOT" ]; then
             git add "$SNAPSHOT"
           fi
-          git add .impact_gate_muted_state.json
+          git add data/impact_gate_muted_results.json
           git commit --allow-empty -m "chore(impact-gate): update scan-done data quality snapshot"
           # Retry push with rebase to handle concurrent workflow runs at 5-min intervals
           git fetch origin main
