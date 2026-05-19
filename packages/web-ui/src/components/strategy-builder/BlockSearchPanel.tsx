@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { ChevronRight, Search, Filter, Save, Folder, Trash2, Blocks, Plus } from 'lucide-react';
+import { ChevronRight, Search, Filter, Save, Folder, Trash2, Blocks, Plus, ChevronDown, X, Edit2, Check } from 'lucide-react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BlockDefinition, BlockType } from '@/lib/strategy-builder/types';
 import { ExitConditionDialog, ExitConditionConfig, AvailableBlock } from './ExitConditionDialog';
@@ -18,11 +18,6 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
   [BlockType.POSITION_SIZING]:  'Position Sizing',
 };
 
-// Signal-type classification mirrors the desktop block_registry_adapter logic.
-// EVENT  — pattern/event-driven triggers (e.g. double-top completion, BOS break)
-// SIGNAL — indicator crossovers and oscillator-based signals (e.g. MACD, EMA cross)
-// CONTEXT — continuous state providers always active in background (e.g. sessions, Fibonacci levels)
-// HYBRID — blocks that combine event detection with continuous state (e.g. ICT, Wyckoff)
 const EVENT_CATS   = new Set(['PATTERNS', 'MARKET_STRUCTURE', 'PRICE_ACTION']);
 const SIGNAL_CATS  = new Set(['OSCILLATORS', 'MOVING_AVERAGES', 'VOLATILITY']);
 const CONTEXT_CATS = new Set(['SESSIONS', 'FIBONACCI', 'PRICE_LEVELS']);
@@ -46,7 +41,6 @@ const SIGNAL_TYPE_TOOLTIPS: Record<string, string> = {
     'HYBRID blocks combine event-detection with continuous state tracking. They fire specific signals AND maintain background context simultaneously (e.g. ICT / SMC concepts, Wyckoff phases, Elliott Wave count). Useful when a single analysis framework handles both role.',
 };
 
-// ─── Structured tooltip content (replaces native title attributes) ────────────
 const TT_SEARCH: TooltipContent = {
   title: 'Search Building Blocks',
   body: 'Full-text search across block names, signal names, and descriptions.',
@@ -58,31 +52,28 @@ const TT_SEARCH: TooltipContent = {
     { header: 'Tip:', items: ['Partial terms work — you do not need exact block names'] },
   ],
 };
-const TT_CATEGORY: TooltipContent = {
-  title: 'Category Filter',
-  body: 'Narrows the library to blocks sharing the same market analysis domain.',
+const TT_FILTER: TooltipContent = {
+  title: 'Category & Type Filter',
+  body: 'Narrows the library by analysis domain (category) and block role (type).',
   sections: [
-    { header: 'Examples:', items: [
+    { header: 'Category examples:', items: [
       'PATTERNS — classical chart formations (Cup & Handle, Double Top)',
-      'OSCILLATORS — momentum-based indicators (RSI, MACD, Stochastic)',
-      'SESSIONS — time-of-day context (London, New York, Asia killzones)',
+      'OSCILLATORS — momentum-based indicators (RSI, MACD)',
+      'SESSIONS — time-of-day context (London, New York killzones)',
     ]},
-    { header: 'Tip:', items: ['Combine with the Type filter to target a specific block role'] },
+    { header: 'Type options:', items: [
+      'EVENT — fires once on discrete occurrences',
+      'SIGNAL — continuous indicator scoring',
+      'CONTEXT — always-active background state',
+      'HYBRID — combines event + continuous state',
+    ]},
   ],
 };
-const TT_TYPE: TooltipContent = {
-  title: 'Block Type Filter',
-  body: 'Controls how a block participates in your strategy execution.',
+const TT_NARROW: TooltipContent = {
+  title: 'Narrow Results',
+  body: 'Filters within the current search + category + type results. Use to further refine a broad search.',
   sections: [
-    { header: 'Types:', items: [
-      'EVENT — fires once on discrete occurrences (pattern completions, structure breaks)',
-      'SIGNAL — continuous indicator scoring directional bias (MACD, RSI, EMA cross)',
-      'CONTEXT — always-active background state (sessions, Fibonacci zones, price levels)',
-      'HYBRID — combines event detection with continuous state (ICT/SMC, Wyckoff, Elliott Wave)',
-    ]},
-    { header: 'Tip:', items: [
-      'Use EVENT as primary triggers, SIGNAL as confirmation, CONTEXT to qualify the market environment',
-    ]},
+    { header: 'Tip:', items: ['Combine with a broad comma-search above to drill down precisely'] },
   ],
 };
 const TT_PRESET: TooltipContent = {
@@ -91,17 +82,16 @@ const TT_PRESET: TooltipContent = {
   sections: [
     { header: 'How to use:', items: [
       'Select a preset in this dropdown, then click 📂 to apply it',
-      'Click 💾 to save the current filter state under a new name',
+      'Click 💾 to open the preset browser and save or manage presets',
     ]},
     { header: 'Tip:', items: ['Create presets for views you use often, e.g. "ICT blocks" or "Bullish patterns"'] },
   ],
 };
 const TT_PRESET_SAVE: TooltipContent = {
-  title: 'Save Filter Preset',
-  body: 'Captures the current search text, category, and type filter as a named preset.',
+  title: 'Manage Filter Presets',
+  body: 'Opens the preset browser to save the current filters, rename, or delete existing presets.',
   sections: [
     { header: 'Stored in:', items: ['Browser local storage — persists across sessions on this device'] },
-    { header: 'Tip:', items: ['Name presets descriptively, e.g. "ICT + HYBRID" or "Pattern EVENT blocks"'] },
   ],
 };
 const TT_PRESET_LOAD: TooltipContent = {
@@ -116,7 +106,6 @@ const TT_PRESET_DELETE: TooltipContent = {
   title: 'Delete Filter Preset',
   body: 'Permanently removes the selected preset from local storage.',
   sections: [
-    { header: 'How to use:', items: ['Select a preset in the dropdown first, then click here to delete it'] },
     { header: 'Warning:', items: ['This action cannot be undone'] },
   ],
 };
@@ -200,10 +189,6 @@ const TT_ADD_EXIT: TooltipContent = {
   ],
 };
 
-// ui_visible=false signals are hidden in Standard mode (matches desktop app behaviour).
-// Advanced mode shows all signals including ui_visible=false for debugging/exploration.
-
-// Convert WAVE_1_BULLISH → Wave 1 Bullish
 function formatSignalName(name: string): string {
   return name
     .split('_')
@@ -233,47 +218,329 @@ function savePresets(presets: FilterPreset[]) {
 }
 
 // ─────────────────────────────────────────────
-// SavePresetModal
+// CombinedFilterMenu — single button that opens a popover with Category + Type sections
 // ─────────────────────────────────────────────
-interface SavePresetModalProps {
-  open: boolean;
-  onSave: (name: string) => void;
-  onCancel: () => void;
+interface CombinedFilterMenuProps {
+  selectedCategory: string;
+  selectedType: string;
+  onCategoryChange: (v: string) => void;
+  onTypeChange: (v: string) => void;
+  allCategories: { id: string; name: string }[];
+  allTypes: { value: string; label: string }[];
 }
 
-function SavePresetModal({ open, onSave, onCancel }: SavePresetModalProps) {
-  const [value, setValue] = useState('');
+function CombinedFilterMenu({ selectedCategory, selectedType, onCategoryChange, onTypeChange, allCategories, allTypes }: CombinedFilterMenuProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const activeCount = (selectedCategory !== 'all' ? 1 : 0) + (selectedType !== 'all' ? 1 : 0);
+  const catLabel = selectedCategory !== 'all'
+    ? (allCategories.find(c => c.id === selectedCategory)?.name ?? selectedCategory)
+    : null;
+  const typeLabel = selectedType !== 'all' ? selectedType : null;
+
+  const parts = [catLabel, typeLabel].filter(Boolean);
+  const buttonLabel = parts.length > 0 ? parts.join(' · ') : 'All';
+
+  const clearAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onCategoryChange('all');
+    onTypeChange('all');
+  };
+
+  return (
+    <div ref={ref} className="relative flex-shrink-0">
+      <RichTooltip content={TT_FILTER}>
+        <button
+          onClick={() => setOpen(v => !v)}
+          className="flex items-center gap-1 px-2 py-1 rounded border text-xs transition-colors max-w-[160px]"
+          style={{
+            background: activeCount > 0 ? 'color-mix(in srgb, var(--accent-blue) 15%, var(--input-bg))' : 'var(--input-bg)',
+            borderColor: activeCount > 0 ? 'var(--accent-blue)' : 'var(--input-border)',
+            color: activeCount > 0 ? 'var(--accent-blue)' : 'var(--input-text)',
+          }}
+        >
+          <span className="truncate max-w-[110px]">{buttonLabel}</span>
+          {activeCount > 0 && (
+            <span
+              onClick={clearAll}
+              className="flex-shrink-0 ml-0.5 hover:opacity-70 transition-opacity"
+              style={{ color: 'var(--accent-blue)' }}
+              title="Clear filters"
+            >
+              <X size={11} />
+            </span>
+          )}
+          {activeCount === 0 && <ChevronDown size={11} className="flex-shrink-0 ml-0.5" />}
+        </button>
+      </RichTooltip>
+
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-1 z-50 rounded-lg shadow-2xl border overflow-hidden"
+          style={{ background: 'var(--surface-panel)', borderColor: 'var(--border)', minWidth: 220, maxHeight: 340, overflowY: 'auto' }}
+        >
+          {/* Category section */}
+          <div className="px-3 pt-2.5 pb-1">
+            <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>Category</p>
+            <div className="space-y-0.5">
+              {[{ id: 'all', name: 'All Categories' }, ...allCategories].map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => { onCategoryChange(cat.id); }}
+                  className="w-full text-left text-xs px-2 py-1 rounded transition-colors"
+                  style={{
+                    background: selectedCategory === cat.id ? 'color-mix(in srgb, var(--accent-blue) 15%, transparent)' : 'transparent',
+                    color: selectedCategory === cat.id ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                    fontWeight: selectedCategory === cat.id ? 600 : 400,
+                  }}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mx-3 my-2" style={{ borderTop: '1px solid var(--border)' }} />
+
+          {/* Type section */}
+          <div className="px-3 pb-2.5">
+            <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>Type</p>
+            <div className="space-y-0.5">
+              {[{ value: 'all', label: 'All Types' }, ...allTypes].map(t => (
+                <button
+                  key={t.value}
+                  onClick={() => { onTypeChange(t.value); }}
+                  className="w-full text-left text-xs px-2 py-1 rounded transition-colors"
+                  style={{
+                    background: selectedType === t.value ? 'color-mix(in srgb, var(--accent-blue) 15%, transparent)' : 'transparent',
+                    color: selectedType === t.value ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                    fontWeight: selectedType === t.value ? 600 : 400,
+                  }}
+                >
+                  {t.label}
+                  {t.value !== 'all' && SIGNAL_TYPE_TOOLTIPS[t.value] && (
+                    <span className="ml-1 text-xs" style={{ color: 'var(--text-muted)', fontWeight: 400 }}>
+                      — {SIGNAL_TYPE_TOOLTIPS[t.value].split('—')[0].trim().substring(0, 40)}…
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// PresetBrowserModal — full preset management UI
+// ─────────────────────────────────────────────
+interface PresetBrowserModalProps {
+  open: boolean;
+  presets: FilterPreset[];
+  currentFilters: { search: string; category: string; type: string };
+  onClose: () => void;
+  onApply: (preset: FilterPreset) => void;
+  onSave: (name: string) => void;
+  onRename: (oldName: string, newName: string) => void;
+  onDelete: (name: string) => void;
+}
+
+function PresetBrowserModal({ open, presets, currentFilters, onClose, onApply, onSave, onRename, onDelete }: PresetBrowserModalProps) {
+  const [newName, setNewName] = useState('');
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
   if (!open) return null;
+
+  const hasActiveFilters = currentFilters.search || currentFilters.category !== 'all' || currentFilters.type !== 'all';
+
+  const startEdit = (name: string) => {
+    setEditingName(name);
+    setEditValue(name);
+    setConfirmDelete(null);
+  };
+
+  const commitRename = (oldName: string) => {
+    if (editValue.trim() && editValue.trim() !== oldName) {
+      onRename(oldName, editValue.trim());
+    }
+    setEditingName(null);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="rounded-lg shadow-2xl border p-5 w-80" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-dim)' }}>Save Filter Preset</h3>
-        <input
-          autoFocus
-          type="text"
-          placeholder="Preset name…"
-          value={value}
-          onChange={e => setValue(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && value.trim()) onSave(value.trim()); if (e.key === 'Escape') onCancel(); }}
-          className="w-full px-2.5 py-1.5 rounded border text-sm focus:outline-none mb-4"
-          style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
-        />
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onCancel}
-            className="text-xs px-3 py-1.5 rounded border transition-colors"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
-          >
-            Cancel
+      <div className="rounded-xl shadow-2xl border flex flex-col" style={{ background: 'var(--surface-panel)', borderColor: 'var(--border)', width: 480, maxHeight: '80vh' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Filter Presets</h3>
+          <button onClick={onClose} className="p-1 rounded hover:opacity-70 transition-opacity" style={{ color: 'var(--text-muted)' }}>
+            <X size={15} />
           </button>
-          <button
-            onClick={() => { if (value.trim()) onSave(value.trim()); }}
-            disabled={!value.trim()}
-            className="text-xs px-3 py-1.5 rounded border transition-colors disabled:opacity-40"
-            style={{ background: 'var(--accent-blue-dark)', borderColor: 'var(--accent-sky-bright)', color: 'var(--accent-sky)' }}
-          >
-            Save
-          </button>
+        </div>
+
+        {/* Save current as new */}
+        <div className="px-5 py-3.5 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+          <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
+            {hasActiveFilters
+              ? `Save current filters as a preset:`
+              : 'No active filters — set a search, category, or type first to save.'}
+          </p>
+          {hasActiveFilters && (
+            <div className="text-xs mb-2 px-2 py-1.5 rounded" style={{ background: 'color-mix(in srgb, var(--accent-blue) 8%, transparent)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+              {[
+                currentFilters.search && `Search: "${currentFilters.search}"`,
+                currentFilters.category !== 'all' && `Category: ${currentFilters.category}`,
+                currentFilters.type !== 'all' && `Type: ${currentFilters.type}`,
+              ].filter(Boolean).join(' · ')}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Preset name…"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && newName.trim() && hasActiveFilters) { onSave(newName.trim()); setNewName(''); }
+                if (e.key === 'Escape') setNewName('');
+              }}
+              disabled={!hasActiveFilters}
+              className="flex-1 px-2.5 py-1.5 rounded border text-xs focus:outline-none disabled:opacity-40"
+              style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
+            />
+            <button
+              onClick={() => { if (newName.trim() && hasActiveFilters) { onSave(newName.trim()); setNewName(''); } }}
+              disabled={!newName.trim() || !hasActiveFilters}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition-colors disabled:opacity-40"
+              style={{ background: 'var(--accent-blue-dark)', borderColor: 'var(--accent-blue)', color: 'var(--accent-blue)' }}
+            >
+              <Save size={12} />
+              Save
+            </button>
+          </div>
+        </div>
+
+        {/* Preset list */}
+        <div className="flex-1 overflow-y-auto px-5 py-3">
+          {presets.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No presets saved yet.</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Set filters above and save them for one-click access.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {presets.map(preset => (
+                <div
+                  key={preset.name}
+                  className="rounded-lg border p-3"
+                  style={{ background: 'var(--surface-card)', borderColor: 'var(--border)' }}
+                >
+                  {/* Name row */}
+                  <div className="flex items-center gap-2 mb-1.5">
+                    {editingName === preset.name ? (
+                      <input
+                        autoFocus
+                        type="text"
+                        value={editValue}
+                        onChange={e => setEditValue(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') commitRename(preset.name);
+                          if (e.key === 'Escape') setEditingName(null);
+                        }}
+                        onBlur={() => commitRename(preset.name)}
+                        className="flex-1 px-1.5 py-0.5 rounded border text-xs focus:outline-none"
+                        style={{ background: 'var(--input-bg)', borderColor: 'var(--accent-blue)', color: 'var(--input-text)' }}
+                      />
+                    ) : (
+                      <span className="flex-1 text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{preset.name}</span>
+                    )}
+                    <button
+                      onClick={() => editingName === preset.name ? commitRename(preset.name) : startEdit(preset.name)}
+                      className="p-1 rounded hover:opacity-70 transition-opacity"
+                      style={{ color: 'var(--text-muted)' }}
+                      title={editingName === preset.name ? 'Confirm rename' : 'Rename'}
+                    >
+                      {editingName === preset.name ? <Check size={12} /> : <Edit2 size={12} />}
+                    </button>
+                  </div>
+
+                  {/* Detail chips */}
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {preset.search && (
+                      <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'color-mix(in srgb, var(--text-muted) 10%, transparent)', color: 'var(--text-secondary)' }}>
+                        🔍 {preset.search}
+                      </span>
+                    )}
+                    {preset.category !== 'all' && (
+                      <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'color-mix(in srgb, var(--accent-blue) 10%, transparent)', color: 'var(--accent-blue)' }}>
+                        {preset.category}
+                      </span>
+                    )}
+                    {preset.type !== 'all' && (
+                      <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'color-mix(in srgb, var(--accent-teal) 10%, transparent)', color: 'var(--accent-teal)' }}>
+                        {preset.type}
+                      </span>
+                    )}
+                    {!preset.search && preset.category === 'all' && preset.type === 'all' && (
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>No filters (shows all)</span>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { onApply(preset); onClose(); }}
+                      className="text-xs px-2.5 py-1 rounded border font-medium transition-colors"
+                      style={{ background: 'var(--accent-blue-dark)', borderColor: 'var(--accent-blue)', color: 'var(--accent-blue)' }}
+                    >
+                      Apply
+                    </button>
+                    {confirmDelete === preset.name ? (
+                      <>
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Delete permanently?</span>
+                        <button
+                          onClick={() => { onDelete(preset.name); setConfirmDelete(null); }}
+                          className="text-xs px-2 py-1 rounded border transition-colors"
+                          style={{ borderColor: 'var(--core-danger)', color: 'var(--core-danger)', background: 'color-mix(in srgb, var(--core-danger) 10%, transparent)' }}
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete(null)}
+                          className="text-xs px-2 py-1 rounded border transition-colors"
+                          style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)', background: 'transparent' }}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDelete(preset.name)}
+                        className="p-1 rounded hover:opacity-70 transition-opacity ml-auto"
+                        style={{ color: 'var(--text-muted)' }}
+                        title="Delete preset"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -301,7 +568,6 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
   const signals = definition.signals ?? [];
   const visibleSignals = signals.filter(s => s.ui_visible !== false);
 
-  // Auto-expand and scroll into view when highlighted from the strategy panel
   useEffect(() => {
     if (!isHighlighted) return;
     setSignalsOpen(true);
@@ -311,6 +577,7 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
     const t = setTimeout(() => onHighlightCleared?.(), 3500);
     return () => clearTimeout(t);
   }, [isHighlighted]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const ext = definition as unknown as Record<string, unknown>;
   const weight = ext.weight as number | undefined;
   const typeLabel = BLOCK_TYPE_LABELS[definition.type] ?? (definition.type as string).replace('_', ' ').toUpperCase();
@@ -360,7 +627,6 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
         boxShadow: isHighlighted ? '0 0 0 2px rgba(14,165,233,0.25)' : undefined,
       }}
     >
-      {/* Block name + meta */}
       <div className="px-3 pt-2.5 pb-1.5">
         <div className="flex items-center gap-1.5">
           <span className="text-sm font-medium leading-tight" style={{ color: 'var(--text-primary)' }}>{definition.name}</span>
@@ -372,7 +638,6 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
         </div>
       </div>
 
-      {/* Show/hide signals link row */}
       {visibleSignals.length > 0 && (
         <RichTooltip content={TT_SHOW_SIGNALS}>
           <button
@@ -395,13 +660,9 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
         </RichTooltip>
       )}
 
-      {/* Expanded: signals list + add buttons */}
       {signalsOpen && visibleSignals.length > 0 && (
         <div className="px-3 pb-2 bg-[var(--bg-deep)]">
-          {/* Header */}
           <p className="text-xs font-semibold text-sky-400 pt-2 pb-1">Select signals to add:</p>
-
-          {/* Signal list with checkboxes */}
           <div className="space-y-2">
             {visibleSignals.map((sig, i) => {
               const isAdded = !advancedMode && addedSignals.has(sig.name);
@@ -444,7 +705,6 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
             })}
           </div>
 
-          {/* Add buttons */}
           <div className="flex gap-1.5 mt-3">
             <RichTooltip content={TT_ADD_AND}>
               <button
@@ -508,69 +768,69 @@ export function BlockSearchPanel() {
     highlightLibraryBlock,
   } = useStrategyStore();
 
-  const [searchText, setSearchText] = useState('');
+  const [searchText, setSearchText]     = useState('');
+  const [narrowText, setNarrowText]     = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedType, setSelectedType] = useState<'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all'>('all');
   const [advancedMode, setAdvancedMode] = useState(false);
 
-  // Exit condition dialog
   const [exitPending, setExitPending] = useState<{
     definition: BlockDefinition;
     selectedSignals: string[];
   } | null>(null);
 
-  // When a block is highlighted from the strategy panel, clear filters so it's visible
   useEffect(() => {
     if (!highlightedLibraryBlockId) return;
     setSearchText('');
+    setNarrowText('');
     setSelectedCategory('all');
     setSelectedType('all');
   }, [highlightedLibraryBlockId]);
 
   // Presets
-  const [presets, setPresets] = useState<FilterPreset[]>([]);
+  const [presets, setPresets]           = useState<FilterPreset[]>([]);
   const [selectedPreset, setSelectedPreset] = useState('');
-  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [presetBrowserOpen, setPresetBrowserOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   useEffect(() => { setPresets(loadPresets()); }, []);
 
-  const handleSavePreset = useCallback(() => {
-    setSaveModalOpen(true);
-  }, []);
-
-  const handleConfirmSavePreset = useCallback((name: string) => {
+  const handleSavePreset = useCallback((name: string) => {
     const preset: FilterPreset = { name, search: searchText, category: selectedCategory, type: selectedType };
     const updated = [...presets.filter(p => p.name !== preset.name), preset];
     savePresets(updated);
     setPresets(updated);
     setSelectedPreset(name);
-    setSaveModalOpen(false);
   }, [searchText, selectedCategory, selectedType, presets]);
+
+  const handleRenamePreset = useCallback((oldName: string, newName: string) => {
+    const updated = presets.map(p => p.name === oldName ? { ...p, name: newName } : p);
+    savePresets(updated);
+    setPresets(updated);
+    if (selectedPreset === oldName) setSelectedPreset(newName);
+  }, [presets, selectedPreset]);
+
+  const handleDeletePreset = useCallback((name: string) => {
+    const updated = presets.filter(p => p.name !== name);
+    savePresets(updated);
+    setPresets(updated);
+    if (selectedPreset === name) setSelectedPreset('');
+  }, [presets, selectedPreset]);
+
+  const handleApplyPreset = useCallback((preset: FilterPreset) => {
+    setSearchText(preset.search);
+    setSelectedCategory(preset.category);
+    setSelectedType(preset.type as 'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all');
+    setNarrowText('');
+    setSelectedPreset(preset.name);
+  }, []);
 
   const handleLoadPreset = useCallback(() => {
     const preset = presets.find(p => p.name === selectedPreset);
     if (!preset) return;
-    setSearchText(preset.search);
-    setSelectedCategory(preset.category);
-    setSelectedType(preset.type as 'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all');
-  }, [presets, selectedPreset]);
+    handleApplyPreset(preset);
+  }, [presets, selectedPreset, handleApplyPreset]);
 
-  const handleDeletePreset = useCallback(() => {
-    if (!selectedPreset) return;
-    setDeleteConfirmOpen(true);
-  }, [selectedPreset]);
-
-  const handleConfirmDeletePreset = useCallback((result: 'yes' | 'no' | 'cancel') => {
-    setDeleteConfirmOpen(false);
-    if (result !== 'yes') return;
-    const updated = presets.filter(p => p.name !== selectedPreset);
-    savePresets(updated);
-    setPresets(updated);
-    setSelectedPreset('');
-  }, [presets, selectedPreset]);
-
-  // Filtered blocks — flat, sorted by category then name.
-  // Search supports comma-separated terms: "50, asia, hod" matches blocks containing ANY term.
+  // Primary filtered blocks (search + category + type)
   const filteredBlocks = useMemo(() => {
     const terms = searchText
       .split(',')
@@ -597,7 +857,16 @@ export function BlockSearchPanel() {
       });
   }, [blockLibrary, searchText, selectedCategory, selectedType]);
 
-  // All categories for dropdown — format SNAKE_CASE to Title Case for display
+  // Secondary narrow — filters within filteredBlocks
+  const displayBlocks = useMemo(() => {
+    const q = narrowText.trim().toLowerCase();
+    if (!q) return filteredBlocks;
+    return filteredBlocks.filter(b =>
+      b.name.toLowerCase().includes(q) ||
+      b.description.toLowerCase().includes(q)
+    );
+  }, [filteredBlocks, narrowText]);
+
   const allCategories = useMemo(() => {
     if (blockCategories.length > 0) return blockCategories.map(c => ({ id: c.id, name: c.name }));
     const cats = new Set(blockLibrary.map(b => b.category));
@@ -607,8 +876,6 @@ export function BlockSearchPanel() {
     }));
   }, [blockCategories, blockLibrary]);
 
-  // Signal types are computed from category — same logic as the desktop block_registry_adapter.
-  // Only show types that have at least one block in the current library.
   const allTypes = useMemo(() => {
     const seen = new Set(blockLibrary.map(b => computeSignalType(b.category)));
     return (['CONTEXT', 'EVENT', 'HYBRID', 'SIGNAL'] as const).filter(t => seen.has(t)).map(t => ({
@@ -617,10 +884,6 @@ export function BlockSearchPanel() {
     }));
   }, [blockLibrary]);
 
-  // Add block to strategy.
-  // Standard mode: signals from the same block definition + logic are merged
-  //   into the existing block card rather than creating a duplicate card.
-  // Advanced mode: always creates a new separate block card (allows duplicates).
   const handleAdd = useCallback(
     (definition: BlockDefinition, logic: 'AND' | 'OR', selectedSignals: string[]) => {
       const state = useStrategyStore.getState();
@@ -735,9 +998,9 @@ export function BlockSearchPanel() {
         </div>
       </div>
 
-      {/* Search + Filters — 2 rows, labels fixed-width so inputs align */}
+      {/* Search + Filter rows */}
       <div className="px-3 pt-3 pb-2 space-y-1.5 flex-shrink-0 border-b border-[var(--border)]" style={{ background: 'var(--bg-panel)' }}>
-        {/* Row 1: Search */}
+        {/* Row 1: Main search */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 text-xs flex-shrink-0" style={{ color: 'var(--text-muted)', width: 68, justifyContent: 'flex-end' }}>
             <Search size={13} style={{ flexShrink: 0 }} />
@@ -755,84 +1018,85 @@ export function BlockSearchPanel() {
           </RichTooltip>
         </div>
 
-        {/* Row 2: Category + Type dropdowns — same label width so controls align with search input */}
-        <div className="flex items-center gap-1.5">
+        {/* Row 2: Combined filter + narrow within results */}
+        <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 text-xs flex-shrink-0" style={{ color: 'var(--text-muted)', width: 68, justifyContent: 'flex-end' }}>
             <Filter size={13} style={{ flexShrink: 0 }} />
             <span>Filter:</span>
           </div>
-          <RichTooltip content={TT_CATEGORY}>
-            <select
-              value={selectedCategory}
-              onChange={e => setSelectedCategory(e.target.value)}
-              className="flex-[1.5] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
+          <CombinedFilterMenu
+            selectedCategory={selectedCategory}
+            selectedType={selectedType}
+            onCategoryChange={setSelectedCategory}
+            onTypeChange={v => setSelectedType(v as 'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all')}
+            allCategories={allCategories}
+            allTypes={allTypes}
+          />
+          <RichTooltip content={TT_NARROW}>
+            <input
+              type="text"
+              placeholder="Narrow within results…"
+              value={narrowText}
+              onChange={e => setNarrowText(e.target.value)}
+              className="flex-1 min-w-0 px-2.5 py-1.5 rounded border text-xs focus:outline-none"
               style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
-            >
-              <option value="all">All Categories</option>
-              {allCategories.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            />
           </RichTooltip>
-          <RichTooltip content={TT_TYPE}>
-            <select
-              value={selectedType}
-              onChange={e => setSelectedType(e.target.value as 'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all')}
-              className="flex-[0.75] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
-              style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
-            >
-              <option value="all">All Types</option>
-              {allTypes.map(({ value, label }) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </RichTooltip>
+        </div>
+
+        {/* Row 3: Presets */}
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 text-xs flex-shrink-0" style={{ color: 'var(--text-muted)', width: 68, justifyContent: 'flex-end' }}>
+            <Save size={13} style={{ flexShrink: 0 }} />
+            <span>Preset:</span>
+          </div>
           <RichTooltip content={TT_PRESET}>
             <select
               value={selectedPreset}
               onChange={e => setSelectedPreset(e.target.value)}
-              className="flex-[3] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
+              className="flex-1 min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
               style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}
             >
-              <option value="">— Preset —</option>
+              <option value="">— Select preset —</option>
               {presets.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
             </select>
           </RichTooltip>
-          <RichTooltip content={TT_PRESET_SAVE}>
-            <button onClick={handleSavePreset}
-              className="flex items-center justify-center px-1.5 py-1 rounded border flex-shrink-0 hover:opacity-80"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
-              <Save size={13} />
-            </button>
-          </RichTooltip>
           <RichTooltip content={TT_PRESET_LOAD}>
-            <button onClick={handleLoadPreset} disabled={!selectedPreset}
-              className="flex items-center justify-center px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
+            <button
+              onClick={handleLoadPreset}
+              disabled={!selectedPreset}
+              className="flex items-center justify-center px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80 transition-opacity"
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}
+              title="Apply selected preset"
+            >
               <Folder size={13} />
             </button>
           </RichTooltip>
-          <RichTooltip content={TT_PRESET_DELETE}>
-            <button onClick={handleDeletePreset} disabled={!selectedPreset}
-              className="flex items-center justify-center px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
-              <Trash2 size={13} />
+          <RichTooltip content={TT_PRESET_SAVE}>
+            <button
+              onClick={() => setPresetBrowserOpen(true)}
+              className="flex items-center gap-1 px-2 py-1 rounded border flex-shrink-0 hover:opacity-80 transition-opacity text-xs"
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}
+              title="Manage presets"
+            >
+              <Save size={12} />
+              Manage
             </button>
           </RichTooltip>
         </div>
       </div>
 
-      {/* Block list — flat, sorted */}
+      {/* Block list */}
       <div className="flex-1 overflow-y-auto px-3 py-3" style={{ background: 'var(--bg-deep)', scrollbarWidth: 'thin', scrollbarColor: 'var(--border) transparent' }}>
         {isLoadingLibrary ? (
           <div className="flex flex-col items-center justify-center py-10 gap-2">
             <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--border)', borderTopColor: 'var(--accent-blue)' }} />
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Loading block library…</p>
           </div>
-        ) : filteredBlocks.length === 0 ? (
+        ) : displayBlocks.length === 0 ? (
           <p className="text-xs text-center py-8" style={{ color: 'var(--text-secondary)' }}>No blocks match the current filters</p>
         ) : (
-          filteredBlocks.map(block => (
+          displayBlocks.map(block => (
             <BlockItem
               key={block.id}
               definition={block}
@@ -849,7 +1113,10 @@ export function BlockSearchPanel() {
       {/* Footer count */}
       <div className="px-3 py-2 border-t border-[var(--border)] flex-shrink-0 flex items-center justify-between" style={{ background: 'var(--bg-panel)' }}>
         <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-          {filteredBlocks.length} / {blockLibrary.length} blocks
+          {displayBlocks.length} / {blockLibrary.length} blocks
+          {narrowText && filteredBlocks.length !== displayBlocks.length && (
+            <span style={{ color: 'var(--text-muted)' }}> ({filteredBlocks.length} before narrow)</span>
+          )}
         </p>
         {currentStrategy && (
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -858,10 +1125,15 @@ export function BlockSearchPanel() {
         )}
       </div>
 
-      <SavePresetModal
-        open={saveModalOpen}
-        onSave={handleConfirmSavePreset}
-        onCancel={() => setSaveModalOpen(false)}
+      <PresetBrowserModal
+        open={presetBrowserOpen}
+        presets={presets}
+        currentFilters={{ search: searchText, category: selectedCategory, type: selectedType }}
+        onClose={() => setPresetBrowserOpen(false)}
+        onApply={handleApplyPreset}
+        onSave={handleSavePreset}
+        onRename={handleRenamePreset}
+        onDelete={handleDeletePreset}
       />
 
       <QuestionDialog
@@ -870,7 +1142,10 @@ export function BlockSearchPanel() {
         title="Delete Filter Preset"
         heading={`Delete "${selectedPreset}"?`}
         message="This preset will be permanently removed from local storage and cannot be recovered."
-        onResult={handleConfirmDeletePreset}
+        onResult={(result) => {
+          setDeleteConfirmOpen(false);
+          if (result === 'yes') handleDeletePreset(selectedPreset);
+        }}
       />
 
       {exitPending && (() => {
