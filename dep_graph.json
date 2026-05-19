@@ -197,9 +197,7 @@
       "src/touch_index/paperclip_client.py"
     ],
     "scripts/scan_fix_issues_done.py": [
-      "src/touch_index/paperclip_client.py",
-      "src/impact_gate/worker.py",
-      "src/blast_radius/worker.py"
+      "src/impact_gate/scan_fix_issues_done.py"
     ],
     "scripts/snapshot_touch_index_quality.py": [
       "src/touch_index/db.py",
@@ -4353,6 +4351,9 @@
       "src/optimizer_v3/validation/institutional_validator.py",
       "src/strategy_builder/testing/walkforward_test_engine.py"
     ],
+    "tests/ui_qt/test_runtime_candle_update_thread.py": [
+      "src/strategy_builder/ui/strategy_builder_main_window.py"
+    ],
     "tests/ui_qt/test_runtime_update_visibility.py": [
       "src/strategy_builder/ui/strategy_builder_main_window.py"
     ],
@@ -4612,7 +4613,6 @@
       "scripts/paperclip_recovery_monitor_backup.py",
       "scripts/rclone_oauth_health.py",
       "scripts/scan_done_alert.py",
-      "scripts/scan_fix_issues_done.py",
       "src/blast_radius/api_server.py",
       "src/blast_radius/generator.py",
       "src/blast_radius/worker.py",
@@ -4756,7 +4756,6 @@
     "src/blast_radius/worker.py": [
       "scripts/impact_gate_polling_daemon.py",
       "scripts/run_impact_gate_worker.py",
-      "scripts/scan_fix_issues_done.py",
       "src/blast_radius/__main__.py",
       "src/blast_radius/api_server.py",
       "src/impact_gate/polling_worker.py",
@@ -4769,7 +4768,6 @@
       "scripts/impact_gate_polling_daemon.py",
       "scripts/impact_gate_worker.py",
       "scripts/run_impact_gate_worker.py",
-      "scripts/scan_fix_issues_done.py",
       "tests/bug_regression/test_btcaaaaa_25832_regression.py",
       "tests/test_impact_gate/test_worker.py"
     ],
@@ -4784,6 +4782,7 @@
       "tests/strategy_builder/ui/test_about_dialog.py",
       "tests/ui_qt/test_quick_preview.py",
       "tests/ui_qt/test_quick_preview_mainwindow.py",
+      "tests/ui_qt/test_runtime_candle_update_thread.py",
       "tests/ui_qt/test_runtime_update_visibility.py",
       "tests/ui_qt/test_tools_menu_position.py"
     ],
@@ -4962,6 +4961,9 @@
     "tests/strategies/backtest_simulator.py": [
       "scripts/run_walkforward_ci.py",
       "src/strategies/universal_optimizer/modules/multi_config_simulator.py"
+    ],
+    "src/impact_gate/scan_fix_issues_done.py": [
+      "scripts/scan_fix_issues_done.py"
     ],
     "src/touch_index/quality.py": [
       "scripts/snapshot_touch_index_quality.py",
@@ -8927,6 +8929,7 @@
     "tests/ui_qt/test_quick_preview.py",
     "tests/ui_qt/test_quick_preview_mainwindow.py",
     "tests/ui_qt/test_reports.py",
+    "tests/ui_qt/test_runtime_candle_update_thread.py",
     "tests/ui_qt/test_runtime_update_visibility.py",
     "tests/ui_qt/test_settings.py",
     "tests/ui_qt/test_strategy.py",
@@ -8965,10 +8968,10 @@
     "src/detectors/building_blocks/patterns/triple_top.py"
   ],
   "stats": {
-    "total_files": 1397,
-    "parsed_files": 1381,
+    "total_files": 1398,
+    "parsed_files": 1382,
     "error_files": 16,
-    "parse_rate_pct": 98.85,
-    "edge_count": 2448
+    "parse_rate_pct": 98.86,
+    "edge_count": 2447
   }
 }
