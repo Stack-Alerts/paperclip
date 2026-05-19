@@ -1,0 +1,141 @@
+name: PaperClip Recovery Monitor Health Check
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Every hour on the hour
+  workflow_dispatch:
+    inputs:
+      alert_on_unhealthy:
+        description: 'Fail job if health is not healthy'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+
+jobs:
+  health-check:
+    name: Verify recovery monitor health
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4.2.0
+
+      - name: Set up Python
+        run: python3 --version
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests python-dotenv
+
+      - name: Run health check
+        id: health
+        env:
+          PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+          PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+          PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+          PAPERCLIP_BOARD_API_KEY: ${{ secrets.PAPERCLIP_BOARD_API_KEY }}
+        run: |
+          FLAGS=""
+          if [ "${{ github.event.inputs.alert_on_unhealthy }}" = "true" ]; then
+            FLAGS="--alert-on-unhealthy"
+          fi
+          python scripts/paperclip_recovery_health_check.py --json-report $FLAGS > /tmp/health-report.json
+          echo "Health report written to /tmp/health-report.json"
+
+      - name: Generate stalled workflow report
+        if: always()
+        env:
+          PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+          PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+          PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+        run: |
+          python scripts/paperclip_stalled_workflow_reporter.py --json-report > /tmp/stalled-workflows.json
+          echo "Stalled workflows report written to /tmp/stalled-workflows.json"
+
+      - name: Write step summary
+        if: always()
+        run: |
+          python -c "
+          import json
+          import os
+
+          lines = []
+          lines.append('## PaperClip Recovery Monitor — Hourly Health Check')
+          lines.append('')
+
+          # Health check report
+          if os.path.exists('/tmp/health-report.json'):
+            d = json.load(open('/tmp/health-report.json'))
+            lines.append('### Health Status')
+            lines.append('')
+            lines.append('**Overall Status:** ' + d.get('overall_status', '?').upper())
+            lines.append('')
+
+            checks = d.get('checks', {})
+            if checks:
+                lines.append('| Check | Status | Details |')
+                lines.append('|-------|--------|---------|')
+                for check_name, check_info in checks.items():
+                    status = check_info.get('status', '?').upper()
+                    details = check_info.get('details', {})
+                    detail_str = ', '.join([f'{k}={v}' for k, v in list(details.items())[:2]])[:60]
+                    lines.append(f'| {check_name} | {status} | {detail_str} |')
+                lines.append('')
+
+            alerts = d.get('alerts', [])
+            if alerts:
+                lines.append('### 🚨 Alerts')
+                for alert in alerts:
+                    lines.append(f'- {alert}')
+                lines.append('')
+
+            warnings = d.get('warnings', [])
+            if warnings:
+                lines.append('### ⚠️ Warnings')
+                for warning in warnings:
+                    lines.append(f'- {warning}')
+                lines.append('')
+
+          # Stalled workflows report
+          if os.path.exists('/tmp/stalled-workflows.json'):
+            d = json.load(open('/tmp/stalled-workflows.json'))
+            summary = d.get('summary', {})
+            total_issues = summary.get('total_issues_in_recovery', 0)
+
+            lines.append('### Stalled Workflows')
+            lines.append('')
+
+            if total_issues == 0:
+              lines.append('✅ No stalled workflows currently in recovery.')
+            else:
+              lines.append(f'**Issues in recovery:** {total_issues}')
+              lines.append(f'**Escalations:** {summary.get(\"issues_with_escalations\", 0)}')
+              lines.append(f'**Recovery loops:** {summary.get(\"issues_stuck_in_loop\", 0)}')
+              lines.append('')
+
+              scenarios = d.get('scenarios', {})
+              if scenarios:
+                lines.append('By scenario:')
+                for scenario_id, scenario_data in scenarios.items():
+                  name = scenario_data.get('scenario_name', scenario_id)
+                  count = scenario_data.get('total_issues', 0)
+                  if count > 0:
+                    lines.append(f'- {name}: {count} issue(s)')
+
+          print('\n'.join(lines))
+          " > $GITHUB_STEP_SUMMARY
+
+      - name: Upload reports and logs
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: recovery-health-check-artifacts
+          path: |
+            /tmp/health-report.json
+            /tmp/stalled-workflows.json
+            ~/.paperclip/recovery_health_check.log
+            ~/.paperclip/stalled_workflow_reporter.log
+          retention-days: 30

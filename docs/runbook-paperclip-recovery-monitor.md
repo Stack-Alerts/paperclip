@@ -479,11 +479,222 @@ python scripts/paperclip_recovery_monitor.py run --dry-run --json-summary
 python scripts/paperclip_recovery_monitor.py matches
 ```
 
+## Health Check and Stalled Workflow Reporting (BTCAAAAA-28995)
+
+The Hourly Health Check verifies that the recovery monitor is functioning correctly
+and provides visibility into any workflows currently undergoing recovery.
+
+### Health Check Script
+
+Located at `scripts/paperclip_recovery_health_check.py`. Validates:
+
+| Check | What It Verifies |
+|-------|------------------|
+| Monitor Execution | Last run timestamp (should be < 45 min old) |
+| Configuration | Valid scenarios, agent scopes, defaults |
+| State Health | Recovery metrics, active escalations, recovery loops |
+| Log Health | Error rate, fatal issues, recent exceptions |
+| Systemd Timer | Timer is running (if systemd-based execution) |
+
+#### Usage
+
+```bash
+# Run health check with JSON output
+python scripts/paperclip_recovery_health_check.py --json-report
+
+# Run health check and fail if unhealthy
+python scripts/paperclip_recovery_health_check.py --alert-on-unhealthy
+```
+
+#### Health Status Values
+
+- **healthy**: All checks pass, recovery monitor operational
+- **degraded**: One or more warnings (non-fatal issues, elevated error rate, etc.)
+- **unhealthy**: One or more check failures (monitor stalled, config invalid, etc.)
+
+#### Key Metrics
+
+- **Monitor execution age**: Time since last recovery monitor run (should be ~0–1 min for recent runs, < 45 min always)
+- **Configuration validity**: All scenarios enabled, agent scopes defined, defaults set
+- **State file health**: No corruption, recent recovery metrics tracked
+- **Log error rate**: Elevated errors (> 5 in last 500 lines) trigger warning
+- **Recovery loops**: Issues with repeated recovery attempts in < 15 min
+
+### Stalled Workflow Reporter
+
+Located at `scripts/paperclip_stalled_workflow_reporter.py`. Analyzes recovery state to report:
+
+- Issues currently undergoing recovery by scenario
+- Recovery attempt count and age
+- Escalated issues requiring manual intervention
+- Issues stuck in recovery loops (rapid repeated attempts)
+
+#### Usage
+
+```bash
+# Generate human-readable report
+python scripts/paperclip_stalled_workflow_reporter.py
+
+# Generate JSON report
+python scripts/paperclip_stalled_workflow_reporter.py --json-report
+
+# Filter to specific scenario
+python scripts/paperclip_stalled_workflow_reporter.py --scenario exchange_api_timeout
+```
+
+### GitHub Actions Hourly Workflow
+
+Workflow: `.github/workflows/paperclip-recovery-health-check.yml`
+
+**Schedule:** Every hour (`:00` minute mark)
+
+**Steps:**
+1. Run health check with JSON output
+2. Generate stalled workflow report
+3. Write combined summary to GitHub step summary
+4. Upload artifacts: health report, stalled workflows JSON, logs (30-day retention)
+
+**Manual Trigger:**
+```bash
+gh workflow run paperclip-recovery-health-check.yml \
+  -f alert_on_unhealthy=true
+```
+
+### Interpreting Health Check Results
+
+#### Healthy Status
+
+```json
+{
+  "overall_status": "healthy",
+  "checks": {
+    "monitor_execution": {"status": "pass", "details": {"age_minutes": 1.5}},
+    "configuration": {"status": "pass", "details": {"scenarios_enabled": 5}},
+    "state_health": {"status": "pass", "details": {"total_issues_recovered": 0}},
+    "log_health": {"status": "pass", "details": {"recent_errors": 0}},
+    "systemd_timer": {"status": "pass", "details": {"systemd_timer_running": true}}
+  },
+  "alerts": [],
+  "warnings": []
+}
+```
+
+**Action:** None — system is operating normally.
+
+#### Degraded Status (Warnings)
+
+Example: Monitor has not run in 35–45 minutes.
+
+```json
+{
+  "overall_status": "degraded",
+  "warnings": [
+    "monitor_execution: Monitor last ran 38 minutes ago (expected ~30 min)"
+  ]
+}
+```
+
+**Action:** Monitor might have missed a cycle. Check GitHub Actions workflow runs:
+```bash
+gh run list --workflow=paperclip-recovery-monitor.yml --limit=5
+gh run view <run-id> --log
+```
+
+#### Unhealthy Status (Alerts)
+
+Example: Recovery state file missing or corrupted.
+
+```json
+{
+  "overall_status": "unhealthy",
+  "alerts": [
+    "monitor_execution: Recovery state file not found — monitor may have never run",
+    "log_health: Recent fatal errors (1) or high error rate (12 errors, 8 exceptions)"
+  ]
+}
+```
+
+**Action:**
+1. **State file missing/corrupt:** Run recovery monitor manually:
+   ```bash
+   python scripts/paperclip_recovery_monitor.py run --dry-run --json-summary
+   ```
+2. **API errors in logs:** Check environment variables (`PAPERCLIP_API_KEY`, `PAPERCLIP_API_URL`)
+3. **Configuration error:** Validate config file:
+   ```bash
+   python -m json.tool scripts/paperclip_recovery_actions.json | head -20
+   ```
+
+### Stalled Workflow Report Examples
+
+#### No Stalled Workflows
+
+```markdown
+# PaperClip Stalled Workflow Report
+
+**Generated:** 2026-05-19T06:16 UTC
+
+✅ **No stalled workflows currently in recovery.**
+```
+
+#### With Active Recoveries
+
+```markdown
+# PaperClip Stalled Workflow Report
+
+**Generated:** 2026-05-19T06:16 UTC
+
+## Summary
+
+- **Scenarios tracking issues:** 2
+- **Total issues in recovery:** 3
+- **Issues escalated:** 1
+- **Issues stuck in loop:** 0
+
+## By Scenario
+
+### Exchange API Timeout Recovery (2 issue(s))
+
+- **BTCA1234**: in_recovery, 2 attempt(s), age 4.5h
+- **BTCA5678**: escalated, 3 attempt(s), age 8.2h ⚠️ Escalation required
+
+### Position Mismatch Detection (1 issue(s))
+
+- **BTCA9999**: in_recovery, 1 attempt(s), age 1.3h
+```
+
+### Alerting and Thresholds
+
+The health check is designed for integration with monitoring systems. Suggested alerting:
+
+| Condition | Severity | Action |
+|-----------|----------|--------|
+| `overall_status != "healthy"` for > 2 check runs | Warning | Review logs, check API key |
+| `issues_stuck_in_loop > 0` | Warning | Check configuration for over-aggressive recovery |
+| `log_health.recent_errors > 10` in recent run | Error | Investigate API/config issues |
+| Monitor age > 45 minutes | Error | Check GitHub Actions; review systemd logs |
+
+### Local Testing
+
+```bash
+# Full health check
+python scripts/paperclip_recovery_health_check.py --json-report | python -m json.tool
+
+# Monitor execution check only (no API calls required)
+python scripts/paperclip_recovery_health_check.py
+
+# Stalled workflow report (no API calls)
+python scripts/paperclip_stalled_workflow_reporter.py
+```
+
 ## Related Documents
 
 - `scripts/paperclip_recovery_monitor.py` — Monitor implementation
+- `scripts/paperclip_recovery_health_check.py` — Hourly health check script (BTCAAAAA-28995)
+- `scripts/paperclip_stalled_workflow_reporter.py` — Stalled workflow analyzer (BTCAAAAA-28995)
 - `scripts/paperclip_recovery_actions.json` — Scenario and agent config
-- `.github/workflows/paperclip-recovery-monitor.yml` — CI/CD workflow
+- `.github/workflows/paperclip-recovery-monitor.yml` — CI/CD workflow for recovery actions
+- `.github/workflows/paperclip-recovery-health-check.yml` — Hourly health check workflow (BTCAAAAA-28995)
 - `tests/test_scripts/test_paperclip_recovery_monitor.py` — Test suite (47 tests)
 - `deploy/systemd/paperclip-recovery-monitor.service` — Systemd service unit
 - `deploy/systemd/paperclip-recovery-monitor.timer` — Systemd timer unit
