@@ -271,8 +271,10 @@ def scan(
         "total_done_fix_issues": len(done_issues),
         "gated": gated_by_status,
         "ungated_count": ungated_count,
+        "ungated_issues": ungated_issues,
         "last_24h": last_24h_count,
         "days_back": days_back,
+        "dry_run": dry_run,
     }
 
     # Optionally run retroactive gates on ungated issues

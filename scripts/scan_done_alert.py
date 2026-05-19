@@ -141,6 +141,7 @@ def create_alert(
         "assigneeAgentId": CTO_AGENT_ID,
         "priority": "medium",
         "status": "todo",
+        "idempotencyKey": f"impact-gate-scan-done-alert:{date_str}:{ungated_count}",
     }
 
     try:
