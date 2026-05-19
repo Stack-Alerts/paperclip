@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Pencil, CheckCircle, Zap, Upload } from 'lucide-react';
-import { InfoTooltip } from './InfoTooltip';
+import { RichTooltip, TooltipContent } from './RichTooltip';
 
 export type StepStatus = 'pending' | 'active' | 'complete' | 'error';
 
@@ -10,16 +10,114 @@ export interface Step {
   id: number;
   name: string;
   icon: React.ReactNode;
-  tooltip: string;
+  tooltip: TooltipContent;
 }
 
 const ICON_PROPS = { size: 14, strokeWidth: 1.5 } as const;
 
 const STEPS: Step[] = [
-  { id: 0, name: 'Design',        icon: <Pencil {...ICON_PROPS} />,       tooltip: 'Design your trading strategy' },
-  { id: 1, name: 'Validate',      icon: <CheckCircle {...ICON_PROPS} />,   tooltip: 'Validate strategy configuration' },
-  { id: 2, name: 'Test/Optimize', icon: <Zap {...ICON_PROPS} />,           tooltip: 'Run backtest and optimize parameters' },
-  { id: 3, name: 'Publish',       icon: <Upload {...ICON_PROPS} />,        tooltip: 'Set publish status' },
+  {
+    id: 0,
+    name: 'Design',
+    icon: <Pencil {...ICON_PROPS} />,
+    tooltip: {
+      title: 'Design',
+      body: 'Build your strategy using building blocks — entry conditions, signals, and exit rules.',
+      sections: [
+        {
+          header: 'Available blocks:',
+          items: [
+            'Entry Conditions (AND / OR logic)',
+            'Signals with optional RECHECK validation',
+            'Timing constraints between signals',
+            'Exit Conditions at Strategy, Block, or Signal level',
+          ],
+        },
+        {
+          header: 'Best practice:',
+          items: ['Start with required AND blocks, then add optional OR boosters for confluence'],
+        },
+      ],
+    },
+  },
+  {
+    id: 1,
+    name: 'Validate',
+    icon: <CheckCircle {...ICON_PROPS} />,
+    tooltip: {
+      title: 'Validate',
+      body: 'Run structural validation to confirm all required blocks, signals, and exit conditions are correctly configured.',
+      sections: [
+        {
+          header: 'Checks performed:',
+          items: [
+            'Required AND blocks are present and fully configured',
+            'All signals have valid parameters',
+            'Exit conditions are bound to the correct level',
+            'No conflicting logic or missing required fields',
+          ],
+        },
+        {
+          header: 'Status:',
+          items: [
+            'Green — validation passed, ready to backtest',
+            'Red — errors found, resolve before testing',
+          ],
+        },
+      ],
+    },
+  },
+  {
+    id: 2,
+    name: 'Test/Optimize',
+    icon: <Zap {...ICON_PROPS} />,
+    tooltip: {
+      title: 'Test / Optimize',
+      body: 'Run a full historical backtest to evaluate strategy performance and tune parameters.',
+      sections: [
+        {
+          header: 'Backtest options:',
+          items: [
+            'Full backtest over a configurable date range',
+            'Quick Preview — 30-day snapshot',
+          ],
+        },
+        {
+          header: 'Key metrics reported:',
+          items: [
+            'Win rate and average return per trade',
+            'Max drawdown and Sharpe ratio',
+            'Signal distribution and total entry count',
+          ],
+        },
+      ],
+    },
+  },
+  {
+    id: 3,
+    name: 'Publish',
+    icon: <Upload {...ICON_PROPS} />,
+    tooltip: {
+      title: 'Publish',
+      body: 'Promote the strategy to Active status, making it available for live execution.',
+      sections: [
+        {
+          header: 'Requirements:',
+          items: [
+            'Strategy must have passed validation (step 2)',
+            'At least one full backtest must be complete (step 3)',
+          ],
+        },
+        {
+          header: 'Status options:',
+          items: [
+            'Active — live execution enabled',
+            'Archived — disabled but preserved in history',
+          ],
+        },
+      ],
+    },
+  },
 ];
 
 const BASE_CLASSES =
@@ -73,20 +171,19 @@ export function StepperRibbon({
     const clickable = !!onStepClick;
     return (
       <div key={step.id} className="flex items-center gap-2">
-        <InfoTooltip id={`stepper-step-${step.id}`}>
+        <RichTooltip content={step.tooltip}>
           <button
             className={stepClasses(status, clickable)}
             style={status === 'active' ? ACTIVE_STYLE : undefined}
             onClick={() => onStepClick?.(step.id)}
             aria-current={status === 'active' ? 'step' : undefined}
-            title={step.tooltip}
           >
             <span aria-hidden="true">{step.icon}</span>
             {step.name}
             {status === 'complete' && <span className="ml-1 text-emerald-400" aria-label="complete">✓</span>}
             {status === 'error' && <span className="ml-1 text-red-400" aria-label="error">✗</span>}
           </button>
-        </InfoTooltip>
+        </RichTooltip>
         {idx < STEPS.length - 1 && (
           <span className="text-sm" style={{ color: 'var(--text-muted)' }} aria-hidden="true">→</span>
         )}
