@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Search, Filter, Save, Folder, Trash2, Blocks, Plus } from 'lucide-react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BlockDefinition, BlockType } from '@/lib/strategy-builder/types';
 import { ExitConditionDialog, ExitConditionConfig, AvailableBlock } from './ExitConditionDialog';
@@ -449,25 +449,28 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
             <RichTooltip content={TT_ADD_AND}>
               <button
                 onClick={() => handleAdd('AND')}
-                className="flex-1 text-xs py-1.5 rounded border border-emerald-800 bg-emerald-900/40 hover:bg-emerald-900/70 text-emerald-300 font-medium transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded border border-emerald-800 bg-emerald-900/40 hover:bg-emerald-900/70 text-emerald-300 font-medium transition-colors"
               >
-                ➕ Add as AND (Required)
+                <Plus size={13} style={{ flexShrink: 0 }} />
+                Add as AND (Required)
               </button>
             </RichTooltip>
             <RichTooltip content={TT_ADD_OR}>
               <button
                 onClick={() => handleAdd('OR')}
-                className="flex-1 text-xs py-1.5 rounded border border-blue-800 bg-blue-900/30 hover:bg-blue-900/60 text-blue-300 font-medium transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded border border-blue-800 bg-blue-900/30 hover:bg-blue-900/60 text-blue-300 font-medium transition-colors"
               >
-                ➕ Add as OR (Optional)
+                <Plus size={13} style={{ flexShrink: 0 }} />
+                Add as OR (Optional)
               </button>
             </RichTooltip>
             <RichTooltip content={TT_ADD_EXIT}>
               <button
                 onClick={handleAddExit}
-                className="flex-1 text-xs py-1.5 rounded border border-red-800 bg-red-900/30 hover:bg-red-900/60 text-red-300 font-medium transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded border border-red-800 bg-red-900/30 hover:bg-red-900/60 text-red-300 font-medium transition-colors"
               >
-                ➕ Add as Exit
+                <Plus size={13} style={{ flexShrink: 0 }} />
+                Add as Exit
               </button>
             </RichTooltip>
           </div>
@@ -691,9 +694,12 @@ export function BlockSearchPanel() {
     <div className="flex flex-col h-full border-l border-[var(--border)]" style={{ background: 'var(--bg-deep)' }}>
       {/* Panel header with Standard / Advanced toggle */}
       <div className="px-4 py-2 border-b border-[var(--border)] flex-shrink-0 flex items-center justify-between" style={{ background: 'var(--bg-panel)' }}>
-        <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dim)' }}>
-          Available Building Blocks
-        </h2>
+        <div className="flex items-center gap-2">
+          <Blocks size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+          <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-dim)' }}>
+            Available Building Blocks
+          </h2>
+        </div>
         <div className="flex items-center" style={{ border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
           <RichTooltip content={TT_STANDARD}>
             <button
@@ -724,7 +730,10 @@ export function BlockSearchPanel() {
       <div className="px-3 pt-3 pb-2 space-y-1.5 flex-shrink-0 border-b border-[var(--border)]" style={{ background: 'var(--bg-panel)' }}>
         {/* Row 1: Search */}
         <div className="flex items-center gap-2">
-          <span className="text-xs flex-shrink-0 text-right" style={{ color: '#9AA0A6', width: 68 }}>🔍 Search:</span>
+          <div className="flex items-center gap-1.5 text-xs flex-shrink-0" style={{ color: '#9AA0A6', width: 68, justifyContent: 'flex-end' }}>
+            <Search size={13} style={{ flexShrink: 0 }} />
+            <span>Search:</span>
+          </div>
           <RichTooltip content={TT_SEARCH}>
             <input
               type="text"
@@ -739,7 +748,10 @@ export function BlockSearchPanel() {
 
         {/* Row 2: Category + Type dropdowns — same label width so controls align with search input */}
         <div className="flex items-center gap-1.5">
-          <span className="text-xs flex-shrink-0 text-right" style={{ color: '#9AA0A6', width: 68 }}>🏷 Filter:</span>
+          <div className="flex items-center gap-1.5 text-xs flex-shrink-0" style={{ color: '#9AA0A6', width: 68, justifyContent: 'flex-end' }}>
+            <Filter size={13} style={{ flexShrink: 0 }} />
+            <span>Filter:</span>
+          </div>
           <RichTooltip content={TT_CATEGORY}>
             <select
               value={selectedCategory}
@@ -779,18 +791,24 @@ export function BlockSearchPanel() {
           </RichTooltip>
           <RichTooltip content={TT_PRESET_SAVE}>
             <button onClick={handleSavePreset}
-              className="text-xs px-1.5 py-1 rounded border flex-shrink-0 hover:opacity-80"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}>💾</button>
+              className="flex items-center justify-center px-1.5 py-1 rounded border flex-shrink-0 hover:opacity-80"
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
+              <Save size={13} />
+            </button>
           </RichTooltip>
           <RichTooltip content={TT_PRESET_LOAD}>
             <button onClick={handleLoadPreset} disabled={!selectedPreset}
-              className="text-xs px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}>📂</button>
+              className="flex items-center justify-center px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
+              <Folder size={13} />
+            </button>
           </RichTooltip>
           <RichTooltip content={TT_PRESET_DELETE}>
             <button onClick={handleDeletePreset} disabled={!selectedPreset}
-              className="text-xs px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}>🗑</button>
+              className="flex items-center justify-center px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80"
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}>
+              <Trash2 size={13} />
+            </button>
           </RichTooltip>
         </div>
       </div>
