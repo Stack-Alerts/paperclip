@@ -355,17 +355,17 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
       ref={itemRef}
       className="rounded-md border mb-1.5 transition-all duration-300"
       style={{
-        background: isHighlighted ? 'color-mix(in srgb, var(--accent-sky-bright) 7%, transparent)' : '#1A2335',
-        borderColor: isHighlighted ? 'var(--accent-sky-bright)' : '#1A2535',
+        background: isHighlighted ? 'color-mix(in srgb, var(--accent-sky-bright) 7%, transparent)' : 'var(--bg-card)',
+        borderColor: isHighlighted ? 'var(--accent-sky-bright)' : 'var(--border)',
         boxShadow: isHighlighted ? '0 0 0 2px rgba(14,165,233,0.25)' : undefined,
       }}
     >
       {/* Block name + meta */}
       <div className="px-3 pt-2.5 pb-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-medium leading-tight" style={{ color: '#E8F2FF' }}>{definition.name}</span>
+          <span className="text-sm font-medium leading-tight" style={{ color: 'var(--text-primary)' }}>{definition.name}</span>
         </div>
-        <div className="text-xs mt-0.5" style={{ color: '#8A9FBF' }}>
+        <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
           Category: {definition.category}
           {typeLabel && ` | Type: ${typeLabel}`}
           {weight != null && ` | Weight: ${weight} pts`}
@@ -378,7 +378,7 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
           <button
             onClick={() => setSignalsOpen(v => !v)}
             className="w-full px-3 pb-2.5 text-left text-xs flex items-center justify-between hover:opacity-80 transition-opacity"
-            style={{ color: '#2E8CFF' }}
+            style={{ color: 'var(--accent-sky-bright)' }}
           >
             <span>{signalsOpen ? `Hide Signals (${visibleSignals.length})` : `Show Signals (${visibleSignals.length})`}</span>
             <ChevronRight
@@ -386,7 +386,7 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
                 width: 13,
                 height: 13,
                 flexShrink: 0,
-                color: '#2E8CFF',
+                color: 'var(--accent-sky-bright)',
                 transform: signalsOpen ? 'rotate(90deg)' : 'none',
                 transition: 'transform 0.2s',
               }}
@@ -449,7 +449,10 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
             <RichTooltip content={TT_ADD_AND}>
               <button
                 onClick={() => handleAdd('AND')}
-                className="flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded border border-emerald-800 bg-emerald-900/40 hover:bg-emerald-900/70 text-emerald-300 font-medium transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded border font-medium transition-colors"
+                style={{ borderColor: 'var(--accent-green-mid)', background: 'var(--accent-green-dark)', color: 'var(--accent-green)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-green-mid)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-green-dark)'; }}
               >
                 <Plus size={13} style={{ flexShrink: 0 }} />
                 Add as AND (Required)
@@ -458,7 +461,10 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
             <RichTooltip content={TT_ADD_OR}>
               <button
                 onClick={() => handleAdd('OR')}
-                className="flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded border border-blue-800 bg-blue-900/30 hover:bg-blue-900/60 text-blue-300 font-medium transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded border font-medium transition-colors"
+                style={{ borderColor: 'var(--accent-blue-mid)', background: 'var(--accent-blue-dark)', color: 'var(--accent-blue)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-blue-mid)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-blue-dark)'; }}
               >
                 <Plus size={13} style={{ flexShrink: 0 }} />
                 Add as OR (Optional)
@@ -467,7 +473,10 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
             <RichTooltip content={TT_ADD_EXIT}>
               <button
                 onClick={handleAddExit}
-                className="flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded border border-red-800 bg-red-900/30 hover:bg-red-900/60 text-red-300 font-medium transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded border font-medium transition-colors"
+                style={{ borderColor: 'var(--accent-red-dark)', background: 'var(--accent-red-deeper)', color: 'var(--accent-red)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-red-dark)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-red-deeper)'; }}
               >
                 <Plus size={13} style={{ flexShrink: 0 }} />
                 Add as Exit
@@ -730,7 +739,7 @@ export function BlockSearchPanel() {
       <div className="px-3 pt-3 pb-2 space-y-1.5 flex-shrink-0 border-b border-[var(--border)]" style={{ background: 'var(--bg-panel)' }}>
         {/* Row 1: Search */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 text-xs flex-shrink-0" style={{ color: '#9AA0A6', width: 68, justifyContent: 'flex-end' }}>
+          <div className="flex items-center gap-1.5 text-xs flex-shrink-0" style={{ color: 'var(--text-muted)', width: 68, justifyContent: 'flex-end' }}>
             <Search size={13} style={{ flexShrink: 0 }} />
             <span>Search:</span>
           </div>
@@ -741,14 +750,14 @@ export function BlockSearchPanel() {
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
               className="flex-1 px-2.5 py-1.5 rounded border text-xs focus:outline-none"
-              style={{ background: '#111720', borderColor: '#253040', color: 'var(--input-text)' }}
+              style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
             />
           </RichTooltip>
         </div>
 
         {/* Row 2: Category + Type dropdowns — same label width so controls align with search input */}
         <div className="flex items-center gap-1.5">
-          <div className="flex items-center gap-1.5 text-xs flex-shrink-0" style={{ color: '#9AA0A6', width: 68, justifyContent: 'flex-end' }}>
+          <div className="flex items-center gap-1.5 text-xs flex-shrink-0" style={{ color: 'var(--text-muted)', width: 68, justifyContent: 'flex-end' }}>
             <Filter size={13} style={{ flexShrink: 0 }} />
             <span>Filter:</span>
           </div>
@@ -757,7 +766,7 @@ export function BlockSearchPanel() {
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
               className="flex-[1.5] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
-              style={{ background: '#111720', borderColor: '#253040', color: 'var(--input-text)' }}
+              style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
             >
               <option value="all">All Categories</option>
               {allCategories.map(c => (
@@ -770,7 +779,7 @@ export function BlockSearchPanel() {
               value={selectedType}
               onChange={e => setSelectedType(e.target.value as 'EVENT' | 'SIGNAL' | 'CONTEXT' | 'HYBRID' | 'all')}
               className="flex-[0.75] min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
-              style={{ background: '#111720', borderColor: '#253040', color: 'var(--input-text)' }}
+              style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
             >
               <option value="all">All Types</option>
               {allTypes.map(({ value, label }) => (
@@ -817,7 +826,7 @@ export function BlockSearchPanel() {
       <div className="flex-1 overflow-y-auto px-3 py-3" style={{ background: 'var(--bg-deep)', scrollbarWidth: 'thin', scrollbarColor: 'var(--border) transparent' }}>
         {isLoadingLibrary ? (
           <div className="flex flex-col items-center justify-center py-10 gap-2">
-            <div className="w-6 h-6 border-2 border-zinc-600 border-t-sky-400 rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--border)', borderTopColor: 'var(--accent-blue)' }} />
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Loading block library…</p>
           </div>
         ) : filteredBlocks.length === 0 ? (

@@ -98,14 +98,14 @@ export const SystemConfigWindow: React.FC<SystemConfigWindowProps> = ({
     onChange: (v: number | string | boolean) => void,
     step?: number
   ) => (
-    <div className="flex items-center justify-between py-2 border-b border-zinc-800 last:border-0">
-      <label className="text-sm text-zinc-300">{label}</label>
+    <div className="flex items-center justify-between py-2 last:border-0" style={{ borderBottom: '1px solid var(--bg-card)' }}>
+      <label className="text-sm" style={{ color: 'var(--text-primary)' }}>{label}</label>
       {type === 'checkbox' ? (
         <input
           type="checkbox"
           checked={value as boolean}
           onChange={(e) => onChange(e.target.checked)}
-          className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-blue-500"
+          className="w-4 h-4 rounded accent-blue-500"
         />
       ) : (
         <input
@@ -115,7 +115,8 @@ export const SystemConfigWindow: React.FC<SystemConfigWindowProps> = ({
           onChange={(e) =>
             onChange(type === 'number' ? parseFloat(e.target.value) : e.target.value)
           }
-          className="w-40 bg-zinc-800 border border-zinc-600 rounded px-2 py-1 text-zinc-100 text-sm focus:outline-none focus:border-blue-500"
+          className="w-40 rounded px-2 py-1 text-sm focus:outline-none"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
         />
       )}
     </div>
@@ -123,28 +124,35 @@ export const SystemConfigWindow: React.FC<SystemConfigWindowProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between border-b border-zinc-700 px-6 py-4 flex-shrink-0">
+      <div className="rounded-lg shadow-2xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
+        <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-3">
             <span className="text-xl">⚙️</span>
-            <h2 className="text-base font-semibold text-zinc-100">System Configuration</h2>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>System Configuration</h2>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 text-xl leading-none">
+          <button
+            onClick={onClose}
+            className="text-xl leading-none transition-colors"
+            style={{ color: 'var(--text-secondary)' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
+          >
             ×
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-zinc-700 overflow-x-auto flex-shrink-0">
+        <div className="flex overflow-x-auto flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
+              className="px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2"
+              style={
                 activeTab === tab.id
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
-              }`}
+                  ? { borderColor: 'var(--accent-blue)', color: 'var(--accent-blue)' }
+                  : { borderColor: 'transparent', color: 'var(--text-secondary)' }
+              }
             >
               {tab.label}
             </button>
@@ -221,25 +229,32 @@ export const SystemConfigWindow: React.FC<SystemConfigWindowProps> = ({
           )}
         </div>
 
-        <div className="flex justify-between px-6 py-4 border-t border-zinc-700 flex-shrink-0">
+        <div className="flex justify-between px-6 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
           <button
             onClick={handleReset}
             disabled={!hasChanges}
-            className="px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 disabled:opacity-40 transition-colors"
+            className="px-4 py-2 rounded text-sm font-medium disabled:opacity-40 transition-colors"
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
           >
             Reset to Defaults
           </button>
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 transition-colors"
+              className="px-4 py-2 rounded text-sm font-medium transition-colors"
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={!hasChanges}
-              className="px-4 py-2 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-40 transition-colors"
+              className="px-4 py-2 rounded text-sm font-medium disabled:opacity-40 transition-colors"
+              style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }}
             >
               Save Configuration
             </button>

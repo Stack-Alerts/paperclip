@@ -13,7 +13,7 @@ function StrategyBuilderContent() {
 
 export function StrategyBuilderPageWrapper() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-full bg-zinc-950">Loading...</div>}>
+    <Suspense fallback={<div className="flex items-center justify-center h-full" style={{ background: 'var(--bg-deep)' }}>Loading...</div>}>
       <StrategyBuilderContent />
     </Suspense>
   );

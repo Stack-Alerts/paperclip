@@ -83,27 +83,24 @@ function TimeframeRow({ tf }: { tf: TimeframeProgress }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
-        <span className="font-mono text-zinc-300 w-8">{tf.timeframe}</span>
-        <span className="flex-1 mx-3 text-zinc-400 truncate">{tf.message}</span>
+        <span className="font-mono w-8" style={{ color: 'var(--text-primary)' }}>{tf.timeframe}</span>
+        <span className="flex-1 mx-3 truncate" style={{ color: 'var(--text-secondary)' }}>{tf.message}</span>
         {tf.lastCandleTs && (
-          <span className="text-zinc-600 font-mono text-[10px] whitespace-nowrap">
+          <span className="font-mono text-[10px] whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
             last: {new Date(tf.lastCandleTs).toUTCString().slice(5, 22)}
           </span>
         )}
         <span
-          className={`ml-2 text-[10px] font-medium ${
-            tf.done ? 'text-green-400' : 'text-zinc-400'
-          }`}
+          className="ml-2 text-[10px] font-medium"
+          style={{ color: tf.done ? 'var(--accent-green)' : 'var(--text-secondary)' }}
         >
           {tf.done ? '✅' : `${pct}%`}
         </span>
       </div>
-      <div className="w-full bg-zinc-700 rounded-full h-1">
+      <div className="w-full rounded-full h-1" style={{ background: 'var(--bg-hover)' }}>
         <div
-          className={`h-1 rounded-full transition-all duration-300 ${
-            tf.done ? 'bg-green-500' : 'bg-blue-600'
-          }`}
-          style={{ width: `${tf.done ? 100 : pct}%` }}
+          className="h-1 rounded-full transition-all duration-300"
+          style={{ width: `${tf.done ? 100 : pct}%`, background: tf.done ? 'var(--accent-green)' : 'var(--accent-blue)' }}
         />
       </div>
     </div>
@@ -119,11 +116,12 @@ function NetworkCheckBanner({
   if (status === 'ok') return null;
   return (
     <div
-      className={`flex items-center gap-2 text-xs px-3 py-2 rounded border ${
+      className="flex items-center gap-2 text-xs px-3 py-2 rounded border"
+      style={
         status === 'checking'
-          ? 'bg-zinc-800 border-zinc-600 text-zinc-400'
-          : 'bg-red-900/30 border-red-700 text-red-300'
-      }`}
+          ? { background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }
+          : { background: 'color-mix(in srgb, var(--accent-red) 15%, transparent)', borderColor: 'var(--accent-red-dark)', color: 'var(--accent-red)' }
+      }
     >
       {status === 'checking' ? (
         <>
@@ -151,7 +149,7 @@ function RetryBanner({
   retryInSeconds: number;
 }) {
   return (
-    <div className="flex items-center gap-2 text-xs px-3 py-2 rounded border bg-amber-900/20 border-amber-700 text-amber-300">
+    <div className="flex items-center gap-2 text-xs px-3 py-2 rounded border" style={{ background: 'color-mix(in srgb, var(--accent-orange) 12%, transparent)', borderColor: 'var(--accent-orange)', color: 'var(--accent-orange)' }}>
       <span className="animate-pulse">🔄</span>
       <span>
         Attempt {attempt}/{maxRetries}… retrying in {retryInSeconds}s
@@ -163,7 +161,7 @@ function RetryBanner({
 /** Fast-path "data already current" banner */
 function AlreadyCurrentBanner() {
   return (
-    <div className="flex items-center gap-2 text-xs px-3 py-2 rounded border bg-green-900/20 border-green-700 text-green-300">
+    <div className="flex items-center gap-2 text-xs px-3 py-2 rounded border" style={{ background: 'color-mix(in srgb, var(--accent-green) 12%, transparent)', borderColor: 'var(--accent-green-dark)', color: 'var(--accent-green)' }}>
       <span>✅</span>
       <span>Data already current — skipping download.</span>
     </div>
@@ -181,7 +179,7 @@ function DownloadLog({ lines }: { lines: string[] }) {
   if (lines.length === 0) return null;
 
   return (
-    <div className="bg-zinc-950 border border-zinc-700 rounded p-2 max-h-36 overflow-y-auto font-mono text-[10px] text-zinc-400 space-y-0.5">
+    <div className="rounded p-2 max-h-36 overflow-y-auto font-mono text-[10px] space-y-0.5 border" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
       {lines.map((line, i) => (
         <div key={i}>{line}</div>
       ))}
@@ -412,13 +410,13 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-full max-w-2xl mx-4">
+      <div className="rounded-lg shadow-2xl w-full max-w-2xl mx-4 border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         {/* Header */}
-        <div className="flex items-center gap-3 border-b border-zinc-700 px-6 py-4">
+        <div className="flex items-center gap-3 border-b px-6 py-4" style={{ borderColor: 'var(--border)' }}>
           <span className="text-xl">📥</span>
           <div>
-            <h2 className="text-base font-semibold text-zinc-100">Data Update</h2>
-            <p className="text-xs text-zinc-400">Strategy Builder Startup Check</p>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Data Update</h2>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Strategy Builder Startup Check</p>
           </div>
         </div>
 
@@ -427,7 +425,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
           {/* ── Gap check loading state ────────────────────────── */}
           {gapCheckLoading && !isRunning && !result && (
             <div className="text-center py-6">
-              <p className="text-sm text-zinc-400 mb-2">Checking data availability…</p>
+              <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>Checking data availability…</p>
               <div className="animate-spin inline-block">⏳</div>
             </div>
           )}
@@ -438,8 +436,8 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
               {gapCheckResult ? (
                 <>
                   {/* Data Status Group - shows per-type gaps */}
-                  <div className="border border-zinc-700 rounded-lg p-4 space-y-3">
-                    <h3 className="text-sm font-semibold text-zinc-200">📊 Data Status</h3>
+                  <div className="rounded-lg p-4 space-y-3 border" style={{ borderColor: 'var(--border)' }}>
+                    <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>📊 Data Status</h3>
 
                     <div className="space-y-2 text-sm">
                       {Object.entries(gapCheckResult.all_status).map(([dataType, info]) => (
@@ -454,7 +452,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                                   : '⚠️'}
                           </span>
                           <div className="flex-1">
-                            <p className="font-mono text-zinc-300">
+                            <p className="font-mono" style={{ color: 'var(--text-primary)' }}>
                               {dataType.toUpperCase()}:{' '}
                               {info.status === 'complete'
                                 ? 'Complete'
@@ -465,7 +463,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                                     : 'ERROR'}
                             </p>
                             {info.start && info.end && (
-                              <p className="text-xs text-zinc-500">
+                              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                                 {info.start} → {info.end}
                               </p>
                             )}
@@ -475,7 +473,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                     </div>
 
                     {gapCheckResult.any_gaps && (
-                      <div className="mt-3 p-3 bg-red-900/20 border border-red-700/50 rounded text-xs text-red-300">
+                      <div className="mt-3 p-3 rounded text-xs border" style={{ background: 'color-mix(in srgb, var(--accent-red) 12%, transparent)', borderColor: 'color-mix(in srgb, var(--accent-red-dark) 50%, transparent)', color: 'var(--accent-red)' }}>
                         <p>
                           {gapCheckResult.max_gap > 0
                             ? `⚠️ DATA GAPS DETECTED: Up to ${gapCheckResult.max_gap} days MISSING`
@@ -485,7 +483,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                     )}
 
                     {!gapCheckResult.any_gaps && (
-                      <div className="mt-3 p-3 bg-green-900/20 border border-green-700/50 rounded text-xs text-green-300">
+                      <div className="mt-3 p-3 rounded text-xs border" style={{ background: 'color-mix(in srgb, var(--accent-green) 12%, transparent)', borderColor: 'color-mix(in srgb, var(--accent-green-dark) 50%, transparent)', color: 'var(--accent-green)' }}>
                         <p>✅ ALL DATA COMPLETE - 100% ACCURATE</p>
                       </div>
                     )}
@@ -495,21 +493,23 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                   {gapCheckResult.any_gaps && (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-xs font-medium text-zinc-300">Start Date</label>
+                        <label className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Start Date</label>
                         <input
                           type="date"
                           value={startDate}
                           onChange={(e) => setStartDate(e.target.value)}
-                          className="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-blue-500"
+                          className="w-full rounded px-3 py-2 text-sm focus:outline-none border"
+                          style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-medium text-zinc-300">End Date</label>
+                        <label className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>End Date</label>
                         <input
                           type="date"
                           value={endDate}
                           onChange={(e) => setEndDate(e.target.value)}
-                          className="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-blue-500"
+                          className="w-full rounded px-3 py-2 text-sm focus:outline-none border"
+                          style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
                         />
                       </div>
                     </div>
@@ -518,27 +518,29 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
               ) : (
                 <>
                   {/* Fallback: no gap check result provided - show old UI */}
-                  <p className="text-sm text-zinc-400">
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                     Missing market data detected. Download candle data from Binance to
                     ensure accurate backtesting.
                   </p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-zinc-300">Start Date</label>
+                      <label className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Start Date</label>
                       <input
                         type="date"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-blue-500"
+                        className="w-full rounded px-3 py-2 text-sm focus:outline-none border"
+                        style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-zinc-300">End Date</label>
+                      <label className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>End Date</label>
                       <input
                         type="date"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-blue-500"
+                        className="w-full rounded px-3 py-2 text-sm focus:outline-none border"
+                        style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
                       />
                     </div>
                   </div>
@@ -575,14 +577,14 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
               {/* Overall progress bar */}
               {!progress.alreadyCurrent && (
                 <>
-                  <p className="text-sm text-zinc-300">Downloading data from Binance…</p>
-                  <div className="w-full bg-zinc-800 rounded-full h-2">
+                  <p className="text-sm" style={{ color: 'var(--text-primary)' }}>Downloading data from Binance…</p>
+                  <div className="w-full rounded-full h-2" style={{ background: 'var(--bg-card)' }}>
                     <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${overallPct}%` }}
+                      className="h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${overallPct}%`, background: 'var(--accent-blue)' }}
                     />
                   </div>
-                  <div className="flex justify-between text-xs text-zinc-400">
+                  <div className="flex justify-between text-xs" style={{ color: 'var(--text-secondary)' }}>
                     <span>{progress.message ?? 'Initializing…'}</span>
                     <span>{overallPct}%</span>
                   </div>
@@ -591,8 +593,8 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
 
               {/* Per-timeframe breakdown */}
               {hasTimeframeBreakdown && !progress.alreadyCurrent && (
-                <div className="space-y-3 pt-1 border-t border-zinc-800">
-                  <p className="text-xs text-zinc-500 font-medium">Per-timeframe progress</p>
+                <div className="space-y-3 pt-1 border-t" style={{ borderColor: 'var(--bg-card)' }}>
+                  <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Per-timeframe progress</p>
                   {progress.timeframes!.map((tf) => (
                     <TimeframeRow key={tf.timeframe} tf={tf} />
                   ))}
@@ -608,11 +610,12 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
           {result && (
             <div className="space-y-3">
               <div
-                className={`flex items-start gap-3 p-4 rounded border ${
+                className="flex items-start gap-3 p-4 rounded border"
+                style={
                   result.success
-                    ? 'bg-green-900/20 border-green-700 text-green-300'
-                    : 'bg-red-900/20 border-red-700 text-red-300'
-                }`}
+                    ? { background: 'color-mix(in srgb, var(--accent-green) 12%, transparent)', borderColor: 'var(--accent-green-dark)', color: 'var(--accent-green)' }
+                    : { background: 'color-mix(in srgb, var(--accent-red) 12%, transparent)', borderColor: 'var(--accent-red-dark)', color: 'var(--accent-red)' }
+                }
               >
                 <span className="text-lg">{result.success ? '✅' : '❌'}</span>
                 <p className="text-sm whitespace-pre-wrap">{result.message}</p>
@@ -620,7 +623,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
 
               {/* Auto-close countdown */}
               {autoMode && result.success && autoCloseSeconds !== null && (
-                <p className="text-xs text-zinc-500 text-center">
+                <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
                   Closing automatically in {autoCloseSeconds}s…
                 </p>
               )}
@@ -632,9 +635,9 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
         </div>
 
         {/* Footer buttons */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-zinc-700">
+        <div className="flex justify-end gap-2 px-6 py-4 border-t" style={{ borderColor: 'var(--border)' }}>
           {gapCheckLoading && !isRunning && !result && (
-            <p className="text-xs text-zinc-500">Checking data…</p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Checking data…</p>
           )}
 
           {gapCheckResult && !isRunning && !result && (
@@ -643,18 +646,22 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                 <>
                   <button
                     onClick={onSkip}
-                    className="px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 transition-colors"
+                    className="px-4 py-2 rounded text-sm font-medium transition-colors"
+                    style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                   >
                     ⏭️ Skip for Now
                   </button>
                   <button
                     onClick={handleUpdate}
                     disabled={!buttonEnabled}
-                    className={`px-4 py-2 rounded text-white text-sm font-medium transition-colors ${
+                    className="px-4 py-2 rounded text-sm font-medium transition-colors"
+                    style={
                       buttonEnabled
-                        ? 'bg-blue-600 hover:bg-blue-700'
-                        : 'bg-zinc-600 cursor-not-allowed opacity-50'
-                    }`}
+                        ? { background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }
+                        : { background: 'var(--bg-hover)', color: 'var(--text-muted)', cursor: 'not-allowed', opacity: 0.5 }
+                    }
                   >
                     📥 Update Data
                   </button>
@@ -664,7 +671,8 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
               {!gapCheckResult.any_gaps && (
                 <button
                   onClick={onSkip}
-                  className="px-4 py-2 rounded bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
+                  className="px-4 py-2 rounded text-sm font-medium transition-colors"
+                  style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
                 >
                   ✅ Continue
                   {autoCloseSeconds !== null && autoCloseSeconds > 0
@@ -679,18 +687,22 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
             <>
               <button
                 onClick={onSkip}
-                className="px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 transition-colors"
+                className="px-4 py-2 rounded text-sm font-medium transition-colors"
+                style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
               >
                 Skip
               </button>
               <button
                 onClick={handleUpdate}
                 disabled={!buttonEnabled}
-                className={`px-4 py-2 rounded text-white text-sm font-medium transition-colors ${
+                className="px-4 py-2 rounded text-sm font-medium transition-colors"
+                style={
                   buttonEnabled
-                    ? 'bg-blue-600 hover:bg-blue-700'
-                    : 'bg-zinc-600 cursor-not-allowed opacity-50'
-                }`}
+                    ? { background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }
+                    : { background: 'var(--bg-hover)', color: 'var(--text-muted)', cursor: 'not-allowed', opacity: 0.5 }
+                }
               >
                 Download Data
               </button>
@@ -700,7 +712,10 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
           {isRunning && (
             <button
               onClick={onSkip}
-              className="px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 transition-colors"
+              className="px-4 py-2 rounded text-sm font-medium transition-colors"
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
             >
               Skip
             </button>
@@ -711,7 +726,8 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
               {result.success ? (
                 <button
                   onClick={onSkip}
-                  className="px-4 py-2 rounded bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
+                  className="px-4 py-2 rounded text-sm font-medium transition-colors"
+                  style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
                 >
                   ✅ Continue
                   {autoMode && autoCloseSeconds !== null && autoCloseSeconds > 0
@@ -721,13 +737,16 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
               ) : (
                 <>
                   {autoMode && retryCount < maxRetries && retryTimer !== null && retryTimer > 0 && (
-                    <span className="text-xs text-amber-300 mr-2">
+                    <span className="text-xs mr-2" style={{ color: 'var(--accent-orange)' }}>
                       🔄 Retrying in {retryTimer}s…
                     </span>
                   )}
                   <button
                     onClick={onSkip}
-                    className="px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 transition-colors"
+                    className="px-4 py-2 rounded text-sm font-medium transition-colors"
+                    style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                   >
                     Close
                   </button>

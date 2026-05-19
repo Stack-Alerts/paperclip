@@ -17,6 +17,8 @@ export function DeleteStrategyModal({ strategy, versions, onConfirm, onCancel }:
   const [selectedVersionIds, setSelectedVersionIds] = useState<Set<string>>(
     versions.length > 0 ? new Set([versions[versions.length - 1].id]) : new Set(),
   );
+  const [cancelHover, setCancelHover] = useState(false);
+  const [confirmHover, setConfirmHover] = useState(false);
 
   const toggleVersion = (id: string) => {
     setSelectedVersionIds((prev) => {
@@ -31,10 +33,13 @@ export function DeleteStrategyModal({ strategy, versions, onConfirm, onCancel }:
 
   return (
     <div className="absolute inset-0 flex items-center justify-center z-60">
-      <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 shadow-2xl max-w-sm w-full mx-4 space-y-4">
-        <h3 className="text-sm font-semibold text-zinc-50">Delete Strategy</h3>
-        <p className="text-xs text-zinc-400">
-          Choose what to delete for <strong className="text-zinc-200">{strategy.name}</strong>:
+      <div
+        className="rounded-lg p-6 shadow-2xl max-w-sm w-full mx-4 space-y-4"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+      >
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Delete Strategy</h3>
+        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+          Choose what to delete for <strong style={{ color: 'var(--text-primary)' }}>{strategy.name}</strong>:
         </p>
 
         <div className="space-y-2">
@@ -48,10 +53,10 @@ export function DeleteStrategyModal({ strategy, versions, onConfirm, onCancel }:
               className="mt-0.5 accent-red-500"
             />
             <div>
-              <span className="text-xs font-medium text-zinc-200">
+              <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
                 Delete entire strategy — All {versions.length} version{versions.length !== 1 ? 's' : ''}
               </span>
-              <p className="text-xs text-zinc-500 mt-0.5">Permanently removes all versions. Cannot be undone.</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Permanently removes all versions. Cannot be undone.</p>
             </div>
           </label>
 
@@ -66,9 +71,9 @@ export function DeleteStrategyModal({ strategy, versions, onConfirm, onCancel }:
               className="mt-0.5 accent-red-500"
             />
             <div>
-              <span className="text-xs font-medium text-zinc-200">Delete specific version only</span>
+              <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Delete specific version only</span>
               {versions.length <= 1 && (
-                <p className="text-xs text-zinc-500 mt-0.5">Only one version — delete entire strategy to remove.</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Only one version — delete entire strategy to remove.</p>
               )}
             </div>
           </label>
@@ -76,12 +81,18 @@ export function DeleteStrategyModal({ strategy, versions, onConfirm, onCancel }:
 
         {scope === 'version' && versions.length > 1 && (
           <div className="space-y-1.5">
-            <p className="text-xs text-zinc-400">Select version(s) to delete:</p>
-            <div className="max-h-36 overflow-y-auto rounded border border-zinc-700 bg-zinc-900/50">
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Select version(s) to delete:</p>
+            <div
+              className="max-h-36 overflow-y-auto rounded"
+              style={{ border: '1px solid var(--border)', background: 'var(--bg-deep)' }}
+            >
               {versions.map((v) => (
                 <label
                   key={v.id}
-                  className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-zinc-700/50 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors"
+                  style={{ background: 'transparent' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
                   <input
                     type="checkbox"
@@ -89,11 +100,18 @@ export function DeleteStrategyModal({ strategy, versions, onConfirm, onCancel }:
                     onChange={() => toggleVersion(v.id)}
                     className="accent-red-500"
                   />
-                  <span className="text-xs text-zinc-200">v{v.versionNumber}</span>
+                  <span className="text-xs" style={{ color: 'var(--text-primary)' }}>v{v.versionNumber}</span>
                   {v.isLatest && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-blue-900/40 border border-blue-700 text-blue-400">latest</span>
+                    <span
+                      className="text-xs px-1.5 py-0.5 rounded"
+                      style={{
+                        background: 'var(--accent-blue-dark)',
+                        border: '1px solid var(--accent-blue-mid)',
+                        color: 'var(--accent-blue)',
+                      }}
+                    >latest</span>
                   )}
-                  <span className="text-xs text-zinc-500 ml-auto">
+                  <span className="text-xs ml-auto" style={{ color: 'var(--text-muted)' }}>
                     {new Date(v.createdAt).toLocaleDateString()}
                   </span>
                 </label>
@@ -105,14 +123,26 @@ export function DeleteStrategyModal({ strategy, versions, onConfirm, onCancel }:
         <div className="flex gap-2 justify-end">
           <button
             onClick={onCancel}
-            className="px-3 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium transition-colors"
+            onMouseEnter={() => setCancelHover(true)}
+            onMouseLeave={() => setCancelHover(false)}
+            className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+            style={{
+              background: cancelHover ? 'var(--bg-hover)' : 'var(--bg-panel)',
+              color: 'var(--text-primary)',
+            }}
           >
             Cancel
           </button>
           <button
             onClick={() => onConfirm(scope, scope === 'version' ? Array.from(selectedVersionIds) : undefined)}
             disabled={!canConfirm}
-            className="px-3 py-1.5 rounded bg-red-700 hover:bg-red-600 text-white text-xs font-medium disabled:opacity-50 transition-colors"
+            onMouseEnter={() => setConfirmHover(true)}
+            onMouseLeave={() => setConfirmHover(false)}
+            className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-50 transition-colors"
+            style={{
+              background: confirmHover ? 'var(--accent-red-dark)' : 'var(--accent-red)',
+              color: 'var(--btn-primary-text)',
+            }}
           >
             {scope === 'entire' ? 'Delete Strategy' : `Delete ${selectedVersionIds.size} Version${selectedVersionIds.size !== 1 ? 's' : ''}`}
           </button>

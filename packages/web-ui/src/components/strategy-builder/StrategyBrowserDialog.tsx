@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect, type CSSProperties } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { Strategy, StrategyStatus, StrategyVersion, Block, BlockType } from '@/lib/strategy-builder/types';
 import {
@@ -12,12 +12,12 @@ import { DuplicateStrategyModal, DuplicateScope } from './DuplicateStrategyModal
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<StrategyStatus, string> = {
-  draft:      'text-gray-400 bg-gray-800/50 border-gray-700',
-  valid:      'text-emerald-400 bg-emerald-900/30 border-emerald-700',
-  invalid:    'text-red-400 bg-red-900/30 border-red-700',
-  backtested: 'text-blue-400 bg-blue-900/30 border-blue-700',
-  active:     'text-purple-400 bg-purple-900/30 border-purple-700',
+const STATUS_STYLES: Record<StrategyStatus, CSSProperties> = {
+  draft:      { color: 'var(--text-muted)',   background: 'var(--bg-card)',           borderColor: 'var(--border)' },
+  valid:      { color: 'var(--accent-green)', background: 'var(--accent-green-dark)',  borderColor: 'var(--accent-green-mid)' },
+  invalid:    { color: 'var(--accent-red)',   background: 'var(--accent-red-deeper)',  borderColor: 'var(--accent-red-dark)' },
+  backtested: { color: 'var(--accent-blue)',  background: 'var(--accent-blue-dark)',   borderColor: 'var(--accent-blue-mid)' },
+  active:     { color: 'var(--accent-teal)',  background: 'var(--accent-teal-dark)',   borderColor: 'var(--accent-teal-mid)' },
 };
 
 const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
@@ -47,10 +47,10 @@ function computeQualityScore(result: NonNullable<Strategy['backtestResults']>[nu
 }
 
 function getQualityLabel(pts: number) {
-  if (pts >= 6) return { label: 'Excellent', color: 'text-emerald-400' };
-  if (pts >= 4) return { label: 'Good', color: 'text-blue-400' };
-  if (pts >= 2) return { label: 'Fair', color: 'text-amber-400' };
-  return { label: 'Poor', color: 'text-red-400' };
+  if (pts >= 6) return { label: 'Excellent', color: 'var(--accent-green)' };
+  if (pts >= 4) return { label: 'Good',      color: 'var(--accent-blue)' };
+  if (pts >= 2) return { label: 'Fair',      color: 'var(--accent-orange)' };
+  return               { label: 'Poor',      color: 'var(--accent-red)' };
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -62,17 +62,20 @@ function SortHeader({
   return (
     <th
       onClick={() => onClick(col)}
-      className="px-3 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wide cursor-pointer hover:text-zinc-200 whitespace-nowrap select-none"
+      className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide cursor-pointer whitespace-nowrap select-none"
+      style={{ color: 'var(--text-secondary)' }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}
     >
       {label}
-      {isActive && <span className="ml-1 text-zinc-500">{dir === 'asc' ? '▴' : '▾'}</span>}
+      {isActive && <span className="ml-1" style={{ color: 'var(--text-muted)' }}>{dir === 'asc' ? '▴' : '▾'}</span>}
     </th>
   );
 }
 
 function BlockHierarchyTree({ blocks }: { blocks: Block[] }) {
   if (blocks.length === 0) {
-    return <p className="text-xs text-zinc-600 italic">No blocks configured</p>;
+    return <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>No blocks configured</p>;
   }
   return (
     <div className="space-y-2 font-mono text-xs">
@@ -82,23 +85,23 @@ function BlockHierarchyTree({ blocks }: { blocks: Block[] }) {
         const exits = (block.data?.exits as Array<{ signalName: string; percentage?: number }> | undefined) ?? [];
         return (
           <div key={block.id} className="space-y-0.5">
-            <div className="text-zinc-300">
-              <span className="text-blue-400 font-bold">#{i + 1}</span>{' '}
-              <span className="text-zinc-200">{BLOCK_TYPE_LABELS[block.type] ?? block.type}</span>
+            <div style={{ color: 'var(--text-secondary)' }}>
+              <span className="font-bold" style={{ color: 'var(--accent-blue)' }}>#{i + 1}</span>{' '}
+              <span style={{ color: 'var(--text-primary)' }}>{BLOCK_TYPE_LABELS[block.type] ?? block.type}</span>
               {timing?.enabled && (
-                <span className="text-amber-400 ml-2">⏱ {timing.maxCandles}c</span>
+                <span className="ml-2" style={{ color: 'var(--accent-orange)' }}>⏱ {timing.maxCandles}c</span>
               )}
             </div>
             {signals.map((sig, si) => (
-              <div key={si} className="ml-4 text-zinc-400">
-                └── <span className={sig.logic === 'OR' ? 'text-blue-400' : 'text-emerald-400'}>
+              <div key={si} className="ml-4" style={{ color: 'var(--text-secondary)' }}>
+                └── <span style={{ color: sig.logic === 'OR' ? 'var(--accent-blue)' : 'var(--accent-green)' }}>
                   {sig.logic ?? 'AND'}
                 </span>{' '}
                 {sig.name}
               </div>
             ))}
             {exits.map((exit, ei) => (
-              <div key={ei} className="ml-4 text-red-400">
+              <div key={ei} className="ml-4" style={{ color: 'var(--accent-red)' }}>
                 └── 🔴 {exit.signalName}{exit.percentage != null ? ` (${exit.percentage}%)` : ''}
               </div>
             ))}
@@ -121,46 +124,46 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
     (strategy.settings as { strategyType?: string }).strategyType;
 
   return (
-    <div className="grid grid-cols-3 gap-4 p-4 border-t border-zinc-800 bg-zinc-950/60">
+    <div className="grid grid-cols-3 gap-4 p-4" style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-deep)' }}>
       {/* Column 1: Strategy Info */}
       <div className="space-y-2">
-        <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">📊 Strategy Info</p>
+        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>📊 Strategy Info</p>
         <div className="space-y-1.5">
           <div>
-            <p className="text-sm font-semibold text-zinc-100 leading-tight">{strategy.name}</p>
+            <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{strategy.name}</p>
             {strategy.versionNumber != null && (
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                 v{strategy.versionNumber}
                 {strategy.versionId && (
-                  <span className="ml-1 font-mono text-zinc-700">{strategy.versionId.slice(0, 8)}</span>
+                  <span className="ml-1 font-mono" style={{ color: 'var(--text-faintest)' }}>{strategy.versionId.slice(0, 8)}</span>
                 )}
               </p>
             )}
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
               {strategy.blocks.length} block{strategy.blocks.length !== 1 ? 's' : ''} · {entryBlocks.length} entry · {exitBlocks.length} exit
             </p>
             {strategy.testCount != null && (
-              <p className="text-xs text-zinc-600 mt-0.5">Tests run: {strategy.testCount}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Tests run: {strategy.testCount}</p>
             )}
           </div>
           {sType && (
             <p className="text-xs">
-              {sType === 'bullish' ? <span className="text-emerald-400">🟢 Bullish</span> :
-               sType === 'bearish' ? <span className="text-red-400">🔴 Bearish</span> :
-               <span className="text-zinc-500">{sType}</span>}
+              {sType === 'bullish' ? <span style={{ color: 'var(--accent-green)' }}>🟢 Bullish</span> :
+               sType === 'bearish' ? <span style={{ color: 'var(--accent-red)' }}>🔴 Bearish</span> :
+               <span style={{ color: 'var(--text-muted)' }}>{sType}</span>}
             </p>
           )}
           {strategy.description && (
-            <p className="text-xs text-zinc-400 leading-relaxed">{strategy.description}</p>
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{strategy.description}</p>
           )}
-          <div className="text-xs text-zinc-600 space-y-0.5">
+          <div className="text-xs space-y-0.5" style={{ color: 'var(--text-muted)' }}>
             <p>Created: {new Date(strategy.createdAt).toLocaleDateString()}</p>
             <p>Updated: {new Date(strategy.updatedAt).toLocaleDateString()}</p>
           </div>
           {strategy.tags && strategy.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {strategy.tags.map((tag) => (
-                <span key={tag} className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 text-xs border border-zinc-700">{tag}</span>
+                <span key={tag} className="px-1.5 py-0.5 rounded text-xs" style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>{tag}</span>
               ))}
             </div>
           )}
@@ -169,70 +172,70 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
 
       {/* Column 2: Configuration Hierarchy */}
       <div className="space-y-2 overflow-y-auto max-h-48">
-        <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">⚙️ Configuration</p>
+        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>⚙️ Configuration</p>
         <BlockHierarchyTree blocks={strategy.blocks} />
       </div>
 
       {/* Column 3: Performance */}
       <div className="space-y-2">
-        <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">📈 Performance</p>
+        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>📈 Performance</p>
         {!result ? (
-          <p className="text-xs text-zinc-600 italic">No backtest results</p>
+          <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>No backtest results</p>
         ) : (
           <div className="space-y-2 text-xs">
             {quality && (
-              <p className={`font-semibold ${quality.color}`}>
+              <p className="font-semibold" style={{ color: quality.color }}>
                 {quality.label} ({qScore}/7)
               </p>
             )}
 
             <div className="space-y-1">
-              <p className="text-zinc-500 uppercase tracking-wide font-medium">Trade Stats</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-zinc-300">
-                <span className="text-zinc-500">Win Rate</span>
-                <span className={result.winRate >= 0.5 ? 'text-emerald-400' : 'text-red-400'}>
+              <p className="uppercase tracking-wide font-medium" style={{ color: 'var(--text-muted)' }}>Trade Stats</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5" style={{ color: 'var(--text-secondary)' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Win Rate</span>
+                <span style={{ color: result.winRate >= 0.5 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
                   {(result.winRate * 100).toFixed(1)}%
                 </span>
-                <span className="text-zinc-500">Trades</span>
+                <span style={{ color: 'var(--text-muted)' }}>Trades</span>
                 <span>{result.totalTrades} ({result.winningTrades}W/{result.losingTrades}L)</span>
               </div>
             </div>
 
             <div className="space-y-1">
-              <p className="text-zinc-500 uppercase tracking-wide font-medium">Returns</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-zinc-300">
-                <span className="text-zinc-500">Return</span>
-                <span className={result.returnPercentage >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+              <p className="uppercase tracking-wide font-medium" style={{ color: 'var(--text-muted)' }}>Returns</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5" style={{ color: 'var(--text-secondary)' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Return</span>
+                <span style={{ color: result.returnPercentage >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
                   {result.returnPercentage >= 0 ? '+' : ''}{result.returnPercentage.toFixed(2)}%
                 </span>
-                <span className="text-zinc-500">Prof. Factor</span>
-                <span className={result.profitFactor >= 1 ? 'text-emerald-400' : 'text-red-400'}>
+                <span style={{ color: 'var(--text-muted)' }}>Prof. Factor</span>
+                <span style={{ color: result.profitFactor >= 1 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
                   {result.profitFactor.toFixed(2)}
                 </span>
               </div>
             </div>
 
             <div className="space-y-1">
-              <p className="text-zinc-500 uppercase tracking-wide font-medium">Risk Metrics</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-zinc-300">
-                <span className="text-zinc-500">Sharpe</span>
-                <span className={result.sharpeRatio >= 0.1 ? 'text-emerald-400' : 'text-amber-400'}>
+              <p className="uppercase tracking-wide font-medium" style={{ color: 'var(--text-muted)' }}>Risk Metrics</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5" style={{ color: 'var(--text-secondary)' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Sharpe</span>
+                <span style={{ color: result.sharpeRatio >= 0.1 ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
                   {result.sharpeRatio.toFixed(2)}
                 </span>
-                <span className="text-zinc-500">Sortino</span>
-                <span className={result.sortino_ratio >= 0.1 ? 'text-emerald-400' : 'text-amber-400'}>
+                <span style={{ color: 'var(--text-muted)' }}>Sortino</span>
+                <span style={{ color: result.sortino_ratio >= 0.1 ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
                   {result.sortino_ratio.toFixed(2)}
                 </span>
                 {result.calmar_ratio != null && (
                   <>
-                    <span className="text-zinc-500">Calmar</span>
-                    <span className={result.calmar_ratio >= 0.1 ? 'text-emerald-400' : 'text-amber-400'}>
+                    <span style={{ color: 'var(--text-muted)' }}>Calmar</span>
+                    <span style={{ color: result.calmar_ratio >= 0.1 ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
                       {result.calmar_ratio.toFixed(2)}
                     </span>
                   </>
                 )}
-                <span className="text-zinc-500">Max DD</span>
-                <span className="text-amber-400">{result.maxDrawdown.toFixed(2)}%</span>
+                <span style={{ color: 'var(--text-muted)' }}>Max DD</span>
+                <span style={{ color: 'var(--accent-orange)' }}>{result.maxDrawdown.toFixed(2)}%</span>
               </div>
             </div>
           </div>
@@ -460,36 +463,54 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
     >
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
 
-      <div className="relative w-full max-w-5xl rounded-lg border border-zinc-700 bg-zinc-900 shadow-2xl mx-4 flex flex-col max-h-[88vh]">
+      <div
+        className="relative w-full max-w-5xl rounded-lg shadow-2xl mx-4 flex flex-col max-h-[88vh]"
+        style={{ border: '1px solid var(--border)', background: 'var(--bg-panel)' }}
+      >
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-3 border-b border-zinc-800 flex-shrink-0">
-          <h2 id="strategy-browser-title" className="text-sm font-semibold text-zinc-50">
+        <div
+          className="flex items-center justify-between px-6 py-3 flex-shrink-0"
+          style={{ borderBottom: '1px solid var(--border)' }}
+        >
+          <h2 id="strategy-browser-title" className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             {title}
           </h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 text-lg" aria-label="Close dialog">✕</button>
+          <button
+            onClick={onClose}
+            className="text-lg transition-colors"
+            aria-label="Close dialog"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
+          >✕</button>
         </div>
 
         {/* Filters + toolbar */}
-        <div className="px-6 py-3 border-b border-zinc-800 flex items-center gap-3 flex-shrink-0 flex-wrap">
+        <div
+          className="px-6 py-3 flex items-center gap-3 flex-shrink-0 flex-wrap"
+          style={{ borderBottom: '1px solid var(--border)' }}
+        >
           <input
             type="text"
             placeholder="Search strategies, blocks…"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            className="flex-1 min-w-48 px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
+            className="flex-1 min-w-48 px-3 py-1.5 rounded text-sm focus:outline-none"
+            style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
           />
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
-            className="px-2 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-sm text-zinc-300 focus:outline-none"
+            className="px-2 py-1.5 rounded text-sm focus:outline-none"
+            style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
           >
             <option value="all">All Types</option>
             <option value="bullish">🟢 Bullish</option>
             <option value="bearish">🔴 Bearish</option>
           </select>
 
-          <span className="text-xs text-zinc-500 whitespace-nowrap">
+          <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
             {filtered.length} strateg{filtered.length !== 1 ? 'ies' : 'y'}
           </span>
 
@@ -500,13 +521,19 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
                 onClick={handleExportJson}
                 disabled={!selectedStrategy}
                 title="Export selected strategy to JSON"
-                className="px-2.5 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs font-medium disabled:opacity-40 transition-colors"
+                className="px-2.5 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
+                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
               >
                 📥 Export JSON
               </button>
               <label
                 title="Import strategy from JSON file"
-                className="px-2.5 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs font-medium cursor-pointer transition-colors"
+                className="px-2.5 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors"
+                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLLabelElement).style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLLabelElement).style.background = 'var(--bg-card)'; }}
               >
                 📤 Import JSON
                 <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImportJson} />
@@ -520,21 +547,21 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
           {/* Table */}
           <div className="overflow-y-auto" style={{ flex: `0 0 ${splitPct}%` }}>
             <table className="w-full text-sm border-collapse">
-              <thead className="sticky top-0 bg-zinc-900 border-b border-zinc-800 z-10">
+              <thead className="sticky top-0 z-10" style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border)' }}>
                 <tr>
                   <SortHeader label="Strategy Name" col="name"    active={sortKey} dir={sortDir} onClick={handleSort} />
-                  <th className="px-3 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap">Type</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>Type</th>
                   <SortHeader label="Version"        col="version" active={sortKey} dir={sortDir} onClick={handleSort} />
                   <SortHeader label="Last Modified"  col="updated" active={sortKey} dir={sortDir} onClick={handleSort} />
                   <SortHeader label="Validation"     col="status"  active={sortKey} dir={sortDir} onClick={handleSort} />
-                  <th className="px-3 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap">Published</th>
-                  {!isSaveAs && <th className="px-3 py-2 text-left text-xs font-medium text-zinc-400 uppercase tracking-wide">Actions</th>}
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>Published</th>
+                  {!isSaveAs && <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={isSaveAs ? 6 : 7} className="px-3 py-8 text-center text-sm text-zinc-500 italic">
+                    <td colSpan={isSaveAs ? 6 : 7} className="px-3 py-8 text-center text-sm italic" style={{ color: 'var(--text-muted)' }}>
                       {displayList.length === 0 ? 'No strategies yet' : 'No matching strategies'}
                     </td>
                   </tr>
@@ -550,41 +577,47 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
                         key={strategy.id}
                         onClick={() => setSelectedId(strategy.id)}
                         onDoubleClick={() => handleRowDoubleClick(strategy)}
-                        className={`border-b border-zinc-800/60 cursor-pointer transition-colors ${
-                          isSelected ? 'bg-blue-500/10 border-l-2 border-l-blue-500' : 'hover:bg-zinc-800/50'
-                        }`}
+                        className={`border-b cursor-pointer transition-colors ${isSelected ? 'border-l-2' : ''}`}
+                        style={{
+                          borderColor: 'var(--border)',
+                          ...(isSelected
+                            ? { background: 'var(--accent-blue-dark)', borderLeftColor: 'var(--accent-blue)' }
+                            : {}),
+                        }}
+                        onMouseEnter={!isSelected ? e => { (e.currentTarget as HTMLTableRowElement).style.background = 'var(--bg-hover)'; } : undefined}
+                        onMouseLeave={!isSelected ? e => { (e.currentTarget as HTMLTableRowElement).style.background = ''; } : undefined}
                       >
                         <td className="px-3 py-2">
-                          <span className="font-medium text-zinc-100 truncate block max-w-xs" title={strategy.name}>
+                          <span className="font-medium truncate block max-w-xs" style={{ color: 'var(--text-primary)' }} title={strategy.name}>
                             {strategy.name}
                           </span>
                           {strategy.description && (
-                            <span className="text-xs text-zinc-500 block truncate max-w-xs">{strategy.description}</span>
+                            <span className="text-xs block truncate max-w-xs" style={{ color: 'var(--text-muted)' }}>{strategy.description}</span>
                           )}
                         </td>
                         <td className="px-3 py-2 text-xs text-center">
-                          {sType === 'bullish' ? <span className="text-emerald-400">🟢 Bullish</span> :
-                           sType === 'bearish' ? <span className="text-red-400">🔴 Bearish</span> :
-                           <span className="text-zinc-600">—</span>}
+                          {sType === 'bullish' ? <span style={{ color: 'var(--accent-green)' }}>🟢 Bullish</span> :
+                           sType === 'bearish' ? <span style={{ color: 'var(--accent-red)' }}>🔴 Bearish</span> :
+                           <span style={{ color: 'var(--text-muted)' }}>—</span>}
                         </td>
-                        <td className="px-3 py-2 text-xs text-zinc-400 text-center">
+                        <td className="px-3 py-2 text-xs text-center" style={{ color: 'var(--text-secondary)' }}>
                           {strategy.versionNumber != null ? `v${strategy.versionNumber}` : '—'}
                         </td>
-                        <td className="px-3 py-2 text-xs text-zinc-400 whitespace-nowrap">
+                        <td className="px-3 py-2 text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
                           {new Date(strategy.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}
                           {' '}
                           {new Date(strategy.updatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                         </td>
                         <td className="px-3 py-2">
-                          <span className={`text-xs px-2 py-0.5 rounded border ${STATUS_COLORS[strategy.status] ?? 'text-zinc-400'}`}>
+                          <span className="text-xs px-2 py-0.5 rounded border" style={STATUS_STYLES[strategy.status] ?? { color: 'var(--text-muted)' }}>
                             {valStatus}
                           </span>
                         </td>
                         <td className="px-3 py-2">
                           {strategy.published ? (
-                            <span className="text-xs px-2 py-0.5 rounded border text-emerald-400 bg-emerald-900/30 border-emerald-700">Published</span>
+                            <span className="text-xs px-2 py-0.5 rounded border" style={STATUS_STYLES.valid}>Published</span>
                           ) : (
-                            <span className="text-xs px-2 py-0.5 rounded border text-gray-400 bg-gray-800/50 border-gray-700">Draft</span>
+                            <span className="text-xs px-2 py-0.5 rounded border" style={STATUS_STYLES.draft}>Draft</span>
                           )}
                         </td>
                         {!isSaveAs && (
@@ -594,7 +627,10 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
                                 onClick={() => { setSelectedId(strategy.id); setShowDupModal(true); }}
                                 disabled={controlling}
                                 title="Duplicate"
-                                className="px-2 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs disabled:opacity-40 transition-colors"
+                                className="px-2 py-1 rounded text-xs disabled:opacity-40 transition-colors"
+                                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+                                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
                               >
                                 ⧉
                               </button>
@@ -602,7 +638,20 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
                                 onClick={() => { setSelectedId(strategy.id); setShowDeleteModal(true); }}
                                 disabled={controlling}
                                 title="Delete"
-                                className="px-2 py-1 rounded bg-zinc-700 hover:bg-red-900 text-zinc-400 hover:text-red-300 text-xs disabled:opacity-40 transition-colors"
+                                className="px-2 py-1 rounded text-xs disabled:opacity-40 transition-colors"
+                                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                                onMouseEnter={e => {
+                                  const el = e.currentTarget as HTMLButtonElement;
+                                  el.style.background = 'var(--accent-red-deeper)';
+                                  el.style.color = 'var(--accent-red)';
+                                  el.style.borderColor = 'var(--accent-red-dark)';
+                                }}
+                                onMouseLeave={e => {
+                                  const el = e.currentTarget as HTMLButtonElement;
+                                  el.style.background = 'var(--bg-card)';
+                                  el.style.color = 'var(--text-secondary)';
+                                  el.style.borderColor = 'var(--border)';
+                                }}
                               >
                                 🗑
                               </button>
@@ -621,10 +670,13 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
           <div
             ref={splitterRef}
             onMouseDown={onSplitterMouseDown}
-            className="flex-shrink-0 flex items-center justify-center h-2 bg-zinc-800 hover:bg-zinc-700 cursor-row-resize select-none border-y border-zinc-700/50 transition-colors"
+            className="flex-shrink-0 flex items-center justify-center h-2 cursor-row-resize select-none transition-colors"
+            style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-hover)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-card)'; }}
             title="Drag to resize"
           >
-            <span className="text-zinc-600 text-xs tracking-widest select-none">⋯</span>
+            <span className="text-xs tracking-widest select-none" style={{ color: 'var(--text-muted)' }}>⋯</span>
           </div>
 
           {/* Details panel */}
@@ -632,7 +684,7 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
             {selectedStrategy ? (
               <DetailsPanel strategy={selectedStrategy} />
             ) : (
-              <div className="flex items-center justify-center h-full text-xs text-zinc-600 italic py-8">
+              <div className="flex items-center justify-center h-full text-xs italic py-8" style={{ color: 'var(--text-muted)' }}>
                 Select a strategy to view details
               </div>
             )}
@@ -640,13 +692,17 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-3 px-6 py-3 border-t border-zinc-800 flex-shrink-0">
+        <div
+          className="flex items-center justify-between gap-3 px-6 py-3 flex-shrink-0"
+          style={{ borderTop: '1px solid var(--border)' }}
+        >
           <div className="flex items-center gap-2 flex-wrap">
             {!isSaveAs && selectedStrategy?.status === StrategyStatus.ACTIVE ? (
               <button
                 onClick={handleDisable}
                 disabled={controlling}
-                className="px-3 py-1.5 rounded bg-amber-700 hover:bg-amber-600 text-white text-xs font-medium disabled:opacity-50 transition-colors"
+                className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-50 transition-colors"
+                style={{ background: 'var(--accent-orange)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-orange)' }}
               >
                 {controlling ? 'Working…' : 'Disable Strategy'}
               </button>
@@ -654,25 +710,30 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
               <button
                 onClick={handleEnable}
                 disabled={controlling}
-                className="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-medium disabled:opacity-50 transition-colors"
+                className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-50 transition-colors"
+                style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-green)' }}
               >
                 {controlling ? 'Working…' : 'Enable Strategy'}
               </button>
             ) : null}
-            {controlMsg && <span className="text-xs text-zinc-400">{controlMsg}</span>}
+            {controlMsg && <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{controlMsg}</span>}
           </div>
 
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium transition-colors"
+              className="px-4 py-1.5 rounded text-sm font-medium transition-colors"
+              style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
             >
               Cancel
             </button>
             <button
               onClick={handleSelect}
               disabled={!selectedId}
-              className="px-4 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+              className="px-4 py-1.5 rounded text-sm font-medium disabled:opacity-50 transition-colors"
+              style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-blue)' }}
             >
               {confirmLabel}
             </button>

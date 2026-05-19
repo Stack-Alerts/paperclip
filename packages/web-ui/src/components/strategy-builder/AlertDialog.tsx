@@ -25,22 +25,24 @@ export const AlertDialog: React.FC<AlertDialogProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-full max-w-2xl mx-4">
-        <div className="flex items-center gap-3 border-b border-zinc-700 px-6 py-4">
+      <div className="rounded-lg shadow-2xl w-full max-w-2xl mx-4 border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+        <div className="flex items-center gap-3 border-b px-6 py-4" style={{ borderColor: 'var(--border)' }}>
           <span className="text-2xl">{icon}</span>
-          <h2 className="text-base font-semibold text-zinc-100 flex-1">{title}</h2>
+          <h2 className="text-base font-semibold flex-1" style={{ color: 'var(--text-primary)' }}>{title}</h2>
         </div>
         <div className="px-6 py-5 space-y-3">
-          <p className="text-lg font-semibold text-zinc-100">{heading}</p>
+          <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{heading}</p>
           <p
-            className="text-sm text-zinc-400 leading-relaxed"
+            className="text-sm leading-relaxed"
+            style={{ color: 'var(--text-secondary)' }}
             dangerouslySetInnerHTML={{ __html: message }}
           />
         </div>
-        <div className="flex justify-end px-6 py-4 border-t border-zinc-700">
+        <div className="flex justify-end px-6 py-4 border-t" style={{ borderColor: 'var(--border)' }}>
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+            className="px-5 py-2 rounded text-sm font-medium transition-colors"
+            style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }}
           >
             ✓ OK
           </button>
@@ -73,34 +75,42 @@ export const QuestionDialog: React.FC<QuestionDialogProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-full max-w-2xl mx-4">
-        <div className="flex items-center gap-3 border-b border-zinc-700 px-6 py-4">
+      <div className="rounded-lg shadow-2xl w-full max-w-2xl mx-4 border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+        <div className="flex items-center gap-3 border-b px-6 py-4" style={{ borderColor: 'var(--border)' }}>
           <span className="text-2xl">{icon}</span>
-          <h2 className="text-base font-semibold text-zinc-100 flex-1">{title}</h2>
+          <h2 className="text-base font-semibold flex-1" style={{ color: 'var(--text-primary)' }}>{title}</h2>
         </div>
         <div className="px-6 py-5 space-y-3">
-          <p className="text-lg font-semibold text-zinc-100">{heading}</p>
+          <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{heading}</p>
           <p
-            className="text-sm text-zinc-400 leading-relaxed"
+            className="text-sm leading-relaxed"
+            style={{ color: 'var(--text-secondary)' }}
             dangerouslySetInnerHTML={{ __html: message }}
           />
         </div>
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-zinc-700">
+        <div className="flex justify-end gap-2 px-6 py-4 border-t" style={{ borderColor: 'var(--border)' }}>
           <button
             onClick={() => onResult('cancel')}
-            className="px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 transition-colors"
+            className="px-4 py-2 rounded text-sm font-medium transition-colors"
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
           >
             ❌ Cancel
           </button>
           <button
             onClick={() => onResult('no')}
-            className="px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 transition-colors"
+            className="px-4 py-2 rounded text-sm font-medium transition-colors"
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
           >
             🔴 No
           </button>
           <button
             onClick={() => onResult('yes')}
-            className="px-4 py-2 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 rounded text-sm font-medium transition-colors"
+            style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }}
           >
             ✅ Yes
           </button>

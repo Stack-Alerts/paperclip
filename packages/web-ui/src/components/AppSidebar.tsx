@@ -42,8 +42,8 @@ function BtcWaveformLogo({ size = 28 }: { size?: number }) {
     >
       <defs>
         <linearGradient id={id} x1="2" y1="14" x2="26" y2="14" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#2E8CFF" />
-          <stop offset="100%" stopColor="#2BE8F2" />
+          <stop offset="0%" stopColor="var(--core-accent-blue)" />
+          <stop offset="100%" stopColor="var(--core-accent-cyan)" />
         </linearGradient>
       </defs>
       <polyline
@@ -136,14 +136,14 @@ export function AppSidebar() {
                   ? {
                       paddingLeft: collapsed ? '8px' : '14px',
                       paddingRight: collapsed ? '8px' : '16px',
-                      background: '#1A2435',
-                      color: '#E8F2FF',
-                      borderLeft: '2px solid #2E8CFF',
+                      background: 'var(--sidebar-item-active-bg)',
+                      color: 'var(--text-primary)',
+                      borderLeft: '2px solid var(--sidebar-item-active-border)',
                     }
                   : {
                       paddingLeft: collapsed ? '8px' : '16px',
                       paddingRight: collapsed ? '8px' : '16px',
-                      color: '#8A9FBF',
+                      color: 'var(--sidebar-item-default)',
                     }
               }
               onMouseEnter={e => {
@@ -157,7 +157,7 @@ export function AppSidebar() {
                 if (!active) {
                   const el = e.currentTarget as HTMLAnchorElement;
                   el.style.background = 'transparent';
-                  el.style.color = '#8A9FBF';
+                  el.style.color = 'var(--sidebar-item-default)';
                 }
               }}
             >
@@ -166,7 +166,7 @@ export function AppSidebar() {
                   width: 18,
                   height: 18,
                   flexShrink: 0,
-                  color: active ? '#2E8CFF' : '#8A9FBF',
+                  color: active ? 'var(--sidebar-item-active-border)' : 'var(--sidebar-item-default)',
                 }}
               />
               {!collapsed && <span className="truncate">{label}</span>}
@@ -183,14 +183,14 @@ export function AppSidebar() {
                 width: 7,
                 height: 7,
                 borderRadius: '50%',
-                background: '#26C46A',
+                background: 'var(--status-connected)',
                 display: 'inline-block',
               }}
             />
             <span
               style={{
                 fontSize: 10,
-                color: '#26C46A',
+                color: 'var(--status-connected)',
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
               }}

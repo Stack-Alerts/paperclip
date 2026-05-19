@@ -48,13 +48,13 @@ const BINDING_OPTIONS = [
     value: 'STRATEGY' as const,
     label: 'STRATEGY - Apply to all positions',
     desc: '└─ Global exit for entire strategy',
-    color: '#DC2626',
+    color: 'var(--accent-red)',
   },
   {
     value: 'BLOCK' as const,
     label: 'BLOCK - Apply to specific block positions',
     desc: '└─ Exit only for positions from specific block',
-    color: '#F59E0B',
+    color: 'var(--accent-orange)',
   },
   {
     value: 'SIGNAL' as const,
@@ -172,7 +172,7 @@ export function ExitConditionDialog({
             <button
               onClick={onCancel}
               className="w-5 h-5 rounded text-xs flex items-center justify-center hover:opacity-80"
-              style={{ background: 'var(--accent-red-dark)', color: '#FCA5A5' }}
+              style={{ background: 'var(--accent-red-dark)', color: 'var(--text-primary)' }}
             >✕</button>
           </div>
         </div>
@@ -181,7 +181,7 @@ export function ExitConditionDialog({
         <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--border) transparent' }}>
           <div className="px-4 py-4 space-y-4">
             {/* Dialog header */}
-            <div className="text-sm font-bold" style={{ color: '#3B9CC0' }}>
+            <div className="text-sm font-bold" style={{ color: 'var(--accent-teal)' }}>
               ⚙ Configure EXIT: {signalName}
             </div>
 
@@ -402,14 +402,14 @@ export function ExitConditionDialog({
           <button
             onClick={onCancel}
             className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
-            style={{ background: 'var(--accent-red)', color: '#ffffff' }}
+            style={{ background: 'var(--accent-red)', color: 'var(--btn-primary-text)' }}
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
-            style={{ background: 'var(--accent-green)', color: '#ffffff' }}
+            style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
           >
             {isEditMode ? 'Update Exit Condition' : 'Add Exit Condition'}
           </button>

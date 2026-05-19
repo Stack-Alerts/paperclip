@@ -79,7 +79,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 style={active
                   ? {
                       background: 'var(--bg-panel)',
-                      color: '#FFFFFF',
+                      color: 'var(--text-primary)',
                       borderLeft: '3px solid var(--accent-blue)',
                       paddingLeft: '9px',
                     }
@@ -103,14 +103,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   width: 7,
                   height: 7,
                   borderRadius: '50%',
-                  background: '#26C46A',
+                  background: 'var(--status-connected)',
                   display: 'inline-block',
                 }}
               />
               <span
                 style={{
                   fontSize: 10,
-                  color: '#26C46A',
+                  color: 'var(--status-connected)',
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
                 }}

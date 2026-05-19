@@ -104,14 +104,14 @@ export const TimingConstraintDialog: React.FC<TimingConstraintDialogProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-full max-w-2xl mx-4">
+      <div className="rounded-lg shadow-2xl w-full max-w-2xl mx-4 border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
 
         {/* ── Header ── */}
-        <div className="flex items-center gap-3 border-b border-zinc-700 px-6 py-4">
+        <div className="flex items-center gap-3 border-b px-6 py-4" style={{ borderColor: 'var(--border)' }}>
           <span className="text-xl">⏱</span>
           <div>
-            <h2 className="text-base font-semibold text-zinc-100">Timing Constraint</h2>
-            <p className="text-xs text-zinc-400">
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Timing Constraint</h2>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
               {blockName} › {signalName}
             </p>
           </div>
@@ -127,11 +127,13 @@ export const TimingConstraintDialog: React.FC<TimingConstraintDialogProps> = ({
               id="tc-enabled"
               checked={enabled}
               onChange={(e) => setEnabled(e.target.checked)}
-              className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-blue-500 focus:ring-blue-500 cursor-pointer"
+              className="w-4 h-4 rounded cursor-pointer"
+              style={{ accentColor: 'var(--accent-blue)' }}
             />
             <label
               htmlFor="tc-enabled"
-              className="text-sm font-semibold text-zinc-200 cursor-pointer"
+              className="text-sm font-semibold cursor-pointer"
+              style={{ color: 'var(--text-primary)' }}
             >
               Enable timing constraint
             </label>
@@ -139,17 +141,18 @@ export const TimingConstraintDialog: React.FC<TimingConstraintDialogProps> = ({
 
           {/* Settings group */}
           <div
-            className={`border border-zinc-700 rounded-lg px-5 py-4 space-y-4 transition-opacity ${
+            className={`rounded-lg px-5 py-4 space-y-4 transition-opacity border ${
               enabled ? '' : 'opacity-40 pointer-events-none'
             }`}
+            style={{ borderColor: 'var(--border)' }}
           >
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
               Timing Constraint Settings
             </p>
 
             {/* Candle count */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-300">
+              <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                 Maximum candles from reference
               </label>
               <div className="flex items-center gap-3">
@@ -159,21 +162,23 @@ export const TimingConstraintDialog: React.FC<TimingConstraintDialogProps> = ({
                   max={1000}
                   value={candleCount}
                   onChange={handleCandleChange}
-                  className="w-28 bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-blue-500"
+                  className="w-28 rounded px-3 py-2 text-sm focus:outline-none"
+                  style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
                 />
-                <span className="text-sm text-zinc-400">candles</span>
+                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>candles</span>
               </div>
             </div>
 
             {/* Reference signal */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-300">Reference signal</label>
+              <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Reference signal</label>
               {hasReferences ? (
                 <>
                   <select
                     value={referenceId}
                     onChange={(e) => setReferenceId(e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-blue-500"
+                    className="w-full rounded px-3 py-2 text-sm focus:outline-none"
+                    style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
                   >
                     {availableReferences.map((ref) => (
                       <option key={ref.referenceId} value={ref.referenceId}>
@@ -182,7 +187,7 @@ export const TimingConstraintDialog: React.FC<TimingConstraintDialogProps> = ({
                     ))}
                   </select>
                   {referenceStale && (
-                    <p className="text-xs text-amber-400 mt-1">
+                    <p className="text-xs mt-1" style={{ color: 'var(--accent-orange)' }}>
                       ⚠️ The previously selected reference no longer exists in the current blocks.
                       Please choose a new reference.
                     </p>
@@ -192,7 +197,8 @@ export const TimingConstraintDialog: React.FC<TimingConstraintDialogProps> = ({
                 <div className="flex items-center gap-2">
                   <select
                     disabled
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-500 text-sm opacity-60 cursor-not-allowed"
+                    className="w-full rounded px-3 py-2 text-sm opacity-60 cursor-not-allowed"
+                    style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
                   >
                     <option>(No previous signals available)</option>
                   </select>
@@ -202,27 +208,33 @@ export const TimingConstraintDialog: React.FC<TimingConstraintDialogProps> = ({
           </div>
 
           {/* Example group box */}
-          <div className="border border-zinc-700 rounded-lg px-5 py-4 bg-zinc-800/30">
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+          <div className="rounded-lg px-5 py-4 border" style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-secondary)' }}>
               Example
             </p>
-            <p className="text-sm text-zinc-400 italic whitespace-pre-line leading-relaxed">
+            <p className="text-sm italic whitespace-pre-line leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
               {exampleText}
             </p>
           </div>
         </div>
 
         {/* ── Footer ── */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-zinc-700">
+        <div className="flex justify-end gap-2 px-6 py-4 border-t" style={{ borderColor: 'var(--border)' }}>
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 transition-colors"
+            className="px-4 py-2 rounded text-sm font-medium transition-colors"
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 rounded text-sm font-medium transition-colors"
+            style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-blue-mid)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent-blue)')}
           >
             Save Constraint
           </button>

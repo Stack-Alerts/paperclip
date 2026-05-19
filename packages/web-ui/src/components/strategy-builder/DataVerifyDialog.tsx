@@ -72,12 +72,12 @@ function computeSummary(
   };
 }
 
-const BANNER_STYLES: Record<SummaryVariant, string> = {
-  clean: 'bg-green-900/30 border-green-700 text-green-300',
-  fixable: 'bg-amber-900/30 border-amber-600 text-amber-300',
-  'too-old': 'bg-red-900/30 border-red-700 text-red-300',
-  mixed: 'bg-amber-900/30 border-amber-600 text-amber-300',
-  idle: 'bg-zinc-800 border-zinc-700 text-zinc-400',
+const BANNER_INLINE_STYLES: Record<SummaryVariant, React.CSSProperties> = {
+  clean: { background: 'color-mix(in srgb, var(--accent-green) 15%, transparent)', borderColor: 'var(--accent-green-dark)', color: 'var(--accent-green)' },
+  fixable: { background: 'color-mix(in srgb, var(--accent-orange) 15%, transparent)', borderColor: 'var(--accent-orange)', color: 'var(--accent-orange)' },
+  'too-old': { background: 'color-mix(in srgb, var(--accent-red) 15%, transparent)', borderColor: 'var(--accent-red-dark)', color: 'var(--accent-red)' },
+  mixed: { background: 'color-mix(in srgb, var(--accent-orange) 15%, transparent)', borderColor: 'var(--accent-orange)', color: 'var(--accent-orange)' },
+  idle: { background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-secondary)' },
 };
 
 // ─── Per-timeframe row rendering ─────────────────────────────────────────────
@@ -119,16 +119,16 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
 
   // Determine primary row status
   let statusLabel: string;
-  let statusClass: string;
+  let statusStyle: React.CSSProperties;
   let primaryNotes: string;
 
   if (totalGaps === 0) {
     statusLabel = '✓ Clean';
-    statusClass = 'bg-green-900/40 text-green-400';
+    statusStyle = { background: 'color-mix(in srgb, var(--accent-green) 20%, transparent)', color: 'var(--accent-green)' };
     primaryNotes = 'No action required';
   } else if (repairableCount > 0 && tooOldCount === 0) {
     statusLabel = 'Repairable Gaps';
-    statusClass = 'bg-red-900/40 text-red-400';
+    statusStyle = { background: 'color-mix(in srgb, var(--accent-red) 20%, transparent)', color: 'var(--accent-red)' };
     const earliest = gaps
       .filter((g) => g.repairable)
       .map((g) => g.gapStart)
@@ -136,7 +136,7 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
     primaryNotes = earliest ? `Earliest: ${earliest}` : '';
   } else if (repairableCount === 0 && tooOldCount > 0) {
     statusLabel = 'Too Old (Binance limit - cannot repair)';
-    statusClass = 'bg-orange-900/40 text-orange-400';
+    statusStyle = { background: 'color-mix(in srgb, var(--accent-orange) 20%, transparent)', color: 'var(--accent-orange)' };
     const earliest = gaps
       .filter((g) => !g.repairable)
       .map((g) => g.gapStart)
@@ -144,7 +144,7 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
     primaryNotes = earliest ? `From ${earliest} — beyond 90d horizon` : '';
   } else {
     statusLabel = 'Mixed Gaps';
-    statusClass = 'bg-amber-900/40 text-amber-400';
+    statusStyle = { background: 'color-mix(in srgb, var(--accent-orange) 15%, transparent)', color: 'var(--accent-orange)' };
     primaryNotes = `${repairableCount} fixable, ${tooOldCount} need LakeAPI`;
   }
 
@@ -152,45 +152,46 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
   const tooOldGaps = gaps.filter((g) => !g.repairable);
 
   return (
-    <div className="bg-zinc-800/50 rounded-lg border border-zinc-700">
+    <div className="rounded-lg border" style={{ background: 'color-mix(in srgb, var(--bg-card) 50%, transparent)', borderColor: 'var(--border)' }}>
       {/* ── Primary row header ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-zinc-700">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-sm font-bold text-zinc-100 min-w-[3rem]">{timeframe}</span>
-          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${statusClass}`}>
+          <span className="text-sm font-bold min-w-[3rem]" style={{ color: 'var(--text-primary)' }}>{timeframe}</span>
+          <span className="px-2 py-0.5 rounded text-xs font-semibold" style={statusStyle}>
             {statusLabel}
           </span>
           {totalGaps > 0 && (
             <>
-              <span className="text-xs text-zinc-400">
-                Repairable: <span className="text-green-400 font-medium">{repairableCount}</span>
+              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                Repairable: <span style={{ color: 'var(--accent-green)', fontWeight: 500 }}>{repairableCount}</span>
                 {repairableCount > 0 && (
-                  <span className="text-zinc-500"> ({repairableMissingBars ?? 0} bars)</span>
+                  <span style={{ color: 'var(--text-muted)' }}> ({repairableMissingBars ?? 0} bars)</span>
                 )}
               </span>
               {tooOldCount > 0 && (
-                <span className="text-xs text-zinc-400">
-                  Too Old: <span className="text-orange-400 font-medium">{tooOldCount}</span>
-                  <span className="text-zinc-500"> ({tooOldMissingBars ?? 0} bars)</span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  Too Old: <span style={{ color: 'var(--accent-orange)', fontWeight: 500 }}>{tooOldCount}</span>
+                  <span style={{ color: 'var(--text-muted)' }}> ({tooOldMissingBars ?? 0} bars)</span>
                 </span>
               )}
             </>
           )}
           {primaryNotes && (
-            <span className="text-xs text-zinc-500 italic">{primaryNotes}</span>
+            <span className="text-xs italic" style={{ color: 'var(--text-muted)' }}>{primaryNotes}</span>
           )}
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-zinc-400">
+        <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
           <span>
             Most recent data:{' '}
-            <span className="text-zinc-300 font-mono">{formatLastCandle(lastCandleTs)}</span>
+            <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{formatLastCandle(lastCandleTs)}</span>
           </span>
           {repairableCount > 0 && (
             <button
               onClick={onRepair}
               disabled={isRepairing}
-              className="px-3 py-1 rounded bg-green-700 text-white text-xs font-medium hover:bg-green-600 disabled:opacity-50 transition-colors"
+              className="px-3 py-1 rounded text-xs font-medium disabled:opacity-50 transition-colors"
+              style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
             >
               {isRepairing ? 'Repairing…' : 'Fix Gaps'}
             </button>
@@ -200,16 +201,16 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
 
       {/* ── Mixed: secondary row for too-old portion ── */}
       {hasMixed && (
-        <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-b border-zinc-700/60 bg-zinc-900/30">
-          <span className="text-xs font-mono text-zinc-500">{timeframe} (old)</span>
-          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-orange-900/40 text-orange-400">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-b" style={{ borderColor: 'color-mix(in srgb, var(--border) 60%, transparent)', background: 'color-mix(in srgb, var(--bg-panel) 30%, transparent)' }}>
+          <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{timeframe} (old)</span>
+          <span className="px-2 py-0.5 rounded text-xs font-semibold" style={{ background: 'color-mix(in srgb, var(--accent-orange) 20%, transparent)', color: 'var(--accent-orange)' }}>
             Too Old (Binance limit - cannot repair)
           </span>
-          <span className="text-xs text-zinc-400">
+          <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
             {tooOldCount} gap(s) · {tooOldMissingBars ?? 0} missing bars
           </span>
           {tooOldGaps.length > 0 && (
-            <span className="text-xs text-zinc-500 italic">
+            <span className="text-xs italic" style={{ color: 'var(--text-muted)' }}>
               From {tooOldGaps.map((g) => g.gapStart).sort()[0]} — beyond 90d horizon
             </span>
           )}
@@ -220,40 +221,48 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
       {gaps.length > 0 && (
         <div className="overflow-x-auto max-h-52">
           <table className="w-full text-xs border-collapse">
-            <thead className="bg-zinc-800 sticky top-0">
+            <thead className="sticky top-0" style={{ background: 'var(--bg-card)' }}>
               <tr>
-                <th className="px-3 py-2 text-left text-zinc-400 font-semibold">Start</th>
-                <th className="px-3 py-2 text-left text-zinc-400 font-semibold">End</th>
-                <th className="px-3 py-2 text-right text-zinc-400 font-semibold">Missing Bars</th>
-                <th className="px-3 py-2 text-left text-zinc-400 font-semibold">Status</th>
-                <th className="px-3 py-2 text-left text-zinc-400 font-semibold">Notes</th>
+                <th className="px-3 py-2 text-left font-semibold" style={{ color: 'var(--text-secondary)' }}>Start</th>
+                <th className="px-3 py-2 text-left font-semibold" style={{ color: 'var(--text-secondary)' }}>End</th>
+                <th className="px-3 py-2 text-right font-semibold" style={{ color: 'var(--text-secondary)' }}>Missing Bars</th>
+                <th className="px-3 py-2 text-left font-semibold" style={{ color: 'var(--text-secondary)' }}>Status</th>
+                <th className="px-3 py-2 text-left font-semibold" style={{ color: 'var(--text-secondary)' }}>Notes</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-700/40">
+            <tbody style={{ borderColor: 'var(--border)' }}>
               {repairableGaps.map((gap, i) => (
-                <tr key={`r-${i}`} className="hover:bg-zinc-700/20">
-                  <td className="px-3 py-1.5 text-zinc-300 font-mono">{gap.gapStart}</td>
-                  <td className="px-3 py-1.5 text-zinc-300 font-mono">{gap.gapEnd}</td>
-                  <td className="px-3 py-1.5 text-zinc-300 text-right font-medium">{gap.missingBars}</td>
+                <tr
+                  key={`r-${i}`}
+                  onMouseEnter={e => ((e.currentTarget as HTMLTableRowElement).style.background = 'color-mix(in srgb, var(--bg-hover) 20%, transparent)')}
+                  onMouseLeave={e => ((e.currentTarget as HTMLTableRowElement).style.background = '')}
+                >
+                  <td className="px-3 py-1.5 font-mono" style={{ color: 'var(--text-primary)' }}>{gap.gapStart}</td>
+                  <td className="px-3 py-1.5 font-mono" style={{ color: 'var(--text-primary)' }}>{gap.gapEnd}</td>
+                  <td className="px-3 py-1.5 text-right font-medium" style={{ color: 'var(--text-primary)' }}>{gap.missingBars}</td>
                   <td className="px-3 py-1.5">
-                    <span className="px-1.5 py-0.5 rounded text-xs bg-green-900/40 text-green-400">
+                    <span className="px-1.5 py-0.5 rounded text-xs" style={{ background: 'color-mix(in srgb, var(--accent-green) 20%, transparent)', color: 'var(--accent-green)' }}>
                       Repairable
                     </span>
                   </td>
-                  <td className="px-3 py-1.5 text-zinc-500">{gap.reason ?? '—'}</td>
+                  <td className="px-3 py-1.5" style={{ color: 'var(--text-muted)' }}>{gap.reason ?? '—'}</td>
                 </tr>
               ))}
               {tooOldGaps.map((gap, i) => (
-                <tr key={`o-${i}`} className="hover:bg-zinc-700/20">
-                  <td className="px-3 py-1.5 text-zinc-300 font-mono">{gap.gapStart}</td>
-                  <td className="px-3 py-1.5 text-zinc-300 font-mono">{gap.gapEnd}</td>
-                  <td className="px-3 py-1.5 text-zinc-300 text-right font-medium">{gap.missingBars}</td>
+                <tr
+                  key={`o-${i}`}
+                  onMouseEnter={e => ((e.currentTarget as HTMLTableRowElement).style.background = 'color-mix(in srgb, var(--bg-hover) 20%, transparent)')}
+                  onMouseLeave={e => ((e.currentTarget as HTMLTableRowElement).style.background = '')}
+                >
+                  <td className="px-3 py-1.5 font-mono" style={{ color: 'var(--text-primary)' }}>{gap.gapStart}</td>
+                  <td className="px-3 py-1.5 font-mono" style={{ color: 'var(--text-primary)' }}>{gap.gapEnd}</td>
+                  <td className="px-3 py-1.5 text-right font-medium" style={{ color: 'var(--text-primary)' }}>{gap.missingBars}</td>
                   <td className="px-3 py-1.5">
-                    <span className="px-1.5 py-0.5 rounded text-xs bg-orange-900/40 text-orange-400">
+                    <span className="px-1.5 py-0.5 rounded text-xs" style={{ background: 'color-mix(in srgb, var(--accent-orange) 20%, transparent)', color: 'var(--accent-orange)' }}>
                       Too Old
                     </span>
                   </td>
-                  <td className="px-3 py-1.5 text-zinc-500">
+                  <td className="px-3 py-1.5" style={{ color: 'var(--text-muted)' }}>
                     {gap.reason ?? '(Binance limit - cannot repair)'}
                   </td>
                 </tr>
@@ -322,22 +331,25 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-full max-w-5xl mx-4 max-h-[92vh] flex flex-col">
+      <div className="rounded-lg shadow-2xl w-full max-w-5xl mx-4 max-h-[92vh] flex flex-col border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between border-b border-zinc-700 px-6 py-4 flex-shrink-0">
+        <div className="flex items-center justify-between border-b px-6 py-4 flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
           <div className="flex items-center gap-3">
             <span className="text-xl">🔍</span>
             <div>
-              <h2 className="text-base font-semibold text-zinc-100">Data Verification</h2>
-              <p className="text-xs text-zinc-400">
+              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Data Verification</h2>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                 Gap detection and repair for BTCUSDT Perpetual OHLCV data across all timeframes
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-200 transition-colors text-xl leading-none"
+            className="transition-colors text-xl leading-none"
+            style={{ color: 'var(--text-secondary)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
             aria-label="Close"
           >
             ×
@@ -349,14 +361,14 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
 
           {/* Error */}
           {error && (
-            <div className="bg-red-900/20 border border-red-700 rounded p-3 text-sm text-red-300">
+            <div className="rounded p-3 text-sm border" style={{ background: 'color-mix(in srgb, var(--accent-red) 12%, transparent)', borderColor: 'var(--accent-red-dark)', color: 'var(--accent-red)' }}>
               {error}
             </div>
           )}
 
           {/* Repair in-progress status */}
           {repairStatus && (
-            <div className="bg-blue-900/20 border border-blue-700 rounded p-3 text-sm text-blue-300">
+            <div className="rounded p-3 text-sm border" style={{ background: 'color-mix(in srgb, var(--accent-blue) 12%, transparent)', borderColor: 'var(--accent-blue-dark)', color: 'var(--accent-blue)' }}>
               {repairStatus}
             </div>
           )}
@@ -364,7 +376,8 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
           {/* Summary banner */}
           {summary && (
             <div
-              className={`rounded-lg border px-4 py-3 text-sm font-semibold flex items-center gap-2 ${BANNER_STYLES[summary.variant]}`}
+              className="rounded-lg border px-4 py-3 text-sm font-semibold flex items-center gap-2"
+              style={BANNER_INLINE_STYLES[summary.variant]}
             >
               <span>{summary.icon}</span>
               <span>{summary.text}</span>
@@ -374,12 +387,13 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
           {/* Idle prompt */}
           {!results && !isVerifying && (
             <div className="text-center py-12">
-              <p className="text-zinc-400 text-sm mb-4">
+              <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
                 Run verification to detect gaps in your stored OHLCV data.
               </p>
               <button
                 onClick={handleVerify}
-                className="px-5 py-2.5 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+                className="px-5 py-2.5 rounded text-sm font-medium transition-colors"
+                style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }}
               >
                 Run Verification
               </button>
@@ -389,8 +403,8 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
           {/* Spinner */}
           {isVerifying && (
             <div className="text-center py-12">
-              <div className="inline-block w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-zinc-400 text-sm">Scanning data files…</p>
+              <div className="inline-block w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mb-4" style={{ borderColor: 'var(--accent-blue)', borderTopColor: 'transparent' }} />
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Scanning data files…</p>
             </div>
           )}
 
@@ -406,13 +420,16 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
         </div>
 
         {/* ── Footer ── */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-700 flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-t flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
           <div className="flex gap-2">
             {results && (
               <button
                 onClick={handleVerify}
                 disabled={isVerifying || !!isRepairing}
-                className="px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 disabled:opacity-50 transition-colors"
+                className="px-4 py-2 rounded text-sm font-medium disabled:opacity-50 transition-colors"
+                style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
               >
                 Re-verify
               </button>
@@ -425,7 +442,8 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
                   const first = tfResults.find((r) => r.repairableCount > 0);
                   if (first) handleRepair(first.timeframe);
                 }}
-                className="px-4 py-2 rounded bg-green-700 text-white text-sm font-medium hover:bg-green-600 transition-colors"
+                className="px-4 py-2 rounded text-sm font-medium transition-colors"
+                style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
               >
                 Fix Gaps
               </button>
@@ -433,7 +451,10 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 transition-colors"
+            className="px-4 py-2 rounded text-sm font-medium transition-colors"
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
           >
             Close
           </button>

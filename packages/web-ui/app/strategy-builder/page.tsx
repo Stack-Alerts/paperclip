@@ -3,7 +3,7 @@ import { StrategyBuilderPageWrapper } from '@/components/strategy-builder/Strate
 
 export default function StrategyBuilderRoute() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-full bg-zinc-950">Loading…</div>}>
+    <Suspense fallback={<div className="flex items-center justify-center h-full" style={{ background: 'var(--app-bg)', color: 'var(--text-muted)' }}>Loading…</div>}>
       <StrategyBuilderPageWrapper />
     </Suspense>
   );

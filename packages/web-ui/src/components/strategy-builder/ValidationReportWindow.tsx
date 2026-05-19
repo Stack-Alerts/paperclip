@@ -30,7 +30,7 @@
  * Note: CSV export and Undo are P3 scope (already partially implemented)
  */
 
-import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { ValidationReport, ValidationIssue, ValidationSeverity } from '@/lib/strategy-builder/types';
 import { AutoFixConfirmDialog } from './AutoFixConfirmDialog';
@@ -41,32 +41,35 @@ export interface ValidationReportWindowProps {
   report?: ValidationReport;
 }
 
-// Severity colors matching PyQt5 implementation
-const SEVERITY_COLORS: Record<ValidationSeverity, { text: string; bg: string; badge: string }> = {
+// Severity styles matching PyQt5 implementation — using CSS variables
+const SEVERITY_STYLES: Record<
+  ValidationSeverity,
+  { text: React.CSSProperties; bg: React.CSSProperties; badge: React.CSSProperties }
+> = {
   [ValidationSeverity.CRITICAL]: {
-    text: 'text-red-500',
-    bg: 'bg-red-950/30',
-    badge: 'bg-red-500 text-white',
+    text: { color: 'var(--accent-red)' },
+    bg: { background: 'var(--accent-red-deeper)' },
+    badge: { background: 'var(--accent-red)', color: 'var(--btn-primary-text)' },
   },
   [ValidationSeverity.ERROR]: {
-    text: 'text-orange-500',
-    bg: 'bg-orange-950/30',
-    badge: 'bg-orange-500 text-white',
+    text: { color: 'var(--accent-orange)' },
+    bg: { background: 'color-mix(in srgb, var(--accent-orange) 12%, transparent)' },
+    badge: { background: 'var(--accent-orange)', color: 'var(--btn-primary-text)' },
   },
   [ValidationSeverity.WARNING]: {
-    text: 'text-amber-500',
-    bg: 'bg-amber-950/30',
-    badge: 'bg-amber-500 text-white',
+    text: { color: 'var(--accent-orange)' },
+    bg: { background: 'color-mix(in srgb, var(--accent-orange) 10%, transparent)' },
+    badge: { background: 'var(--accent-orange)', color: 'var(--btn-primary-text)' },
   },
   [ValidationSeverity.NOTICE]: {
-    text: 'text-blue-500',
-    bg: 'bg-blue-950/30',
-    badge: 'bg-blue-500 text-white',
+    text: { color: 'var(--accent-blue)' },
+    bg: { background: 'var(--accent-blue-dark)' },
+    badge: { background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' },
   },
   [ValidationSeverity.INFO]: {
-    text: 'text-zinc-500',
-    bg: 'bg-zinc-800/30',
-    badge: 'bg-zinc-600 text-white',
+    text: { color: 'var(--text-muted)' },
+    bg: { background: 'var(--bg-card)' },
+    badge: { background: 'var(--bg-hover)', color: 'var(--text-primary)' },
   },
 };
 
@@ -81,7 +84,7 @@ function CollapsibleSection({
   content,
   defaultExpanded = true,
   onMaximize,
-  titleColor = '#095983',
+  titleColor = 'var(--accent-teal)',
 }: {
   title: string;
   content: string;
@@ -92,13 +95,21 @@ function CollapsibleSection({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
-    <div className="border border-zinc-700 rounded-lg bg-zinc-800/50 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/50">
+    <div
+      className="border rounded-lg overflow-hidden"
+      style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}
+    >
+      <div
+        className="flex items-center justify-between px-4 py-3"
+        style={{ background: 'var(--bg-panel)' }}
+      >
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="flex items-center gap-2 flex-1 text-left hover:opacity-80 transition-opacity"
         >
-          <span className="text-lg">{isExpanded ? '▼' : '▶'}</span>
+          <span className="text-lg" style={{ color: 'var(--text-secondary)' }}>
+            {isExpanded ? '▼' : '▶'}
+          </span>
           <h3 className="font-bold text-sm" style={{ color: titleColor }}>
             {title}
           </h3>
@@ -106,15 +117,22 @@ function CollapsibleSection({
         {onMaximize && (
           <button
             onClick={onMaximize}
-            className="px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-white text-xs font-medium transition-colors"
+            className="px-3 py-1 rounded text-xs font-medium transition-colors"
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
           >
             🗖 Maximize
           </button>
         )}
       </div>
       {isExpanded && (
-        <div className="px-4 py-3 bg-zinc-950/50 border-t border-zinc-700">
-          <pre className="text-xs text-zinc-300 font-mono overflow-x-auto whitespace-pre-wrap break-words">
+        <div
+          className="px-4 py-3 border-t"
+          style={{ background: 'var(--bg-deep)', borderColor: 'var(--border)' }}
+        >
+          <pre
+            className="text-xs font-mono overflow-x-auto whitespace-pre-wrap break-words"
+            style={{ color: 'var(--text-primary)' }}
+          >
             {content}
           </pre>
         </div>
@@ -130,6 +148,8 @@ function IssuesTable({
   issues: ValidationIssue[];
   onFixClick: (issue: ValidationIssue) => void;
 }) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
   const getFixButtonLabel = (ruleId: string): string => {
     const labels: Record<string, string> = {
       DIRECTION_001: '🔄 Switch Direction',
@@ -144,35 +164,77 @@ function IssuesTable({
     <div className="overflow-x-auto">
       <table className="w-full text-sm border-collapse">
         <thead>
-          <tr className="border-b border-zinc-700 bg-zinc-900/50">
-            <th className="px-4 py-3 text-left font-bold text-zinc-300">Severity</th>
-            <th className="px-4 py-3 text-left font-bold text-zinc-300">Category</th>
-            <th className="px-4 py-3 text-left font-bold text-zinc-300">Issue</th>
-            <th className="px-4 py-3 text-left font-bold text-zinc-300">Location</th>
-            <th className="px-4 py-3 text-left font-bold text-zinc-300">Description & Guidance</th>
-            <th className="px-4 py-3 text-left font-bold text-zinc-300">Action</th>
+          <tr
+            className="border-b"
+            style={{ borderColor: 'var(--border)', background: 'var(--bg-panel)' }}
+          >
+            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-primary)' }}>
+              Severity
+            </th>
+            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-primary)' }}>
+              Category
+            </th>
+            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-primary)' }}>
+              Issue
+            </th>
+            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-primary)' }}>
+              Location
+            </th>
+            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-primary)' }}>
+              Description &amp; Guidance
+            </th>
+            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-primary)' }}>
+              Action
+            </th>
           </tr>
         </thead>
         <tbody>
           {issues.map((issue, idx) => {
-            const colors = SEVERITY_COLORS[issue.severity];
+            const styles = SEVERITY_STYLES[issue.severity];
+            const isHovered = hoveredIdx === idx;
             return (
-              <tr key={`${issue.rule_id}-${idx}`} className={`border-b border-zinc-700/50 ${colors.bg} hover:bg-zinc-700/20`}>
+              <tr
+                key={`${issue.rule_id}-${idx}`}
+                className="border-b transition-colors"
+                style={{
+                  borderColor: 'var(--border)',
+                  ...styles.bg,
+                  ...(isHovered ? { background: 'var(--bg-hover)' } : {}),
+                }}
+                onMouseEnter={() => setHoveredIdx(idx)}
+                onMouseLeave={() => setHoveredIdx(null)}
+              >
                 <td className="px-4 py-3 font-bold">
-                  <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${colors.badge}`}>
+                  <span
+                    className="inline-block px-2 py-1 rounded text-xs font-bold"
+                    style={styles.badge}
+                  >
                     {issue.severity}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-zinc-300">{issue.category}</td>
-                <td className="px-4 py-3 font-bold text-zinc-200">{issue.rule_name}</td>
-                <td className="px-4 py-3 text-zinc-400 text-xs font-mono whitespace-pre-wrap">
+                <td className="px-4 py-3" style={{ color: 'var(--text-primary)' }}>
+                  {issue.category}
+                </td>
+                <td className="px-4 py-3 font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {issue.rule_name}
+                </td>
+                <td
+                  className="px-4 py-3 text-xs font-mono whitespace-pre-wrap"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
                   {formatLocation(issue.location)}
                 </td>
-                <td className="px-4 py-3 text-zinc-300 max-w-md">
+                <td className="px-4 py-3 max-w-md" style={{ color: 'var(--text-primary)' }}>
                   <div className="whitespace-normal break-words">
                     {issue.message}
                     {issue.suggestion && (
-                      <div className="mt-2 pt-2 border-t border-zinc-600 text-xs text-blue-400">
+                      <div
+                        className="mt-2 pt-2 border-t text-xs"
+                        style={{
+                          borderColor: 'var(--border)',
+                          color: 'var(--accent-blue)',
+                        }}
+                      >
                         💡 How to Fix: {issue.suggestion}
                       </div>
                     )}
@@ -180,17 +242,32 @@ function IssuesTable({
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   {issue.severity === ValidationSeverity.INFO ? (
-                    <span className="text-green-500 font-bold text-xs">✓ Passed</span>
+                    <span
+                      className="font-bold text-xs"
+                      style={{ color: 'var(--accent-green)' }}
+                    >
+                      ✓ Passed
+                    </span>
                   ) : issue.auto_fix_available ? (
                     <button
                       onClick={() => onFixClick(issue)}
-                      className="px-3 py-1 rounded bg-amber-700 hover:bg-amber-600 text-white text-xs font-bold transition-colors"
+                      className="px-3 py-1 rounded text-xs font-bold transition-colors"
+                      style={{ background: 'var(--accent-orange)', color: 'var(--btn-primary-text)' }}
                       title={getFixButtonTooltip(issue.rule_id)}
                     >
                       {getFixButtonLabel(issue.rule_id)}
                     </button>
                   ) : (
-                    <span className={`text-xs font-bold ${issue.severity === ValidationSeverity.CRITICAL || issue.severity === ValidationSeverity.ERROR ? 'text-red-500' : 'text-zinc-500'}`}>
+                    <span
+                      className="text-xs font-bold"
+                      style={{
+                        color:
+                          issue.severity === ValidationSeverity.CRITICAL ||
+                          issue.severity === ValidationSeverity.ERROR
+                            ? 'var(--accent-red)'
+                            : 'var(--text-muted)',
+                      }}
+                    >
                       {getActionText(issue.severity)}
                     </span>
                   )}
@@ -410,7 +487,6 @@ function getCompositionBreakdown(strategy: any): Array<{ label: string; count: n
   let entryCount = 0;
   let exitCount = 0;
   let riskCount = 0;
-  let otherCount = 0;
 
   strategy.blocks.forEach((block: any) => {
     const blockType = block.blockType || '';
@@ -420,8 +496,6 @@ function getCompositionBreakdown(strategy: any): Array<{ label: string; count: n
       exitCount++;
     } else if (blockType === 'risk' || blockType.includes('risk') || blockType === 'money-management') {
       riskCount++;
-    } else {
-      otherCount++;
     }
   });
 
@@ -652,7 +726,6 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
 
   const handleUndo = useCallback(() => {
     if (undoStack.length > 0) {
-      const lastUndo = undoStack[undoStack.length - 1];
       // TODO: Restore snapshot
       setUndoStack((prev) => prev.slice(0, -1));
       validateStrategy().catch(console.error);
@@ -661,39 +734,53 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
 
   if (!open) return null;
 
-  const statusColor = displayReport.is_valid
-    ? 'bg-emerald-950/30 border-emerald-700'
-    : 'bg-red-950/30 border-red-700';
-  const statusText = displayReport.is_valid
-    ? 'text-emerald-500'
-    : 'text-red-500';
+  const statusBgStyle: React.CSSProperties = displayReport.is_valid
+    ? { background: 'color-mix(in srgb, var(--accent-green) 12%, transparent)', borderColor: 'var(--accent-green-mid)' }
+    : { background: 'var(--accent-red-deeper)', borderColor: 'var(--accent-red-dark)' };
+  const statusTextStyle: React.CSSProperties = displayReport.is_valid
+    ? { color: 'var(--accent-green)' }
+    : { color: 'var(--accent-red)' };
+  const closeButtonStyle: React.CSSProperties = displayReport.is_valid
+    ? { background: 'var(--accent-green-dark)', color: 'var(--btn-primary-text)' }
+    : { background: 'var(--accent-red-dark)', color: 'var(--btn-primary-text)' };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="relative w-full max-w-6xl h-[90vh] rounded-lg border border-zinc-700 bg-zinc-900 shadow-2xl mx-4 flex flex-col">
+      <div
+        className="relative w-full max-w-6xl h-[90vh] rounded-lg border shadow-2xl mx-4 flex flex-col"
+        style={{ borderColor: 'var(--border)', background: 'var(--bg-panel)' }}
+      >
         {/* Header */}
-        <div className="flex-shrink-0 px-6 py-4 border-b border-zinc-700">
+        <div
+          className="flex-shrink-0 px-6 py-4 border-b"
+          style={{ borderColor: 'var(--border)' }}
+        >
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xl font-bold text-blue-400">💼 Validation Report</h2>
+            <h2 className="text-xl font-bold" style={{ color: 'var(--accent-blue)' }}>
+              💼 Validation Report
+            </h2>
             <button
               onClick={onClose}
-              className="text-zinc-400 hover:text-zinc-200 transition-colors text-2xl"
+              className="transition-colors text-2xl"
+              style={{ color: 'var(--text-secondary)' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
               aria-label="Close"
             >
               ✕
             </button>
           </div>
-          <p className="text-xs text-zinc-500 mb-3">
+          <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
             Strategy: {displayReport.strategy_summary.name}
             {displayReport.strategy_summary.version && ` (v${displayReport.strategy_summary.version})`} • Validated:{' '}
             {new Date(displayReport.timestamp).toLocaleString()}
           </p>
-          <div className={`rounded border ${statusColor} p-3`}>
+          <div className="rounded border p-3" style={statusBgStyle}>
             <div className="flex items-center gap-3">
-              <span className={`text-lg font-bold ${statusText}`}>
+              <span className="text-lg font-bold" style={statusTextStyle}>
                 {displayReport.is_valid ? '✅ VALIDATION PASSED' : '❌ VALIDATION FAILED'}
               </span>
-              <span className="text-sm text-zinc-400">
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                 {displayReport.is_valid
                   ? 'Your strategy meets all institutional-grade requirements.'
                   : `${issueCounts.critical + issueCounts.errors} blocking issue(s) must be fixed.`}
@@ -703,7 +790,10 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
         </div>
 
         {/* Summary bar */}
-        <div className="flex-shrink-0 px-6 py-2 border-b border-zinc-700 flex gap-4 bg-zinc-800/20 flex-wrap items-center text-xs text-zinc-300">
+        <div
+          className="flex-shrink-0 px-6 py-2 border-b flex gap-4 flex-wrap items-center text-xs"
+          style={{ borderColor: 'var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)' }}
+        >
           {issueCounts.critical > 0 && <span>Critical: {issueCounts.critical}</span>}
           {issueCounts.errors > 0 && <span>Errors: {issueCounts.errors}</span>}
           {issueCounts.warnings > 0 && <span>Warnings: {issueCounts.warnings}</span>}
@@ -712,16 +802,30 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
         </div>
 
         {/* Tabs */}
-        <div className="flex-shrink-0 px-6 border-b border-zinc-700 flex gap-8 bg-zinc-900/50">
+        <div
+          className="flex-shrink-0 px-6 border-b flex gap-8"
+          style={{ borderColor: 'var(--border)', background: 'var(--bg-panel)' }}
+        >
           {(['summary', 'issues', 'metrics'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setCurrentTab(tab)}
-              className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
+              className="px-4 py-3 font-medium text-sm border-b-2 transition-colors"
+              style={
                 currentTab === tab
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
-              }`}
+                  ? { borderColor: 'var(--accent-blue)', color: 'var(--accent-blue)' }
+                  : { borderColor: 'transparent', color: 'var(--text-secondary)' }
+              }
+              onMouseEnter={(e) => {
+                if (currentTab !== tab) {
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (currentTab !== tab) {
+                  e.currentTarget.style.color = 'var(--text-secondary)';
+                }
+              }}
             >
               {tab === 'summary' && '📊 Summary'}
               {tab === 'issues' && '⚠️ Issues'}
@@ -735,68 +839,110 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
           {currentTab === 'summary' && (
             <div className="space-y-6">
               {/* Validation Summary */}
-              <div className="bg-zinc-800/30 rounded border border-zinc-700 p-4">
-                <h3 className="font-bold text-blue-400 mb-3 text-sm">Validation Summary</h3>
+              <div
+                className="rounded border p-4"
+                style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+              >
+                <h3 className="font-bold mb-3 text-sm" style={{ color: 'var(--accent-blue)' }}>
+                  Validation Summary
+                </h3>
                 <div className="grid grid-cols-5 gap-3 text-xs">
-                  <div className="bg-zinc-900/50 rounded p-2">
-                    <div className="text-red-500 font-bold">Critical</div>
-                    <div className="text-xl font-bold text-zinc-300 mt-1">{issueCounts.critical}</div>
+                  <div className="rounded p-2" style={{ background: 'var(--bg-panel)' }}>
+                    <div className="font-bold" style={{ color: 'var(--accent-red)' }}>
+                      Critical
+                    </div>
+                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-primary)' }}>
+                      {issueCounts.critical}
+                    </div>
                   </div>
-                  <div className="bg-zinc-900/50 rounded p-2">
-                    <div className="text-orange-500 font-bold">Errors</div>
-                    <div className="text-xl font-bold text-zinc-300 mt-1">{issueCounts.errors}</div>
+                  <div className="rounded p-2" style={{ background: 'var(--bg-panel)' }}>
+                    <div className="font-bold" style={{ color: 'var(--accent-orange)' }}>
+                      Errors
+                    </div>
+                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-primary)' }}>
+                      {issueCounts.errors}
+                    </div>
                   </div>
-                  <div className="bg-zinc-900/50 rounded p-2">
-                    <div className="text-amber-500 font-bold">Warnings</div>
-                    <div className="text-xl font-bold text-zinc-300 mt-1">{issueCounts.warnings}</div>
+                  <div className="rounded p-2" style={{ background: 'var(--bg-panel)' }}>
+                    <div className="font-bold" style={{ color: 'var(--accent-orange)' }}>
+                      Warnings
+                    </div>
+                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-primary)' }}>
+                      {issueCounts.warnings}
+                    </div>
                   </div>
-                  <div className="bg-zinc-900/50 rounded p-2">
-                    <div className="text-blue-500 font-bold">Notices</div>
-                    <div className="text-xl font-bold text-zinc-300 mt-1">{issueCounts.notices}</div>
+                  <div className="rounded p-2" style={{ background: 'var(--bg-panel)' }}>
+                    <div className="font-bold" style={{ color: 'var(--accent-blue)' }}>
+                      Notices
+                    </div>
+                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-primary)' }}>
+                      {issueCounts.notices}
+                    </div>
                   </div>
-                  <div className="bg-zinc-900/50 rounded p-2">
-                    <div className="text-zinc-500 font-bold">Info</div>
-                    <div className="text-xl font-bold text-zinc-300 mt-1">{issueCounts.info}</div>
+                  <div className="rounded p-2" style={{ background: 'var(--bg-panel)' }}>
+                    <div className="font-bold" style={{ color: 'var(--text-muted)' }}>
+                      Info
+                    </div>
+                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-primary)' }}>
+                      {issueCounts.info}
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Strategy Composition */}
-              <div className="bg-zinc-800/30 rounded border border-zinc-700 p-4">
-                <h3 className="font-bold text-blue-400 mb-3 text-sm">Strategy Composition</h3>
+              <div
+                className="rounded border p-4"
+                style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+              >
+                <h3 className="font-bold mb-3 text-sm" style={{ color: 'var(--accent-blue)' }}>
+                  Strategy Composition
+                </h3>
                 <div className="space-y-3">
                   {getCompositionBreakdown(currentStrategy).map((item, idx) => (
-                    <div key={idx} className="bg-zinc-900/50 rounded p-3">
+                    <div key={idx} className="rounded p-3" style={{ background: 'var(--bg-panel)' }}>
                       <div className="flex justify-between items-center">
-                        <span className="text-zinc-400">{item.label}:</span>
-                        <div className="font-bold text-zinc-300 text-lg">{item.count}</div>
+                        <span style={{ color: 'var(--text-secondary)' }}>{item.label}:</span>
+                        <div className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>
+                          {item.count}
+                        </div>
                       </div>
-                      {item.details && <div className="text-xs text-zinc-500 mt-1">{item.details}</div>}
+                      {item.details && (
+                        <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                          {item.details}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
 
               {/* Complexity */}
-              <div className="bg-zinc-800/30 rounded border border-zinc-700 p-4">
-                <h3 className="font-bold text-blue-400 mb-3 text-sm">Strategy Complexity</h3>
+              <div
+                className="rounded border p-4"
+                style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+              >
+                <h3 className="font-bold mb-3 text-sm" style={{ color: 'var(--accent-blue)' }}>
+                  Strategy Complexity
+                </h3>
                 <div className="space-y-3">
-                  <div className="bg-zinc-900/50 rounded p-3">
+                  <div className="rounded p-3" style={{ background: 'var(--bg-panel)' }}>
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-zinc-400">Complexity Score:</span>
-                      <span className="font-bold text-emerald-500 text-lg">
+                      <span style={{ color: 'var(--text-secondary)' }}>Complexity Score:</span>
+                      <span className="font-bold text-lg" style={{ color: 'var(--accent-green)' }}>
                         {displayReport.complexity_metrics.complexity_score}/100
                       </span>
                     </div>
-                    <div className="w-full bg-zinc-700 rounded-full h-2">
+                    <div className="w-full rounded-full h-2" style={{ background: 'var(--bg-hover)' }}>
                       <div
-                        className="bg-emerald-500 h-2 rounded-full transition-all"
+                        className="h-2 rounded-full transition-all"
                         style={{
+                          background: 'var(--accent-green)',
                           width: `${Math.min(displayReport.complexity_metrics.complexity_score, 100)}%`,
                         }}
                       />
                     </div>
-                    <div className="text-xs text-zinc-400 mt-2">
+                    <div className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
                       {getComplexityLevel(displayReport.complexity_metrics.complexity_score)}
                     </div>
                   </div>
@@ -808,7 +954,9 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
           {currentTab === 'issues' && (
             <div className="space-y-4">
               {allIssues.length === 0 ? (
-                <div className="text-center py-8 text-zinc-500">No validation issues found.</div>
+                <div className="text-center py-8" style={{ color: 'var(--text-muted)' }}>
+                  No validation issues found.
+                </div>
               ) : (
                 <IssuesTable issues={allIssues} onFixClick={handleFixClick} />
               )}
@@ -825,10 +973,10 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
                 <CollapsibleSection
                   title="❌ Timing Conflict Analysis"
                   content={getTimingConflictAnalysis(displayReport.timing_conflicts)}
-                  titleColor="#ef4444"
+                  titleColor="var(--accent-red)"
                 />
               )}
-              {!displayReport.timing_conflicts || displayReport.timing_conflicts.length === 0 && (
+              {(!displayReport.timing_conflicts || displayReport.timing_conflicts.length === 0) && (
                 <CollapsibleSection
                   title="✅ Timing Conflict Analysis"
                   content="No timing conflicts detected. All RECHECK delays are within their timing windows."
@@ -843,10 +991,16 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
         </div>
 
         {/* Footer */}
-        <div className="flex-shrink-0 flex justify-between items-center px-6 py-4 border-t border-zinc-700 gap-4">
+        <div
+          className="flex-shrink-0 flex justify-between items-center px-6 py-4 border-t gap-4"
+          style={{ borderColor: 'var(--border)' }}
+        >
           <button
             onClick={handleExportCSV}
-            className="px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-medium transition-colors"
+            className="px-4 py-2 rounded text-sm font-medium transition-colors"
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-card)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
           >
             📄 Export to CSV
           </button>
@@ -854,23 +1008,28 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
           <button
             onClick={handleUndo}
             disabled={undoStack.length === 0}
-            className="px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+            className="px-4 py-2 rounded disabled:opacity-50 text-sm font-medium transition-colors"
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            onMouseEnter={(e) => {
+              if (undoStack.length > 0) e.currentTarget.style.background = 'var(--bg-card)';
+            }}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
             title="Revert the most recently applied auto-fix"
           >
             ↩ Undo Last Fix
           </button>
           <button
-            className="px-4 py-2 rounded bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium transition-colors"
+            className="px-4 py-2 rounded text-sm font-medium transition-colors"
+            style={{ background: 'var(--accent-blue-dark)', color: 'var(--btn-primary-text)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--accent-blue-mid)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--accent-blue-dark)')}
           >
             📝 Generate Code
           </button>
           <button
             onClick={onClose}
-            className={`px-4 py-2 rounded text-white text-sm font-medium transition-colors ${
-              displayReport.is_valid
-                ? 'bg-emerald-700 hover:bg-emerald-600'
-                : 'bg-red-700 hover:bg-red-600'
-            }`}
+            className="px-4 py-2 rounded text-sm font-medium transition-colors"
+            style={closeButtonStyle}
           >
             {displayReport.is_valid ? '✓ All Clear' : '⚠ Close'}
           </button>

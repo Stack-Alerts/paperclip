@@ -120,18 +120,19 @@ export const DecisionCycleMonitor: React.FC<DecisionCycleMonitorProps> = ({ clas
   const phaseList: PhaseData[] = Array.from(phases.values()).filter((p) => p.durationUs > 0);
 
   return (
-    <div className={`bg-zinc-900 rounded-lg border border-zinc-700 overflow-hidden ${className}`}>
+    <div className={`rounded-lg overflow-hidden border ${className}`} style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-700">
-        <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: 'var(--border)' }}>
+        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
           Decision Cycle Monitor
         </span>
         <span
-          className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+          className="text-xs px-2 py-0.5 rounded-full font-medium"
+          style={
             mode === 'per-phase'
-              ? 'bg-purple-900/40 text-purple-300'
-              : 'bg-zinc-700 text-zinc-400'
-          }`}
+              ? { background: 'color-mix(in srgb, #a855f7 20%, transparent)', color: '#c084fc' }
+              : { background: 'var(--bg-hover)', color: 'var(--text-secondary)' }
+          }
         >
           {mode === 'per-phase' ? 'Per-Phase' : 'Aggregate'}
         </span>
@@ -142,30 +143,30 @@ export const DecisionCycleMonitor: React.FC<DecisionCycleMonitorProps> = ({ clas
           {aggregate ? (
             <>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-500">Bar Close UTC</span>
-                <span className="text-sm font-mono text-zinc-200">{aggregate.barCloseUtc}</span>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Bar Close UTC</span>
+                <span className="text-sm font-mono" style={{ color: 'var(--text-primary)' }}>{aggregate.barCloseUtc}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-500">Checkpoint Seq</span>
-                <span className="text-sm font-mono text-zinc-200">{aggregate.checkpointSeq}</span>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Checkpoint Seq</span>
+                <span className="text-sm font-mono" style={{ color: 'var(--text-primary)' }}>{aggregate.checkpointSeq}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-500">Cycle ID</span>
-                <span className="text-xs font-mono text-zinc-400 truncate max-w-[160px]">
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Cycle ID</span>
+                <span className="text-xs font-mono truncate max-w-[160px]" style={{ color: 'var(--text-secondary)' }}>
                   {aggregate.cycleId}
                 </span>
               </div>
-              <div className="text-xs text-zinc-600 text-right">
+              <div className="text-xs text-right" style={{ color: 'var(--text-faintest)' }}>
                 {aggregate.lastUpdated.toLocaleTimeString()}
               </div>
             </>
           ) : (
-            <p className="text-zinc-500 text-xs text-center py-4">
+            <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>
               Waiting for /ws/cycle stream…
             </p>
           )}
           {phaseCount > 0 && phaseCount < MIN_EVENTS_TO_ACTIVATE && (
-            <p className="text-xs text-zinc-600 text-center mt-2">
+            <p className="text-xs text-center mt-2" style={{ color: 'var(--text-faintest)' }}>
               Phase events: {phaseCount}/{MIN_EVENTS_TO_ACTIVATE} (activating per-phase view)
             </p>
           )}
@@ -175,7 +176,7 @@ export const DecisionCycleMonitor: React.FC<DecisionCycleMonitorProps> = ({ clas
       {mode === 'per-phase' && (
         <div className="px-4 py-3">
           <PerPhaseTimingChart phases={phaseList} />
-          <p className="text-xs text-zinc-600 text-center mt-1">
+          <p className="text-xs text-center mt-1" style={{ color: 'var(--text-faintest)' }}>
             Falls back to aggregate view after {FALLBACK_MS / 1000}s with no phase events
           </p>
         </div>

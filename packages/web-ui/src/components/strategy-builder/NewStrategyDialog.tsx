@@ -16,6 +16,8 @@ export function NewStrategyDialog({ open, onClose }: NewStrategyDialogProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const [cancelHover, setCancelHover] = useState(false);
+  const [createHover, setCreateHover] = useState(false);
 
   const handleSubmit = useCallback(async () => {
     const trimmed = name.trim();
@@ -60,15 +62,24 @@ export function NewStrategyDialog({ open, onClose }: NewStrategyDialogProps) {
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg rounded-lg border border-zinc-700 bg-zinc-900 shadow-2xl mx-4">
+      <div
+        className="relative w-full max-w-lg rounded-lg shadow-2xl mx-4"
+        style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)' }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-          <h2 id="new-strategy-title" className="text-base font-semibold text-zinc-50">
+        <div
+          className="flex items-center justify-between px-6 py-4"
+          style={{ borderBottom: '1px solid var(--bg-card)' }}
+        >
+          <h2 id="new-strategy-title" className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
             📝 Create New Strategy
           </h2>
           <button
             onClick={onClose}
-            className="text-zinc-500 hover:text-zinc-300 text-lg leading-none"
+            className="text-lg leading-none transition-colors"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
             aria-label="Close dialog"
           >
             ✕
@@ -79,8 +90,8 @@ export function NewStrategyDialog({ open, onClose }: NewStrategyDialogProps) {
         <div className="px-6 py-5 space-y-4">
           {/* Name */}
           <div className="space-y-1.5">
-            <label htmlFor="new-strategy-name" className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
-              Strategy Name <span className="text-red-400">*</span>
+            <label htmlFor="new-strategy-name" className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
+              Strategy Name <span style={{ color: 'var(--accent-red)' }}>*</span>
             </label>
             <InfoTooltip id="new-strategy-name-input">
               <input
@@ -92,19 +103,22 @@ export function NewStrategyDialog({ open, onClose }: NewStrategyDialogProps) {
                 onChange={(e) => { setName(e.target.value); setError(null); }}
                 placeholder="e.g., MA_Crossover_RSI"
                 maxLength={100}
-                className={`w-full px-3 py-2 rounded bg-zinc-800 border text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none ${
-                  error ? 'border-red-600 focus:border-red-500' : 'border-zinc-700 focus:border-zinc-500'
-                }`}
+                className="w-full px-3 py-2 rounded text-sm focus:outline-none"
+                style={{
+                  background: 'var(--input-bg)',
+                  border: `1px solid ${error ? 'var(--accent-red)' : 'var(--input-border)'}`,
+                  color: 'var(--input-text)',
+                }}
               />
             </InfoTooltip>
-            {error && <p className="text-xs text-red-400">{error}</p>}
-            <p className="text-xs text-zinc-500">Unique identifier stored in the database</p>
+            {error && <p className="text-xs" style={{ color: 'var(--accent-red)' }}>{error}</p>}
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Unique identifier stored in the database</p>
           </div>
 
           {/* Description */}
           <div className="space-y-1.5">
-            <label htmlFor="new-strategy-desc" className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
-              Description <span className="text-zinc-600">(optional)</span>
+            <label htmlFor="new-strategy-desc" className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
+              Description <span style={{ color: 'var(--text-muted)' }}>(optional)</span>
             </label>
             <InfoTooltip id="new-strategy-desc-input">
               <textarea
@@ -113,18 +127,32 @@ export function NewStrategyDialog({ open, onClose }: NewStrategyDialogProps) {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe the market thesis or signal combination…"
                 rows={4}
-                className="w-full px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500 resize-none"
+                className="w-full px-3 py-2 rounded text-sm focus:outline-none resize-none"
+                style={{
+                  background: 'var(--input-bg)',
+                  border: '1px solid var(--input-border)',
+                  color: 'var(--input-text)',
+                }}
               />
             </InfoTooltip>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-zinc-800">
+        <div
+          className="flex justify-end gap-2 px-6 py-4"
+          style={{ borderTop: '1px solid var(--bg-card)' }}
+        >
           <InfoTooltip id="new-strategy-cancel-btn">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium transition-colors"
+              onMouseEnter={() => setCancelHover(true)}
+              onMouseLeave={() => setCancelHover(false)}
+              className="px-4 py-2 rounded text-sm font-medium transition-colors"
+              style={{
+                background: cancelHover ? 'var(--bg-hover)' : 'var(--bg-panel)',
+                color: 'var(--text-primary)',
+              }}
             >
               Cancel
             </button>
@@ -133,7 +161,13 @@ export function NewStrategyDialog({ open, onClose }: NewStrategyDialogProps) {
             <button
               onClick={handleSubmit}
               disabled={!valid || isCreating}
-              className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+              onMouseEnter={() => setCreateHover(true)}
+              onMouseLeave={() => setCreateHover(false)}
+              className="px-4 py-2 rounded text-sm font-medium disabled:opacity-50 transition-colors"
+              style={{
+                background: createHover ? 'var(--accent-blue-dark)' : 'var(--accent-blue)',
+                color: 'var(--btn-primary-text)',
+              }}
             >
               {isCreating ? 'Creating…' : 'Create Strategy'}
             </button>

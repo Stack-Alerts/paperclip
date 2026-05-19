@@ -49,9 +49,10 @@ export const PerPhaseTimingChart: React.FC<PerPhaseTimingChartProps> = ({
   if (phases.length === 0) {
     return (
       <div
-        className={`flex items-center justify-center h-48 bg-zinc-900 rounded border border-zinc-700 ${className}`}
+        className={`flex items-center justify-center h-48 rounded ${className}`}
+        style={{ background: 'var(--bg-panel)', border: '1px solid var(--border)' }}
       >
-        <p className="text-zinc-500 text-sm">Waiting for phase events…</p>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Waiting for phase events…</p>
       </div>
     );
   }
@@ -67,7 +68,8 @@ export const PerPhaseTimingChart: React.FC<PerPhaseTimingChartProps> = ({
 
   return (
     <div
-      className={`bg-zinc-900 rounded border border-zinc-700 overflow-x-auto ${className}`}
+      className={`rounded overflow-x-auto ${className}`}
+      style={{ background: 'var(--bg-panel)', border: '1px solid var(--border)', minHeight: chartH }}
       style={{ minHeight: chartH }}
     >
       <div className="relative" style={{ height: chartH }}>

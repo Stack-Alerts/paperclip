@@ -57,21 +57,21 @@ export const AdminPinDialog: React.FC<AdminPinDialogProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-full max-w-sm mx-4">
-        <div className="flex items-center gap-3 border-b border-zinc-700 px-6 py-4">
+      <div className="rounded-lg shadow-2xl w-full max-w-sm mx-4 border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+        <div className="flex items-center gap-3 border-b px-6 py-4" style={{ borderColor: 'var(--border)' }}>
           <span className="text-xl">🔐</span>
-          <h2 className="text-base font-semibold text-zinc-100">
+          <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
             {setupMode ? 'Set Admin PIN' : 'Admin Authentication'}
           </h2>
         </div>
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
             {setupMode
               ? 'Create a PIN to protect admin settings.'
               : 'Enter your admin PIN to access restricted settings.'}
           </p>
           <div className="space-y-2">
-            <label className="text-xs font-medium text-zinc-300">PIN</label>
+            <label className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>PIN</label>
             <input
               ref={inputRef}
               type="password"
@@ -83,13 +83,14 @@ export const AdminPinDialog: React.FC<AdminPinDialogProps> = ({
                 setPin(e.target.value.replace(/\D/g, ''));
                 setError('');
               }}
-              className="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-blue-500 tracking-widest"
+              className="w-full rounded px-3 py-2 text-sm focus:outline-none tracking-widest border"
+              style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
               placeholder="••••"
             />
           </div>
           {setupMode && (
             <div className="space-y-2">
-              <label className="text-xs font-medium text-zinc-300">Confirm PIN</label>
+              <label className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Confirm PIN</label>
               <input
                 type="password"
                 inputMode="numeric"
@@ -100,23 +101,28 @@ export const AdminPinDialog: React.FC<AdminPinDialogProps> = ({
                   setConfirmPin(e.target.value.replace(/\D/g, ''));
                   setError('');
                 }}
-                className="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-blue-500 tracking-widest"
+                className="w-full rounded px-3 py-2 text-sm focus:outline-none tracking-widest border"
+                style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
                 placeholder="••••"
               />
             </div>
           )}
-          {error && <p className="text-xs text-red-400">{error}</p>}
+          {error && <p className="text-xs" style={{ color: 'var(--accent-red)' }}>{error}</p>}
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 transition-colors"
+              className="px-4 py-2 rounded text-sm font-medium transition-colors"
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 rounded text-sm font-medium transition-colors"
+              style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }}
             >
               {setupMode ? 'Set PIN' : 'Unlock'}
             </button>

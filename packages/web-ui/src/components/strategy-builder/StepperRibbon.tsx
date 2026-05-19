@@ -127,7 +127,7 @@ const ACTIVE_STYLE: React.CSSProperties = {
   background: 'rgba(46, 140, 255, 0.12)',
   borderColor: 'rgba(46, 140, 255, 0.6)',
   boxShadow: '0 0 12px rgba(46, 140, 255, 0.25), inset 0 0 8px rgba(46, 140, 255, 0.08)',
-  color: '#2e8cff',
+  color: 'var(--accent-blue)',
 };
 
 function stepClasses(status: StepStatus, clickable: boolean): string {
@@ -136,9 +136,9 @@ function stepClasses(status: StepStatus, clickable: boolean): string {
     case 'active':
       return `${BASE_CLASSES} ${cursor}`;
     case 'complete':
-      return `${BASE_CLASSES} ${cursor} bg-emerald-900 border-emerald-700 text-emerald-300 hover:bg-emerald-800`;
+      return `${BASE_CLASSES} ${cursor} bg-[var(--accent-green-dark)] border-[var(--accent-green-mid)] text-[var(--accent-green)] hover:bg-[var(--accent-green-mid)]`;
     case 'error':
-      return `${BASE_CLASSES} ${cursor} bg-red-950 border-red-800 text-red-400 hover:bg-red-900`;
+      return `${BASE_CLASSES} ${cursor} bg-[var(--accent-red-deeper)] border-[var(--accent-red-dark)] text-[var(--accent-red)] hover:bg-[var(--accent-red-dark)]`;
     default:
       return `${BASE_CLASSES} ${cursor} bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.08)] text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text-primary)] hover:border-[rgba(255,255,255,0.15)]`;
   }
@@ -180,8 +180,8 @@ export function StepperRibbon({
           >
             <span aria-hidden="true">{step.icon}</span>
             {step.name}
-            {status === 'complete' && <span className="ml-1 text-emerald-400" aria-label="complete">✓</span>}
-            {status === 'error' && <span className="ml-1 text-red-400" aria-label="error">✗</span>}
+            {status === 'complete' && <span className="ml-1" style={{ color: 'var(--accent-green)' }} aria-label="complete">✓</span>}
+            {status === 'error' && <span className="ml-1" style={{ color: 'var(--accent-red)' }} aria-label="error">✗</span>}
           </button>
         </RichTooltip>
         {idx < STEPS.length - 1 && (
@@ -196,7 +196,7 @@ export function StepperRibbon({
   }
 
   return (
-    <div className="flex items-center gap-2 border-b border-zinc-800 bg-zinc-900 px-6 py-2 flex-shrink-0">
+    <div className="flex items-center gap-2 px-6 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)' }}>
       {stepButtons}
     </div>
   );

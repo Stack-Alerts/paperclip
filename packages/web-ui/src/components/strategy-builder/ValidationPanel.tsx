@@ -19,22 +19,25 @@ import { InfoTooltip } from './InfoTooltip';
 
 const LEVEL_STYLES: Record<
   ValidationLevel,
-  { icon: string; classes: string; rowClasses: string }
+  { icon: string; color: string; borderColor: string; bgColor: string }
 > = {
   [ValidationLevel.ERROR]: {
     icon: '✗',
-    classes: 'text-red-400',
-    rowClasses: 'border-l-2 border-l-red-600 bg-red-950/30',
+    color: 'var(--accent-red)',
+    borderColor: 'var(--accent-red-dark)',
+    bgColor: 'var(--accent-red-deeper)',
   },
   [ValidationLevel.WARNING]: {
     icon: '⚠',
-    classes: 'text-amber-400',
-    rowClasses: 'border-l-2 border-l-amber-600 bg-amber-950/30',
+    color: 'var(--accent-orange)',
+    borderColor: 'var(--accent-orange)',
+    bgColor: 'color-mix(in srgb, var(--accent-orange) 8%, transparent)',
   },
   [ValidationLevel.INFO]: {
     icon: 'ℹ',
-    classes: 'text-blue-400',
-    rowClasses: 'border-l-2 border-l-blue-600 bg-blue-950/20',
+    color: 'var(--accent-blue)',
+    borderColor: 'var(--accent-blue-dark)',
+    bgColor: 'var(--accent-blue-dark)',
   },
 };
 
@@ -44,21 +47,25 @@ interface MessageRowProps {
 }
 
 function MessageRow({ message, onClick }: MessageRowProps) {
-  const style = LEVEL_STYLES[message.level];
+  const lvlStyle = LEVEL_STYLES[message.level];
   return (
     <button
-      className={`w-full text-left px-3 py-1.5 flex items-start gap-2 text-xs hover:bg-zinc-800 transition-colors ${style.rowClasses}`}
+      className="w-full text-left px-3 py-1.5 flex items-start gap-2 text-xs transition-colors border-l-2"
+      style={{ borderColor: lvlStyle.borderColor, background: lvlStyle.bgColor }}
+      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+      onMouseLeave={e => (e.currentTarget.style.background = lvlStyle.bgColor)}
       onClick={() => onClick?.(message)}
     >
       <span
-        className={`flex-shrink-0 font-bold mt-0.5 ${style.classes}`}
+        className="flex-shrink-0 font-bold mt-0.5"
+        style={{ color: lvlStyle.color }}
         aria-label={message.level}
       >
-        {style.icon}
+        {lvlStyle.icon}
       </span>
-      <span className="flex-1 text-zinc-200 leading-relaxed">{message.text}</span>
+      <span className="flex-1 leading-relaxed" style={{ color: 'var(--text-primary)' }}>{message.text}</span>
       {message.blockIndex != null && (
-        <span className="flex-shrink-0 text-zinc-500 font-mono">#{message.blockIndex + 1}</span>
+        <span className="flex-shrink-0 font-mono" style={{ color: 'var(--text-muted)' }}>#{message.blockIndex + 1}</span>
       )}
     </button>
   );
@@ -94,40 +101,40 @@ const SECTIONS: SectionConfig[] = [
     title: 'Basic Validation',
     passTitle: '✅ Basic Validation',
     failTitle: '❌ Basic Validation',
-    borderColor: 'border-l-green-500',
-    passColor: 'text-green-400',
-    failColor: 'text-red-400',
-    warnColor: 'text-amber-400',
+    borderColor: 'var(--accent-green)',
+    passColor: 'var(--accent-green)',
+    failColor: 'var(--accent-red)',
+    warnColor: 'var(--accent-orange)',
   },
   {
     id: 'standard',
     title: 'Standard Validation',
     passTitle: '✅ Standard Validation',
     failTitle: '❌ Standard Validation',
-    borderColor: 'border-l-blue-500',
-    passColor: 'text-blue-400',
-    failColor: 'text-red-400',
-    warnColor: 'text-amber-400',
+    borderColor: 'var(--accent-blue)',
+    passColor: 'var(--accent-blue)',
+    failColor: 'var(--accent-red)',
+    warnColor: 'var(--accent-orange)',
   },
   {
     id: 'strict',
     title: 'Strict Validation',
     passTitle: '✅ Strict Validation',
     failTitle: '❌ Strict Validation',
-    borderColor: 'border-l-purple-500',
-    passColor: 'text-purple-400',
-    failColor: 'text-red-400',
-    warnColor: 'text-amber-400',
+    borderColor: 'var(--accent-teal)',
+    passColor: 'var(--accent-teal)',
+    failColor: 'var(--accent-red)',
+    warnColor: 'var(--accent-orange)',
   },
   {
     id: 'exit',
     title: 'Exit Condition Validation',
     passTitle: '✅ Exit Condition Validation',
     failTitle: '❌ Exit Condition Validation',
-    borderColor: 'border-l-red-500',
-    passColor: 'text-green-400',
-    failColor: 'text-red-400',
-    warnColor: 'text-amber-400',
+    borderColor: 'var(--accent-red)',
+    passColor: 'var(--accent-green)',
+    failColor: 'var(--accent-red)',
+    warnColor: 'var(--accent-orange)',
   },
 ];
 
@@ -216,19 +223,19 @@ function severityIcon(sev: ValidationSeverity): string {
   }
 }
 
-function severityTextClass(sev: ValidationSeverity): string {
+function severityColor(sev: ValidationSeverity): string {
   switch (sev) {
     case ValidationSeverity.CRITICAL:
     case ValidationSeverity.ERROR:
-      return 'text-red-400';
+      return 'var(--accent-red)';
     case ValidationSeverity.WARNING:
-      return 'text-amber-400';
+      return 'var(--accent-orange)';
     case ValidationSeverity.NOTICE:
-      return 'text-blue-300';
+      return 'var(--accent-blue-mid)';
     case ValidationSeverity.INFO:
-      return 'text-zinc-400';
+      return 'var(--text-secondary)';
     default:
-      return 'text-zinc-400';
+      return 'var(--text-secondary)';
   }
 }
 
@@ -249,18 +256,19 @@ function ReportSection({ config, issues, passItems, hidden }: ReportSectionProps
   const hasErrors = issues.length > 0;
   const titleText = hasErrors ? config.failTitle : config.passTitle;
   const titleColor = hasErrors ? config.failColor : config.passColor;
-  const borderColor = hasErrors ? 'border-l-red-500' : config.borderColor;
+  const leftBorderColor = hasErrors ? 'var(--accent-red)' : config.borderColor;
 
   return (
     <div
-      className={`border border-zinc-700 border-l-4 ${borderColor} rounded bg-zinc-800/60 px-4 py-3 space-y-1.5`}
+      className="rounded border-l-4 px-4 py-3 space-y-1.5"
+      style={{ border: '1px solid var(--border)', borderLeftColor: leftBorderColor, borderLeftWidth: 4, background: 'var(--bg-card)' }}
     >
-      <span className={`text-xs font-bold ${titleColor}`}>{titleText}</span>
+      <span className="text-xs font-bold" style={{ color: titleColor }}>{titleText}</span>
       {!hasErrors && passItems && passItems.length > 0 && (
         <ul className="space-y-0.5 pl-2">
           {passItems.map((item, i) => (
-            <li key={i} className="text-xs text-zinc-400 flex items-start gap-1.5">
-              <span className="text-green-500 flex-shrink-0">├─</span>
+            <li key={i} className="text-xs flex items-start gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <span className="flex-shrink-0" style={{ color: 'var(--accent-green)' }}>├─</span>
               <span>{item}</span>
             </li>
           ))}
@@ -270,18 +278,18 @@ function ReportSection({ config, issues, passItems, hidden }: ReportSectionProps
         <ul className="space-y-1 pl-2">
           {issues.map((issue, i) => (
             <li key={i} className="text-xs flex items-start gap-1.5">
-              <span className={`flex-shrink-0 font-bold ${severityTextClass(issue.severity)}`}>
+              <span className="flex-shrink-0 font-bold" style={{ color: severityColor(issue.severity) }}>
                 {severityIcon(issue.severity)}
               </span>
               <div className="flex-1">
-                <span className="text-zinc-200">{issue.message}</span>
+                <span style={{ color: 'var(--text-primary)' }}>{issue.message}</span>
                 {issue.location && (
-                  <span className="ml-1.5 text-zinc-500 font-mono text-[10px]">
+                  <span className="ml-1.5 font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>
                     [{issue.location}]
                   </span>
                 )}
                 {issue.suggestion && (
-                  <p className="mt-0.5 text-zinc-500 italic">{issue.suggestion}</p>
+                  <p className="mt-0.5 italic" style={{ color: 'var(--text-muted)' }}>{issue.suggestion}</p>
                 )}
               </div>
             </li>
@@ -303,17 +311,17 @@ interface WarningsSectionProps {
 function WarningsSection({ issues }: WarningsSectionProps) {
   if (issues.length === 0) return null;
   return (
-    <div className="border border-zinc-700 border-l-4 border-l-amber-500 rounded bg-zinc-800/60 px-4 py-3 space-y-1.5">
-      <span className="text-xs font-bold text-amber-400">
+    <div className="rounded border-l-4 px-4 py-3 space-y-1.5" style={{ border: '1px solid var(--border)', borderLeftColor: 'var(--accent-orange)', borderLeftWidth: 4, background: 'var(--bg-card)' }}>
+      <span className="text-xs font-bold" style={{ color: 'var(--accent-orange)' }}>
         ⚠️ Warnings ({issues.length})
       </span>
       <ul className="space-y-1 pl-2">
         {issues.map((issue, i) => (
           <li key={i} className="text-xs flex items-start gap-1.5">
-            <span className={`flex-shrink-0 font-bold ${severityTextClass(issue.severity)}`}>
+            <span className="flex-shrink-0 font-bold" style={{ color: severityColor(issue.severity) }}>
               {severityIcon(issue.severity)}
             </span>
-            <span className="flex-1 text-zinc-300">{issue.message}</span>
+            <span className="flex-1" style={{ color: 'var(--text-secondary)' }}>{issue.message}</span>
           </li>
         ))}
       </ul>
@@ -463,31 +471,30 @@ function ValidationPanel({ currentVersionId }, ref) {
   const isSafeToBacktest = canActOnStrategy;
 
   return (
-    <div className="border-t border-zinc-800 bg-zinc-900 flex flex-col" style={{ maxHeight: '22rem' }}>
+    <div className="flex flex-col border-t" style={{ maxHeight: '22rem', background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
       {/* Toast notification */}
       {toastMsg && (
-        <div className="absolute bottom-16 right-4 z-50 bg-zinc-700 text-zinc-100 text-xs px-3 py-2 rounded shadow-lg animate-fade-in">
+        <div className="absolute bottom-16 right-4 z-50 text-xs px-3 py-2 rounded shadow-lg animate-fade-in" style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}>
           {toastMsg}
         </div>
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-zinc-800 flex-shrink-0">
-        <span className="text-xs font-semibold text-zinc-400 flex-1">Validation</span>
+      <div className="flex items-center gap-2 px-4 py-1.5 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
+        <span className="text-xs font-semibold flex-1" style={{ color: 'var(--text-secondary)' }}>Validation</span>
 
         {/* Last validated timestamp */}
         {lastValidatedAt && (
-          <span className="text-[10px] text-zinc-600 font-mono">Last: {lastValidatedAt}</span>
+          <span className="text-[10px] font-mono" style={{ color: 'var(--text-faintest)' }}>Last: {lastValidatedAt}</span>
         )}
 
         {/* NautilusTrader compatibility badge */}
         {hasMessages || report ? (
           <span
-            className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-              nautilusCompatible
-                ? 'bg-green-900/40 text-green-400 border border-green-700'
-                : 'bg-red-900/40 text-red-400 border border-red-700'
-            }`}
+            className="text-[10px] font-medium px-2 py-0.5 rounded-full border"
+            style={nautilusCompatible
+              ? { background: 'var(--accent-green-dark)', color: 'var(--accent-green)', borderColor: 'var(--accent-green-mid)' }
+              : { background: 'var(--accent-red-deeper)', color: 'var(--accent-red)', borderColor: 'var(--accent-red-dark)' }}
           >
             {nautilusCompatible ? '✅ NT Compatible' : '❌ NT Incompatible'}
           </span>
@@ -497,16 +504,16 @@ function ValidationPanel({ currentVersionId }, ref) {
         {hasMessages && (
           <div className="flex items-center gap-2 text-xs">
             {errors > 0 && (
-              <span className="text-red-400 font-medium">
+              <span className="font-medium" style={{ color: 'var(--accent-red)' }}>
                 {errors} error{errors !== 1 ? 's' : ''}
               </span>
             )}
             {warnings > 0 && (
-              <span className="text-amber-400 font-medium">
+              <span className="font-medium" style={{ color: 'var(--accent-orange)' }}>
                 {warnings} warning{warnings !== 1 ? 's' : ''}
               </span>
             )}
-            {infos > 0 && <span className="text-blue-400">{infos} info</span>}
+            {infos > 0 && <span style={{ color: 'var(--accent-blue)' }}>{infos} info</span>}
           </div>
         )}
 
@@ -514,7 +521,10 @@ function ValidationPanel({ currentVersionId }, ref) {
           <button
             onClick={handleValidate}
             disabled={isValidating}
-            className="px-2 py-0.5 rounded bg-green-700 hover:bg-green-600 text-white text-xs font-medium disabled:opacity-50 transition-colors"
+            className="px-2 py-0.5 rounded text-xs font-medium disabled:opacity-50 transition-colors"
+            style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-green-mid)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent-green)')}
           >
             {isValidating ? 'Validating…' : 'Validate'}
           </button>
@@ -528,7 +538,10 @@ function ValidationPanel({ currentVersionId }, ref) {
                 setReport(null);
                 setLastValidatedAt(null);
               }}
-              className="px-2 py-0.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs transition-colors"
+              className="px-2 py-0.5 rounded text-xs transition-colors"
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
             >
               Clear
             </button>
@@ -540,13 +553,13 @@ function ValidationPanel({ currentVersionId }, ref) {
       <div className="overflow-y-auto flex-1 min-h-0">
         {/* No results placeholder */}
         {!hasMessages && !report && !isValidating && (
-          <p className="px-4 py-2 text-xs text-zinc-600">
+          <p className="px-4 py-2 text-xs" style={{ color: 'var(--text-faintest)' }}>
             No validation results — click Validate to run checks.
           </p>
         )}
 
         {isValidating && (
-          <p className="px-4 py-2 text-xs text-zinc-400 animate-pulse">Running validation…</p>
+          <p className="px-4 py-2 text-xs animate-pulse" style={{ color: 'var(--text-secondary)' }}>Running validation…</p>
         )}
 
         {/* Full ValidationReport view — three sections + exit + warnings */}
@@ -587,12 +600,15 @@ function ValidationPanel({ currentVersionId }, ref) {
       </div>
 
       {/* Action buttons row */}
-      <div className="flex items-center gap-2 px-4 py-2 border-t border-zinc-800 flex-shrink-0 bg-zinc-900">
+      <div className="flex items-center gap-2 px-4 py-2 border-t flex-shrink-0" style={{ borderColor: 'var(--border)', background: 'var(--bg-panel)' }}>
         <InfoTooltip id="save-strategy-btn">
           <button
             onClick={handleSave}
             disabled={!isSafeToSave || isSaving}
-            className="px-3 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1 rounded text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
+            onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--accent-green-mid)'; }}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent-green)')}
             title="Save the validated strategy to the database"
           >
             {isSaving ? 'Saving…' : '💾 Save Strategy'}
@@ -603,7 +619,10 @@ function ValidationPanel({ currentVersionId }, ref) {
           <button
             onClick={handleRunBacktest}
             disabled={!isSafeToBacktest || isBacktesting}
-            className="px-3 py-1 rounded bg-blue-700 hover:bg-blue-600 text-white text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1 rounded text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }}
+            onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--accent-blue-mid)'; }}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent-blue)')}
             title="Run a quick backtest on this strategy"
           >
             {isBacktesting ? 'Starting…' : '▶ Run Backtest'}
@@ -613,7 +632,10 @@ function ValidationPanel({ currentVersionId }, ref) {
         <InfoTooltip id="generate-code-btn">
           <button
             onClick={handleGenerateCode}
-            className="px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs font-medium transition-colors"
+            className="px-3 py-1 rounded text-xs font-medium transition-colors"
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
             title="Generate NautilusTrader Python strategy code (P2 feature)"
           >
             📝 Generate Code

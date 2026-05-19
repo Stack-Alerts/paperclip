@@ -227,7 +227,7 @@ function RecheckConfigModal({ open, signalName, enabled, barDelay, mode, onSave,
           <div className="flex items-center gap-1">
             <span className="w-5 h-5 rounded text-xs flex items-center justify-center" style={{ background: 'var(--border)', color: 'var(--text-secondary)' }}>─</span>
             <span className="w-5 h-5 rounded text-xs flex items-center justify-center" style={{ background: 'var(--border)', color: 'var(--text-secondary)' }}>□</span>
-            <button onClick={onCancel} className="w-5 h-5 rounded text-xs flex items-center justify-center hover:opacity-80" style={{ background: 'var(--accent-red-dark)', color: '#FCA5A5' }}>✕</button>
+            <button onClick={onCancel} className="w-5 h-5 rounded text-xs flex items-center justify-center hover:opacity-80" style={{ background: 'var(--accent-red-dark)', color: 'var(--text-primary)' }}>✕</button>
           </div>
         </div>
 
@@ -290,8 +290,8 @@ function RecheckConfigModal({ open, signalName, enabled, barDelay, mode, onSave,
 
         {/* Footer */}
         <div className="flex border-t rounded-b overflow-hidden" style={{ borderColor: 'var(--border)' }}>
-          <button onClick={onCancel} className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90" style={{ background: 'var(--accent-red)', color: '#ffffff' }}>✕ Cancel</button>
-          <button onClick={() => onSave(isEnabled, delay, recheckMode)} className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90" style={{ background: 'var(--accent-green)', color: '#ffffff' }}>✓ OK</button>
+          <button onClick={onCancel} className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90" style={{ background: 'var(--accent-red)', color: 'var(--btn-primary-text)' }}>✕ Cancel</button>
+          <button onClick={() => onSave(isEnabled, delay, recheckMode)} className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90" style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}>✓ OK</button>
         </div>
       </div>
     </div>
@@ -320,7 +320,7 @@ function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate, onHighlig
   return (
     <div className="flex items-center gap-2 ml-3 mt-1 text-xs pl-2 py-1 rounded border border-red-900/50" style={{ background: 'rgba(220,38,38,0.07)' }}>
       <span style={{ color: 'var(--accent-red)' }}>↳ 🔴</span>
-      <span className="flex-1 min-w-0 truncate" style={{ color: '#FCA5A5' }}>
+      <span className="flex-1 min-w-0 truncate" style={{ color: 'var(--text-primary)' }}>
         <span
           className={`font-semibold${canHighlight ? ' hover:text-sky-300 transition-colors' : ''}`}
           style={{ cursor: canHighlight ? 'pointer' : 'default' }}
@@ -443,10 +443,10 @@ function BlockCard({
   const definitionId = block.data.definitionId as string | undefined;
 
   const badgeStyle: React.CSSProperties = isExit
-    ? { background: 'rgba(153,27,27,0.6)', color: '#FCA5A5', border: '1px solid var(--accent-red-deeper)' }
+    ? { background: 'rgba(153,27,27,0.6)', color: 'var(--text-primary)', border: '1px solid var(--accent-red-deeper)' }
     : logic === 'OR'
-    ? { background: 'var(--accent-green-mid)', color: '#ffffff', border: '1px solid var(--accent-green-dark)' }
-    : { background: 'var(--accent-blue-mid)', color: '#ffffff', border: '1px solid var(--accent-blue-dark)' };
+    ? { background: 'var(--accent-green-mid)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-green-dark)' }
+    : { background: 'var(--accent-blue-mid)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-blue-dark)' };
 
   const badgeLabel = isExit ? 'EXIT' : logic === 'OR' ? 'OPTIONAL' : 'REQUIRED';
   const leftBorderColor = isExit ? 'var(--accent-red)' : logic === 'OR' ? 'var(--accent-green)' : 'var(--accent-blue)';
@@ -499,14 +499,14 @@ function BlockCard({
               onClick={() => onConfig(index)}
               disabled={mainIndex === 0}
               className="hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition-opacity"
-              style={{ ...BTN, background: 'var(--accent-blue-mid)', color: '#ffffff', border: '1px solid var(--accent-blue-dark)', gap: 5 }}
+              style={{ ...BTN, background: 'var(--accent-blue-mid)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-blue-dark)', gap: 5 }}
             ><GearIcon size={11} /> Config</button>
           </RichTooltip>
           <RichTooltip content={TT_REMOVE_BLOCK}>
             <button
               onClick={() => onRemove(index)}
               className="hover:opacity-80 transition-opacity"
-              style={{ ...BTN, background: 'rgba(153,27,27,0.7)', color: '#FCA5A5', border: '1px solid var(--accent-red)', gap: 5 }}
+              style={{ ...BTN, background: 'rgba(153,27,27,0.7)', color: 'var(--text-primary)', border: '1px solid var(--accent-red)', gap: 5 }}
             ><XIcon size={9} /> Remove</button>
           </RichTooltip>
         </div>
@@ -649,7 +649,10 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate, o
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <span
-                        className={`text-red-300 font-semibold text-xs flex-shrink-0${defId ? ' hover:text-sky-300 transition-colors' : ''}`}
+                        className={`font-semibold text-xs flex-shrink-0${defId ? ' transition-colors' : ''}`}
+                        style={{ color: 'var(--accent-red)' }}
+                        onMouseEnter={defId ? e => { (e.currentTarget as HTMLSpanElement).style.color = 'var(--accent-sky)'; } : undefined}
+                        onMouseLeave={defId ? e => { (e.currentTarget as HTMLSpanElement).style.color = 'var(--accent-red)'; } : undefined}
                         style={{ cursor: defId ? 'pointer' : 'default' }}
                         onClick={() => { if (defId) onHighlightInLibrary(defId); }}
                       >🔴 {name}</span>
@@ -723,8 +726,8 @@ function ReorderConfirmModal({ fromName, toName, direction, onConfirm, onCancel 
           </p>
         </div>
         <div className="flex border-t overflow-hidden" style={{ borderColor: 'var(--border)' }}>
-          <button onClick={onCancel} className="flex-1 py-2.5 text-sm font-semibold hover:opacity-80" style={{ background: 'var(--accent-red)', color: '#fff' }}>✕ Cancel</button>
-          <button onClick={onConfirm} className="flex-1 py-2.5 text-sm font-semibold hover:opacity-80" style={{ background: 'var(--accent-green)', color: '#fff' }}>✓ Confirm</button>
+          <button onClick={onCancel} className="flex-1 py-2.5 text-sm font-semibold hover:opacity-80" style={{ background: 'var(--accent-red)', color: 'var(--btn-primary-text)' }}>✕ Cancel</button>
+          <button onClick={onConfirm} className="flex-1 py-2.5 text-sm font-semibold hover:opacity-80" style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}>✓ Confirm</button>
         </div>
       </div>
     </div>

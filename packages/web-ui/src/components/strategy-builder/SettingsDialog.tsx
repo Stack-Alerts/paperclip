@@ -65,14 +65,15 @@ function SecretField({ label, storageKey }: { label: string; storageKey: string 
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 space-y-1">
-        <label className="text-xs font-medium text-zinc-400">{label}</label>
+        <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</label>
         <input
           type={showing || editing ? 'text' : 'password'}
           value={value}
           readOnly={!editing}
           onChange={(e) => setValue(e.target.value)}
           placeholder={editing ? 'Enter new value…' : 'Not set'}
-          className="w-full rounded bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-blue-500 font-mono"
+          className="w-full rounded px-3 py-1.5 text-sm focus:outline-none font-mono"
+          style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
         />
       </div>
       {!editing ? (
@@ -80,13 +81,19 @@ function SecretField({ label, storageKey }: { label: string; storageKey: string 
           <button
             onClick={handleShow}
             title="Reveal for 10s"
-            className="mt-5 p-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-400 hover:text-zinc-100 transition-colors"
+            className="mt-5 p-1.5 rounded transition-colors"
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
           >
             {showing ? <EyeOff size={13} /> : <Eye size={13} />}
           </button>
           <button
             onClick={() => { setEditing(true); setValue(''); }}
-            className="mt-5 px-2 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-xs text-zinc-300 transition-colors"
+            className="mt-5 px-2 py-1.5 rounded text-xs transition-colors"
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
           >
             Edit
           </button>
@@ -95,13 +102,19 @@ function SecretField({ label, storageKey }: { label: string; storageKey: string 
         <>
           <button
             onClick={handleSave}
-            className="mt-5 px-2 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-xs text-white transition-colors"
+            className="mt-5 px-2 py-1.5 rounded text-xs transition-colors"
+            style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-blue-mid)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent-blue)')}
           >
             Save
           </button>
           <button
             onClick={() => { setEditing(false); setValue(''); }}
-            className="mt-5 px-2 py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-xs text-zinc-300 transition-colors"
+            className="mt-5 px-2 py-1.5 rounded text-xs transition-colors"
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
           >
             Cancel
           </button>
@@ -119,28 +132,30 @@ function ApiTab() {
     <div className="space-y-6">
       <div className="space-y-3">
         <div className="space-y-1">
-          <label className="text-xs font-medium text-zinc-400">LLM Provider</label>
+          <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>LLM Provider</label>
           <select
             value={provider}
             onChange={(e) => { setProvider(e.target.value); setModel(PROVIDER_MODELS[e.target.value]?.[0] ?? ''); }}
-            className="w-full rounded bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+            className="w-full rounded px-3 py-1.5 text-sm focus:outline-none"
+            style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
           >
             {PROVIDER_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium text-zinc-400">Model</label>
+          <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Model</label>
           <select
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            className="w-full rounded bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+            className="w-full rounded px-3 py-1.5 text-sm focus:outline-none"
+            style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
           >
             {(PROVIDER_MODELS[provider] ?? []).map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>
       </div>
-      <div className="border-t border-zinc-800 pt-4 space-y-4">
-        <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wide">API Keys</h3>
+      <div className="border-t pt-4 space-y-4" style={{ borderColor: 'var(--border)' }}>
+        <h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>API Keys</h3>
         <SecretField label="Anthropic API Key" storageKey="settings.anthropic_api_key" />
         <SecretField label="OpenAI API Key" storageKey="settings.openai_api_key" />
         <SecretField label="OpenRouter API Key" storageKey="settings.openrouter_api_key" />
@@ -167,11 +182,12 @@ function TradingTab() {
           { label: 'Max Drawdown %', value: maxDrawdown, set: setMaxDrawdown },
         ].map(({ label, value, set }) => (
           <div key={label} className="space-y-1">
-            <label className="text-xs font-medium text-zinc-400">{label}</label>
+            <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</label>
             <input
               value={value}
               onChange={(e) => set(e.target.value)}
-              className="w-full rounded bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+              className="w-full rounded px-3 py-1.5 text-sm focus:outline-none"
+              style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
             />
           </div>
         ))}
@@ -187,22 +203,24 @@ function DisplayTab() {
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <label className="text-xs font-medium text-zinc-400">Theme</label>
+        <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Theme</label>
         <select
           value={theme}
           onChange={(e) => setTheme(e.target.value)}
-          className="w-full rounded bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+          className="w-full rounded px-3 py-1.5 text-sm focus:outline-none"
+          style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
         >
           <option value="dark">Dark (default)</option>
           <option value="light">Light</option>
         </select>
       </div>
       <div className="space-y-1">
-        <label className="text-xs font-medium text-zinc-400">Log Level</label>
+        <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Log Level</label>
         <select
           value={logLevel}
           onChange={(e) => setLogLevel(e.target.value)}
-          className="w-full rounded bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+          className="w-full rounded px-3 py-1.5 text-sm focus:outline-none"
+          style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
         >
           {['DEBUG', 'INFO', 'WARNING', 'ERROR'].map((l) => <option key={l} value={l}>{l}</option>)}
         </select>
@@ -214,7 +232,7 @@ function DisplayTab() {
 function AdminTab({ unlocked }: { unlocked: boolean }) {
   if (!unlocked) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 gap-3 text-zinc-500">
+      <div className="flex flex-col items-center justify-center py-12 gap-3" style={{ color: 'var(--text-muted)' }}>
         <ShieldAlert size={32} />
         <p className="text-sm">Admin section locked. Verify PIN to access.</p>
       </div>
@@ -223,7 +241,7 @@ function AdminTab({ unlocked }: { unlocked: boolean }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 text-emerald-400 text-xs font-medium mb-2">
+      <div className="flex items-center gap-2 text-xs font-medium mb-2" style={{ color: 'var(--accent-green)' }}>
         <Shield size={13} /> Admin access granted
       </div>
       <SecretField label="Database URL" storageKey="admin.db_url" />
@@ -257,25 +275,27 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-        <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[85vh]">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 flex-shrink-0">
-            <h2 className="text-base font-semibold text-zinc-100">Settings</h2>
-            <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200 transition-colors">
+        <div className="rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[85vh] border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+          <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Settings</h2>
+            <button onClick={onClose} className="transition-colors" style={{ color: 'var(--text-muted)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}>
               <X size={16} />
             </button>
           </div>
 
-          <div className="flex border-b border-zinc-800 flex-shrink-0">
+          <div className="flex border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
             {TABS.map(({ id, label }) => (
               <button
                 key={id}
                 onClick={() => handleTabClick(id)}
-                className={[
-                  'px-5 py-2.5 text-xs font-medium transition-colors',
-                  activeTab === id
-                    ? 'text-blue-400 border-b-2 border-blue-500 -mb-px'
-                    : 'text-zinc-400 hover:text-zinc-200',
-                ].join(' ')}
+                className="px-5 py-2.5 text-xs font-medium transition-colors"
+                style={activeTab === id
+                  ? { color: 'var(--accent-blue)', borderBottom: '2px solid var(--accent-blue)', marginBottom: -1 }
+                  : { color: 'var(--text-secondary)' }}
+                onMouseEnter={e => { if (activeTab !== id) e.currentTarget.style.color = 'var(--text-primary)'; }}
+                onMouseLeave={e => { if (activeTab !== id) e.currentTarget.style.color = 'var(--text-secondary)'; }}
               >
                 {id === 'admin' && !adminUnlocked ? `🔒 ${label}` : label}
               </button>
@@ -289,10 +309,13 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
             {activeTab === 'admin' && <AdminTab unlocked={adminUnlocked} />}
           </div>
 
-          <div className="flex justify-end gap-2 px-6 py-4 border-t border-zinc-800 flex-shrink-0">
+          <div className="flex justify-end gap-2 px-6 py-4 border-t flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
             <button
               onClick={onClose}
-              className="px-5 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium transition-colors"
+              className="px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
             >
               Close
             </button>

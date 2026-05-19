@@ -29,12 +29,12 @@ export interface ConfigDiscoveryResultsDialogProps {
   onClose: () => void;
 }
 
-const BADGE_STYLES: Record<string, string> = {
-  gold: 'bg-yellow-500/20 text-yellow-400 border border-yellow-600',
-  silver: 'bg-zinc-400/20 text-zinc-300 border border-zinc-500',
-  bronze: 'bg-orange-500/20 text-orange-400 border border-orange-600',
-  baseline: 'bg-blue-500/20 text-blue-400 border border-blue-600',
-  '': 'bg-zinc-800 text-zinc-400',
+const BADGE_INLINE_STYLES: Record<string, React.CSSProperties> = {
+  gold: { background: 'color-mix(in srgb, #eab308 20%, transparent)', color: '#eab308', border: '1px solid #ca8a04' },
+  silver: { background: 'color-mix(in srgb, var(--text-secondary) 20%, transparent)', color: 'var(--text-primary)', border: '1px solid var(--border)' },
+  bronze: { background: 'color-mix(in srgb, var(--accent-orange) 20%, transparent)', color: 'var(--accent-orange)', border: '1px solid var(--accent-orange)' },
+  baseline: { background: 'color-mix(in srgb, var(--accent-blue) 20%, transparent)', color: 'var(--accent-blue)', border: '1px solid var(--accent-blue-dark)' },
+  '': { background: 'var(--bg-card)', color: 'var(--text-secondary)' },
 };
 
 const BADGE_ICONS: Record<string, string> = {
@@ -63,7 +63,10 @@ function ColHeader({
   return (
     <th
       onClick={() => onSort(sortK)}
-      className="px-3 py-2 text-left text-xs font-semibold text-zinc-400 cursor-pointer select-none hover:text-zinc-200 whitespace-nowrap"
+      className="px-3 py-2 text-left text-xs font-semibold cursor-pointer select-none whitespace-nowrap"
+      style={{ color: 'var(--text-secondary)' }}
+      onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+      onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
     >
       {label}
       {sortKey === sortK ? (sortAsc ? ' ▲' : ' ▼') : ''}
@@ -115,23 +118,26 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-full max-w-6xl mx-4 max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between border-b border-zinc-700 px-6 py-4 flex-shrink-0">
+      <div className="rounded-lg shadow-2xl w-full max-w-6xl mx-4 max-h-[90vh] flex flex-col border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+        <div className="flex items-center justify-between border-b px-6 py-4 flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
           <div>
-            <h2 className="text-base font-semibold text-zinc-100">Config Discovery Results</h2>
-            <p className="text-xs text-zinc-400">{results.length} scenarios evaluated</p>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Config Discovery Results</h2>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{results.length} scenarios evaluated</p>
           </div>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-200 transition-colors text-xl leading-none"
+            className="transition-colors text-xl leading-none"
+            style={{ color: 'var(--text-secondary)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
           >
             ×
           </button>
         </div>
 
         {/* Filter Controls */}
-        <div className="flex items-center gap-4 px-6 py-3 border-b border-zinc-800 flex-shrink-0">
-          <label className="text-xs text-zinc-400">Min Trades:</label>
+        <div className="flex items-center gap-4 px-6 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--bg-card)' }}>
+          <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>Min Trades:</label>
           <input
             type="range"
             min={0}
@@ -140,17 +146,17 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
             onChange={(e) => setMinTrades(Number(e.target.value))}
             className="w-32"
           />
-          <span className="text-xs text-zinc-300 w-8">{minTrades}</span>
-          <span className="text-xs text-zinc-500 ml-2">{filtered.length} shown</span>
+          <span className="text-xs w-8" style={{ color: 'var(--text-primary)' }}>{minTrades}</span>
+          <span className="text-xs ml-2" style={{ color: 'var(--text-muted)' }}>{filtered.length} shown</span>
         </div>
 
         {/* Results Table */}
         <div className="flex-1 overflow-auto">
           <table className="w-full text-sm border-collapse">
-            <thead className="bg-zinc-800 sticky top-0 z-10">
+            <thead className="sticky top-0 z-10" style={{ background: 'var(--bg-card)' }}>
               <tr>
                 <ColHeader label="Rank" sortK="rank" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
-                <th className="px-3 py-2 text-left text-xs font-semibold text-zinc-400">Badge</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Badge</th>
                 <ColHeader label="Scenario" sortK="scenario" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
                 <ColHeader label="Trades" sortK="trades" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
                 <ColHeader label="Win%" sortK="winRate" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
@@ -165,59 +171,70 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
                 <ColHeader label="Type" sortK="type" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800">
+            <tbody style={{ borderColor: 'var(--bg-card)' }}>
               {filtered.map((row, idx) => (
                 <tr
                   key={idx}
                   onClick={() => setSelectedIdx(idx === selectedIdx ? null : idx)}
-                  className={`cursor-pointer transition-colors ${
+                  className="cursor-pointer transition-colors"
+                  style={
                     selectedIdx === idx
-                      ? 'bg-blue-900/30'
+                      ? { background: 'color-mix(in srgb, var(--accent-blue) 15%, transparent)' }
                       : row.type === 'baseline'
-                      ? 'bg-zinc-800/40 hover:bg-zinc-800'
-                      : 'hover:bg-zinc-800/50'
-                  }`}
+                      ? { background: 'color-mix(in srgb, var(--bg-card) 40%, transparent)' }
+                      : {}
+                  }
+                  onMouseEnter={e => {
+                    if (selectedIdx !== idx) {
+                      (e.currentTarget as HTMLTableRowElement).style.background = 'color-mix(in srgb, var(--bg-card) 50%, transparent)';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (selectedIdx !== idx) {
+                      (e.currentTarget as HTMLTableRowElement).style.background = row.type === 'baseline'
+                        ? 'color-mix(in srgb, var(--bg-card) 40%, transparent)'
+                        : '';
+                    }
+                  }}
                 >
-                  <td className="px-3 py-2 text-zinc-300 font-mono">{row.rank}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-primary)' }}>{row.rank}</td>
                   <td className="px-3 py-2">
                     <span
-                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
-                        BADGE_STYLES[row.badge]
-                      }`}
+                      className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
+                      style={BADGE_INLINE_STYLES[row.badge]}
                     >
                       {BADGE_ICONS[row.badge]} {row.badge || '—'}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-zinc-200 max-w-xs truncate">{row.scenario}</td>
-                  <td className="px-3 py-2 text-zinc-300 font-mono">{row.trades}</td>
-                  <td className="px-3 py-2 text-zinc-300 font-mono">{row.winRate.toFixed(1)}%</td>
+                  <td className="px-3 py-2 max-w-xs truncate" style={{ color: 'var(--text-primary)' }}>{row.scenario}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-primary)' }}>{row.trades}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-primary)' }}>{row.winRate.toFixed(1)}%</td>
                   <td
-                    className={`px-3 py-2 font-mono font-semibold ${
-                      row.totalPnl >= 0 ? 'text-green-400' : 'text-red-400'
-                    }`}
+                    className="px-3 py-2 font-mono font-semibold"
+                    style={{ color: row.totalPnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}
                   >
                     ${row.totalPnl.toFixed(2)}
                   </td>
                   <td
-                    className={`px-3 py-2 font-mono ${
-                      row.avgPnl >= 0 ? 'text-green-400' : 'text-red-400'
-                    }`}
+                    className="px-3 py-2 font-mono"
+                    style={{ color: row.avgPnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}
                   >
                     ${row.avgPnl.toFixed(2)}
                   </td>
-                  <td className="px-3 py-2 text-zinc-300 font-mono">{row.sharpe.toFixed(2)}</td>
-                  <td className="px-3 py-2 text-zinc-400 font-mono">{row.tp1}</td>
-                  <td className="px-3 py-2 text-zinc-400 font-mono">{row.tp2}</td>
-                  <td className="px-3 py-2 text-zinc-400 font-mono">{row.tp3}</td>
-                  <td className="px-3 py-2 text-zinc-400 font-mono">{row.sl}</td>
-                  <td className="px-3 py-2 text-zinc-400 font-mono">${row.maxDd.toFixed(0)}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-primary)' }}>{row.sharpe.toFixed(2)}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>{row.tp1}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>{row.tp2}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>{row.tp3}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>{row.sl}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>${row.maxDd.toFixed(0)}</td>
                   <td className="px-3 py-2">
                     <span
-                      className={`inline-flex px-2 py-0.5 rounded text-xs ${
+                      className="inline-flex px-2 py-0.5 rounded text-xs"
+                      style={
                         row.type === 'baseline'
-                          ? 'bg-blue-900/40 text-blue-300'
-                          : 'bg-zinc-700 text-zinc-400'
-                      }`}
+                          ? { background: 'color-mix(in srgb, var(--accent-blue) 20%, transparent)', color: 'var(--accent-blue)' }
+                          : { background: 'var(--bg-hover)', color: 'var(--text-secondary)' }
+                      }
                     >
                       {row.type}
                     </span>
@@ -226,7 +243,7 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={14} className="px-3 py-8 text-center text-zinc-500 text-sm">
+                  <td colSpan={14} className="px-3 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
                     No scenarios match the current filter
                   </td>
                 </tr>
@@ -235,21 +252,25 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
           </table>
         </div>
 
-        <div className="flex justify-between items-center px-6 py-4 border-t border-zinc-700 flex-shrink-0">
-          <span className="text-xs text-zinc-500">
+        <div className="flex justify-between items-center px-6 py-4 border-t flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {selected ? `Selected: ${selected.scenario}` : 'Click a row to select'}
           </span>
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 transition-colors"
+              className="px-4 py-2 rounded text-sm font-medium transition-colors"
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
             >
               Close
             </button>
             <button
               disabled={!selected}
               onClick={() => selected && onApplyConfig(selected)}
-              className="px-4 py-2 rounded bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-40 transition-colors"
+              className="px-4 py-2 rounded text-sm font-medium disabled:opacity-40 transition-colors"
+              style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
             >
               Apply Config
             </button>

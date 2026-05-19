@@ -261,7 +261,7 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
       </RichTooltip>
       <span style={{ color: 'var(--text-muted)' }}>|</span>
       <RichTooltip content={TT_STAT_TIMING}>
-        <span style={{ color: 'var(--text-dim)', cursor: 'default' }}>Time Constraint: <span className="font-bold" style={{ color: '#E8EAED' }}>{stats.timeConstrained > 0 ? 'Yes' : 'No'}</span></span>
+        <span style={{ color: 'var(--text-dim)', cursor: 'default' }}>Time Constraint: <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{stats.timeConstrained > 0 ? 'Yes' : 'No'}</span></span>
       </RichTooltip>
     </>
   );
@@ -327,14 +327,13 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
             <RichTooltip key={type} content={type === 'Bullish' ? TT_BULLISH : TT_BEARISH}>
               <button
                 onClick={() => handleTypeChange(type)}
-                className={`px-2 py-0 rounded text-[10px] font-medium border transition-colors leading-[18px] ${
-                  currentType === type
-                    ? type === 'Bullish'
-                      ? 'bg-emerald-900 text-emerald-300 border-emerald-700'
-                      : 'bg-red-900 text-red-300 border-red-700'
-                    : 'border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.2)]'
-                }`}
-                style={currentType !== type ? { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' } : undefined}
+                className="px-2 py-0 rounded text-[10px] font-medium border transition-colors leading-[18px]"
+                style={currentType === type
+                  ? type === 'Bullish'
+                    ? { background: 'var(--accent-green-dark)', color: 'var(--accent-green)', borderColor: 'var(--accent-green-mid)' }
+                    : { background: 'var(--accent-red-deeper)', color: 'var(--accent-red)', borderColor: 'var(--accent-red-dark)' }
+                  : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', borderColor: 'rgba(255,255,255,0.08)' }
+                }
               >
                 {type}
               </button>
@@ -392,14 +391,13 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
           <RichTooltip key={type} content={type === 'Bullish' ? TT_BULLISH : TT_BEARISH}>
             <button
               onClick={() => handleTypeChange(type)}
-              className={`px-3 py-0.5 rounded text-xs font-medium border transition-colors ${
-                currentType === type
-                  ? type === 'Bullish'
-                    ? 'bg-emerald-900 text-emerald-300 border-emerald-700'
-                    : 'bg-red-900 text-red-300 border-red-700'
-                  : 'border-[#3C4149] hover:border-[#9AA0A6] hover:text-[#A0AEC0]'
-              }`}
-              style={currentType !== type ? { background: 'var(--bg-card)', color: 'var(--text-secondary)' } : undefined}
+              className="px-3 py-0.5 rounded text-xs font-medium border transition-colors"
+              style={currentType === type
+                ? type === 'Bullish'
+                  ? { background: 'var(--accent-green-dark)', color: 'var(--accent-green)', borderColor: 'var(--accent-green-mid)' }
+                  : { background: 'var(--accent-red-deeper)', color: 'var(--accent-red)', borderColor: 'var(--accent-red-dark)' }
+                : { background: 'var(--bg-card)', color: 'var(--text-secondary)', borderColor: 'var(--border)' }
+              }
             >
               {type}
             </button>
@@ -425,7 +423,7 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
             </RichTooltip>
             <span style={{ color: 'var(--text-secondary)' }}>|</span>
             <RichTooltip content={TT_STAT_TIMING}>
-              <span style={{ color: 'var(--text-dim)', cursor: 'default' }}>Time Constraint: <span className="font-bold" style={{ color: '#E8EAED' }}>{stats.timeConstrained > 0 ? 'Yes' : 'No'}</span></span>
+              <span style={{ color: 'var(--text-dim)', cursor: 'default' }}>Time Constraint: <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{stats.timeConstrained > 0 ? 'Yes' : 'No'}</span></span>
             </RichTooltip>
           </>
         )}

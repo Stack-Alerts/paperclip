@@ -51,40 +51,45 @@ function QuickPreviewResultsDialog({ open, result, onClose }: QuickPreviewResult
 
   const winRate = result.winRate * 100;
   const rows: [string, string, string][] = [
-    ['Win Rate',       `${winRate.toFixed(1)}%`,         winRate >= 50 ? 'text-emerald-400' : 'text-red-400'],
-    ['Total Trades',   String(result.totalTrades),        'text-zinc-100'],
-    ['Winning Trades', String(result.winningTrades),      'text-emerald-400'],
+    ['Win Rate',       `${winRate.toFixed(1)}%`,         winRate >= 50 ? 'var(--accent-green)' : 'var(--accent-red)'],
+    ['Total Trades',   String(result.totalTrades),        'var(--text-primary)'],
+    ['Winning Trades', String(result.winningTrades),      'var(--accent-green)'],
     ['Total Return',   `${result.returnPercentage >= 0 ? '+' : ''}${result.returnPercentage.toFixed(2)}%`,
-      result.returnPercentage >= 0 ? 'text-emerald-400' : 'text-red-400'],
-    ['Max Drawdown',   `${result.maxDrawdown.toFixed(2)}%`,  'text-red-400'],
-    ['Sharpe Ratio',   result.sharpeRatio.toFixed(2),     'text-zinc-100'],
-    ['Profit Factor',  result.profitFactor.toFixed(2),    'text-zinc-100'],
+      result.returnPercentage >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'],
+    ['Max Drawdown',   `${result.maxDrawdown.toFixed(2)}%`,  'var(--accent-red)'],
+    ['Sharpe Ratio',   result.sharpeRatio.toFixed(2),     'var(--text-primary)'],
+    ['Profit Factor',  result.profitFactor.toFixed(2),    'var(--text-primary)'],
   ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-96 p-6">
+      <div className="rounded-lg shadow-2xl w-96 p-6 border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-zinc-100">30-Day Backtest Summary</h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 text-xl leading-none">✕</button>
+          <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>30-Day Backtest Summary</h2>
+          <button onClick={onClose} className="text-xl leading-none" style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}>✕</button>
         </div>
         <div className="space-y-1.5">
           {rows.map(([label, value, color]) => (
             <div key={label} className="flex items-center justify-between py-1">
-              <span className="text-sm text-zinc-500">{label}:</span>
-              <span className={`text-sm font-semibold ${color}`}>{value}</span>
+              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{label}:</span>
+              <span className="text-sm font-semibold" style={{ color }}>{value}</span>
             </div>
           ))}
         </div>
         {result.totalTrades === 0 && (
-          <p className="mt-3 text-xs text-zinc-500">
+          <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
             No trades found in this 30-day period. Try lowering the confluence threshold.
           </p>
         )}
         <div className="mt-4 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-1.5 text-sm bg-blue-700 hover:bg-blue-600 text-white rounded transition-colors"
+            className="px-4 py-1.5 text-sm rounded transition-colors"
+            style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-blue-mid)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent-blue)')}
           >
             Close
           </button>
@@ -380,7 +385,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   if (strategyError) {
     return (
       <div className="flex items-center justify-center h-full" style={{ background: 'var(--shell-bg)' }}>
-        <div className="text-red-400 text-sm">Error: {strategyError}</div>
+        <div className="text-sm" style={{ color: 'var(--accent-red)' }}>Error: {strategyError}</div>
       </div>
     );
   }
@@ -442,7 +447,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
           <span className="ml-auto text-xs truncate max-w-xs pr-2" style={{ color: 'var(--text-secondary)' }}>
             BTC Trade Engine — Strategy Builder —{' '}
             <span style={{ color: 'var(--text-primary)' }}>{currentStrategy.name}</span>
-            {isModified && <span className="text-amber-400 ml-1" title="Unsaved changes">●</span>}
+            {isModified && <span className="ml-1" style={{ color: 'var(--accent-orange)' }} title="Unsaved changes">●</span>}
           </span>
         )}
       </div>
@@ -531,7 +536,10 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 
         {/* Drag handle */}
         <div
-          className="w-2 bg-[var(--bg-card)] hover:bg-blue-700 transition-colors cursor-col-resize flex-shrink-0 flex flex-col items-center justify-center gap-0.5"
+          className="w-2 transition-colors cursor-col-resize flex-shrink-0 flex flex-col items-center justify-center gap-0.5"
+          style={{ background: 'var(--bg-card)' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-blue)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-card)')}
           onMouseDown={() => { isDragging.current = true; }}
         >
           {[0, 1, 2].map(i => (
@@ -586,18 +594,24 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 
       {activeDialog === 'logViewer' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-2/3 max-h-[70vh] flex flex-col p-6">
+          <div className="rounded-lg shadow-2xl w-2/3 max-h-[70vh] flex flex-col p-6 border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold text-zinc-100">Debug Log Viewer</h2>
+              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Debug Log Viewer</h2>
               <div className="flex gap-2 items-center">
-                <button onClick={() => setConsoleLogs([])} className="text-xs px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded">Clear</button>
-                <button onClick={handleDownloadLogs} className="text-xs px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded">Download</button>
-                <button onClick={close} className="text-zinc-500 hover:text-zinc-300 text-xl leading-none ml-2">✕</button>
+                <button onClick={() => setConsoleLogs([])} className="text-xs px-2 py-1 rounded transition-colors" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}>Clear</button>
+                <button onClick={handleDownloadLogs} className="text-xs px-2 py-1 rounded transition-colors" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}>Download</button>
+                <button onClick={close} className="text-xl leading-none ml-2" style={{ color: 'var(--text-muted)' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}>✕</button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto bg-zinc-950 rounded border border-zinc-800 p-3 font-mono text-xs text-zinc-400">
+            <div className="flex-1 overflow-y-auto rounded p-3 font-mono text-xs border" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
               {consoleLogs.length === 0
-                ? <span className="text-zinc-600">No log entries.</span>
+                ? <span style={{ color: 'var(--text-faintest)' }}>No log entries.</span>
                 : consoleLogs.map((line, i) => <div key={i}>{line}</div>)
               }
             </div>
@@ -696,7 +710,7 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, tooltip, onClick, 
         disabled
           ? 'text-[var(--text-muted)] bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.05)] cursor-not-allowed'
           : accent
-          ? 'text-white bg-blue-700 border-blue-600 hover:bg-blue-600 font-medium'
+          ? 'font-medium border-[var(--accent-blue-dark)] bg-[var(--accent-blue)] text-[var(--btn-primary-text)] hover:bg-[var(--accent-blue-mid)]'
           : active
           ? 'text-[var(--text-primary)] bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.12)] hover:bg-[rgba(255,255,255,0.10)]'
           : 'text-[var(--text-secondary)] bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text-primary)] hover:border-[rgba(255,255,255,0.15)]'

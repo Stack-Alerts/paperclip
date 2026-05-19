@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ValidationPanel } from './ValidationPanel';
 
 export interface ValidationDialogProps {
@@ -9,19 +9,30 @@ export interface ValidationDialogProps {
 }
 
 export const ValidationDialog: React.FC<ValidationDialogProps> = ({ open, onClose }) => {
+  const [closeHover, setCloseHover] = useState(false);
+
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between border-b border-zinc-700 px-6 py-4 flex-shrink-0">
+      <div
+        className="rounded-lg shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col"
+        style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)' }}
+      >
+        <div
+          className="flex items-center justify-between px-6 py-4 flex-shrink-0"
+          style={{ borderBottom: '1px solid var(--border)' }}
+        >
           <div className="flex items-center gap-3">
             <span className="text-xl">✅</span>
-            <h2 className="text-base font-semibold text-zinc-100">Strategy Validation</h2>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Strategy Validation</h2>
           </div>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-200 transition-colors text-xl leading-none"
+            className="transition-colors text-xl leading-none"
+            style={{ color: closeHover ? 'var(--text-primary)' : 'var(--text-secondary)' }}
+            onMouseEnter={() => setCloseHover(true)}
+            onMouseLeave={() => setCloseHover(false)}
           >
             ×
           </button>
@@ -31,10 +42,16 @@ export const ValidationDialog: React.FC<ValidationDialogProps> = ({ open, onClos
           <ValidationPanel />
         </div>
 
-        <div className="flex justify-end px-6 py-4 border-t border-zinc-700 flex-shrink-0">
+        <div
+          className="flex justify-end px-6 py-4 flex-shrink-0"
+          style={{ borderTop: '1px solid var(--border)' }}
+        >
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm font-medium hover:bg-zinc-600 transition-colors"
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-panel)')}
+            className="px-4 py-2 rounded text-sm font-medium transition-colors"
+            style={{ background: 'var(--bg-panel)', color: 'var(--text-primary)' }}
           >
             Close
           </button>
