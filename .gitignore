@@ -32,8 +32,9 @@ wheels/
 MANIFEST
 
 # Data directories (large files)
-data/
+data/*
 # Exception: Impact Gate muted results must be tracked for state persistence
+!data/
 !data/impact_gate_muted_results.json
 .lakecache/
 *.pkl
