@@ -308,8 +308,7 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
         {/* Row 2: description stats label */}
         <RichTooltip content={TT_DESCRIPTION}>
           <p className="text-[10px] leading-tight cursor-default" style={{ color: 'var(--text-muted)' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>Description: </span>
-            {descLabel ? `${descLabel}.` : autoDescription.split('\n')[0]}
+            {`Description: ${descLabel ? `${descLabel}.` : autoDescription.split('\n')[0]}`}
           </p>
         </RichTooltip>
 
