@@ -14,13 +14,14 @@ interface Props {
 export function PanelShell({ title, subtitle, status, children, className = '' }: Props) {
   return (
     <section
-      className={`flex flex-col rounded-xl border border-zinc-800 bg-zinc-900 ${className}`}
+      className={`flex flex-col rounded-xl ${className}`}
+      style={{ border: '1px solid var(--border)', background: 'var(--surface-panel)' }}
       aria-label={title}
     >
-      <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+      <header className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
         <div>
-          <h2 className="text-sm font-semibold text-zinc-100 tracking-wide">{title}</h2>
-          {subtitle && <p className="text-xs text-zinc-500 mt-0.5">{subtitle}</p>}
+          <h2 className="text-sm font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>{title}</h2>
+          {subtitle && <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{subtitle}</p>}
         </div>
         <WsStatusBadge status={status} />
       </header>

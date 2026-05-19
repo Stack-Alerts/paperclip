@@ -29,13 +29,13 @@ export function ITMDashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans">
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen font-sans" style={{ background: 'var(--app-bg)', color: 'var(--text-primary)' }}>
+      <header className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
         <div>
-          <h1 className="text-lg font-bold tracking-tight text-zinc-50">
+          <h1 className="text-lg font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             BTC Trade Engine — ITM Live Dashboard
           </h1>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
             Real-time institutional monitoring · panels B1–B6
           </p>
         </div>
@@ -50,7 +50,7 @@ export function ITMDashboard() {
           >
             {halting ? 'Halting…' : '⛔ Emergency Halt'}
           </button>
-          <span className="text-xs text-zinc-600 font-mono">{WS_BASE}</span>
+          <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{WS_BASE}</span>
         </div>
       </header>
 

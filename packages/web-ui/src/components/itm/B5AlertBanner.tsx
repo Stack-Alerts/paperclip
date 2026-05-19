@@ -37,24 +37,25 @@ export function B5AlertBanner({ wsBaseUrl }: Props) {
       role="region"
       aria-label="B5 Alert Banner"
       aria-live="assertive"
-      className={`w-full rounded-xl border px-4 py-3 transition-colors ${
-        hasCritical ? 'border-red-700 bg-red-950/40' : 'border-zinc-800 bg-zinc-900'
-      }`}
+      className="w-full rounded-xl px-4 py-3 transition-colors"
+      style={hasCritical
+        ? { border: '1px solid rgb(185 28 28)', background: 'rgba(69, 10, 10, 0.4)' }
+        : { border: '1px solid var(--border)', background: 'var(--surface-panel)' }}
     >
       <div className="flex items-center justify-between mb-2">
         <Tooltip tip="Displays all non-acknowledged alerts from the strategy engine, ordered by severity.">
-          <h2 className="text-sm font-semibold text-zinc-100 tracking-wide">B5 · Alert Banner</h2>
+          <h2 className="text-sm font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>B5 · Alert Banner</h2>
         </Tooltip>
         <div className="flex items-center gap-2">
           <Tooltip tip="Number of unacknowledged active alerts.">
-            <span className="text-xs text-zinc-400">{active.length} active</span>
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{active.length} active</span>
           </Tooltip>
           <WsStatusMini status={status} />
         </div>
       </div>
 
       {active.length === 0 ? (
-        <p className="text-xs text-zinc-500">No active alerts.</p>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No active alerts.</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {active.map((alert) => (
@@ -70,7 +71,7 @@ export function B5AlertBanner({ wsBaseUrl }: Props) {
                 <Tooltip tip={`Source: ${alert.source} · Raised: ${new Date(alert.raised_at).toISOString().replace('T', ' ').slice(0, 19)} UTC`}>
                   <p className="font-medium">{alert.message}</p>
                 </Tooltip>
-                <p className="text-zinc-500 mt-0.5">{alert.source}</p>
+                <p className="mt-0.5" style={{ color: 'var(--text-muted)' }}>{alert.source}</p>
               </div>
             </div>
           ))}

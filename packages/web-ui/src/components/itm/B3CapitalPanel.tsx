@@ -24,7 +24,7 @@ export function B3CapitalPanel({ wsBaseUrl }: Props) {
         status={status}
         className="h-full"
       >
-        <p className="text-xs text-zinc-500">Awaiting capital data…</p>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Awaiting capital data…</p>
       </PanelShell>
     );
   }
@@ -55,14 +55,14 @@ export function B3CapitalPanel({ wsBaseUrl }: Props) {
       <div className="space-y-6">
         <div>
           <Tooltip tip="Total account equity (unrealized PnL included) in account currency.">
-            <p className="text-xs text-zinc-500 mb-1">Total Equity</p>
+            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Total Equity</p>
           </Tooltip>
           <p className="text-lg font-semibold text-emerald-400">${fmt(data.total_equity)}</p>
         </div>
 
         <div className="space-y-2">
           <Tooltip tip="Daily realized + unrealized PnL since 00:00 UTC.">
-            <p className="text-xs text-zinc-500 mb-1">Daily PnL</p>
+            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Daily PnL</p>
           </Tooltip>
           <p className={`text-lg font-semibold ${data.daily_pnl < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
             {data.daily_pnl >= 0 ? '+' : ''}${fmt(data.daily_pnl)}
@@ -71,33 +71,33 @@ export function B3CapitalPanel({ wsBaseUrl }: Props) {
 
         <div className="space-y-2">
           <Tooltip tip="Fraction of maximum allowed risk budget currently in use.">
-            <p className="text-xs text-zinc-400">Risk Utilization</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Risk Utilization</p>
           </Tooltip>
           <ProgressBar
             value={Math.min(data.risk_utilization_pct, 100)}
             color={riskColor}
             className="text-xs"
           />
-          <p className="text-xs text-zinc-400 text-right">{fmt(data.risk_utilization_pct, 1)}%</p>
+          <p className="text-xs text-right" style={{ color: 'var(--text-secondary)' }}>{fmt(data.risk_utilization_pct, 1)}%</p>
         </div>
 
         <div className="space-y-2">
           <Tooltip tip="Peak-to-trough equity decline as a percentage of peak equity.">
-            <p className="text-xs text-zinc-400">Drawdown</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Drawdown</p>
           </Tooltip>
           <ProgressBar
             value={Math.min(data.drawdown_pct, data.max_drawdown_limit_pct || 100)}
             color={drawdownColor}
             className="text-xs"
           />
-          <p className="text-xs text-zinc-400 text-right">
+          <p className="text-xs text-right" style={{ color: 'var(--text-secondary)' }}>
             {fmt(data.drawdown_pct, 1)}% / {fmt(data.max_drawdown_limit_pct, 1)}%
           </p>
         </div>
 
         <div className="space-y-2">
           <Tooltip tip="Free vs used margin allocation.">
-            <p className="text-xs text-zinc-400">Margin Allocation</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Margin Allocation</p>
           </Tooltip>
           <DonutChart
             data={chartData}

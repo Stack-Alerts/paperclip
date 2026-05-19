@@ -22,7 +22,7 @@ const CONFIG_TABS: { id: ConfigTab; label: string }[] = [
 function FormRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-4">
-      <label className="w-48 text-sm text-zinc-400 flex-shrink-0">{label}</label>
+      <label className="w-48 text-sm flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>{label}</label>
       <div className="flex-1">{children}</div>
     </div>
   );
@@ -36,7 +36,8 @@ function NumberInput({ value, onChange, min, max }: { value: number; onChange: (
       min={min}
       max={max}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="w-32 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+      className="w-32 rounded px-3 py-1.5 text-sm focus:outline-none"
+      style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
     />
   );
 }
@@ -45,7 +46,8 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
   return (
     <button
       onClick={() => onChange(!value)}
-      className={`relative w-10 h-5 rounded-full transition-colors ${value ? 'bg-blue-600' : 'bg-zinc-700'}`}
+      className="relative w-10 h-5 rounded-full transition-colors"
+      style={{ background: value ? 'var(--core-accent-blue)' : 'var(--surface-hover)' }}
     >
       <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${value ? 'translate-x-5' : 'translate-x-0.5'}`} />
     </button>
@@ -122,7 +124,8 @@ function TabContent({ tab, config, setConfig }: { tab: ConfigTab; config: Config
               type="text"
               value={config.system.apiUrl}
               onChange={(e) => setConfig((c) => ({ ...c, system: { ...c.system, apiUrl: e.target.value } }))}
-              className="w-64 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+              className="w-64 rounded px-3 py-1.5 text-sm focus:outline-none"
+              style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
             />
           </FormRow>
           <FormRow label="Timeout (s)">
@@ -177,12 +180,12 @@ export function SystemConfigWindow({ open, onClose }: SystemConfigWindowProps) {
   if (open === false) return null;
 
   const content = (
-    <div className="flex flex-col h-full bg-zinc-900 text-zinc-100">
+    <div className="flex flex-col h-full" style={{ background: 'var(--surface-panel)', color: 'var(--text-primary)' }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 flex-shrink-0">
-        <h1 className="text-base font-semibold text-zinc-100">System Configuration</h1>
+      <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+        <h1 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>System Configuration</h1>
         {onClose && (
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200 transition-colors" aria-label="Close">
+          <button onClick={onClose} className="transition-colors" aria-label="Close" style={{ color: 'var(--text-muted)' }}>
             <X className="w-4 h-4" />
           </button>
         )}
@@ -190,16 +193,15 @@ export function SystemConfigWindow({ open, onClose }: SystemConfigWindowProps) {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar tabs */}
-        <div className="w-44 border-r border-zinc-800 flex flex-col py-2 flex-shrink-0">
+        <div className="w-44 flex flex-col py-2 flex-shrink-0" style={{ borderRight: '1px solid var(--border)' }}>
           {CONFIG_TABS.map(({ id, label }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
-              className={`text-left px-4 py-2.5 text-sm transition-colors ${
-                activeTab === id
-                  ? 'bg-blue-600/20 text-blue-400 border-r-2 border-blue-500'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
-              }`}
+              className="text-left px-4 py-2.5 text-sm transition-colors"
+              style={activeTab === id
+                ? { background: 'color-mix(in srgb, var(--core-accent-blue) 20%, transparent)', color: 'var(--core-accent-blue)', borderRight: '2px solid var(--core-accent-blue)' }
+                : { color: 'var(--text-secondary)' }}
             >
               {label}
             </button>
@@ -213,10 +215,11 @@ export function SystemConfigWindow({ open, onClose }: SystemConfigWindowProps) {
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-800 flex-shrink-0">
+      <div className="flex items-center justify-end gap-2 px-6 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
         <button
           onClick={handleReset}
-          className="flex items-center gap-2 px-4 py-2 rounded bg-zinc-700 text-zinc-200 text-sm hover:bg-zinc-600 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 rounded text-sm transition-colors"
+          style={{ background: 'var(--surface-hover)', color: 'var(--text-secondary)' }}
         >
           <RotateCcw className="w-3.5 h-3.5" />
           Reset to Defaults
@@ -236,7 +239,7 @@ export function SystemConfigWindow({ open, onClose }: SystemConfigWindowProps) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-        <div className="relative w-full max-w-3xl h-[80vh] bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl mx-4 overflow-hidden">
+        <div className="relative w-full max-w-3xl h-[80vh] rounded-xl shadow-2xl mx-4 overflow-hidden" style={{ background: 'var(--surface-panel)', border: '1px solid var(--border)' }}>
           {content}
         </div>
       </div>

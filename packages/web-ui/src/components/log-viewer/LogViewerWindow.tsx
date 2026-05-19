@@ -39,21 +39,23 @@ export const LogViewerWindow: React.FC<LogViewerWindowProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={handleBackdropClick}
     >
-      <div className="relative flex flex-col bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-[90vw] max-w-5xl h-[85vh] mx-4">
+      <div className="relative flex flex-col rounded-xl shadow-2xl w-[90vw] max-w-5xl h-[85vh] mx-4" style={{ background: 'var(--surface-panel)', border: '1px solid var(--border)' }}>
         {/* Title bar */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800 flex-shrink-0">
-          <h2 className="text-sm font-semibold text-zinc-100">{title}</h2>
+        <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
           <div className="flex items-center gap-2">
             <button
               title="Expand"
-              className="p-1 text-zinc-500 hover:text-zinc-300 transition-colors"
+              className="p-1 transition-colors"
+              style={{ color: 'var(--text-muted)' }}
             >
               <Maximize2 className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
               title="Close"
-              className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors"
+              className="p-1 transition-colors"
+              style={{ color: 'var(--text-muted)' }}
             >
               <X className="w-4 h-4" />
             </button>

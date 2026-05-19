@@ -34,7 +34,7 @@ export function B6DecisionLog({ wsBaseUrl }: Props) {
         status={status}
         className="h-full"
       >
-        <p className="text-xs text-zinc-500">Awaiting decision stream…</p>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Awaiting decision stream…</p>
       </PanelShell>
     );
   }
@@ -47,11 +47,11 @@ export function B6DecisionLog({ wsBaseUrl }: Props) {
       className="h-full"
     >
       {data.decisions.length === 0 ? (
-        <p className="text-xs text-zinc-500">No decisions recorded yet.</p>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No decisions recorded yet.</p>
       ) : (
         <div className="space-y-2 overflow-y-auto max-h-96">
           {[...data.decisions].reverse().map((dec) => (
-            <div key={dec.id} className="rounded-lg border border-zinc-800 bg-zinc-800/30 p-3 space-y-2">
+            <div key={dec.id} className="rounded-lg p-3 space-y-2" style={{ border: '1px solid var(--border)', background: 'color-mix(in srgb, var(--surface-card) 30%, transparent)' }}>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <Tooltip tip={ACTION_TIPS[dec.action] ?? 'Trading decision action.'}>
@@ -60,10 +60,10 @@ export function B6DecisionLog({ wsBaseUrl }: Props) {
                     </Badge>
                   </Tooltip>
                   <Tooltip tip="Trading instrument this decision was made for.">
-                    <span className="text-xs font-mono text-zinc-300 truncate">{dec.instrument_id}</span>
+                    <span className="text-xs font-mono truncate" style={{ color: 'var(--text-secondary)' }}>{dec.instrument_id}</span>
                   </Tooltip>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono flex-shrink-0">
+                <div className="flex items-center gap-2 text-xs font-mono flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
                   <Tooltip tip="Decision cycle index.">
                     <span>#{dec.cycle_number}</span>
                   </Tooltip>
@@ -75,19 +75,19 @@ export function B6DecisionLog({ wsBaseUrl }: Props) {
 
               <div>
                 <Tooltip tip="Model confidence score (0–1). Values closer to 1.0 indicate higher conviction.">
-                  <p className="text-xs text-zinc-500 mb-1">Confidence</p>
+                  <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Confidence</p>
                 </Tooltip>
                 <ProgressBar value={dec.confidence * 100} color="violet" className="mb-1" />
-                <p className="text-xs font-mono text-zinc-300 text-right">{(dec.confidence * 100).toFixed(1)}%</p>
+                <p className="text-xs font-mono text-right" style={{ color: 'var(--text-secondary)' }}>{(dec.confidence * 100).toFixed(1)}%</p>
               </div>
 
               <Tooltip tip="Human-readable rationale produced by the decision engine for this cycle.">
-                <p className="text-xs text-zinc-400 italic">{dec.rationale}</p>
+                <p className="text-xs italic" style={{ color: 'var(--text-secondary)' }}>{dec.rationale}</p>
               </Tooltip>
 
               {dec.shap_values && dec.shap_values.length > 0 && (
                 <details className="group">
-                  <summary className="cursor-pointer text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+                  <summary className="cursor-pointer text-xs transition-colors" style={{ color: 'var(--text-muted)' }}>
                     SHAP values ({dec.shap_values.length} features)
                   </summary>
                   <div className="mt-2 space-y-1.5">
@@ -103,10 +103,10 @@ export function B6DecisionLog({ wsBaseUrl }: Props) {
                             <Tooltip
                               tip={`SHAP value for feature "${sv.feature}": ${sv.value.toFixed(4)}. Positive = pushes toward current action; negative = pushes away.`}
                             >
-                              <span className="w-32 text-zinc-500 truncate">{sv.feature}</span>
+                              <span className="w-32 truncate" style={{ color: 'var(--text-muted)' }}>{sv.feature}</span>
                             </Tooltip>
                             <ProgressBar value={pct} color={color} className="flex-1" />
-                            <span className="font-mono text-zinc-300 w-16 text-right">{sv.value.toFixed(4)}</span>
+                            <span className="font-mono w-16 text-right" style={{ color: 'var(--text-secondary)' }}>{sv.value.toFixed(4)}</span>
                           </div>
                         );
                       })}

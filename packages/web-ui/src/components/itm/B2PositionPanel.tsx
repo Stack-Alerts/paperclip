@@ -30,7 +30,7 @@ export function B2PositionPanel({ wsBaseUrl }: Props) {
         status={status}
         className="h-full"
       >
-        <p className="text-xs text-zinc-500">Awaiting positions data…</p>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Awaiting positions data…</p>
       </PanelShell>
     );
   }
@@ -45,7 +45,7 @@ export function B2PositionPanel({ wsBaseUrl }: Props) {
       <div className="space-y-4">
         <div>
           <Tooltip tip="Sum of unrealized PnL across all open positions in account currency.">
-            <p className="text-xs text-zinc-500 mb-1">Total Unrealized PnL</p>
+            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Total Unrealized PnL</p>
           </Tooltip>
           <p
             className={`text-lg font-semibold ${
@@ -53,15 +53,16 @@ export function B2PositionPanel({ wsBaseUrl }: Props) {
                 ? 'text-emerald-400'
                 : pnlColor(data.total_unrealized_pnl) === 'red'
                 ? 'text-red-400'
-                : 'text-zinc-400'
+                : ''
             }`}
+            style={pnlColor(data.total_unrealized_pnl) === 'zinc' ? { color: 'var(--text-secondary)' } : undefined}
           >
             {data.total_unrealized_pnl >= 0 ? '+' : ''}${fmt(data.total_unrealized_pnl)}
           </p>
         </div>
 
         {data.positions.length === 0 ? (
-          <p className="text-xs text-zinc-500">No open positions.</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No open positions.</p>
         ) : (
           <Table>
             <TableHead>
@@ -125,10 +126,10 @@ export function B2PositionPanel({ wsBaseUrl }: Props) {
                   >
                     {pos.unrealized_pnl >= 0 ? '+' : ''}${fmt(pos.unrealized_pnl)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm text-zinc-400">
+                  <TableCell className="text-right font-mono text-sm" style={{ color: 'var(--text-secondary)' }}>
                     {pos.stop_loss != null ? `$${fmt(pos.stop_loss)}` : '—'}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm text-zinc-400">
+                  <TableCell className="text-right font-mono text-sm" style={{ color: 'var(--text-secondary)' }}>
                     {pos.take_profit != null ? `$${fmt(pos.take_profit)}` : '—'}
                   </TableCell>
                 </TableRow>

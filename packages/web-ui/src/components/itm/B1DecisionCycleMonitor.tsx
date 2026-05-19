@@ -52,7 +52,7 @@ export function B1DecisionCycleMonitor({ wsBaseUrl }: Props) {
         status={status}
         className="h-full"
       >
-        <p className="text-xs text-zinc-500">Awaiting first cycle message…</p>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Awaiting first cycle message…</p>
       </PanelShell>
     );
   }
@@ -75,7 +75,7 @@ export function B1DecisionCycleMonitor({ wsBaseUrl }: Props) {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <Tooltip tip="Current phase of the decision pipeline.">
-            <span className="text-xs text-zinc-400">Current Phase</span>
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Current Phase</span>
           </Tooltip>
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-semibold text-white ${PHASE_COLOR[data.phase]}`}
@@ -86,21 +86,21 @@ export function B1DecisionCycleMonitor({ wsBaseUrl }: Props) {
 
         <div>
           <Tooltip tip="Elapsed time in the current phase (ms).">
-            <p className="text-xs text-zinc-500 mb-1">Elapsed</p>
+            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Elapsed</p>
           </Tooltip>
-          <p className="text-lg font-semibold text-zinc-100">{data.elapsed_ms} ms</p>
+          <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{data.elapsed_ms} ms</p>
         </div>
 
         <div>
           <Tooltip tip="Decision cycle index since strategy start.">
-            <p className="text-xs text-zinc-500 mb-1">Cycle #</p>
+            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Cycle #</p>
           </Tooltip>
-          <p className="text-lg font-semibold text-zinc-100">{data.cycle_number}</p>
+          <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{data.cycle_number}</p>
         </div>
 
         <div>
           <Tooltip tip="Phase breakdown for the most-recently completed cycle.">
-            <p className="mb-3 text-xs text-zinc-400">Phase Durations (stacked bar)</p>
+            <p className="mb-3 text-xs" style={{ color: 'var(--text-secondary)' }}>Phase Durations (stacked bar)</p>
           </Tooltip>
           <div className="space-y-2">
             {phases.map((p) => {
@@ -109,19 +109,19 @@ export function B1DecisionCycleMonitor({ wsBaseUrl }: Props) {
               return (
                 <div key={p} className="flex items-center gap-2">
                   <Tooltip tip={PHASE_TIPS[p]}>
-                    <span className="w-32 text-xs text-zinc-400 truncate">
+                    <span className="w-32 text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
                       {PHASE_LABELS[p]}
                     </span>
                   </Tooltip>
                   {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   <ProgressBar value={pct} color={TREMOR_COLOR[p] as any} className="flex-1" />
-                  <span className="text-xs font-mono text-zinc-300 w-12 text-right">{ms} ms</span>
+                  <span className="text-xs font-mono w-12 text-right" style={{ color: 'var(--text-secondary)' }}>{ms} ms</span>
                 </div>
               );
             })}
-            <div className="flex items-center justify-between pt-1 border-t border-zinc-800 mt-1">
-              <span className="text-xs text-zinc-500">Total</span>
-              <span className="text-xs font-mono text-zinc-300">{totalMs} ms</span>
+            <div className="flex items-center justify-between pt-1 mt-1" style={{ borderTop: '1px solid var(--border)' }}>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Total</span>
+              <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>{totalMs} ms</span>
             </div>
           </div>
         </div>
@@ -129,7 +129,7 @@ export function B1DecisionCycleMonitor({ wsBaseUrl }: Props) {
         {chartData.length > 0 && (
           <div className="pt-2">
             <Tooltip tip="Phase duration distribution.">
-              <p className="mb-2 text-xs text-zinc-400">Duration Chart</p>
+              <p className="mb-2 text-xs" style={{ color: 'var(--text-secondary)' }}>Duration Chart</p>
             </Tooltip>
             <AreaChart
               data={chartData}

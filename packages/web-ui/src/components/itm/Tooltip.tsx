@@ -21,7 +21,8 @@ export function Tooltip({ tip, children }: Props) {
       {visible && (
         <span
           role="tooltip"
-          className="absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-pre-wrap rounded-lg border border-zinc-700 bg-zinc-800 px-2.5 py-1.5 text-xs text-zinc-200 shadow-lg max-w-xs"
+          className="absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-pre-wrap rounded-lg px-2.5 py-1.5 text-xs shadow-lg max-w-xs"
+          style={{ border: '1px solid var(--tooltip-border)', background: 'var(--tooltip-bg)', color: 'var(--tooltip-text)' }}
         >
           {tip}
         </span>
