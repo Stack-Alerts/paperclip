@@ -299,7 +299,7 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
               style={{
                 background: 'rgba(255,255,255,0.04)',
                 borderColor: 'rgba(255,255,255,0.08)',
-                color: 'var(--text-primary)',
+                color: 'var(--text-secondary)',
               }}
             />
           </RichTooltip>
