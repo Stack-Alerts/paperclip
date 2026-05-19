@@ -20,6 +20,7 @@ import type { BacktestResult, BacktestConfig, Strategy } from '@/lib/strategy-bu
 import { RichTooltip, TooltipContent } from './RichTooltip';
 import { useTooltipSettings } from './TooltipSettingsContext';
 import { ThemeSelector } from './ThemeSelector';
+import { Plus, FolderOpen, Save, Play, ChevronDown } from 'lucide-react';
 
 type DialogKey =
   | 'newStrategy'
@@ -447,20 +448,22 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       </div>
 
       {/* ── Toolbar + Stepper (3-column: left tools | center stepper | right spacer) ── */}
-      <div className="flex items-center border-b px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+      <div className="flex items-center border-b px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border)' }}>
         {/* Left: toolbar buttons */}
         <div className="flex items-center gap-1">
-          <ToolbarButton label="New"  tooltip={TT_NEW}  onClick={() => open('newStrategy')} />
-          <ToolbarButton label="Open" tooltip={TT_OPEN} onClick={() => open('strategyBrowser')} />
+          <ToolbarButton label="New"  icon={<Plus size={13} strokeWidth={1.5} />} tooltip={TT_NEW}  onClick={() => open('newStrategy')} />
+          <ToolbarButton label="Open" icon={<FolderOpen size={13} strokeWidth={1.5} />} tooltip={TT_OPEN} onClick={() => open('strategyBrowser')} />
           <ToolbarButton
-            label={mounted && isModified ? 'Save ●' : 'Save'}
+            label="Save"
+            icon={<Save size={13} strokeWidth={1.5} />}
+            trailing={<ChevronDown size={11} strokeWidth={1.5} />}
             tooltip={TT_SAVE}
             onClick={handleSave}
-            active={mounted && isModified}
           />
           <div className="w-px h-5 mx-1 flex-shrink-0" style={{ background: 'var(--border)' }} />
           <ToolbarButton
-            label={backTestInProgress ? '▶ Running…' : '▶ Quick Preview'}
+            label={backTestInProgress ? 'Running…' : 'Quick Preview'}
+            icon={<Play size={13} strokeWidth={1.5} />}
             tooltip={TT_QUICK_PREVIEW}
             onClick={handleQuickPreview}
             disabled={!currentStrategy || backTestInProgress}
@@ -680,24 +683,28 @@ interface ToolbarButtonProps {
   disabled?: boolean;
   active?: boolean;
   accent?: boolean;
+  icon?: React.ReactNode;
+  trailing?: React.ReactNode;
 }
 
-const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, tooltip, onClick, disabled, active, accent }) => (
+const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, tooltip, onClick, disabled, active, accent, icon, trailing }) => (
   <RichTooltip content={tooltip}>
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`px-2.5 py-1 text-xs rounded transition-colors border ${
+      className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors border ${
         disabled
-          ? 'text-[var(--text-muted)] bg-[var(--bg-panel)] border-[var(--border)] cursor-not-allowed'
+          ? 'text-[var(--text-muted)] bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.05)] cursor-not-allowed'
           : accent
           ? 'text-white bg-blue-700 border-blue-600 hover:bg-blue-600 font-medium'
           : active
-          ? 'text-amber-300 bg-[var(--bg-card)] border-[var(--border)] hover:bg-[var(--border)]'
-          : 'text-[var(--text-dim)] bg-[var(--bg-card)] border-[var(--border)] hover:bg-[var(--border)] hover:text-[var(--text-primary)]'
+          ? 'text-[var(--text-primary)] bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.12)] hover:bg-[rgba(255,255,255,0.10)]'
+          : 'text-[var(--text-secondary)] bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text-primary)] hover:border-[rgba(255,255,255,0.15)]'
       }`}
     >
+      {icon}
       {label}
+      {trailing}
     </button>
   </RichTooltip>
 );

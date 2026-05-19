@@ -1,5 +1,7 @@
 'use client';
 
+import React from 'react';
+import { Pencil, CheckCircle, Zap, Upload } from 'lucide-react';
 import { InfoTooltip } from './InfoTooltip';
 
 export type StepStatus = 'pending' | 'active' | 'complete' | 'error';
@@ -7,30 +9,40 @@ export type StepStatus = 'pending' | 'active' | 'complete' | 'error';
 export interface Step {
   id: number;
   name: string;
-  icon: string;
+  icon: React.ReactNode;
   tooltip: string;
 }
 
+const ICON_PROPS = { size: 14, strokeWidth: 1.5 } as const;
+
 const STEPS: Step[] = [
-  { id: 0, name: 'Design',        icon: '📝', tooltip: 'Design your trading strategy' },
-  { id: 1, name: 'Validate',      icon: '✓',  tooltip: 'Validate strategy configuration' },
-  { id: 2, name: 'Test/Optimize', icon: '🧪', tooltip: 'Run backtest and optimize parameters' },
-  { id: 3, name: 'Publish',       icon: '🚀', tooltip: 'Set publish status' },
+  { id: 0, name: 'Design',        icon: <Pencil {...ICON_PROPS} />,       tooltip: 'Design your trading strategy' },
+  { id: 1, name: 'Validate',      icon: <CheckCircle {...ICON_PROPS} />,   tooltip: 'Validate strategy configuration' },
+  { id: 2, name: 'Test/Optimize', icon: <Zap {...ICON_PROPS} />,           tooltip: 'Run backtest and optimize parameters' },
+  { id: 3, name: 'Publish',       icon: <Upload {...ICON_PROPS} />,        tooltip: 'Set publish status' },
 ];
 
+const BASE_CLASSES =
+  'flex items-center gap-1.5 px-4 py-1.5 rounded text-sm font-medium transition-all border select-none';
+
+const ACTIVE_STYLE: React.CSSProperties = {
+  background: 'rgba(46, 140, 255, 0.12)',
+  borderColor: 'rgba(46, 140, 255, 0.6)',
+  boxShadow: '0 0 12px rgba(46, 140, 255, 0.25), inset 0 0 8px rgba(46, 140, 255, 0.08)',
+  color: '#2e8cff',
+};
+
 function stepClasses(status: StepStatus, clickable: boolean): string {
-  const base =
-    'flex items-center gap-1.5 px-4 py-1.5 rounded text-sm font-medium transition-colors border select-none';
   const cursor = clickable ? 'cursor-pointer' : 'cursor-default';
   switch (status) {
     case 'active':
-      return `${base} ${cursor} bg-blue-600 border-blue-500 text-white`;
+      return `${BASE_CLASSES} ${cursor}`;
     case 'complete':
-      return `${base} ${cursor} bg-emerald-900 border-emerald-700 text-emerald-300 hover:bg-emerald-800`;
+      return `${BASE_CLASSES} ${cursor} bg-emerald-900 border-emerald-700 text-emerald-300 hover:bg-emerald-800`;
     case 'error':
-      return `${base} ${cursor} bg-red-950 border-red-800 text-red-400 hover:bg-red-900`;
+      return `${BASE_CLASSES} ${cursor} bg-red-950 border-red-800 text-red-400 hover:bg-red-900`;
     default:
-      return `${base} ${cursor} bg-[var(--bg-card)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--border)]`;
+      return `${BASE_CLASSES} ${cursor} bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.08)] text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text-primary)] hover:border-[rgba(255,255,255,0.15)]`;
   }
 }
 
@@ -64,6 +76,7 @@ export function StepperRibbon({
         <InfoTooltip id={`stepper-step-${step.id}`}>
           <button
             className={stepClasses(status, clickable)}
+            style={status === 'active' ? ACTIVE_STYLE : undefined}
             onClick={() => onStepClick?.(step.id)}
             aria-current={status === 'active' ? 'step' : undefined}
             title={step.tooltip}
