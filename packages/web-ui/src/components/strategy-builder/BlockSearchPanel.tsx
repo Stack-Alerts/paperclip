@@ -557,9 +557,10 @@ interface BlockItemProps {
   advancedMode: boolean;
   isHighlighted?: boolean;
   onHighlightCleared?: () => void;
+  isBlockUsed?: boolean;
 }
 
-function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, onHighlightCleared }: BlockItemProps) {
+function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, onHighlightCleared, isBlockUsed }: BlockItemProps) {
   const itemRef = useRef<HTMLDivElement>(null);
   const [signalsOpen, setSignalsOpen] = useState(false);
   const [checkedSignals, setCheckedSignals] = useState<Set<string>>(new Set());
@@ -625,11 +626,18 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
         background: isHighlighted ? 'color-mix(in srgb, var(--accent-sky-bright) 7%, transparent)' : 'var(--bg-card)',
         borderColor: isHighlighted ? 'var(--accent-sky-bright)' : 'var(--border)',
         boxShadow: isHighlighted ? '0 0 0 2px rgba(14,165,233,0.25)' : undefined,
+        opacity: isBlockUsed ? 0.45 : undefined,
       }}
     >
       <div className="px-3 pt-2.5 pb-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-medium leading-tight" style={{ color: 'var(--text-primary)' }}>{definition.name}</span>
+          <span
+            className={`text-sm font-medium leading-tight${isBlockUsed ? ' line-through' : ''}`}
+            style={{
+              color: isBlockUsed ? 'var(--text-muted)' : 'var(--text-primary)',
+              cursor: isBlockUsed ? 'not-allowed' : undefined,
+            }}
+          >{definition.name}</span>
         </div>
         <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
           Category: {definition.category}
@@ -856,6 +864,16 @@ export function BlockSearchPanel() {
         return a.name.localeCompare(b.name);
       });
   }, [blockLibrary, searchText, selectedCategory, selectedType]);
+
+  // Track which block definition IDs are already present in the strategy (standard mode only).
+  const usedDefinitionIds = useMemo(() => {
+    if (advancedMode || !currentStrategy?.blocks) return new Set<string>();
+    return new Set(
+      currentStrategy.blocks
+        .map(b => (b.data as Record<string, unknown>).definitionId as string)
+        .filter(Boolean)
+    );
+  }, [advancedMode, currentStrategy?.blocks]);
 
   // Secondary narrow — filters within filteredBlocks
   const displayBlocks = useMemo(() => {
@@ -1105,6 +1123,7 @@ export function BlockSearchPanel() {
               advancedMode={advancedMode}
               isHighlighted={highlightedLibraryBlockId === block.id}
               onHighlightCleared={() => highlightLibraryBlock(null)}
+              isBlockUsed={usedDefinitionIds.has(block.id)}
             />
           ))
         )}
