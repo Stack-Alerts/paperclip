@@ -617,7 +617,7 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
     >
       <div className="px-3 pt-2.5 pb-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-medium leading-tight" style={{ color: 'var(--text-primary)' }}>{definition.name}</span>
+          <span className={`text-sm font-medium leading-tight${isBlockUsed ? ' line-through' : ''}`} style={{ color: isBlockUsed ? 'var(--text-muted)' : 'var(--text-primary)', cursor: isBlockUsed ? 'not-allowed' : undefined }}>{definition.name}</span>
         </div>
         <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
           Category: {definition.category}
