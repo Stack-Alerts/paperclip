@@ -306,20 +306,12 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
         </div>
 
         {/* Row 2: description (single truncated line) */}
-        {descLabel && (
-          <RichTooltip content={TT_DESCRIPTION}>
-            <p className="text-[10px] truncate leading-tight cursor-default" style={{ color: 'var(--text-muted)' }}>
-              {descLabel}.
-            </p>
-          </RichTooltip>
-        )}
-        {autoDescription && !descLabel && (
-          <RichTooltip content={TT_DESCRIPTION}>
-            <p className="text-[10px] truncate leading-tight cursor-default" style={{ color: 'var(--text-muted)' }}>
-              {autoDescription.split('\n')[0]}
-            </p>
-          </RichTooltip>
-        )}
+        <RichTooltip content={TT_DESCRIPTION}>
+          <p className="text-[10px] truncate leading-tight cursor-default" style={{ color: 'var(--text-muted)' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Description: </span>
+            {descLabel ? `${descLabel}.` : autoDescription.split('\n')[0]}
+          </p>
+        </RichTooltip>
 
         {/* Row 3: type buttons + stats */}
         <div className="flex items-center gap-1.5 text-[10px] overflow-hidden flex-nowrap">
