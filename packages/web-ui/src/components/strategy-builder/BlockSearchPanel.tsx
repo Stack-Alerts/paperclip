@@ -706,7 +706,7 @@ export function BlockSearchPanel() {
               onClick={() => setAdvancedMode(false)}
               className="text-xs px-2.5 py-1 transition-colors"
               style={!advancedMode
-                ? { background: 'var(--accent-blue-dark)', color: 'var(--accent-sky)', fontWeight: 600 }
+                ? { background: 'var(--accent-blue-dark)', color: 'var(--accent-blue)', fontWeight: 600 }
                 : { background: 'var(--bg-card)', color: 'var(--text-muted)' }}
             >
               Standard
@@ -717,7 +717,7 @@ export function BlockSearchPanel() {
               onClick={() => setAdvancedMode(true)}
               className="text-xs px-2.5 py-1 transition-colors border-l border-[var(--border)]"
               style={advancedMode
-                ? { background: 'var(--accent-blue-dark)', color: 'var(--accent-sky)', fontWeight: 600 }
+                ? { background: 'var(--accent-blue-dark)', color: 'var(--accent-blue)', fontWeight: 600 }
                 : { background: 'var(--bg-card)', color: 'var(--text-muted)' }}
             >
               Advanced
