@@ -81,7 +81,7 @@ jobs:
             FLAGS="$FLAGS --lookback-minutes 10"
           fi
 
-          python scripts/impact_gate_polling_daemon.py $FLAGS > /tmp/poll-output.json
+          bash scripts/run_impact_gate_polling_daemon.sh $FLAGS > /tmp/poll-output.json
           echo "poll_exit_code=$?" >> "$GITHUB_OUTPUT"
           cat /tmp/poll-output.json
 
