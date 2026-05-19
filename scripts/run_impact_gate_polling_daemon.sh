@@ -8,11 +8,15 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Load environment if running locally (not in CI)
-if [ -z "$PAPERCLIP_API_URL" ]; then
-    if [ -f "$REPO_ROOT/.env" ]; then
+# Load .env for database credentials
+# In CI, PAPERCLIP_* secrets are pre-set; POSTGRES_* must come from either CI secrets or .env fallback
+# Locally, all credentials come from .env
+if [ -f "$REPO_ROOT/.env" ]; then
+    # If POSTGRES_PASSWORD is empty (not set as CI secret), load from .env
+    if [ -z "$POSTGRES_PASSWORD" ]; then
         set -a
-        source "$REPO_ROOT/.env"
+        # shellcheck disable=SC1090
+        source "$REPO_ROOT/.env" 2>/dev/null || true
         set +a
     fi
 fi
