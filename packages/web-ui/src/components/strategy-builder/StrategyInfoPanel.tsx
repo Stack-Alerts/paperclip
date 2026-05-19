@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
+import { Info } from 'lucide-react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { Block, BlockType } from '@/lib/strategy-builder/types';
 import { RichTooltip, TooltipContent } from './RichTooltip';
@@ -282,8 +283,9 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
       <div className="px-3 py-1.5 space-y-1" style={{ background: 'var(--bg-deep)' }}>
         {/* Row 1: header label + name input side-by-side */}
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-widest flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
-            Strategy
+          <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+            <Info size={10} />
+            Strategy Information
           </span>
           <RichTooltip content={TT_STRATEGY_NAME}>
             <input
@@ -349,7 +351,8 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
   return (
     <div className="px-4 py-3 space-y-2.5" style={{ background: 'var(--bg-panel)' }}>
       {/* Section header */}
-      <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+        <Info size={12} />
         Strategy Information
       </div>
 
@@ -372,24 +375,14 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
 
       {/* Description (auto-generated, read-only) */}
       <div className="space-y-1">
-        <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-          Description:
-          {descLabel && <span className="ml-1 font-normal" style={{ color: 'var(--text-muted)' }}>{descLabel}.</span>}
-        </label>
+        <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>Description:</label>
         <RichTooltip content={TT_DESCRIPTION}>
-          <textarea
-            rows={5}
-            value={autoDescription}
-            readOnly
-            className="w-full px-2 py-1.5 rounded border text-xs resize-none focus:outline-none leading-relaxed cursor-default select-none"
-            style={{
-              background: 'color-mix(in srgb, var(--bg-card) 40%, transparent)',
-              borderColor: 'color-mix(in srgb, var(--border) 60%, transparent)',
-              color: 'var(--text-secondary)',
-              scrollbarWidth: 'thin' as const,
-              scrollbarColor: 'var(--border) var(--bg-panel)',
-            }}
-          />
+          <p
+            className="text-xs leading-relaxed whitespace-pre-line cursor-default"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {autoDescription}
+          </p>
         </RichTooltip>
       </div>
 
