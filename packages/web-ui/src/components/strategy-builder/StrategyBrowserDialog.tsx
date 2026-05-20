@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useRef, useEffect, type CSSProperties } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect, type CSSProperties } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { Strategy, StrategyStatus, StrategyVersion, Block, BlockType } from '@/lib/strategy-builder/types';
 import {
@@ -21,6 +21,23 @@ const STATUS_STYLES: Record<StrategyStatus, CSSProperties> = {
   backtested: { color: 'var(--accent-blue)',  background: 'var(--accent-blue-dark)',   borderColor: 'var(--accent-blue-mid)' },
   active:     { color: 'var(--accent-teal)',  background: 'var(--accent-teal-dark)',   borderColor: 'var(--accent-teal-mid)' },
 };
+
+// Splitter persistence: 5-row default + localStorage restore (BTCAAAAA-29359).
+const SPLIT_STORAGE_KEY = 'strategyBrowser.splitPct.v1';
+const SPLIT_MIN_PCT = 25;
+const SPLIT_MAX_PCT = 85;
+const SPLIT_FALLBACK_PCT = 60;
+
+function readStoredSplitPct(): number | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(SPLIT_STORAGE_KEY);
+    if (raw == null) return null;
+    const n = parseFloat(raw);
+    if (Number.isFinite(n) && n >= SPLIT_MIN_PCT && n <= SPLIT_MAX_PCT) return n;
+  } catch { /* ignore */ }
+  return null;
+}
 
 const STATUS_PILL_BASE: CSSProperties = {
   display: 'inline-flex',
@@ -514,10 +531,17 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
   const [detailOverride, setDetailOverride]    = useState<Strategy | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
-  // Splitter state: table flex-basis percentage
-  const [splitPct, setSplitPct] = useState(60);
+  // Splitter state: table flex-basis percentage. Stored value (if any) is
+  // loaded in a mount-time effect since useState's lazy initializer runs
+  // during SSR where localStorage is unavailable. Without a stored value, a
+  // 5-row measured default is applied once the table renders (BTCAAAAA-29359).
+  const [splitPct, setSplitPct] = useState<number>(SPLIT_FALLBACK_PCT);
   const splitterRef = useRef<HTMLDivElement>(null);
+  const tableTheadRef = useRef<HTMLTableSectionElement>(null);
+  const tableFirstRowRef = useRef<HTMLTableRowElement>(null);
   const dragging = useRef(false);
+  const fiveRowDefaultApplied = useRef<boolean>(false);
+  const hasLoadedOnce = useRef(false);
 
   const displayList = localList ?? strategyList;
 
@@ -535,6 +559,7 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
       setLocalList(null);
     } finally {
       setListLoading(false);
+      hasLoadedOnce.current = true;
     }
   }, []);
 
@@ -572,7 +597,8 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
     }
   }, []);
 
-  // Drag-to-resize splitter
+  // Drag-to-resize splitter. Final position is persisted to localStorage on
+  // mouse-up so it survives reloads (BTCAAAAA-29359).
   const onSplitterMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     dragging.current = true;
@@ -581,20 +607,63 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
     const startY = e.clientY;
     const startPct = splitPct;
     const totalH = container.getBoundingClientRect().height;
+    let latestPct = startPct;
     const onMove = (ev: MouseEvent) => {
       if (!dragging.current) return;
       const delta = ev.clientY - startY;
-      const newPct = Math.min(85, Math.max(25, startPct + (delta / totalH) * 100));
+      const newPct = Math.min(SPLIT_MAX_PCT, Math.max(SPLIT_MIN_PCT, startPct + (delta / totalH) * 100));
+      latestPct = newPct;
       setSplitPct(newPct);
     };
     const onUp = () => {
       dragging.current = false;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+      try {
+        window.localStorage.setItem(SPLIT_STORAGE_KEY, String(latestPct));
+      } catch { /* ignore */ }
+      fiveRowDefaultApplied.current = true;
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   }, [splitPct]);
+
+  // Restore persisted splitter position from localStorage on mount. Runs only
+  // on the client, so it bypasses the SSR-unavailable-window issue.
+  useEffect(() => {
+    const stored = readStoredSplitPct();
+    if (stored != null) {
+      setSplitPct(stored);
+      fiveRowDefaultApplied.current = true;
+    }
+  }, []);
+
+  // On first open with no stored preference, size the top panel so exactly ~5
+  // strategy rows + the table header are visible. Skipped once a stored value
+  // is in effect or the user has dragged.
+  useLayoutEffect(() => {
+    if (!open) return;
+    if (fiveRowDefaultApplied.current) return;
+    if (!hasLoadedOnce.current || listLoading) return;
+    const firstRow = tableFirstRowRef.current;
+    if (displayList.length > 0 && !firstRow) return;
+    const container = splitterRef.current?.parentElement;
+    if (!container) return;
+    const containerH = container.getBoundingClientRect().height;
+    if (containerH <= 0) return;
+    if (displayList.length === 0) {
+      fiveRowDefaultApplied.current = true;
+      return;
+    }
+    const headH = tableTheadRef.current?.getBoundingClientRect().height ?? 28;
+    const rowH = firstRow!.getBoundingClientRect().height;
+    const desiredTopPx = headH + 5 * rowH;
+    const pct = (desiredTopPx / containerH) * 100;
+    const clamped = Math.min(SPLIT_MAX_PCT, Math.max(SPLIT_MIN_PCT, pct));
+    setSplitPct(clamped);
+    fiveRowDefaultApplied.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, listLoading, displayList.length]);
 
   const handleSort = useCallback((col: SortKey) => {
     if (col === sortKey) {
@@ -818,7 +887,7 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
         {/* Table */}
         <div className="overflow-y-auto" style={{ flex: `0 0 ${splitPct}%` }}>
           <table className="w-full text-sm border-collapse">
-            <thead className="sticky top-0 z-10" style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border)' }}>
+            <thead ref={tableTheadRef} className="sticky top-0 z-10" style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border)' }}>
               <tr>
                 <SortHeader label="Strategy Name" col="name"    active={sortKey} dir={sortDir} onClick={handleSort} />
                 <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>Type</th>
@@ -857,6 +926,7 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
                   return (
                     <tr
                       key={strategy.id}
+                      ref={idx === 0 ? tableFirstRowRef : undefined}
                       onClick={() => setSelectedId(strategy.id)}
                       onDoubleClick={() => handleRowDoubleClick(strategy)}
                       className={`border-b cursor-pointer transition-colors ${isSelected ? 'border-l-2' : ''}`}
