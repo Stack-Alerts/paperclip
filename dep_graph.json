@@ -126,6 +126,9 @@
     "scripts/paperclip_recovery_monitor_backup.py": [
       "src/touch_index/paperclip_client.py"
     ],
+    "scripts/paperclip_stalled_workflow_reporter.py": [
+      "src/touch_index/paperclip_client.py"
+    ],
     "scripts/provider_dashboard.py": [
       "scripts/provider_monitor.py"
     ],
@@ -4284,11 +4287,17 @@
     "tests/test_scripts/test_paper_trading_strategy.py": [
       "src/strategies/paper_trading_strategy.py"
     ],
+    "tests/test_scripts/test_paperclip_recovery_health_check.py": [
+      "scripts/paperclip_recovery_health_check.py"
+    ],
     "tests/test_scripts/test_paperclip_recovery_monitor.py": [
       "scripts/paperclip_recovery_monitor.py"
     ],
     "tests/test_scripts/test_paperclip_recovery_monitor_backup.py": [
       "scripts/paperclip_recovery_monitor_backup.py"
+    ],
+    "tests/test_scripts/test_paperclip_stalled_workflow_reporter.py": [
+      "scripts/paperclip_stalled_workflow_reporter.py"
     ],
     "tests/test_scripts/test_rclone_oauth_health.py": [
       "scripts/rclone_oauth_health.py"
@@ -4611,6 +4620,7 @@
       "scripts/nightly_test_alert.py",
       "scripts/paperclip_recovery_monitor.py",
       "scripts/paperclip_recovery_monitor_backup.py",
+      "scripts/paperclip_stalled_workflow_reporter.py",
       "scripts/rclone_oauth_health.py",
       "scripts/scan_done_alert.py",
       "src/blast_radius/api_server.py",
@@ -7533,11 +7543,17 @@
     "src/strategies/paper_trading_strategy.py": [
       "tests/test_scripts/test_paper_trading_strategy.py"
     ],
+    "scripts/paperclip_recovery_health_check.py": [
+      "tests/test_scripts/test_paperclip_recovery_health_check.py"
+    ],
     "scripts/paperclip_recovery_monitor.py": [
       "tests/test_scripts/test_paperclip_recovery_monitor.py"
     ],
     "scripts/paperclip_recovery_monitor_backup.py": [
       "tests/test_scripts/test_paperclip_recovery_monitor_backup.py"
+    ],
+    "scripts/paperclip_stalled_workflow_reporter.py": [
+      "tests/test_scripts/test_paperclip_stalled_workflow_reporter.py"
     ],
     "scripts/rclone_oauth_health.py": [
       "tests/test_scripts/test_rclone_oauth_health.py"
@@ -7658,8 +7674,10 @@
     "scripts/nightly_test_alert.py",
     "scripts/opencode_watchdog.py",
     "scripts/p1_2_compare_data_sources.py",
+    "scripts/paperclip_recovery_health_check.py",
     "scripts/paperclip_recovery_monitor.py",
     "scripts/paperclip_recovery_monitor_backup.py",
+    "scripts/paperclip_stalled_workflow_reporter.py",
     "scripts/patches/0002-add-stale-run-evaluation-dedup.py",
     "scripts/provider_dashboard.py",
     "scripts/provider_monitor.py",
@@ -8903,8 +8921,10 @@
     "tests/test_scripts/test_deadman_switch_monitor.py",
     "tests/test_scripts/test_nightly_test_alert.py",
     "tests/test_scripts/test_paper_trading_strategy.py",
+    "tests/test_scripts/test_paperclip_recovery_health_check.py",
     "tests/test_scripts/test_paperclip_recovery_monitor.py",
     "tests/test_scripts/test_paperclip_recovery_monitor_backup.py",
+    "tests/test_scripts/test_paperclip_stalled_workflow_reporter.py",
     "tests/test_scripts/test_rclone_oauth_health.py",
     "tests/test_scripts/test_validate_testnet_env.py",
     "tests/test_touch_index/__init__.py",
@@ -8968,10 +8988,10 @@
     "src/detectors/building_blocks/patterns/triple_top.py"
   ],
   "stats": {
-    "total_files": 1398,
-    "parsed_files": 1382,
+    "total_files": 1402,
+    "parsed_files": 1386,
     "error_files": 16,
     "parse_rate_pct": 98.86,
-    "edge_count": 2447
+    "edge_count": 2450
   }
 }
