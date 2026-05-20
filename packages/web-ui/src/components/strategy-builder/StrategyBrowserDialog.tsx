@@ -9,7 +9,10 @@ import {
 } from '@/lib/strategy-builder/api';
 import { DeleteStrategyModal, DeleteScope } from './DeleteStrategyModal';
 import { DuplicateStrategyModal, DuplicateScope } from './DuplicateStrategyModal';
-import { Info, Settings, TrendingUp, Calendar, RefreshCw, CheckCircle, GitBranch, Save } from 'lucide-react';
+import {
+  Info, Settings, TrendingUp, Calendar, RefreshCw, CheckCircle, GitBranch, Save,
+  Trash2, Copy, Download, Upload, FolderOpen,
+} from 'lucide-react';
 import { AppBrand } from '@/components/shared/AppBrand';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -794,7 +797,8 @@ export function StrategyBrowserDialog({
 
   const handlePopOut = useCallback(() => {
     // Carry the inline view's current selection + search/filter/sort into the
-    // popped-out window so it opens already showing the same state
+    // popped-out window so it opens already showing the same state, then
+    // close the inline view so only one Strategy Browser is visible at a time
     // (BTCAAAAA-29371).
     const params = new URLSearchParams();
     if (selectedId) params.set('selectedId', selectedId);
@@ -804,8 +808,33 @@ export function StrategyBrowserDialog({
     if (sortDir !== 'desc') params.set('dir', sortDir);
     const qs = params.toString();
     const url = qs ? `/strategy-browser?${qs}` : '/strategy-browser';
-    window.open(url, '_blank', 'width=1280,height=800,menubar=no,toolbar=no,location=no,status=no');
+    const win = window.open(url, '_blank', 'width=1280,height=800,menubar=no,toolbar=no,location=no,status=no');
+    if (win) onClose();
+  }, [selectedId, searchText, typeFilter, sortKey, sortDir, onClose]);
+
+  const handlePopIn = useCallback(() => {
+    // Standalone-only: hand current state back to the opener and close this
+    // window. The opener listens for `strategy-browser:popin` postMessages
+    // and re-opens the inline dialog seeded with this state (BTCAAAAA-29371).
+    if (typeof window === 'undefined' || !window.opener) return;
+    window.opener.postMessage(
+      {
+        type: 'strategy-browser:popin',
+        state: { selectedId, searchText, typeFilter, sortKey, sortDir },
+      },
+      window.location.origin,
+    );
+    window.close();
   }, [selectedId, searchText, typeFilter, sortKey, sortDir]);
+
+  // Only show Pop In when this standalone window was opened via Pop Out
+  // (i.e., has an opener). Direct URL visits get no Pop In target.
+  const [canPopIn, setCanPopIn] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && standalone && window.opener) {
+      setCanPopIn(true);
+    }
+  }, [standalone]);
 
   if (!open) return null;
 
@@ -855,6 +884,18 @@ export function StrategyBrowserDialog({
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
             >
               ↗ Pop Out
+            </button>
+          )}
+          {canPopIn && (
+            <button
+              onClick={handlePopIn}
+              title="Return this browser to the main app window with the current selection and search state"
+              className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
+              style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
+            >
+              ↙ Pop In
             </button>
           )}
           <button
@@ -1047,43 +1088,47 @@ export function StrategyBrowserDialog({
             onClick={() => setShowDeleteModal(true)}
             disabled={!selectedStrategy || controlling}
             title="Permanently delete the selected strategy and all its versions from the database"
-            className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
             style={{ background: 'var(--accent-red-deeper)', color: 'var(--accent-red)', border: '1px solid var(--accent-red-dark)' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-red-dark)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-red-deeper)'; }}
           >
-            🗑️ Delete
+            <Trash2 size={13} strokeWidth={1.5} aria-hidden="true" />
+            Delete
           </button>
           <button
             onClick={() => setShowDupModal(true)}
             disabled={!selectedStrategy || controlling}
             title="Create a copy of the selected strategy as a new entry"
-            className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
             style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
           >
-            📋 Duplicate
+            <Copy size={13} strokeWidth={1.5} aria-hidden="true" />
+            Duplicate
           </button>
           <button
             onClick={handleExportJson}
             disabled={!selectedStrategy}
             title="Export the selected strategy's configuration to a JSON file"
-            className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
             style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
           >
-            📥 Export JSON
+            <Download size={13} strokeWidth={1.5} aria-hidden="true" />
+            Export JSON
           </button>
           <label
             title="Import a strategy configuration from a previously exported JSON file"
-            className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors"
             style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
             onMouseEnter={e => { (e.currentTarget as HTMLLabelElement).style.background = 'var(--bg-hover)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLLabelElement).style.background = 'var(--bg-card)'; }}
           >
-            📤 Import JSON
+            <Upload size={13} strokeWidth={1.5} aria-hidden="true" />
+            Import JSON
             <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImportJson} />
           </label>
           {controlMsg && (
@@ -1107,9 +1152,29 @@ export function StrategyBrowserDialog({
             onClick={handleSelect}
             disabled={!selectedId}
             title={isSaveAs ? 'Save the strategy to the selected location' : 'Open the selected strategy in the Strategy Builder'}
-            className="px-4 py-1.5 rounded text-sm font-medium disabled:opacity-50 transition-colors"
-            style={{ background: 'var(--accent-purple, var(--accent-blue))', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-purple, var(--accent-blue))' }}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded text-sm font-medium transition-all border select-none disabled:opacity-40"
+            style={{
+              background: 'rgba(255,255,255,0.04)',
+              borderColor: 'rgba(255,255,255,0.08)',
+              color: 'var(--text-secondary)',
+            }}
+            onMouseEnter={e => {
+              if ((e.currentTarget as HTMLButtonElement).disabled) return;
+              const t = e.currentTarget as HTMLButtonElement;
+              t.style.background = 'rgba(255,255,255,0.08)';
+              t.style.borderColor = 'rgba(255,255,255,0.15)';
+              t.style.color = 'var(--text-primary)';
+            }}
+            onMouseLeave={e => {
+              const t = e.currentTarget as HTMLButtonElement;
+              t.style.background = 'rgba(255,255,255,0.04)';
+              t.style.borderColor = 'rgba(255,255,255,0.08)';
+              t.style.color = 'var(--text-secondary)';
+            }}
           >
+            {isSaveAs
+              ? <Save size={14} strokeWidth={1.5} aria-hidden="true" />
+              : <FolderOpen size={14} strokeWidth={1.5} aria-hidden="true" />}
             {confirmLabel}
           </button>
         </div>

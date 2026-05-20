@@ -359,6 +359,32 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     [close]
   );
 
+  // Pop In: receive state from a popped-out Strategy Browser window and
+  // re-open the inline dialog seeded with it. Remount the dialog by bumping
+  // the rev so its useState initializers pick up the new initialXxx props
+  // (BTCAAAAA-29371).
+  type PopInSeed = {
+    selectedId?: string | null;
+    searchText?: string;
+    typeFilter?: 'all' | 'bullish' | 'bearish';
+    sortKey?: 'name' | 'blocks' | 'updated' | 'status' | 'created' | 'version';
+    sortDir?: 'asc' | 'desc';
+  };
+  const [popInSeed, setPopInSeed] = useState<PopInSeed | null>(null);
+  const [popInRev, setPopInRev] = useState(0);
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as { type?: string; state?: PopInSeed } | null;
+      if (!data || data.type !== 'strategy-browser:popin') return;
+      setPopInSeed(data.state ?? null);
+      setPopInRev(r => r + 1);
+      setActiveDialog('strategyBrowser');
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
   // -------------------------------------------------------------------------
   // Debug Logger helpers
   // -------------------------------------------------------------------------
@@ -562,9 +588,15 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       <NewStrategyDialog open={activeDialog === 'newStrategy'} onClose={close} />
 
       <StrategyBrowserDialog
+        key={`strategyBrowser-${popInRev}`}
         open={activeDialog === 'strategyBrowser'}
         onSelect={handleStrategySelect}
         onClose={close}
+        initialSelectedId={popInSeed?.selectedId ?? null}
+        initialSearchText={popInSeed?.searchText}
+        initialTypeFilter={popInSeed?.typeFilter}
+        initialSortKey={popInSeed?.sortKey}
+        initialSortDir={popInSeed?.sortDir}
       />
 
       <BacktestConfigDialog open={activeDialog === 'backtestConfig'} onClose={close} />
