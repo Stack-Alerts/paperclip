@@ -46,7 +46,7 @@ log = logging.getLogger(__name__)
 def _get_muted_state_functions():
     """Import muted state functions from scan_fix_issues_done, handling circular dependency."""
     try:
-        from scan_fix_issues_done import (
+        from impact_gate.scan_fix_issues_done import (
             _load_muted_state,
             save_muted_gate_result,
             purge_muted_entries,
