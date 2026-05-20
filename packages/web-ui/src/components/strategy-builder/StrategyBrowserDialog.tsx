@@ -10,6 +10,7 @@ import {
 import { DeleteStrategyModal, DeleteScope } from './DeleteStrategyModal';
 import { DuplicateStrategyModal, DuplicateScope } from './DuplicateStrategyModal';
 import { Info, Settings, TrendingUp, Calendar, RefreshCw, CheckCircle, GitBranch, Save } from 'lucide-react';
+import { AppBrand } from '@/components/shared/AppBrand';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -19,6 +20,21 @@ const STATUS_STYLES: Record<StrategyStatus, CSSProperties> = {
   invalid:    { color: 'var(--accent-red)',   background: 'var(--accent-red-deeper)',  borderColor: 'var(--accent-red-dark)' },
   backtested: { color: 'var(--accent-blue)',  background: 'var(--accent-blue-dark)',   borderColor: 'var(--accent-blue-mid)' },
   active:     { color: 'var(--accent-teal)',  background: 'var(--accent-teal-dark)',   borderColor: 'var(--accent-teal-mid)' },
+};
+
+const STATUS_PILL_BASE: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minWidth: 76,
+  height: 20,
+  lineHeight: 1,
+  padding: '0 8px',
+  borderRadius: 4,
+  borderWidth: 1,
+  borderStyle: 'solid',
+  fontSize: 12,
+  whiteSpace: 'nowrap',
 };
 
 const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
@@ -728,11 +744,19 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
       >
         <h2
           id="strategy-browser-title"
-          className="text-sm font-semibold flex items-center gap-2"
+          className="text-sm font-semibold flex items-center gap-3"
           style={{ color: 'var(--text-secondary)' }}
         >
-          <TitleIcon style={{ width: 16, height: 16, flexShrink: 0 }} />
-          <span>{titleText}</span>
+          {standalone && (
+            <>
+              <AppBrand size={24} />
+              <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>—</span>
+            </>
+          )}
+          <span className="flex items-center gap-2">
+            <TitleIcon style={{ width: 16, height: 16, flexShrink: 0 }} />
+            <span>{titleText}</span>
+          </span>
         </h2>
         <div className="flex items-center gap-2">
           {!standalone && (
@@ -760,7 +784,7 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
 
       {/* Filters */}
       <div
-        className="px-6 py-3 flex items-center gap-3 flex-shrink-0 flex-wrap"
+        className="px-3 py-3 flex items-center gap-3 flex-shrink-0 flex-wrap"
         style={{ borderBottom: '1px solid var(--border)' }}
       >
         <input
@@ -880,17 +904,16 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
                       </td>
                       <td className="px-3 py-2">
                         <span
-                          className="text-xs px-2 py-0.5 rounded border"
-                          style={STATUS_STYLES[strategy.status] ?? { color: 'var(--text-muted)' }}
+                          style={{ ...STATUS_PILL_BASE, ...(STATUS_STYLES[strategy.status] ?? { color: 'var(--text-muted)' }) }}
                         >
                           {valStatus}
                         </span>
                       </td>
                       <td className="px-3 py-2">
                         {strategy.published ? (
-                          <span className="text-xs px-2 py-0.5 rounded border" style={STATUS_STYLES.valid}>Published</span>
+                          <span style={{ ...STATUS_PILL_BASE, ...STATUS_STYLES.valid }}>Published</span>
                         ) : (
-                          <span className="text-xs px-2 py-0.5 rounded border" style={STATUS_STYLES.draft}>Draft</span>
+                          <span style={{ ...STATUS_PILL_BASE, ...STATUS_STYLES.draft }}>Draft</span>
                         )}
                       </td>
                     </tr>
