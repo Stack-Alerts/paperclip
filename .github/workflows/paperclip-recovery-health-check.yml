@@ -29,7 +29,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests python-dotenv
 
-      - name: Run health check
+      - name: Run health check and report to Paperclip
         id: health
         env:
           PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
@@ -37,38 +37,47 @@ jobs:
           PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
           PAPERCLIP_BOARD_API_KEY: ${{ secrets.PAPERCLIP_BOARD_API_KEY }}
         run: |
-          FLAGS=""
-          if [ "${{ github.event.inputs.alert_on_unhealthy }}" = "true" ]; then
-            FLAGS="--alert-on-unhealthy"
-          fi
-          python scripts/paperclip_recovery_health_check.py --json-report $FLAGS > /tmp/health-report.json
-          echo "Health report written to /tmp/health-report.json"
+          python scripts/report_recovery_health_check.py > /tmp/health-report.txt
+          echo "Health report written to /tmp/health-report.txt"
 
-      - name: Generate stalled workflow report
+      - name: Capture report artifacts for step summary
         if: always()
         env:
           PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
           PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
           PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
         run: |
+          python scripts/paperclip_recovery_health_check.py --json-report > /tmp/health-report.json
           python scripts/paperclip_stalled_workflow_reporter.py --json-report > /tmp/stalled-workflows.json
-          echo "Stalled workflows report written to /tmp/stalled-workflows.json"
+          echo "Report artifacts captured"
 
       - name: Write step summary
         if: always()
         run: |
+          if [ -f /tmp/health-report.txt ]; then
+            cat /tmp/health-report.txt >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## PaperClip Recovery Monitor — Hourly Health Check" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Status:** Report generation failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
           python -c "
           import json
           import os
 
           lines = []
-          lines.append('## PaperClip Recovery Monitor — Hourly Health Check')
+          lines.append('### Detailed Health Metrics')
           lines.append('')
 
           # Health check report
           if os.path.exists('/tmp/health-report.json'):
             d = json.load(open('/tmp/health-report.json'))
-            lines.append('### Health Status')
+            lines.append('#### Health Status Details')
             lines.append('')
             lines.append('**Overall Status:** ' + d.get('overall_status', '?').upper())
             lines.append('')
@@ -84,27 +93,13 @@ jobs:
                     lines.append(f'| {check_name} | {status} | {detail_str} |')
                 lines.append('')
 
-            alerts = d.get('alerts', [])
-            if alerts:
-                lines.append('### 🚨 Alerts')
-                for alert in alerts:
-                    lines.append(f'- {alert}')
-                lines.append('')
-
-            warnings = d.get('warnings', [])
-            if warnings:
-                lines.append('### ⚠️ Warnings')
-                for warning in warnings:
-                    lines.append(f'- {warning}')
-                lines.append('')
-
           # Stalled workflows report
           if os.path.exists('/tmp/stalled-workflows.json'):
             d = json.load(open('/tmp/stalled-workflows.json'))
             summary = d.get('summary', {})
             total_issues = summary.get('total_issues_in_recovery', 0)
 
-            lines.append('### Stalled Workflows')
+            lines.append('#### Stalled Workflows Detailed View')
             lines.append('')
 
             if total_issues == 0:
@@ -117,7 +112,7 @@ jobs:
 
               scenarios = d.get('scenarios', {})
               if scenarios:
-                lines.append('By scenario:')
+                lines.append('**By scenario:**')
                 for scenario_id, scenario_data in scenarios.items():
                   name = scenario_data.get('scenario_name', scenario_id)
                   count = scenario_data.get('total_issues', 0)
@@ -125,7 +120,7 @@ jobs:
                     lines.append(f'- {name}: {count} issue(s)')
 
           print('\n'.join(lines))
-          " > $GITHUB_STEP_SUMMARY
+          " >> $GITHUB_STEP_SUMMARY
 
       - name: Upload reports and logs
         if: always()
