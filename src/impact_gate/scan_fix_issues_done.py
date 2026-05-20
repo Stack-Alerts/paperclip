@@ -114,15 +114,44 @@ def purge_muted_entries(status: str | None = None) -> int:
 
 
 def _check_gate_status(issue_id: str) -> str | None:
-    """Check if issue already has an Impact Gate result (from muted cache).
+    """Check if issue already has an Impact Gate result (cache-first, then comments).
 
-    Returns the gate status (PASS, FAIL, BYPASSED, ERROR, SKIPPED) or
-    None if no result found in cache.
+    Returns the gate status (PASS, FAIL, BYPASSED, ERROR, SKIPPED, SCANNED) or
+    None if no result found.
     """
+    # Check muted cache first
     muted = _load_muted_state()
     if issue_id in muted:
         return muted[issue_id]
+
+    # Fall back to checking comments for gate result markers
+    try:
+        comments = fetch_issue_comments(issue_id)
+        import re
+        _GATE_HEADER_RE = re.compile(
+            r"^## Impact Gate:\s+(PASS|FAIL|BYPASSED|ERROR|SKIPPED)", re.MULTILINE
+        )
+        for comment in reversed(comments):
+            body = comment.get("body", "")
+            m = _GATE_HEADER_RE.search(body)
+            if m:
+                return m.group(1)
+            # Also detect scan-done verification comments
+            if re.search(r"^## Impact Gate — Scan Done", body, re.MULTILINE):
+                return "SCANNED"
+    except Exception:
+        pass
     return None
+
+
+def process_issue(issue_id: str, dry_run: bool = False, force: bool = False) -> dict:
+    """Run the Impact Gate for a single issue (wrapper for testing).
+
+    This function is defined at module level to allow test monkeypatching.
+    It delegates to worker.process_issue().
+    """
+    from . import worker
+    return worker.process_issue(issue_id, dry_run=dry_run, force=force)
 
 
 def _is_fix_issue(issue: dict) -> bool:
@@ -144,26 +173,26 @@ def _is_recent(issue: dict, days_back: int) -> bool:
     if days_back is None:
         return True
 
-    # Get the completed timestamp from the issue
-    updated_at = issue.get("updatedAt")
-    if not updated_at:
-        return True  # Assume old issues are in scope if no timestamp
+    # Get the completed timestamp from the issue (falls back to updatedAt)
+    timestamp = issue.get("completedAt") or issue.get("updatedAt")
+    if not timestamp:
+        return True  # Assume issues are in scope if no timestamp
 
     try:
         # Parse ISO 8601 timestamp
-        if isinstance(updated_at, str):
+        if isinstance(timestamp, str):
             # Handle both "2026-05-16T12:34:56Z" and datetime objects
-            if updated_at.endswith("Z"):
-                updated_at = updated_at[:-1]
-            updated_dt = datetime.fromisoformat(updated_at)
+            if timestamp.endswith("Z"):
+                timestamp = timestamp[:-1]
+            timestamp_dt = datetime.fromisoformat(timestamp)
         else:
-            updated_dt = updated_at
+            timestamp_dt = timestamp
 
         cutoff = datetime.utcnow() - timedelta(days=days_back)
-        return updated_dt >= cutoff
+        return timestamp_dt >= cutoff
     except Exception as exc:
         log.warning("Failed to parse issue timestamp: %s", exc)
-        return True
+        return False  # Exclude issues with unparseable timestamps when days_back is set
 
 
 def _fetch_done_issues(days_back: int | None = None) -> list[dict]:
@@ -247,8 +276,9 @@ def scan(
         issue_id = issue.get("id", "")
         if not issue_id:
             continue
-        if issue_id in muted:
-            status = muted[issue_id].lower()
+        gate_status = _check_gate_status(issue_id)
+        if gate_status is not None:
+            status = gate_status.lower()
             # Map gate status to the expected keys
             if status == "pass":
                 gated_by_status["pass"] += 1
@@ -260,6 +290,8 @@ def scan(
                 gated_by_status["error"] += 1
             elif status == "skipped":
                 gated_by_status["skipped"] += 1
+            elif status == "scanned":
+                gated_by_status["scanned"] += 1
             else:
                 # Unknown status, count as skipped
                 gated_by_status["skipped"] += 1
@@ -291,17 +323,16 @@ def scan(
         "dry_run": dry_run,
     }
 
-    # Optionally run retroactive gates on ungated issues
-    if retroactive and ungated_issues:
+    # Optionally run retroactive gates on ungated issues (skip in dry_run mode)
+    if retroactive and ungated_issues and not dry_run:
         log.info("Running retroactive Impact Gate on %d ungated issues", ungated_count)
-        from . import worker
 
         retroactive_results = []
         for issue in ungated_issues:
             issue_id = issue.get("id", "")
             identifier = issue.get("identifier", issue_id)
             try:
-                gate_result = worker.process_issue(issue_id, dry_run=dry_run, force=True)
+                gate_result = process_issue(issue_id, dry_run=dry_run, force=True)
                 gate_status = gate_result.get("gate_status", "ERROR")
                 retroactive_results.append({
                     "issue": identifier,

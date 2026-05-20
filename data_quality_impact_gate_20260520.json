@@ -1,17 +1,17 @@
 {
-  "timestamp": "2026-05-20T04:53:45.085883Z",
+  "timestamp": "2026-05-20T11:21:49.748702+00:00",
   "impact_gate_scan": {
-    "total_done_fix_issues": 97,
+    "total_done_fix_issues": 299,
     "gated": {
-      "pass": 10,
-      "fail": 7,
-      "bypassed": 21,
-      "error": 10,
-      "skipped": 49
+      "pass": 0,
+      "fail": 0,
+      "bypassed": 6,
+      "error": 0,
+      "skipped": 10
     },
-    "ungated_count": 0,
-    "coverage_pct": 100.0,
+    "ungated_count": 283,
+    "coverage_pct": 5.4,
     "window_days": 7,
-    "last_24h": 55
+    "last_24h": 25
   }
 }

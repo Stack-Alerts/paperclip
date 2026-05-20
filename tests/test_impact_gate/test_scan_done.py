@@ -1,25 +1,28 @@
-"""Unit tests for scripts/scan_fix_issues_done.py."""
+"""Unit tests for src/impact_gate/scan_fix_issues_done.py."""
 
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parents[2] / "scripts"))
 sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
 
-import importlib
-
-_scan_path = Path(__file__).parents[2] / "scripts" / "scan_fix_issues_done.py"
-_spec = importlib.util.spec_from_file_location("scan_fix_issues_done", _scan_path)
-_scan = importlib.util.module_from_spec(_spec)
-sys.modules["scan_fix_issues_done"] = _scan
-_spec.loader.exec_module(_scan)
+import impact_gate.scan_fix_issues_done as _scan
 
 _is_fix = _scan._is_fix_issue
-_check_gate = _scan._check_gate_status
-_GATE_HEADER_RE = _scan._GATE_HEADER_RE
+
+# Import regex and gate check from daemon for those specific tests
+sys.path.insert(0, str(Path(__file__).parents[2] / "scripts"))
+import importlib
+_daemon_path = Path(__file__).parents[2] / "scripts" / "impact_gate_polling_daemon.py"
+_daemon_spec = importlib.util.spec_from_file_location("impact_gate_polling_daemon", _daemon_path)
+_daemon = importlib.util.module_from_spec(_daemon_spec)
+_daemon_spec.loader.exec_module(_daemon)
+
+_GATE_HEADER_RE = _daemon._GATE_HEADER_RE
+_check_gate = _daemon._check_gate_status
 
 
 class TestIsFixIssue:
@@ -108,9 +111,8 @@ One or more tests failed."""
 
 class TestCheckGateStatus:
     def test_detects_pass(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_load_muted_state", lambda: {})
         monkeypatch.setattr(
-            _scan,
+            _daemon,
             "fetch_issue_comments",
             lambda iid: [
                 {"body": "## Impact Gate: PASS\n\nAll tests passed."},
@@ -119,9 +121,8 @@ class TestCheckGateStatus:
         assert _check_gate("any-id") == "PASS"
 
     def test_detects_fail(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_load_muted_state", lambda: {})
         monkeypatch.setattr(
-            _scan,
+            _daemon,
             "fetch_issue_comments",
             lambda iid: [
                 {"body": "## Impact Gate: FAIL\n\nTests failed."},
@@ -130,9 +131,8 @@ class TestCheckGateStatus:
         assert _check_gate("any-id") == "FAIL"
 
     def test_detects_bypassed(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_load_muted_state", lambda: {})
         monkeypatch.setattr(
-            _scan,
+            _daemon,
             "fetch_issue_comments",
             lambda iid: [
                 {"body": "## Impact Gate: BYPASSED\n\nCEO bypass."},
@@ -141,9 +141,8 @@ class TestCheckGateStatus:
         assert _check_gate("any-id") == "BYPASSED"
 
     def test_returns_none_when_no_gate_comment(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_load_muted_state", lambda: {})
         monkeypatch.setattr(
-            _scan,
+            _daemon,
             "fetch_issue_comments",
             lambda iid: [
                 {"body": "Some other comment"},
@@ -153,14 +152,13 @@ class TestCheckGateStatus:
         assert _check_gate("any-id") is None
 
     def test_returns_none_on_empty_comments(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_load_muted_state", lambda: {})
-        monkeypatch.setattr(_scan, "fetch_issue_comments", lambda iid: [])
+        monkeypatch.setattr(_daemon, "fetch_issue_comments", lambda iid: [])
         assert _check_gate("any-id") is None
+
     def test_returns_most_recent_gate_result(self, monkeypatch):
         """When an issue has multiple gate comments (re-run), return the newest."""
-        monkeypatch.setattr(_scan, "_load_muted_state", lambda: {})
         monkeypatch.setattr(
-            _scan,
+            _daemon,
             "fetch_issue_comments",
             lambda iid: [
                 {"body": "## Impact Gate: FAIL\n\nTests failed."},
@@ -169,11 +167,9 @@ class TestCheckGateStatus:
         )
         assert _check_gate("any-id") == "PASS"
 
-
     def test_detects_skipped(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_load_muted_state", lambda: {})
         monkeypatch.setattr(
-            _scan,
+            _daemon,
             "fetch_issue_comments",
             lambda iid: [
                 {"body": "## Impact Gate: SKIPPED\n\nNo touched files found."},
@@ -182,12 +178,9 @@ class TestCheckGateStatus:
         assert _check_gate("any-id") == "SKIPPED"
 
     def test_handles_api_failure_gracefully(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_load_muted_state", lambda: {})
-        monkeypatch.setattr(
-            _scan,
-            "fetch_issue_comments",
-            lambda iid: (_ for _ in ()).throw(RuntimeError("API down")),
-        )
+        def raise_error(*args, **kwargs):
+            raise RuntimeError("API down")
+        monkeypatch.setattr(_daemon, "fetch_issue_comments", raise_error)
         assert _check_gate("any-id") is None
 
 
@@ -208,7 +201,7 @@ class TestScanFunction:
         }
 
     def test_scan_filters_fix_issues(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_load_muted_state", lambda: {})
+        monkeypatch.setattr(_daemon, "_load_muted_state", lambda: {})
         monkeypatch.setattr(
             _scan,
             "_paginate",
@@ -324,7 +317,7 @@ class TestScanFunction:
         assert result["gated"]["pass"] == 1
 
     def test_dry_run_does_not_run_retroactive(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_load_muted_state", lambda: {})
+        monkeypatch.setattr(_daemon, "_load_muted_state", lambda: {})
         monkeypatch.setattr(
             _scan,
             "_paginate",
@@ -354,7 +347,7 @@ class TestScanFunction:
         assert len(process_called) == 0
 
     def test_retroactive_runs_process_on_ungated(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_load_muted_state", lambda: {})
+        monkeypatch.setattr(_daemon, "_load_muted_state", lambda: {})
         monkeypatch.setattr(
             _scan,
             "_paginate",
@@ -388,7 +381,7 @@ class TestScanFunction:
         assert result["retroactive_results"][0]["gate_status"] == "PASS"
 
     def test_retroactive_handles_process_error(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_load_muted_state", lambda: {})
+        monkeypatch.setattr(_daemon, "_load_muted_state", lambda: {})
         monkeypatch.setattr(
             _scan,
             "_paginate",
@@ -419,7 +412,7 @@ class TestScanFunction:
         assert "runner crashed" in result["retroactive_results"][0]["error"]
 
     def test_scan_counts_all_gate_statuses(self, monkeypatch):
-        monkeypatch.setattr(_scan, "_load_muted_state", lambda: {})
+        monkeypatch.setattr(_daemon, "_load_muted_state", lambda: {})
         monkeypatch.setattr(
             _scan,
             "_paginate",
@@ -474,7 +467,7 @@ class TestScanFunction:
             status = mapping.get(iid, "PASS")
             return [{"body": f"## Impact Gate: {status}"}]
 
-        monkeypatch.setattr(_scan, "fetch_issue_comments", mock_comments)
+        monkeypatch.setattr(_daemon, "fetch_issue_comments", mock_comments)
         result = _scan.scan()
         assert result["total_done_fix_issues"] == 5
         assert result["gated"]["pass"] == 1
@@ -534,7 +527,7 @@ class TestScanFunction:
             if iid in ("u1", "u3"):
                 return [{"body": "## Impact Gate: PASS"}]
             return [{"body": "Other comment"}]
-        monkeypatch.setattr(_scan, "fetch_issue_comments", mock_comments)
+        monkeypatch.setattr(_daemon, "fetch_issue_comments", mock_comments)
         result = _scan.scan()
         l24 = result.get("last_24h", {})
         assert l24["total_done_fix_issues"] == 2, (

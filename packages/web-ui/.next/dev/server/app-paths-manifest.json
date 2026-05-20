@@ -1,4 +1,6 @@
 {
-  "/backtest/page": "app/backtest/page.js",
-  "/page": "app/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/page": "app/page.js",
+  "/strategy-browser/page": "app/strategy-browser/page.js",
+  "/strategy-builder/page": "app/strategy-builder/page.js"
 }
