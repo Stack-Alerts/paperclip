@@ -90,13 +90,13 @@ function getQualityLabel(pts: number) {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function SortHeader({
-  label, col, active, dir, onClick,
-}: { label: string; col: SortKey; active: SortKey; dir: SortDir; onClick: (c: SortKey) => void }) {
+  label, col, active, dir, onClick, className,
+}: { label: string; col: SortKey; active: SortKey; dir: SortDir; onClick: (c: SortKey) => void; className?: string }) {
   const isActive = col === active;
   return (
     <th
       onClick={() => onClick(col)}
-      className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide cursor-pointer whitespace-nowrap select-none"
+      className={className || "px-3 py-2 text-left text-xs font-medium uppercase tracking-wide cursor-pointer whitespace-nowrap select-none"}
       style={{ color: 'var(--text-secondary)' }}
       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}
@@ -512,15 +512,26 @@ export interface StrategyBrowserDialogProps {
   onClose: () => void;
   mode?: 'open' | 'save_as';
   standalone?: boolean;
+  // Initial visible-state seed used when the standalone window inherits state
+  // from the inline view at Pop Out time (BTCAAAAA-29371). All optional; the
+  // inline dialog leaves them undefined and uses its normal defaults.
+  initialSelectedId?: string | null;
+  initialSearchText?: string;
+  initialTypeFilter?: TypeFilter;
+  initialSortKey?: SortKey;
+  initialSortDir?: SortDir;
 }
 
-export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', standalone = false }: StrategyBrowserDialogProps) {
+export function StrategyBrowserDialog({
+  open, onSelect, onClose, mode = 'open', standalone = false,
+  initialSelectedId, initialSearchText, initialTypeFilter, initialSortKey, initialSortDir,
+}: StrategyBrowserDialogProps) {
   const { strategyList } = useStrategyStore();
-  const [searchText, setSearchText]   = useState('');
-  const [typeFilter, setTypeFilter]   = useState<TypeFilter>('all');
-  const [sortKey, setSortKey]         = useState<SortKey>('updated');
-  const [sortDir, setSortDir]         = useState<SortDir>('desc');
-  const [selectedId, setSelectedId]   = useState<string | null>(null);
+  const [searchText, setSearchText]   = useState<string>(initialSearchText ?? '');
+  const [typeFilter, setTypeFilter]   = useState<TypeFilter>(initialTypeFilter ?? 'all');
+  const [sortKey, setSortKey]         = useState<SortKey>(initialSortKey ?? 'updated');
+  const [sortDir, setSortDir]         = useState<SortDir>(initialSortDir ?? 'desc');
+  const [selectedId, setSelectedId]   = useState<string | null>(initialSelectedId ?? null);
   const [controlling, setControlling] = useState(false);
   const [controlMsg, setControlMsg]   = useState<string | null>(null);
   const [localList, setLocalList]     = useState<typeof strategyList | null>(null);
@@ -782,8 +793,19 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
   );
 
   const handlePopOut = useCallback(() => {
-    window.open('/strategy-browser', '_blank', 'width=1280,height=800,menubar=no,toolbar=no,location=no,status=no');
-  }, []);
+    // Carry the inline view's current selection + search/filter/sort into the
+    // popped-out window so it opens already showing the same state
+    // (BTCAAAAA-29371).
+    const params = new URLSearchParams();
+    if (selectedId) params.set('selectedId', selectedId);
+    if (searchText) params.set('q', searchText);
+    if (typeFilter !== 'all') params.set('type', typeFilter);
+    if (sortKey !== 'updated') params.set('sort', sortKey);
+    if (sortDir !== 'desc') params.set('dir', sortDir);
+    const qs = params.toString();
+    const url = qs ? `/strategy-browser?${qs}` : '/strategy-browser';
+    window.open(url, '_blank', 'width=1280,height=800,menubar=no,toolbar=no,location=no,status=no');
+  }, [selectedId, searchText, typeFilter, sortKey, sortDir]);
 
   if (!open) return null;
 
@@ -884,7 +906,7 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
           <table className="w-full text-sm border-collapse">
             <thead ref={tableTheadRef} className="sticky top-0 z-10" style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border)' }}>
               <tr>
-                <SortHeader label="Strategy Name" col="name"    active={sortKey} dir={sortDir} onClick={handleSort} />
+                <SortHeader label="Strategy Name" col="name"    active={sortKey} dir={sortDir} onClick={handleSort} className="pl-6 pr-3 py-2 text-left text-xs font-medium uppercase tracking-wide cursor-pointer whitespace-nowrap select-none" />
                 <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>Type</th>
                 <SortHeader label="Version"        col="version" active={sortKey} dir={sortDir} onClick={handleSort} />
                 <SortHeader label="Last Modified"  col="updated" active={sortKey} dir={sortDir} onClick={handleSort} />
@@ -895,19 +917,19 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
             <tbody>
               {listLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-sm italic" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={6} className="pl-6 pr-3 py-8 text-center text-sm italic" style={{ color: 'var(--text-muted)' }}>
                     Loading strategies…
                   </td>
                 </tr>
               ) : listError ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-sm" style={{ color: 'var(--accent-red)' }}>
+                  <td colSpan={6} className="pl-6 pr-3 py-8 text-center text-sm" style={{ color: 'var(--accent-red)' }}>
                     {listError}
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-sm italic" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={6} className="pl-6 pr-3 py-8 text-center text-sm italic" style={{ color: 'var(--text-muted)' }}>
                     {displayList.length === 0 ? 'No strategies yet' : 'No matching strategies'}
                   </td>
                 </tr>
@@ -935,7 +957,7 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
                       onMouseEnter={!isSelected ? e => { (e.currentTarget as HTMLTableRowElement).style.boxShadow = 'inset 0 0 0 1px rgba(46, 140, 255, 0.35)'; } : undefined}
                       onMouseLeave={!isSelected ? e => { (e.currentTarget as HTMLTableRowElement).style.boxShadow = ''; } : undefined}
                     >
-                      <td className="px-3 py-2">
+                      <td className="pl-6 pr-3 py-2">
                         <StrategyNameCell strategy={strategy} />
                       </td>
                       <td className="px-3 py-2 text-xs text-center">
