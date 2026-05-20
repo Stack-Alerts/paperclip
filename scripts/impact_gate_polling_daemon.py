@@ -49,6 +49,7 @@ from touch_index.paperclip_client import (
 )
 from blast_radius.worker import _is_fix_issue
 from impact_gate.worker import process_issue
+from impact_gate.scan_fix_issues_done import _load_muted_results
 import re
 
 # Daemon state directories and files
@@ -118,6 +119,110 @@ def _save_daemon_state(state: dict):
     DAEMON_STATE_FILE.write_text(json.dumps(state, indent=2))
 
 
+def _write_data_quality_snapshot(cycle_result: dict) -> None:
+    """Write data quality snapshot for Impact Gate scan-done monitoring.
+
+    The snapshot file is used by impact_gate_scan_health.py to verify
+    daemon freshness and coverage metrics.
+    """
+    # Get full list of done fix issues and their gate status
+    repo_root = Path(__file__).resolve().parent.parent
+
+    # Fetch all done fix issues to build comprehensive snapshot
+    done_issues = _fetch_done_fix_issues(lookback_minutes=None)
+
+    # Load muted results to check gate status
+    muted = _load_muted_results()
+
+    # Count gated by status
+    gated_by_status = {"pass": 0, "fail": 0, "bypassed": 0, "error": 0, "skipped": 0}
+    ungated_count = 0
+
+    for issue in done_issues:
+        issue_id = issue.get("id", "")
+        if not issue_id:
+            continue
+
+        # Check current cycle results first (more up-to-date)
+        found_in_cycle = False
+        for result in cycle_result.get("results", []):
+            if result.get("issue_id") == issue_id:
+                gate_status = result.get("gate_status", result.get("reason", "")).lower()
+                if result.get("action") == "skipped":
+                    reason = result.get("reason", "")
+                    if "already_gated" in reason:
+                        # Extract status from reason like "already_gated_pass"
+                        status_part = reason.split("already_gated_", 1)[-1]
+                        # Map "scanned" to "skipped" for consistency
+                        if status_part == "scanned":
+                            gated_by_status["skipped"] += 1
+                        elif status_part in gated_by_status:
+                            gated_by_status[status_part] += 1
+                        else:
+                            gated_by_status["skipped"] += 1
+                    else:
+                        gated_by_status["skipped"] += 1
+                elif result.get("action") == "gated":
+                    if gate_status in gated_by_status:
+                        gated_by_status[gate_status] += 1
+                    else:
+                        gated_by_status["skipped"] += 1
+                elif result.get("action") == "error":
+                    gated_by_status["error"] += 1
+                found_in_cycle = True
+                break
+
+        # Fall back to muted cache for other issues
+        if not found_in_cycle:
+            if issue_id in muted:
+                status = muted[issue_id].lower()
+                # Map unknown statuses (e.g., "scanned") to "skipped"
+                if status in gated_by_status:
+                    gated_by_status[status] += 1
+                else:
+                    gated_by_status["skipped"] += 1
+            else:
+                ungated_count += 1
+
+    total = len(done_issues)
+    gated_total = sum(gated_by_status.values())
+    coverage_pct = round((gated_total / total * 100), 1) if total > 0 else 0.0
+
+    # Count issues done in last 24h
+    last_24h_cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    last_24h_count = 0
+    for issue in done_issues:
+        ts = _parse_iso_ts(issue.get("completedAt"))
+        if ts is not None and ts >= last_24h_cutoff:
+            last_24h_count += 1
+
+    snapshot = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "impact_gate_scan": {
+            "total_done_fix_issues": total,
+            "gated": gated_by_status,
+            "ungated_count": ungated_count,
+            "coverage_pct": coverage_pct,
+            "window_days": 7,
+            "last_24h": last_24h_count,
+        },
+    }
+
+    # Write snapshot with today's date
+    today = datetime.now(timezone.utc).strftime("%Y%m%d")
+    snapshot_file = repo_root / f"data_quality_impact_gate_{today}.json"
+    snapshot_file.write_text(json.dumps(snapshot, indent=2))
+
+    logger.info(
+        "Wrote data quality snapshot: %s (total=%d, gated=%d, ungated=%d, coverage=%.1f%%)",
+        snapshot_file.name,
+        total,
+        gated_total,
+        ungated_count,
+        coverage_pct,
+    )
+
+
 def _check_gate_status(issue_id: str) -> str | None:
     """Check if issue already has an Impact Gate result or scan-done comment.
 
@@ -142,20 +247,30 @@ def _check_gate_status(issue_id: str) -> str | None:
     return None
 
 
-def _fetch_done_fix_issues(lookback_minutes: int = 10) -> list[dict]:
-    """Fetch fix/bug issues that transitioned to done recently."""
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=lookback_minutes)
+def _fetch_done_fix_issues(lookback_minutes: int | None = 10) -> list[dict]:
+    """Fetch fix/bug issues that transitioned to done recently.
+
+    If lookback_minutes is None, returns all done fix issues.
+    Otherwise, returns only those completed within the last lookback_minutes.
+    """
     issues = _paginate(
         f"/api/companies/{_company()}/issues",
         {"status": "done"},
         page_size=100,
     )
+
+    fix_issues = [i for i in issues if _is_fix_issue(i)]
+
+    if lookback_minutes is None:
+        return fix_issues
+
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=lookback_minutes)
     recent = []
-    for issue in issues:
+    for issue in fix_issues:
         ts = _parse_iso_ts(issue.get("completedAt"))
         if ts is None or ts >= cutoff:
             recent.append(issue)
-    return [i for i in recent if _is_fix_issue(i)]
+    return recent
 
 
 def poll_cycle(
@@ -312,6 +427,9 @@ def daemon_loop(
                 state=state,
             )
 
+            # Write data quality snapshot for monitoring
+            _write_data_quality_snapshot(cycle_result)
+
             # Update daemon state
             state["last_poll_utc"] = datetime.now(timezone.utc).isoformat()
             state["total_polls"] += 1
@@ -380,6 +498,9 @@ def main() -> int:
             lookback_minutes=args.lookback_minutes,
             dry_run=args.dry_run,
         )
+        # Write data quality snapshot for monitoring
+        if not args.dry_run:
+            _write_data_quality_snapshot(result)
         print(json.dumps(result, indent=2, default=str))  # noqa: T201
         return 0 if result.get("errors", 0) == 0 else 1
 
