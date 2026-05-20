@@ -9,7 +9,7 @@ import {
 } from '@/lib/strategy-builder/api';
 import { DeleteStrategyModal, DeleteScope } from './DeleteStrategyModal';
 import { DuplicateStrategyModal, DuplicateScope } from './DuplicateStrategyModal';
-import { Info, Settings, TrendingUp, Calendar, RefreshCw, CheckCircle } from 'lucide-react';
+import { Info, Settings, TrendingUp, Calendar, RefreshCw, CheckCircle, GitBranch, Save } from 'lucide-react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -703,7 +703,8 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
   if (!open) return null;
 
   const isSaveAs = mode === 'save_as';
-  const title = isSaveAs ? '💾 Save Strategy As' : '📚 Strategy Browser';
+  const TitleIcon = isSaveAs ? Save : GitBranch;
+  const titleText = isSaveAs ? 'Save Strategy As' : 'Strategy Browser';
   const confirmLabel = isSaveAs ? 'Save Here' : 'Open';
 
   const contentBox = (
@@ -725,8 +726,13 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
         className="flex items-center justify-between px-6 py-3 flex-shrink-0"
         style={{ borderBottom: '1px solid var(--border)' }}
       >
-        <h2 id="strategy-browser-title" className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-          {title}
+        <h2
+          id="strategy-browser-title"
+          className="text-sm font-semibold flex items-center gap-2"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          <TitleIcon style={{ width: 16, height: 16, flexShrink: 0 }} />
+          <span>{titleText}</span>
         </h2>
         <div className="flex items-center gap-2">
           {!standalone && (
