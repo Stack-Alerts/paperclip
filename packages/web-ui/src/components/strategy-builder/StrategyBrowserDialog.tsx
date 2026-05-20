@@ -816,12 +816,8 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', 
           className="text-sm font-semibold flex items-center gap-3"
           style={{ color: 'var(--text-secondary)' }}
         >
-          {standalone && (
-            <>
-              <AppBrand size={24} />
-              <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>—</span>
-            </>
-          )}
+          <AppBrand size={24} />
+          <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>—</span>
           <span className="flex items-center gap-2">
             <TitleIcon style={{ width: 16, height: 16, flexShrink: 0 }} />
             <span>{titleText}</span>
