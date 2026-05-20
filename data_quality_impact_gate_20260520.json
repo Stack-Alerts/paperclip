@@ -1,11 +1,11 @@
 {
-  "timestamp": "2026-05-20T04:53:45.085883Z",
+  "timestamp": "2026-05-20T06:20:49.890008Z",
   "impact_gate_scan": {
-    "total_done_fix_issues": 97,
+    "total_done_fix_issues": 89,
     "gated": {
       "pass": 10,
       "fail": 7,
-      "bypassed": 21,
+      "bypassed": 13,
       "error": 10,
       "skipped": 49
     },
