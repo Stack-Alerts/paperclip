@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-20T03:26:06.821655Z",
+  "timestamp": "2026-05-20T04:53:45.085883Z",
   "impact_gate_scan": {
     "total_done_fix_issues": 97,
     "gated": {
@@ -12,6 +12,6 @@
     "ungated_count": 0,
     "coverage_pct": 100.0,
     "window_days": 7,
-    "last_24h": 63
+    "last_24h": 55
   }
 }
