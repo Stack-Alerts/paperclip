@@ -319,7 +319,7 @@ function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate, onHighlig
   const mode = cfg?.exitMode ?? 'ABSOLUTE';
   return (
     <div className="flex items-center gap-2 ml-3 mt-1 text-xs pl-2 py-1 rounded border border-red-900/50" style={{ background: 'rgba(220,38,38,0.07)' }}>
-      <span style={{ color: 'var(--accent-red)' }}>↳ 🔴</span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--accent-red)' }}>↳ <ExitDot /></span>
       <span className="flex-1 min-w-0 truncate" style={{ color: 'var(--text-primary)' }}>
         <span
           className={`font-semibold${canHighlight ? ' hover:text-sky-300 transition-colors' : ''}`}
@@ -400,6 +400,24 @@ const BTN: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   fontSize: 11, cursor: 'pointer', flexShrink: 0, padding: '0 8px', fontWeight: 600,
 };
+
+function ExitDot({ size = 7 }: { size?: number }) {
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        flexShrink: 0,
+        verticalAlign: 'middle',
+        background: 'rgba(160, 45, 45, 0.80)',
+        boxShadow: '0 0 5px 1px rgba(200, 60, 60, 0.30), 0 0 2px 0px rgba(220, 80, 80, 0.50)',
+        border: '1px solid rgba(200, 70, 70, 0.35)',
+      }}
+    />
+  );
+}
 
 function DupIcon() {
   return (
@@ -626,7 +644,7 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate, o
     <div className="border-t flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
       <div className="px-4 py-2 flex items-center justify-between" style={{ background: 'color-mix(in srgb, var(--bg-panel) 60%, transparent)' }}>
         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-          🔴 Strategy Exit Conditions
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><ExitDot size={6} /> Strategy Exit Conditions</span>
         </span>
         <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{strategyExits.length} exit block{strategyExits.length !== 1 ? 's' : ''}</span>
       </div>
@@ -650,12 +668,11 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate, o
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <span
                         className={`font-semibold text-xs flex-shrink-0${defId ? ' transition-colors' : ''}`}
-                        style={{ color: 'var(--accent-red)' }}
+                        style={{ color: 'var(--accent-red)', cursor: defId ? 'pointer' : 'default' }}
                         onMouseEnter={defId ? e => { (e.currentTarget as HTMLSpanElement).style.color = 'var(--accent-sky)'; } : undefined}
                         onMouseLeave={defId ? e => { (e.currentTarget as HTMLSpanElement).style.color = 'var(--accent-red)'; } : undefined}
-                        style={{ cursor: defId ? 'pointer' : 'default' }}
                         onClick={() => { if (defId) onHighlightInLibrary(defId); }}
-                      >🔴 {name}</span>
+                      ><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><ExitDot size={6} /> {name}</span></span>
                       {cfg?.signalName && cfg.signalName !== name && (
                         <span
                           className={`text-xs truncate${defId ? ' hover:text-sky-300 transition-colors' : ''}`}

@@ -10,7 +10,7 @@ All REST and WebSocket endpoints call require_jwt() / ws_require_jwt().
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, Optional
 
 import jwt
 from fastapi import Depends, HTTPException, Query, WebSocket, status
@@ -41,7 +41,11 @@ _PUBLIC_KEY: str = os.environ.get("BTE_JWT_PUBLIC_KEY", _EMBEDDED_PUBLIC_KEY).st
 
 _ALGORITHMS = ["RS256"]
 
-_bearer = HTTPBearer(auto_error=True)
+# Set BTE_API_DEV_MODE=1 in .env to disable JWT validation for local development.
+# NEVER enable in production — all requests are accepted without a token.
+_DEV_MODE: bool = os.environ.get("BTE_API_DEV_MODE", "").lower() in ("1", "true", "yes")
+
+_bearer = HTTPBearer(auto_error=not _DEV_MODE)
 
 
 def _decode(token: str) -> dict[str, Any]:
@@ -66,9 +70,17 @@ def _decode(token: str) -> dict[str, Any]:
 
 
 async def require_jwt(
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
 ) -> dict[str, Any]:
     """FastAPI dependency: validates Bearer JWT for REST endpoints."""
+    if _DEV_MODE:
+        return {"sub": "dev", "dev_mode": True}
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return _decode(credentials.credentials)
 
 

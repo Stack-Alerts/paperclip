@@ -4,11 +4,12 @@ import { useState, useCallback, useMemo, useRef, useEffect, type CSSProperties }
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { Strategy, StrategyStatus, StrategyVersion, Block, BlockType } from '@/lib/strategy-builder/types';
 import {
-  enableStrategy, disableStrategy, deleteStrategyScoped, duplicateStrategyScoped,
-  createStrategy, listStrategies, getStrategyVersions,
+  deleteStrategyScoped, duplicateStrategyScoped,
+  createStrategy, listStrategies, getStrategyVersions, loadStrategyVersion,
 } from '@/lib/strategy-builder/api';
 import { DeleteStrategyModal, DeleteScope } from './DeleteStrategyModal';
 import { DuplicateStrategyModal, DuplicateScope } from './DuplicateStrategyModal';
+import { Info, Settings, TrendingUp, Calendar, RefreshCw, CheckCircle } from 'lucide-react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -47,10 +48,10 @@ function computeQualityScore(result: NonNullable<Strategy['backtestResults']>[nu
 }
 
 function getQualityLabel(pts: number) {
-  if (pts >= 6) return { label: 'Excellent', color: 'var(--accent-green)' };
-  if (pts >= 4) return { label: 'Good',      color: 'var(--accent-blue)' };
-  if (pts >= 2) return { label: 'Fair',      color: 'var(--accent-orange)' };
-  return               { label: 'Poor',      color: 'var(--accent-red)' };
+  if (pts >= 6) return { label: 'Excellent', dot: '#7cc27a', color: 'var(--accent-green)' };
+  if (pts >= 4) return { label: 'Good',      dot: '#60A5FA', color: 'var(--accent-blue)' };
+  if (pts >= 2) return { label: 'Fair',      dot: '#f97316', color: 'var(--accent-orange)' };
+  return               { label: 'Poor',      dot: '#c35252', color: 'var(--accent-red)' };
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -73,38 +74,147 @@ function SortHeader({
   );
 }
 
-function BlockHierarchyTree({ blocks }: { blocks: Block[] }) {
+function prettySignalName(s: string): string {
+  return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function fmtN(v: number | null | undefined, decimals: number, suffix = ''): string {
+  return v != null ? v.toFixed(decimals) + suffix : '—';
+}
+
+function StrategyNameCell({ strategy }: { strategy: Strategy }) {
+  // API-returned blocks have { name, signals[] } directly; local store blocks use { data.signals }
+  const blocks = strategy.blocks as unknown as Array<{ name: string; signals?: Array<{ name: string }> }>;
+  const MAX_BLOCKS = 3;
+  const shown = blocks.slice(0, MAX_BLOCKS);
+  const extra = blocks.length - MAX_BLOCKS;
+
+  return (
+    <div className="flex items-baseline flex-wrap gap-x-1 min-w-0" style={{ fontSize: '12px', lineHeight: '1.4' }}>
+      <span className="font-medium font-sans shrink-0" style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+        {strategy.name}
+      </span>
+      {blocks.length > 0 && (
+        <>
+          <span style={{ color: '#666666' }}>–</span>
+          {shown.map((b, i) => {
+            const sigs = (b.signals ?? []).map(s => prettySignalName(s.name));
+            return (
+              <span key={i} className="flex items-baseline gap-x-0.5">
+                <span style={{ color: '#00BCD4' }}>{b.name}</span>
+                {sigs.length > 0 && (
+                  <>
+                    <span style={{ color: '#666666' }}>[</span>
+                    <span style={{ color: '#81C784' }}>{sigs.join(', ')}</span>
+                    <span style={{ color: '#666666' }}>]</span>
+                  </>
+                )}
+                {(i < shown.length - 1 || extra > 0) && (
+                  <span style={{ color: '#666666' }}>&nbsp;|</span>
+                )}
+              </span>
+            );
+          })}
+          {extra > 0 && (
+            <span style={{ color: '#666666' }}>+ {extra} more</span>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// DB blocks: { name, logic, signals: [...], exit_conditions: [...] }
+// Store blocks: { id, type, data: { signals, timingConstraint, exits, recheckConfigs } }
+interface DBRecheckConfig { enabled?: boolean; bar_delay?: number; validation_mode?: string; }
+interface DBExitCondition { signal_name: string; percentage?: number; exit_mode?: string; binding_level?: string; recheck_config?: DBRecheckConfig; }
+interface DBSignal {
+  name: string; logic?: string;
+  timing_constraint?: { reference?: string; max_candles?: number } | null;
+  recheck_config?: DBRecheckConfig | null;
+  recheck_chain?: DBRecheckConfig[] | null;
+  exit_conditions?: DBExitCondition[];
+}
+type AnyBlock = Block | { name: string; logic?: string; signals?: DBSignal[]; exit_conditions?: DBExitCondition[] };
+
+function exitModeLabel(mode?: string): string {
+  return mode === 'ABSOLUTE' ? 'immediate exit' : 'TP-aware exit';
+}
+
+function recheckLabel(rc: DBRecheckConfig): string {
+  if (rc.validation_mode === 'RECHECK') return `RECHECK of RECHECK (WITHIN ${rc.bar_delay} bars)`;
+  if (rc.validation_mode === 'SIGNAL') return `RECHECK of Signal (WITHIN ${rc.bar_delay} bars)`;
+  return `RECHECK (WITHIN ${rc.bar_delay} bars)`;
+}
+
+function BlockHierarchyTree({ blocks }: { blocks: AnyBlock[] }) {
   if (blocks.length === 0) {
     return <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>No blocks configured</p>;
   }
   return (
     <div className="space-y-2 font-mono text-xs">
       {blocks.map((block, i) => {
-        const signals = (block.data?.signals as Array<{ name: string; logic?: string }> | undefined) ?? [];
-        const timing = block.data?.timingConstraint as { enabled?: boolean; maxCandles?: number } | undefined;
-        const exits = (block.data?.exits as Array<{ signalName: string; percentage?: number }> | undefined) ?? [];
+        const b = block as Record<string, unknown>;
+        const rawSignals = (b.signals ?? (b.data as Record<string, unknown> | undefined)?.signals ?? []) as DBSignal[];
+        const blockExits = (b.exit_conditions ?? []) as DBExitCondition[];
+        const label = (b.name as string | undefined) ?? BLOCK_TYPE_LABELS[(b.type as BlockType)] ?? String(b.type ?? '');
         return (
-          <div key={block.id} className="space-y-0.5">
-            <div style={{ color: 'var(--text-secondary)' }}>
-              <span className="font-bold" style={{ color: 'var(--accent-blue)' }}>#{i + 1}</span>{' '}
-              <span style={{ color: 'var(--text-primary)' }}>{BLOCK_TYPE_LABELS[block.type] ?? block.type}</span>
-              {timing?.enabled && (
-                <span className="ml-2" style={{ color: 'var(--accent-orange)' }}>⏱ {timing.maxCandles}c</span>
-              )}
+          <div key={i} className="space-y-0.5">
+            <div>
+              <span className="font-bold" style={{ color: '#00BCD4' }}>#{i + 1}</span>{' '}
+              <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
             </div>
-            {signals.map((sig, si) => (
-              <div key={si} className="ml-4" style={{ color: 'var(--text-secondary)' }}>
-                └── <span style={{ color: sig.logic === 'OR' ? 'var(--accent-blue)' : 'var(--accent-green)' }}>
-                  {sig.logic ?? 'AND'}
-                </span>{' '}
-                {sig.name}
+            {rawSignals.map((sig, si) => (
+              <div key={si}>
+                <div className="ml-4" style={{ color: 'var(--text-secondary)' }}>
+                  └── <span style={{ color: sig.logic === 'OR' ? 'var(--accent-blue)' : '#66BB6A' }}>
+                    {si + 1}. {sig.name} [{sig.logic ?? 'AND'}]
+                  </span>
+                </div>
+                {sig.timing_constraint && (
+                  <div className="ml-8" style={{ color: '#FFA500' }}>
+                    └── TIME CONSTRAINT
+                    <div className="ml-4" style={{ color: 'var(--text-muted)' }}>
+                      └── Within {sig.timing_constraint.max_candles} candles of previous signal
+                    </div>
+                  </div>
+                )}
+                {sig.recheck_config?.enabled && (
+                  <div className="ml-8" style={{ color: '#4ADE80' }}>
+                    └── RECHECK (WITHIN {sig.recheck_config.bar_delay} bars)
+                  </div>
+                )}
+                {(sig.recheck_chain ?? []).filter(rc => rc.enabled).map((rc, ri) => (
+                  <div key={ri} className="ml-8" style={{ color: '#60A5FA' }}>
+                    └── {recheckLabel(rc)}
+                  </div>
+                ))}
+                {(sig.exit_conditions ?? []).map((ec, ei) => (
+                  <div key={ei}>
+                    <div className="ml-8" style={{ color: 'var(--accent-red)' }}>
+                      └── EXIT: {ec.signal_name} - {ec.percentage != null ? Math.round(ec.percentage * 100) : 0}% {exitModeLabel(ec.exit_mode)} <span style={{ color: 'var(--text-muted)' }}>[SIGNAL]</span>
+                    </div>
+                    {ec.recheck_config?.enabled && (
+                      <div className="ml-12" style={{ color: '#4ADE80' }}>
+                        └── RECHECK (WITHIN {ec.recheck_config.bar_delay} bars)
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             ))}
-            {exits.map((exit, ei) => (
-              <div key={ei} className="ml-4" style={{ color: 'var(--accent-red)' }}>
-                └── 🔴 {exit.signalName}{exit.percentage != null ? ` (${exit.percentage}%)` : ''}
+            {blockExits.length > 0 && (
+              <div className="mt-1">
+                <div className="ml-4 font-semibold" style={{ color: '#81C784' }}>
+                  Block-Level Exit Conditions: ({label})
+                </div>
+                {blockExits.map((ec, ei) => (
+                  <div key={ei} className="ml-8" style={{ color: 'var(--accent-red)' }}>
+                    └── EXIT: {ec.signal_name} - {ec.percentage != null ? Math.round(ec.percentage * 100) : 0}% {exitModeLabel(ec.exit_mode)} <span style={{ color: 'var(--text-muted)' }}>[BLOCK]</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         );
       })}
@@ -123,119 +233,235 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
   const sType = strategy.strategyType ??
     (strategy.settings as { strategyType?: string }).strategyType;
 
+  // Parse description into block components with signal lists
+  const parseDescription = (desc: string) => {
+    const blocks = desc.split(/\s\+\s|\n/).filter(Boolean);
+    return blocks.map((line) => {
+      const trimmed = line.trim();
+      const match = trimmed.match(/^([^\(]+)\s*\((REQUIRED|OPTIONAL)\):\s*(.*)$/);
+      if (match) {
+        return {
+          name: match[1].trim(),
+          required: match[2] === 'REQUIRED',
+          signals: match[3].split(',').map((s) => s.trim()).filter(Boolean),
+        };
+      }
+      return { name: trimmed, required: false, signals: [] };
+    });
+  };
+
+  const descriptionBlocks = strategy.description ? parseDescription(strategy.description) : [];
+
   return (
-    <div className="grid grid-cols-3 gap-4 p-4" style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-deep)' }}>
+    <div className="grid grid-cols-3 gap-4 p-4 min-h-full" style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-deep)' }}>
       {/* Column 1: Strategy Info */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>📊 Strategy Info</p>
-        <div className="space-y-1.5">
-          <div>
-            <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{strategy.name}</p>
-            {strategy.versionNumber != null && (
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                v{strategy.versionNumber}
-                {strategy.versionId && (
-                  <span className="ml-1 font-mono" style={{ color: 'var(--text-faintest)' }}>{strategy.versionId.slice(0, 8)}</span>
-                )}
-              </p>
-            )}
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {strategy.blocks.length} block{strategy.blocks.length !== 1 ? 's' : ''} · {entryBlocks.length} entry · {exitBlocks.length} exit
-            </p>
-            {strategy.testCount != null && (
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Tests run: {strategy.testCount}</p>
+      <div className="space-y-4">
+        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+          <Info size={12} strokeWidth={1.5} />
+          Strategy Info
+        </div>
+
+        {/* Identity */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-secondary)' }}>{strategy.name}</p>
+            {sType && (
+              <span className="text-xs font-medium" style={{
+                color: sType.toLowerCase() === 'bullish' ? 'var(--accent-green)' : 'var(--accent-red)',
+              }}>
+                {sType.toLowerCase() === 'bullish' ? '▲' : '▼'} {sType.charAt(0).toUpperCase() + sType.slice(1).toLowerCase()}
+              </span>
             )}
           </div>
-          {sType && (
-            <p className="text-xs">
-              {sType === 'bullish' ? <span style={{ color: 'var(--accent-green)' }}>🟢 Bullish</span> :
-               sType === 'bearish' ? <span style={{ color: 'var(--accent-red)' }}>🔴 Bearish</span> :
-               <span style={{ color: 'var(--text-muted)' }}>{sType}</span>}
+          {strategy.versionNumber != null && (
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              v{strategy.versionNumber}
+              {strategy.versionId && (
+                <span className="ml-1.5" style={{ color: 'var(--text-faintest)' }}>{strategy.versionId.slice(0, 8)}</span>
+              )}
             </p>
           )}
-          {strategy.description && (
-            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{strategy.description}</p>
-          )}
-          <div className="text-xs space-y-0.5" style={{ color: 'var(--text-muted)' }}>
-            <p>Created: {new Date(strategy.createdAt).toLocaleDateString()}</p>
-            <p>Updated: {new Date(strategy.updatedAt).toLocaleDateString()}</p>
-          </div>
-          {strategy.tags && strategy.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {strategy.tags.map((tag) => (
-                <span key={tag} className="px-1.5 py-0.5 rounded text-xs" style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>{tag}</span>
+        </div>
+
+        {/* Blocks — numbered list, signals as sub-text */}
+        {descriptionBlocks.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+              Blocks ({descriptionBlocks.length})
+            </p>
+            <div className="space-y-2">
+              {descriptionBlocks.map((block, i) => (
+                <div key={i} className="space-y-0.5">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-xs shrink-0 tabular-nums" style={{ color: 'var(--text-faintest)' }}>#{i + 1}</span>
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{block.name}</span>
+                    <span className="text-xs ml-auto shrink-0" style={{
+                      color: block.required ? 'var(--accent-green)' : 'var(--text-muted)',
+                    }}>
+                      {block.required ? 'REQ' : 'opt'}
+                    </span>
+                  </div>
+                  {block.signals.length > 0 && (
+                    <p className="text-xs pl-5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                      {block.signals.join(', ')}
+                    </p>
+                  )}
+                </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Metadata — icon + label rows, no emoji */}
+        <div className="space-y-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <div className="flex items-center gap-1.5">
+            <Calendar size={11} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+            <span>Created {new Date(strategy.createdAt).toLocaleDateString()}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <RefreshCw size={11} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+            <span>Updated {new Date(strategy.updatedAt).toLocaleDateString()}</span>
+          </div>
+          {strategy.testCount != null && (
+            <div className="flex items-center gap-1.5">
+              <CheckCircle size={11} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+              <span>{strategy.testCount} test{strategy.testCount !== 1 ? 's' : ''}</span>
             </div>
           )}
         </div>
+
+        {/* Tags */}
+        {strategy.tags && strategy.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {strategy.tags.map((tag) => (
+              <span key={tag} className="px-2 py-0.5 rounded text-xs" style={{
+                background: 'var(--bg-card)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border)',
+              }}>{tag}</span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Column 2: Configuration Hierarchy */}
-      <div className="space-y-2 overflow-y-auto max-h-48">
-        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>⚙️ Configuration</p>
-        <BlockHierarchyTree blocks={strategy.blocks} />
+      <div className="space-y-2 overflow-y-auto">
+        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+          <Settings size={12} strokeWidth={1.5} />
+          Configuration
+        </div>
+        <BlockHierarchyTree blocks={strategy.blocks as AnyBlock[]} />
+        <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+          {strategy.blocks.length} block{strategy.blocks.length !== 1 ? 's' : ''}
+          {entryBlocks.length > 0 || exitBlocks.length > 0
+            ? ` · ${entryBlocks.length} entry · ${exitBlocks.length} exit`
+            : ''}
+        </p>
       </div>
 
       {/* Column 3: Performance */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>📈 Performance</p>
+      <div className="space-y-3">
+        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+          <TrendingUp size={12} strokeWidth={1.5} />
+          Performance
+        </div>
         {!result ? (
-          <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>No backtest results</p>
+          <div className="space-y-1">
+            <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>
+              Run backtest to see: Sharpe Ratio, Win Rate, Trade Stats
+            </p>
+          </div>
         ) : (
-          <div className="space-y-2 text-xs">
+          <div className="space-y-1.5 text-xs">
+            {/* Quality Score Badge */}
             {quality && (
-              <p className="font-semibold" style={{ color: quality.color }}>
-                {quality.label} ({qScore}/7)
-              </p>
+              <div className="px-2.5 py-1.5 rounded border flex items-center gap-2" style={{
+                background: quality.color === 'var(--accent-green)' ? 'rgba(124, 194, 122, 0.15)' :
+                           quality.color === 'var(--accent-blue)' ? 'rgba(96, 165, 250, 0.15)' :
+                           quality.color === 'var(--accent-orange)' ? 'rgba(249, 115, 22, 0.15)' :
+                           'rgba(195, 82, 82, 0.15)',
+                borderColor: quality.color === 'var(--accent-green)' ? 'rgba(124, 194, 122, 0.3)' :
+                            quality.color === 'var(--accent-blue)' ? 'rgba(96, 165, 250, 0.3)' :
+                            quality.color === 'var(--accent-orange)' ? 'rgba(249, 115, 22, 0.3)' :
+                            'rgba(195, 82, 82, 0.3)'
+              }}>
+                <span style={{ color: quality.dot, fontSize: '12px' }}>●</span>
+                <span className="font-semibold" style={{ color: quality.color }}>{quality.label}</span>
+                <span style={{ color: 'var(--text-muted)' }}>{qScore}/7</span>
+                {strategy.testCount != null && <span style={{ color: 'var(--text-muted)', marginLeft: 'auto' }}>{strategy.testCount} test{strategy.testCount !== 1 ? 's' : ''}</span>}
+              </div>
             )}
 
-            <div className="space-y-1">
-              <p className="uppercase tracking-wide font-medium" style={{ color: 'var(--text-muted)' }}>Trade Stats</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5" style={{ color: 'var(--text-secondary)' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Win Rate</span>
-                <span style={{ color: result.winRate >= 0.5 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-                  {(result.winRate * 100).toFixed(1)}%
-                </span>
-                <span style={{ color: 'var(--text-muted)' }}>Trades</span>
-                <span>{result.totalTrades} ({result.winningTrades}W/{result.losingTrades}L)</span>
+            {/* Trade Stats Section */}
+            <div className="px-2.5 py-1.5 rounded border" style={{ borderColor: 'var(--border)', background: 'rgba(0,0,0,0.1)' }}>
+              <p className="uppercase tracking-wide font-semibold mb-1 text-xs" style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>Trade Stats</p>
+              <div className="space-y-0.5">
+                <div className="flex items-center justify-between">
+                  <span style={{ color: 'var(--text-muted)' }}>Win Rate</span>
+                  <span style={{ color: (result.winRate ?? 0) >= 0.5 ? 'var(--accent-green)' : 'var(--accent-red)', fontWeight: 500 }}>
+                    {result.winRate != null ? (result.winRate * 100).toFixed(1) + '%' : '—'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span style={{ color: 'var(--text-muted)' }}>Trades</span>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>{result.totalTrades} ({result.winningTrades}W/{result.losingTrades}L)</span>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <p className="uppercase tracking-wide font-medium" style={{ color: 'var(--text-muted)' }}>Returns</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5" style={{ color: 'var(--text-secondary)' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Return</span>
-                <span style={{ color: result.returnPercentage >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-                  {result.returnPercentage >= 0 ? '+' : ''}{result.returnPercentage.toFixed(2)}%
-                </span>
-                <span style={{ color: 'var(--text-muted)' }}>Prof. Factor</span>
-                <span style={{ color: result.profitFactor >= 1 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-                  {result.profitFactor.toFixed(2)}
-                </span>
+            {/* Returns Section */}
+            <div className="px-2.5 py-1.5 rounded border" style={{ borderColor: 'var(--border)', background: 'rgba(0,0,0,0.1)' }}>
+              <p className="uppercase tracking-wide font-semibold mb-1 text-xs" style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>Returns</p>
+              <div className="space-y-0.5">
+                <div className="flex items-center justify-between">
+                  <span style={{ color: 'var(--text-muted)' }}>Return</span>
+                  <span style={{ color: (result.returnPercentage ?? 0) >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', fontWeight: 500 }}>
+                    {result.returnPercentage != null
+                      ? (result.returnPercentage >= 0 ? '+' : '') + result.returnPercentage.toFixed(2) + '%'
+                      : '—'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span style={{ color: 'var(--text-muted)' }}>Prof. Factor</span>
+                  <span style={{
+                    color: (result.profitFactor ?? 0) >= 1.5 ? 'var(--accent-green)' :
+                           (result.profitFactor ?? 0) >= 1.0 ? 'var(--accent-orange)' : 'var(--accent-red)',
+                    fontWeight: 500
+                  }}>
+                    {fmtN(result.profitFactor, 2)}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <p className="uppercase tracking-wide font-medium" style={{ color: 'var(--text-muted)' }}>Risk Metrics</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5" style={{ color: 'var(--text-secondary)' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Sharpe</span>
-                <span style={{ color: result.sharpeRatio >= 0.1 ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
-                  {result.sharpeRatio.toFixed(2)}
-                </span>
-                <span style={{ color: 'var(--text-muted)' }}>Sortino</span>
-                <span style={{ color: result.sortino_ratio >= 0.1 ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
-                  {result.sortino_ratio.toFixed(2)}
-                </span>
+            {/* Risk Metrics Section */}
+            <div className="px-2.5 py-1.5 rounded border" style={{ borderColor: 'var(--border)', background: 'rgba(0,0,0,0.1)' }}>
+              <p className="uppercase tracking-wide font-semibold mb-1 text-xs" style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>Risk Metrics</p>
+              <div className="space-y-0.5">
+                <div className="flex items-center justify-between">
+                  <span style={{ color: 'var(--text-muted)' }}>Sharpe</span>
+                  <span style={{ color: (result.sharpeRatio ?? 0) >= 1.0 ? 'var(--accent-green)' : (result.sharpeRatio ?? 0) >= 0.5 ? 'var(--accent-orange)' : 'var(--accent-red)', fontWeight: 500 }}>
+                    {fmtN(result.sharpeRatio, 2)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span style={{ color: 'var(--text-muted)' }}>Sortino</span>
+                  <span style={{ color: (result.sortino_ratio ?? 0) >= 1.0 ? 'var(--accent-green)' : (result.sortino_ratio ?? 0) >= 0.5 ? 'var(--accent-orange)' : 'var(--accent-red)', fontWeight: 500 }}>
+                    {fmtN(result.sortino_ratio, 2)}
+                  </span>
+                </div>
                 {result.calmar_ratio != null && (
-                  <>
+                  <div className="flex items-center justify-between">
                     <span style={{ color: 'var(--text-muted)' }}>Calmar</span>
-                    <span style={{ color: result.calmar_ratio >= 0.1 ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
+                    <span style={{ color: result.calmar_ratio >= 1.0 ? 'var(--accent-green)' : result.calmar_ratio >= 0.5 ? 'var(--accent-orange)' : 'var(--accent-red)', fontWeight: 500 }}>
                       {result.calmar_ratio.toFixed(2)}
                     </span>
-                  </>
+                  </div>
                 )}
-                <span style={{ color: 'var(--text-muted)' }}>Max DD</span>
-                <span style={{ color: 'var(--accent-orange)' }}>{result.maxDrawdown.toFixed(2)}%</span>
+                <div className="flex items-center justify-between">
+                  <span style={{ color: 'var(--text-muted)' }}>Max DD</span>
+                  <span style={{ color: 'var(--accent-red)', fontWeight: 500 }}>{fmtN(result.maxDrawdown, 2, '%')}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -252,9 +478,10 @@ export interface StrategyBrowserDialogProps {
   onSelect: (strategy: Strategy) => void;
   onClose: () => void;
   mode?: 'open' | 'save_as';
+  standalone?: boolean;
 }
 
-export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }: StrategyBrowserDialogProps) {
+export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open', standalone = false }: StrategyBrowserDialogProps) {
   const { strategyList } = useStrategyStore();
   const [searchText, setSearchText]   = useState('');
   const [typeFilter, setTypeFilter]   = useState<TypeFilter>('all');
@@ -267,6 +494,8 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDupModal, setShowDupModal]       = useState(false);
   const [versions, setVersions]               = useState<StrategyVersion[]>([]);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [detailOverride, setDetailOverride]    = useState<Strategy | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
   // Splitter state: table flex-basis percentage
@@ -276,27 +505,56 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
 
   const displayList = localList ?? strategyList;
 
+  const [listLoading, setListLoading] = useState(false);
+  const [listError, setListError]     = useState<string | null>(null);
+
   const refreshList = useCallback(async () => {
+    setListLoading(true);
+    setListError(null);
     try {
       const updated = await listStrategies();
       setLocalList(updated as typeof strategyList);
-    } catch {
+    } catch (e) {
+      setListError(e instanceof Error ? e.message : 'Failed to load strategies');
       setLocalList(null);
+    } finally {
+      setListLoading(false);
     }
   }, []);
+
+  // Fetch from DB every time the dialog opens (not just on user-triggered refresh)
+  useEffect(() => {
+    if (!open) return;
+    refreshList();
+  }, [open, refreshList]);
 
   const selectedStrategy = useMemo(
     () => displayList.find((s) => s.id === selectedId) ?? null,
     [displayList, selectedId],
   );
+  // DetailsPanel shows the version-overridden data when a different version is selected
+  const detailsStrategy = detailOverride ?? selectedStrategy;
 
-  // Load versions when selection changes
+  // Load versions when selection changes; reset version override
   useEffect(() => {
-    if (!selectedId) { setVersions([]); return; }
+    if (!selectedId) { setVersions([]); setSelectedVersionId(null); setDetailOverride(null); return; }
+    const currentVersionId = displayList.find(s => s.id === selectedId)?.versionId ?? null;
+    setSelectedVersionId(currentVersionId);
+    setDetailOverride(null);
     getStrategyVersions(selectedId)
       .then((v) => setVersions((v as StrategyVersion[]) ?? []))
       .catch(() => setVersions([]));
-  }, [selectedId]);
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleVersionChange = useCallback(async (strategyId: string, versionId: string) => {
+    setSelectedVersionId(versionId);
+    try {
+      const data = await loadStrategyVersion(strategyId, versionId);
+      setDetailOverride(data as Strategy);
+    } catch {
+      setDetailOverride(null);
+    }
+  }, []);
 
   // Drag-to-resize splitter
   const onSplitterMouseDown = useCallback((e: React.MouseEvent) => {
@@ -323,27 +581,34 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
   }, [splitPct]);
 
   const handleSort = useCallback((col: SortKey) => {
-    setSortKey((prev) => {
-      if (prev === col) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
-      else setSortDir('asc');
-      return col;
-    });
-  }, []);
+    if (col === sortKey) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(col);
+      setSortDir('asc');
+    }
+  }, [sortKey]);
 
   const filtered = useMemo(() => {
     let result = [...displayList];
     if (searchText) {
       const q = searchText.toLowerCase();
-      result = result.filter((s) =>
-        s.name.toLowerCase().includes(q) ||
-        (s.description?.toLowerCase().includes(q) ?? false) ||
-        s.blocks.some((b) => BLOCK_TYPE_LABELS[b.type]?.toLowerCase().includes(q)),
-      );
+      result = result.filter((s) => {
+        const sType = s.strategyType ?? (s.settings as { strategyType?: string }).strategyType ?? '';
+        const dateStr = new Date(s.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        return (
+          s.name.toLowerCase().includes(q) ||
+          (s.description?.toLowerCase().includes(q) ?? false) ||
+          sType.toLowerCase().includes(q) ||
+          dateStr.includes(q) ||
+          s.blocks.some((b) => BLOCK_TYPE_LABELS[b.type]?.toLowerCase().includes(q))
+        );
+      });
     }
     if (typeFilter !== 'all') {
       result = result.filter((s) => {
         const t = s.strategyType ?? (s.settings as { strategyType?: string }).strategyType;
-        return t === typeFilter;
+        return t?.toLowerCase() === typeFilter;
       });
     }
     result.sort((a, b) => {
@@ -358,22 +623,6 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
     });
     return result;
   }, [displayList, searchText, typeFilter, sortKey, sortDir]);
-
-  const handleEnable = useCallback(async () => {
-    if (!selectedId) return;
-    setControlling(true); setControlMsg(null);
-    try { await enableStrategy(selectedId); setControlMsg('Strategy enabled'); await refreshList(); }
-    catch { setControlMsg('Enable failed'); }
-    finally { setControlling(false); }
-  }, [selectedId, refreshList]);
-
-  const handleDisable = useCallback(async () => {
-    if (!selectedId) return;
-    setControlling(true); setControlMsg(null);
-    try { await disableStrategy(selectedId); setControlMsg('Strategy disabled'); await refreshList(); }
-    catch { setControlMsg('Disable failed'); }
-    finally { setControlling(false); }
-  }, [selectedId, refreshList]);
 
   const handleDeleteConfirm = useCallback(async (scope: DeleteScope, versionIds?: string[]) => {
     if (!selectedId) return;
@@ -447,35 +696,51 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
     [selectedId, onClose, handleSelect],
   );
 
+  const handlePopOut = useCallback(() => {
+    window.open('/strategy-browser', '_blank', 'width=1280,height=800,menubar=no,toolbar=no,location=no,status=no');
+  }, []);
+
   if (!open) return null;
 
   const isSaveAs = mode === 'save_as';
   const title = isSaveAs ? '💾 Save Strategy As' : '📚 Strategy Browser';
-  const confirmLabel = isSaveAs ? 'Save Here' : 'Load Strategy';
+  const confirmLabel = isSaveAs ? 'Save Here' : 'Open';
 
-  return (
+  const contentBox = (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="strategy-browser-title"
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      onKeyDown={handleKeyDown}
+      className="relative w-full flex flex-col"
+      style={{
+        maxWidth: standalone ? '100%' : '2560px',
+        width: '100%',
+        height: '100%',
+        borderRadius: 0,
+        border: '1px solid var(--border)',
+        background: 'var(--bg-panel)',
+        boxShadow: standalone ? 'none' : '0 25px 50px -12px rgba(0,0,0,0.5)',
+      }}
     >
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
 
+      {/* Header */}
       <div
-        className="relative w-full max-w-5xl rounded-lg shadow-2xl mx-4 flex flex-col max-h-[88vh]"
-        style={{ border: '1px solid var(--border)', background: 'var(--bg-panel)' }}
+        className="flex items-center justify-between px-6 py-3 flex-shrink-0"
+        style={{ borderBottom: '1px solid var(--border)' }}
       >
-
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-6 py-3 flex-shrink-0"
-          style={{ borderBottom: '1px solid var(--border)' }}
-        >
-          <h2 id="strategy-browser-title" className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {title}
-          </h2>
+        <h2 id="strategy-browser-title" className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+          {title}
+        </h2>
+        <div className="flex items-center gap-2">
+          {!standalone && (
+            <button
+              onClick={handlePopOut}
+              title="Open this browser in a separate window that can be moved to another monitor"
+              className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
+              style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
+            >
+              ↗ Pop Out
+            </button>
+          )}
           <button
             onClick={onClose}
             className="text-lg transition-colors"
@@ -485,263 +750,259 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
           >✕</button>
         </div>
+      </div>
 
-        {/* Filters + toolbar */}
-        <div
-          className="px-6 py-3 flex items-center gap-3 flex-shrink-0 flex-wrap"
-          style={{ borderBottom: '1px solid var(--border)' }}
+      {/* Filters */}
+      <div
+        className="px-6 py-3 flex items-center gap-3 flex-shrink-0 flex-wrap"
+        style={{ borderBottom: '1px solid var(--border)' }}
+      >
+        <input
+          type="text"
+          placeholder="Search strategies, blocks…"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          className="flex-1 min-w-48 px-3 py-1.5 rounded text-sm focus:outline-none"
+          style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
+          title="Filter strategies by name — updates results as you type"
+        />
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
+          className="px-2 py-1.5 rounded text-sm focus:outline-none"
+          style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-secondary)' }}
+          title="Filter strategies by market direction — Bullish (long) or Bearish (short)"
         >
-          <input
-            type="text"
-            placeholder="Search strategies, blocks…"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="flex-1 min-w-48 px-3 py-1.5 rounded text-sm focus:outline-none"
-            style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
-          />
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
-            className="px-2 py-1.5 rounded text-sm focus:outline-none"
-            style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--input-text)' }}
-          >
-            <option value="all">All Types</option>
-            <option value="bullish">🟢 Bullish</option>
-            <option value="bearish">🔴 Bearish</option>
-          </select>
+          <option value="all">All Types</option>
+          <option value="bullish">🟢 Bullish</option>
+          <option value="bearish">🔴 Bearish</option>
+        </select>
 
-          <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
-            {filtered.length} strateg{filtered.length !== 1 ? 'ies' : 'y'}
-          </span>
+        <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+          {filtered.length} strateg{filtered.length !== 1 ? 'ies' : 'y'}
+        </span>
+      </div>
 
-          {/* Import/Export — only in open mode */}
-          {!isSaveAs && (
-            <div className="flex items-center gap-1.5 ml-auto">
-              <button
-                onClick={handleExportJson}
-                disabled={!selectedStrategy}
-                title="Export selected strategy to JSON"
-                className="px-2.5 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
-                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
-              >
-                📥 Export JSON
-              </button>
-              <label
-                title="Import strategy from JSON file"
-                className="px-2.5 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors"
-                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLLabelElement).style.background = 'var(--bg-hover)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLLabelElement).style.background = 'var(--bg-card)'; }}
-              >
-                📤 Import JSON
-                <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImportJson} />
-              </label>
+      {/* Resizable table + details area */}
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        {/* Table */}
+        <div className="overflow-y-auto" style={{ flex: `0 0 ${splitPct}%` }}>
+          <table className="w-full text-sm border-collapse">
+            <thead className="sticky top-0 z-10" style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border)' }}>
+              <tr>
+                <SortHeader label="Strategy Name" col="name"    active={sortKey} dir={sortDir} onClick={handleSort} />
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>Type</th>
+                <SortHeader label="Version"        col="version" active={sortKey} dir={sortDir} onClick={handleSort} />
+                <SortHeader label="Last Modified"  col="updated" active={sortKey} dir={sortDir} onClick={handleSort} />
+                <SortHeader label="Validation"     col="status"  active={sortKey} dir={sortDir} onClick={handleSort} />
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>Published</th>
+              </tr>
+            </thead>
+            <tbody>
+              {listLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-3 py-8 text-center text-sm italic" style={{ color: 'var(--text-muted)' }}>
+                    Loading strategies…
+                  </td>
+                </tr>
+              ) : listError ? (
+                <tr>
+                  <td colSpan={6} className="px-3 py-8 text-center text-sm" style={{ color: 'var(--accent-red)' }}>
+                    {listError}
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-3 py-8 text-center text-sm italic" style={{ color: 'var(--text-muted)' }}>
+                    {displayList.length === 0 ? 'No strategies yet' : 'No matching strategies'}
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((strategy, idx) => {
+                  const isSelected = strategy.id === selectedId;
+                  const sType = strategy.strategyType ?? (strategy.settings as { strategyType?: string }).strategyType;
+                  const valStatus = strategy.validationStatus ??
+                    (strategy.status === StrategyStatus.VALID ? 'Pass' :
+                     strategy.status === StrategyStatus.INVALID ? 'Fail' : 'Un-Validated');
+                  return (
+                    <tr
+                      key={strategy.id}
+                      onClick={() => setSelectedId(strategy.id)}
+                      onDoubleClick={() => handleRowDoubleClick(strategy)}
+                      className={`border-b cursor-pointer transition-colors ${isSelected ? 'border-l-2' : ''}`}
+                      style={{
+                        borderBottomColor: 'var(--border)',
+                        borderLeftColor: isSelected ? 'var(--accent-blue)' : 'var(--border)',
+                        background: isSelected
+                          ? 'var(--accent-blue-mid)'
+                          : idx % 2 === 0 ? 'var(--bg-panel)' : 'var(--bg-card)',
+                      }}
+                      onMouseEnter={!isSelected ? e => { (e.currentTarget as HTMLTableRowElement).style.boxShadow = 'inset 0 0 0 1px rgba(46, 140, 255, 0.35)'; } : undefined}
+                      onMouseLeave={!isSelected ? e => { (e.currentTarget as HTMLTableRowElement).style.boxShadow = ''; } : undefined}
+                    >
+                      <td className="px-3 py-2">
+                        <StrategyNameCell strategy={strategy} />
+                      </td>
+                      <td className="px-3 py-2 text-xs text-center">
+                        {sType?.toLowerCase() === 'bullish'
+                          ? <span><span style={{ color: '#7cc27a' }}>●</span><span style={{ color: '#9CA3AF' }}> Bullish</span></span>
+                          : sType?.toLowerCase() === 'bearish'
+                          ? <span><span style={{ color: '#c35252' }}>●</span><span style={{ color: '#9CA3AF' }}> Bearish</span></span>
+                          : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-center" style={{ color: 'var(--text-secondary)' }}>
+                        {isSelected && versions.length > 1 ? (
+                          <select
+                            value={selectedVersionId ?? strategy.versionId ?? ''}
+                            onChange={e => handleVersionChange(strategy.id, e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                            className="rounded text-xs px-1 py-0.5 focus:outline-none"
+                            style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                          >
+                            {versions.map(v => (
+                              <option key={v.id} value={v.id}>v{v.versionNumber}{v.isLatest ? ' (latest)' : ''}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          strategy.versionNumber != null ? `v${strategy.versionNumber}` : '—'
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
+                        {new Date(strategy.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                        {' '}
+                        {new Date(strategy.updatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className="text-xs px-2 py-0.5 rounded border"
+                          style={STATUS_STYLES[strategy.status] ?? { color: 'var(--text-muted)' }}
+                        >
+                          {valStatus}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        {strategy.published ? (
+                          <span className="text-xs px-2 py-0.5 rounded border" style={STATUS_STYLES.valid}>Published</span>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 rounded border" style={STATUS_STYLES.draft}>Draft</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Splitter handle */}
+        <div
+          ref={splitterRef}
+          onMouseDown={onSplitterMouseDown}
+          className="flex-shrink-0 flex items-center justify-center h-2 cursor-row-resize select-none transition-colors"
+          style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-hover)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-card)'; }}
+          title="Drag to resize"
+        >
+          <span className="text-xs tracking-widest select-none" style={{ color: 'var(--text-muted)' }}>⋯</span>
+        </div>
+
+        {/* Details panel */}
+        <div className="overflow-y-auto" style={{ flex: `0 0 ${100 - splitPct}%`, background: 'var(--bg-deep)' }}>
+          {detailsStrategy ? (
+            <DetailsPanel strategy={detailsStrategy} />
+          ) : (
+            <div className="flex items-center justify-center h-full text-xs italic py-8" style={{ color: 'var(--text-muted)' }}>
+              Select a strategy to view details
             </div>
           )}
         </div>
-
-        {/* Resizable table + details area */}
-        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          {/* Table */}
-          <div className="overflow-y-auto" style={{ flex: `0 0 ${splitPct}%` }}>
-            <table className="w-full text-sm border-collapse">
-              <thead className="sticky top-0 z-10" style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border)' }}>
-                <tr>
-                  <SortHeader label="Strategy Name" col="name"    active={sortKey} dir={sortDir} onClick={handleSort} />
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>Type</th>
-                  <SortHeader label="Version"        col="version" active={sortKey} dir={sortDir} onClick={handleSort} />
-                  <SortHeader label="Last Modified"  col="updated" active={sortKey} dir={sortDir} onClick={handleSort} />
-                  <SortHeader label="Validation"     col="status"  active={sortKey} dir={sortDir} onClick={handleSort} />
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>Published</th>
-                  {!isSaveAs && <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={isSaveAs ? 6 : 7} className="px-3 py-8 text-center text-sm italic" style={{ color: 'var(--text-muted)' }}>
-                      {displayList.length === 0 ? 'No strategies yet' : 'No matching strategies'}
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((strategy) => {
-                    const isSelected = strategy.id === selectedId;
-                    const sType = strategy.strategyType ?? (strategy.settings as { strategyType?: string }).strategyType;
-                    const valStatus = strategy.validationStatus ??
-                      (strategy.status === StrategyStatus.VALID ? 'Pass' :
-                       strategy.status === StrategyStatus.INVALID ? 'Fail' : 'Un-Validated');
-                    return (
-                      <tr
-                        key={strategy.id}
-                        onClick={() => setSelectedId(strategy.id)}
-                        onDoubleClick={() => handleRowDoubleClick(strategy)}
-                        className={`border-b cursor-pointer transition-colors ${isSelected ? 'border-l-2' : ''}`}
-                        style={{
-                          borderColor: 'var(--border)',
-                          ...(isSelected
-                            ? { background: 'var(--accent-blue-dark)', borderLeftColor: 'var(--accent-blue)' }
-                            : {}),
-                        }}
-                        onMouseEnter={!isSelected ? e => { (e.currentTarget as HTMLTableRowElement).style.background = 'var(--bg-hover)'; } : undefined}
-                        onMouseLeave={!isSelected ? e => { (e.currentTarget as HTMLTableRowElement).style.background = ''; } : undefined}
-                      >
-                        <td className="px-3 py-2">
-                          <span className="font-medium truncate block max-w-xs" style={{ color: 'var(--text-primary)' }} title={strategy.name}>
-                            {strategy.name}
-                          </span>
-                          {strategy.description && (
-                            <span className="text-xs block truncate max-w-xs" style={{ color: 'var(--text-muted)' }}>{strategy.description}</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-xs text-center">
-                          {sType === 'bullish' ? <span style={{ color: 'var(--accent-green)' }}>🟢 Bullish</span> :
-                           sType === 'bearish' ? <span style={{ color: 'var(--accent-red)' }}>🔴 Bearish</span> :
-                           <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                        </td>
-                        <td className="px-3 py-2 text-xs text-center" style={{ color: 'var(--text-secondary)' }}>
-                          {strategy.versionNumber != null ? `v${strategy.versionNumber}` : '—'}
-                        </td>
-                        <td className="px-3 py-2 text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                          {new Date(strategy.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}
-                          {' '}
-                          {new Date(strategy.updatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                        </td>
-                        <td className="px-3 py-2">
-                          <span className="text-xs px-2 py-0.5 rounded border" style={STATUS_STYLES[strategy.status] ?? { color: 'var(--text-muted)' }}>
-                            {valStatus}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">
-                          {strategy.published ? (
-                            <span className="text-xs px-2 py-0.5 rounded border" style={STATUS_STYLES.valid}>Published</span>
-                          ) : (
-                            <span className="text-xs px-2 py-0.5 rounded border" style={STATUS_STYLES.draft}>Draft</span>
-                          )}
-                        </td>
-                        {!isSaveAs && (
-                          <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => { setSelectedId(strategy.id); setShowDupModal(true); }}
-                                disabled={controlling}
-                                title="Duplicate"
-                                className="px-2 py-1 rounded text-xs disabled:opacity-40 transition-colors"
-                                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
-                                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
-                              >
-                                ⧉
-                              </button>
-                              <button
-                                onClick={() => { setSelectedId(strategy.id); setShowDeleteModal(true); }}
-                                disabled={controlling}
-                                title="Delete"
-                                className="px-2 py-1 rounded text-xs disabled:opacity-40 transition-colors"
-                                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                                onMouseEnter={e => {
-                                  const el = e.currentTarget as HTMLButtonElement;
-                                  el.style.background = 'var(--accent-red-deeper)';
-                                  el.style.color = 'var(--accent-red)';
-                                  el.style.borderColor = 'var(--accent-red-dark)';
-                                }}
-                                onMouseLeave={e => {
-                                  const el = e.currentTarget as HTMLButtonElement;
-                                  el.style.background = 'var(--bg-card)';
-                                  el.style.color = 'var(--text-secondary)';
-                                  el.style.borderColor = 'var(--border)';
-                                }}
-                              >
-                                🗑
-                              </button>
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Splitter handle */}
-          <div
-            ref={splitterRef}
-            onMouseDown={onSplitterMouseDown}
-            className="flex-shrink-0 flex items-center justify-center h-2 cursor-row-resize select-none transition-colors"
-            style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-hover)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-card)'; }}
-            title="Drag to resize"
-          >
-            <span className="text-xs tracking-widest select-none" style={{ color: 'var(--text-muted)' }}>⋯</span>
-          </div>
-
-          {/* Details panel */}
-          <div className="overflow-y-auto" style={{ flex: `0 0 ${100 - splitPct}%` }}>
-            {selectedStrategy ? (
-              <DetailsPanel strategy={selectedStrategy} />
-            ) : (
-              <div className="flex items-center justify-center h-full text-xs italic py-8" style={{ color: 'var(--text-muted)' }}>
-                Select a strategy to view details
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div
-          className="flex items-center justify-between gap-3 px-6 py-3 flex-shrink-0"
-          style={{ borderTop: '1px solid var(--border)' }}
-        >
-          <div className="flex items-center gap-2 flex-wrap">
-            {!isSaveAs && selectedStrategy?.status === StrategyStatus.ACTIVE ? (
-              <button
-                onClick={handleDisable}
-                disabled={controlling}
-                className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-50 transition-colors"
-                style={{ background: 'var(--accent-orange)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-orange)' }}
-              >
-                {controlling ? 'Working…' : 'Disable Strategy'}
-              </button>
-            ) : !isSaveAs && selectedStrategy && [StrategyStatus.VALID, StrategyStatus.BACKTESTED].includes(selectedStrategy.status) ? (
-              <button
-                onClick={handleEnable}
-                disabled={controlling}
-                className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-50 transition-colors"
-                style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-green)' }}
-              >
-                {controlling ? 'Working…' : 'Enable Strategy'}
-              </button>
-            ) : null}
-            {controlMsg && <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{controlMsg}</span>}
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-1.5 rounded text-sm font-medium transition-colors"
-              style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSelect}
-              disabled={!selectedId}
-              className="px-4 py-1.5 rounded text-sm font-medium disabled:opacity-50 transition-colors"
-              style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-blue)' }}
-            >
-              {confirmLabel}
-            </button>
-          </div>
-        </div>
       </div>
 
-      {/* Delete modal */}
+      {/* Footer */}
+      <div
+        className="flex items-center justify-between gap-3 px-6 py-3 flex-shrink-0"
+        style={{ borderTop: '1px solid var(--border)' }}
+      >
+        {/* Left: action buttons (selection-dependent except Import) */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            disabled={!selectedStrategy || controlling}
+            title="Permanently delete the selected strategy and all its versions from the database"
+            className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
+            style={{ background: 'var(--accent-red-deeper)', color: 'var(--accent-red)', border: '1px solid var(--accent-red-dark)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-red-dark)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-red-deeper)'; }}
+          >
+            🗑️ Delete
+          </button>
+          <button
+            onClick={() => setShowDupModal(true)}
+            disabled={!selectedStrategy || controlling}
+            title="Create a copy of the selected strategy as a new entry"
+            className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
+            style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
+          >
+            📋 Duplicate
+          </button>
+          <button
+            onClick={handleExportJson}
+            disabled={!selectedStrategy}
+            title="Export the selected strategy's configuration to a JSON file"
+            className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
+            style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
+          >
+            📥 Export JSON
+          </button>
+          <label
+            title="Import a strategy configuration from a previously exported JSON file"
+            className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors"
+            style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLLabelElement).style.background = 'var(--bg-hover)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLLabelElement).style.background = 'var(--bg-card)'; }}
+          >
+            📤 Import JSON
+            <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImportJson} />
+          </label>
+          {controlMsg && (
+            <span className="text-xs ml-1" style={{ color: 'var(--text-secondary)' }}>{controlMsg}</span>
+          )}
+        </div>
+
+        {/* Right: Cancel + Open/Save */}
+        <div className="flex gap-2 flex-shrink-0">
+          <button
+            onClick={onClose}
+            title="Close the browser without opening or saving a strategy"
+            className="px-4 py-1.5 rounded text-sm font-medium transition-colors"
+            style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSelect}
+            disabled={!selectedId}
+            title={isSaveAs ? 'Save the strategy to the selected location' : 'Open the selected strategy in the Strategy Builder'}
+            className="px-4 py-1.5 rounded text-sm font-medium disabled:opacity-50 transition-colors"
+            style={{ background: 'var(--accent-purple, var(--accent-blue))', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-purple, var(--accent-blue))' }}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const modals = (
+    <>
       {showDeleteModal && selectedStrategy && (
         <DeleteStrategyModal
           strategy={selectedStrategy}
@@ -750,8 +1011,6 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
           onCancel={() => setShowDeleteModal(false)}
         />
       )}
-
-      {/* Duplicate modal */}
       {showDupModal && selectedStrategy && (
         <DuplicateStrategyModal
           strategy={selectedStrategy}
@@ -759,6 +1018,25 @@ export function StrategyBrowserDialog({ open, onSelect, onClose, mode = 'open' }
           onCancel={() => setShowDupModal(false)}
         />
       )}
+    </>
+  );
+
+  if (standalone) {
+    return <>{contentBox}{modals}</>;
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="strategy-browser-title"
+      className="fixed inset-y-0 right-0 z-50 flex items-stretch"
+      style={{ left: 'var(--sidebar-width, 0px)' }}
+      onKeyDown={handleKeyDown}
+    >
+      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      {contentBox}
+      {modals}
     </div>
   );
 }

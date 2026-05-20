@@ -5,8 +5,16 @@ import { StrategyBrowserDialog } from '@/components/strategy-builder/StrategyBro
 import { Providers } from '@/components/strategy-builder/Providers';
 import { StrategyStatus } from '@/lib/strategy-builder/types';
 
-jest.mock('@/hooks/useStrategyStore', () => ({ useStrategyStore: jest.fn() }));
-import { useStrategyStore } from '@/hooks/useStrategyStore';
+jest.mock('@/hooks/strategy-builder/useStrategyStore', () => ({ useStrategyStore: jest.fn() }));
+jest.mock('@/lib/strategy-builder/api', () => ({
+  listStrategies: jest.fn().mockResolvedValue([]),
+  getStrategyVersions: jest.fn().mockResolvedValue([]),
+  deleteStrategyScoped: jest.fn().mockResolvedValue({}),
+  duplicateStrategyScoped: jest.fn().mockResolvedValue({}),
+  createStrategy: jest.fn().mockResolvedValue({}),
+}));
+
+import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 const mockStore = useStrategyStore as jest.MockedFunction<typeof useStrategyStore>;
 
 const makeStrategy = (id: string, name: string, status: StrategyStatus = StrategyStatus.DRAFT) => ({
@@ -38,7 +46,7 @@ describe('StrategyBrowserDialog', () => {
   it('renders dialog when open', () => {
     renderDialog();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText(/Strategy Library/)).toBeInTheDocument();
+    expect(screen.getByText(/Strategy Browser/)).toBeInTheDocument();
   });
 
   it('shows empty state when no strategies', () => {
@@ -83,21 +91,21 @@ describe('StrategyBrowserDialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('Load Strategy button disabled when nothing selected', () => {
+  it('Open button disabled when nothing selected', () => {
     renderDialog();
-    expect(screen.getByRole('button', { name: /Load Strategy/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Open/ })).toBeDisabled();
   });
 
   it('selects strategy and calls onSelect on Load', () => {
     const strat = makeStrategy('1', 'Alpha');
     const { onSelect, onClose } = renderDialog({}, [strat]);
     fireEvent.click(screen.getByText('Alpha'));
-    fireEvent.click(screen.getByRole('button', { name: /Load Strategy/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Open/ }));
     expect(onSelect).toHaveBeenCalledWith(strat);
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('triggers Load Strategy on Enter when item selected', () => {
+  it('triggers Open on Enter when item selected', () => {
     const strat = makeStrategy('1', 'Alpha');
     const { onSelect } = renderDialog({}, [strat]);
     fireEvent.click(screen.getByText('Alpha'));

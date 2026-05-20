@@ -40,6 +40,7 @@ automatically.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -49,6 +50,8 @@ from typing import Any, Optional
 
 import redis.asyncio as aioredis
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect, status
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from .auth import require_jwt, ws_require_jwt
 from .models import (
@@ -83,6 +86,9 @@ _start_time: float = time.monotonic()
 # Typed as Any to avoid importing ITM modules at module load time when
 # the registry is not used (e.g. in test environments that only test P1).
 _registry: Optional[Any] = None
+
+# Strategy-builder DB manager – lazy singleton, None until first use.
+_sb_db: Optional[Any] = None
 
 
 def configure(registry: Any, orchestrator: Optional[Any] = None, publisher: Optional[Any] = None) -> None:
@@ -160,6 +166,16 @@ app = FastAPI(
     version="1.0.0",
     description="REST + WebSocket bridge between the ITM and the Next.js dashboard.",
     lifespan=lifespan,
+)
+
+# Allow the Next.js dev server (port 3000) and any localhost origin to call the API.
+# OPTIONS preflight requests were returning 405 because no CORS middleware was present.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -711,6 +727,365 @@ async def emergency_halt(
         halted_strategy_ids=halted_ids,
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
+
+
+# ---------------------------------------------------------------------------
+# Strategy Builder: database-backed endpoints (not ITM runtime)
+# ---------------------------------------------------------------------------
+
+
+def _get_sb_db() -> Optional[Any]:
+    """Return the strategy-builder DB manager, initialising it on first call."""
+    global _sb_db
+    if _sb_db is None:
+        try:
+            from src.optimizer_v3.database import get_database_manager
+            _sb_db = get_database_manager()
+        except Exception as exc:
+            logger.warning("Strategy builder DB unavailable: %s", exc)
+    return _sb_db
+
+
+def _sb_db_unavailable() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Strategy builder database not available – check POSTGRES_* env vars",
+    )
+
+
+def _iso(dt: Any) -> str:
+    """Serialize a datetime (or None) to ISO-8601 string."""
+    if dt is None:
+        return ""
+    if hasattr(dt, "isoformat"):
+        return dt.isoformat()
+    return str(dt)
+
+
+def _map_validation_status(vs: Optional[str]) -> str:
+    return {"Pass": "valid", "Fail": "invalid"}.get(vs or "", "draft")
+
+
+def _build_sb_strategy(strategy_id: str, version: dict, tests: list) -> dict:
+    """Map a DB version dict + test-result list to the web-UI Strategy shape."""
+    backtest_results = None
+    if tests:
+        backtest_results = []
+        for t in tests:
+            wr_raw = float(t.get("win_rate") or 0.0)
+            # DB stores win_rate as 0–100; web UI expects 0–1
+            win_rate = wr_raw / 100.0 if wr_raw > 1.0 else wr_raw
+            total = int(t.get("total_trades") or 0)
+            wins = round(total * win_rate) if total > 0 else 0
+            risk = t.get("risk_metrics") or {}
+            backtest_results.append({
+                "winRate": win_rate,
+                "totalTrades": total,
+                "winningTrades": wins,
+                "losingTrades": total - wins,
+                "sharpeRatio": float(t.get("sharpe_ratio") or 0.0),
+                "profitFactor": float(t.get("profit_factor") or 0.0),
+                "returnPercentage": float(t.get("total_return_pct") or 0.0),
+                "maxDrawdown": float(t.get("max_drawdown_pct") or 0.0),
+                "sortino_ratio": risk.get("sortino_ratio"),
+                "calmar_ratio": risk.get("calmar_ratio"),
+            })
+
+    return {
+        "id": strategy_id,
+        "name": version.get("name", ""),
+        "description": version.get("description") or "",
+        "status": _map_validation_status(version.get("validation_status")),
+        "strategyType": version.get("strategy_type"),
+        "validationStatus": version.get("validation_status"),
+        "versionNumber": version.get("version_number"),
+        "versionId": str(version["version_id"]) if version.get("version_id") else None,
+        "blocks": version.get("blocks") or [],
+        "tags": version.get("tags") or [],
+        "createdAt": _iso(version.get("created_at")),
+        "updatedAt": _iso(version.get("timestamp") or version.get("created_at")),
+        "backtestResults": backtest_results,
+        "published": False,
+        "testCount": len(tests),
+    }
+
+
+# ── Request bodies ────────────────────────────────────────────────────────────
+
+class _CreateSBStrategyRequest(BaseModel):
+    name: str
+    description: Optional[str] = ""
+
+
+class _DeleteVersionsRequest(BaseModel):
+    version_ids: list[str]
+
+
+class _DuplicateRequest(BaseModel):
+    scope: str = "version"
+    name: Optional[str] = None
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@app.get(
+    "/strategy-builder/strategies",
+    tags=["Strategy Builder"],
+    summary="List all strategy builder strategies (DB-backed)",
+)
+async def sb_list_strategies(_: dict = Depends(require_jwt)) -> list:
+    """Return all strategies from the strategy builder ORM database."""
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    def _fetch() -> list:
+        strategies = db.strategy.get_all_strategies()
+        result = []
+        for s in strategies:
+            try:
+                version = db.strategy.get_latest_version(s["strategy_id"])
+                if version is None:
+                    continue
+                try:
+                    tests = db.test_results.get_version_test_results(str(version["version_id"]))
+                except Exception:
+                    tests = []
+                result.append(_build_sb_strategy(s["strategy_id"], version, tests))
+            except Exception as exc:
+                logger.warning("sb_list_strategies: skipping %s: %s", s.get("strategy_id"), exc)
+        return result
+
+    return await asyncio.to_thread(_fetch)
+
+
+@app.get(
+    "/strategy-builder/strategies/{strategy_id}/versions",
+    tags=["Strategy Builder"],
+    summary="List all versions of a strategy builder strategy",
+)
+async def sb_get_strategy_versions(
+    strategy_id: str,
+    _: dict = Depends(require_jwt),
+) -> list:
+    """Return all versions for a strategy from the strategy builder database."""
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    def _fetch() -> list:
+        versions = db.strategy.get_strategy_versions(strategy_id)
+        latest_num = max((v.get("version_number", 0) for v in versions), default=0)
+        return [
+            {
+                "id": str(v["version_id"]),
+                "strategyId": strategy_id,
+                "versionNumber": v.get("version_number"),
+                "createdAt": _iso(v.get("created_at")),
+                "author": v.get("created_by"),
+                "description": v.get("notes") or v.get("description"),
+                "isLatest": v.get("version_number") == latest_num,
+                "changesSummary": v.get("notes"),
+            }
+            for v in versions
+        ]
+
+    return await asyncio.to_thread(_fetch)
+
+
+@app.get(
+    "/strategy-builder/strategies/{strategy_id}/versions/{version_id}",
+    tags=["Strategy Builder"],
+    summary="Get a specific version of a strategy builder strategy",
+)
+async def sb_get_strategy_version(
+    strategy_id: str,
+    version_id: str,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Return a single strategy version by version_id from the strategy builder database."""
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    def _fetch() -> Optional[dict]:
+        version = db.strategy.get_strategy_version(version_id)
+        if version is None:
+            return None
+        try:
+            tests = db.test_results.get_version_test_results(str(version["version_id"]))
+        except Exception:
+            tests = []
+        return _build_sb_strategy(strategy_id, version, tests)
+
+    result = await asyncio.to_thread(_fetch)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version '{version_id}' not found for strategy '{strategy_id}'",
+        )
+    return result
+
+
+@app.get(
+    "/strategy-builder/strategies/{strategy_id}",
+    tags=["Strategy Builder"],
+    summary="Get a strategy builder strategy by ID",
+)
+async def sb_get_strategy(
+    strategy_id: str,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Return a single strategy (latest version) from the strategy builder database."""
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    def _fetch() -> Optional[dict]:
+        version = db.strategy.get_latest_version(strategy_id)
+        if version is None:
+            return None
+        try:
+            tests = db.test_results.get_version_test_results(str(version["version_id"]))
+        except Exception:
+            tests = []
+        return _build_sb_strategy(strategy_id, version, tests)
+
+    result = await asyncio.to_thread(_fetch)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy '{strategy_id}' not found",
+        )
+    return result
+
+
+@app.post(
+    "/strategy-builder/strategies",
+    tags=["Strategy Builder"],
+    summary="Create a new strategy builder strategy",
+    status_code=status.HTTP_201_CREATED,
+)
+async def sb_create_strategy(
+    body: _CreateSBStrategyRequest,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Create a new strategy in the strategy builder database."""
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    def _create() -> dict:
+        strategy_id = db.strategy.create_strategy(body.name)
+        version_id = db.strategy.create_strategy_version({
+            "strategy_id": strategy_id,
+            "name": body.name,
+            "description": body.description or "",
+            "blocks": [],
+            "signals": {},
+            "parameters": {},
+            "entry_conditions": {},
+            "exit_conditions": {},
+            "risk_management": {},
+            "backtest_config": {},
+        })
+        version = db.strategy.get_strategy_version(version_id)
+        return _build_sb_strategy(strategy_id, version, [])
+
+    return await asyncio.to_thread(_create)
+
+
+@app.delete(
+    "/strategy-builder/strategies/{strategy_id}",
+    tags=["Strategy Builder"],
+    summary="Delete a strategy builder strategy",
+)
+async def sb_delete_strategy(
+    strategy_id: str,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Delete a strategy and all its versions from the strategy builder database."""
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    deleted = await asyncio.to_thread(db.strategy.delete_strategy, strategy_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy '{strategy_id}' not found",
+        )
+    return {"deleted": True, "strategy_id": strategy_id}
+
+
+@app.post(
+    "/strategy-builder/strategies/{strategy_id}/versions/delete",
+    tags=["Strategy Builder"],
+    summary="Delete specific versions of a strategy",
+)
+async def sb_delete_strategy_versions(
+    strategy_id: str,
+    body: _DeleteVersionsRequest,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Delete specific versions from the strategy builder database."""
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    def _delete_versions() -> dict:
+        return {vid: db.strategy.delete_strategy_version(vid) for vid in body.version_ids}
+
+    results = await asyncio.to_thread(_delete_versions)
+    return {"deleted": results}
+
+
+@app.post(
+    "/strategy-builder/strategies/{strategy_id}/duplicate",
+    tags=["Strategy Builder"],
+    summary="Duplicate a strategy builder strategy",
+    status_code=status.HTTP_201_CREATED,
+)
+async def sb_duplicate_strategy(
+    strategy_id: str,
+    body: _DuplicateRequest,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Duplicate a strategy (new version or new strategy) in the strategy builder database."""
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    def _duplicate() -> Optional[dict]:
+        latest = db.strategy.get_latest_version(strategy_id)
+        if latest is None:
+            return None
+
+        # Strip auto-generated fields before re-inserting
+        _strip = {"version_id", "version_number", "timestamp", "created_at",
+                  "config_hash", "validation_timestamp"}
+        version_data = {k: v for k, v in latest.items() if k not in _strip}
+
+        if body.scope == "strategy":
+            new_name = body.name or f"{latest['name']} (Copy)"
+            new_strategy_id = db.strategy.create_strategy(new_name)
+            version_data["strategy_id"] = new_strategy_id
+            version_data["name"] = new_name
+        else:
+            new_strategy_id = strategy_id
+            version_data["strategy_id"] = strategy_id
+
+        version_id = db.strategy.create_strategy_version(version_data)
+        version = db.strategy.get_strategy_version(version_id)
+        return _build_sb_strategy(new_strategy_id, version, [])
+
+    result = await asyncio.to_thread(_duplicate)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy '{strategy_id}' not found",
+        )
+    return result
 
 
 # ---------------------------------------------------------------------------

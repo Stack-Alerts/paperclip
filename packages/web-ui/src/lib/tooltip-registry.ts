@@ -337,6 +337,67 @@ const settingsTooltips: TooltipModule = {
 };
 
 // ---------------------------------------------------------------------------
+// Strategy Browser Module Tooltips
+// Sourced from: src/strategy_builder/ui/strategy_browser_dialog.py
+// ---------------------------------------------------------------------------
+const strategyBrowserTooltips: TooltipModule = {
+  'search': {
+    id: 'strategy-browser.search',
+    label: 'Search Strategies',
+    description: 'Filter strategies by name — updates results as you type',
+    category: 'strategy-browser.filters',
+  },
+  'type-filter': {
+    id: 'strategy-browser.type-filter',
+    label: 'Strategy Type Filter',
+    description: 'Filter strategies by market direction — Bullish (long) or Bearish (short)',
+    category: 'strategy-browser.filters',
+  },
+  'delete': {
+    id: 'strategy-browser.delete',
+    label: 'Delete Strategy',
+    description: 'Permanently delete the selected strategy and all its versions from the database',
+    category: 'strategy-browser.actions',
+  },
+  'duplicate': {
+    id: 'strategy-browser.duplicate',
+    label: 'Duplicate Strategy',
+    description: 'Create a copy of the selected strategy as a new entry',
+    category: 'strategy-browser.actions',
+  },
+  'export-json': {
+    id: 'strategy-browser.export-json',
+    label: 'Export to JSON',
+    description: "Export the selected strategy's configuration to a JSON file",
+    category: 'strategy-browser.actions',
+  },
+  'import-json': {
+    id: 'strategy-browser.import-json',
+    label: 'Import from JSON',
+    description: 'Import a strategy configuration from a previously exported JSON file',
+    category: 'strategy-browser.actions',
+  },
+  'cancel': {
+    id: 'strategy-browser.cancel',
+    label: 'Cancel',
+    description: 'Close the browser without opening or saving a strategy',
+    category: 'strategy-browser.actions',
+  },
+  'open': {
+    id: 'strategy-browser.open',
+    label: 'Open',
+    description: 'Open the selected strategy in the Strategy Builder',
+    category: 'strategy-browser.actions',
+  },
+  'pop-out': {
+    id: 'strategy-browser.pop-out',
+    label: 'Pop Out',
+    description: 'Open this browser in a separate window that can be moved to another monitor',
+    category: 'strategy-browser.controls',
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Assembled Registry
 // ---------------------------------------------------------------------------
 export const TOOLTIP_REGISTRY: TooltipRegistry = {
@@ -344,6 +405,7 @@ export const TOOLTIP_REGISTRY: TooltipRegistry = {
   'data-management': dataManagementTooltips,
   'log-viewer': logViewerTooltips,
   settings: settingsTooltips,
+  'strategy-browser': strategyBrowserTooltips,
 };
 
 /**

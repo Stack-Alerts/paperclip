@@ -109,6 +109,9 @@ export function clearAuthToken(): void {
 }
 
 // Strategy Builder API endpoints
+// All strategy-builder endpoints read from the strategy builder ORM DB, not the ITM runtime.
+
+const SB = '/strategy-builder/strategies';
 
 export interface CreateStrategyRequest {
   name: string;
@@ -116,23 +119,23 @@ export interface CreateStrategyRequest {
 }
 
 export async function createStrategy(data: CreateStrategyRequest) {
-  return post('/strategies', data);
+  return post(SB, data);
 }
 
 export async function listStrategies() {
-  return get('/strategies');
+  return get(SB);
 }
 
 export async function getStrategy(id: string) {
-  return get(`/strategies/${id}`);
+  return get(`${SB}/${id}`);
 }
 
 export async function updateStrategy(id: string, data: unknown) {
-  return put(`/strategies/${id}`, data);
+  return put(`${SB}/${id}`, data);
 }
 
 export async function deleteStrategy(id: string) {
-  return del(`/strategies/${id}`);
+  return del(`${SB}/${id}`);
 }
 
 export async function deleteStrategyScoped(
@@ -141,9 +144,9 @@ export async function deleteStrategyScoped(
   versionIds?: string[],
 ) {
   if (scope === 'version' && versionIds?.length) {
-    return post(`/strategies/${id}/versions/delete`, { version_ids: versionIds });
+    return post(`${SB}/${id}/versions/delete`, { version_ids: versionIds });
   }
-  return del(`/strategies/${id}`);
+  return del(`${SB}/${id}`);
 }
 
 export async function duplicateStrategyScoped(
@@ -151,7 +154,7 @@ export async function duplicateStrategyScoped(
   scope: 'version' | 'strategy',
   newName?: string,
 ) {
-  return post(`/strategies/${id}/duplicate`, { scope, name: newName });
+  return post(`${SB}/${id}/duplicate`, { scope, name: newName });
 }
 
 export async function getBlockLibrary() {
@@ -241,41 +244,15 @@ export function deleteFilterPreset(name: string): void {
   );
 }
 
-// Strategy version management (P2-backend)
-// TODO(P2-backend): Implement GET /strategies/{id}/versions endpoint
+// Strategy version management
 export async function getStrategyVersions(strategyId: string) {
-  try {
-    // Placeholder: Returns empty array until backend endpoint is implemented
-    // When backend is ready, uncomment:
-    // return get(`/strategies/${strategyId}/versions`);
-    return [];
-  } catch {
-    return [];
-  }
+  return get(`${SB}/${strategyId}/versions`);
 }
 
-// TODO(P2-backend): Implement GET /strategies/{id}/versions/{versionId} endpoint
 export async function loadStrategyVersion(strategyId: string, versionId: string) {
-  try {
-    // Placeholder: Until backend endpoint is implemented
-    // When backend is ready, uncomment:
-    // return get(`/strategies/${strategyId}/versions/${versionId}`);
-    throw new Error('Version history API not yet implemented');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to load strategy version';
-    throw new Error(message);
-  }
+  return get(`${SB}/${strategyId}/versions/${versionId}`);
 }
 
-// TODO(P2-backend): Implement POST /strategies/{id}/versions/{versionId}/restore endpoint
-export async function restoreStrategyVersion(strategyId: string, versionId: string) {
-  try {
-    // Placeholder: Until backend endpoint is implemented
-    // When backend is ready, uncomment:
-    // return post(`/strategies/${strategyId}/versions/${versionId}/restore`, {});
-    throw new Error('Version restore API not yet implemented');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to restore strategy version';
-    throw new Error(message);
-  }
+export async function restoreStrategyVersion(strategyId: string, _versionId: string) {
+  throw new Error('Version restore not yet implemented');
 }

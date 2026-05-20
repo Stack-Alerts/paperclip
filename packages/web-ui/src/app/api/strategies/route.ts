@@ -1,63 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
-import { randomUUID } from 'crypto';
 
-const DATA_DIR = join(process.cwd(), '.strategy-data');
-const DATA_FILE = join(DATA_DIR, 'strategies.json');
+// This route proxies /api/strategies to the Python backend.
+// The real strategy data lives in the strategy builder ORM DB at
+// GET /strategy-builder/strategies on the Python API server.
+// This proxy exists only for tooling that hits the Next.js origin directly.
 
-function ensureDir() {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true });
-  }
+const BACKEND = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8765';
+
+async function proxy(req: NextRequest, path: string) {
+  const backendUrl = `${BACKEND}${path}`;
+  const headers: Record<string, string> = {};
+  const auth = req.headers.get('authorization');
+  if (auth) headers['Authorization'] = auth;
+  headers['Content-Type'] = 'application/json';
+
+  const body = req.method !== 'GET' && req.method !== 'HEAD'
+    ? await req.text()
+    : undefined;
+
+  const res = await fetch(backendUrl, {
+    method: req.method,
+    headers,
+    body,
+  });
+
+  const data = await res.text();
+  return new NextResponse(data, {
+    status: res.status,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
-function loadStrategies(): Record<string, unknown>[] {
-  ensureDir();
-  if (!existsSync(DATA_FILE)) return [];
-  try {
-    return JSON.parse(readFileSync(DATA_FILE, 'utf-8'));
-  } catch {
-    return [];
-  }
+export async function GET(req: NextRequest) {
+  return proxy(req, '/strategy-builder/strategies');
 }
 
-function saveStrategies(strategies: Record<string, unknown>[]) {
-  ensureDir();
-  writeFileSync(DATA_FILE, JSON.stringify(strategies, null, 2));
-}
-
-export async function GET() {
-  const strategies = loadStrategies();
-  return NextResponse.json(strategies);
-}
-
-export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const strategies = loadStrategies();
-
-  const now = new Date().toISOString();
-  const id = randomUUID();
-  const newStrategy = {
-    name: body.name || 'New Strategy',
-    description: body.description || '',
-    status: 'DRAFT',
-    strategyType: body.strategyType || 'Bullish',
-    blocks: [],
-    settings: {
-      timeframe: '1h',
-      targetMarket: 'BTC/USDT',
-      riskParameters: null,
-      strategyExits: [],
-    },
-    validationStatus: null,
-    ...body,
-    id,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  strategies.push(newStrategy);
-  saveStrategies(strategies);
-  return NextResponse.json(newStrategy, { status: 201 });
+export async function POST(req: NextRequest) {
+  return proxy(req, '/strategy-builder/strategies');
 }
