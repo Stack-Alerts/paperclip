@@ -32,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 from touch_index.paperclip_client import (
     _paginate,
     _company,
+    fetch_issue_comments,
 )
 
 log = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ FIX_LABELS = {
 _STATE_PATH = Path(
     os.environ.get(
         "IMPACT_GATE_MUTED_RESULTS_FILE",
-        Path(__file__).resolve().parents[2] / "data" / "impact_gate_muted_results.json",
+        Path(__file__).resolve().parents[2] / ".impact_gate_muted_state.json",
     )
 )
 
@@ -62,9 +63,9 @@ def _load_muted_results() -> dict[str, str]:
     Muted results are issues that have already been gated and should not be
     re-gated unless explicitly retried.
     """
-    if _STATE_PATH.exists():
+    if _MUTED_STATE_PATH.exists():
         try:
-            data = json.loads(_STATE_PATH.read_text())
+            data = json.loads(_MUTED_STATE_PATH.read_text())
             if isinstance(data, dict) and all(isinstance(v, str) for v in data.values()):
                 return data
         except Exception as exc:
@@ -78,8 +79,8 @@ _load_muted_state = _load_muted_results
 
 def _save_muted_results(results: dict[str, str]) -> None:
     """Persist muted gate results."""
-    _STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _STATE_PATH.write_text(json.dumps(results, indent=2))
+    _MUTED_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _MUTED_STATE_PATH.write_text(json.dumps(results, indent=2))
 
 
 def save_muted_gate_result(issue_id: str, status: str) -> None:
@@ -110,6 +111,18 @@ def purge_muted_entries(status: str | None = None) -> int:
     removed = before_count - len(results)
     log.debug("Purged %d muted entries (status=%s)", removed, status)
     return removed
+
+
+def _check_gate_status(issue_id: str) -> str | None:
+    """Check if issue already has an Impact Gate result (from muted cache).
+
+    Returns the gate status (PASS, FAIL, BYPASSED, ERROR, SKIPPED) or
+    None if no result found in cache.
+    """
+    muted = _load_muted_state()
+    if issue_id in muted:
+        return muted[issue_id]
+    return None
 
 
 def _is_fix_issue(issue: dict) -> bool:
@@ -228,7 +241,7 @@ def scan(
     log.info("Found %d done fix/bug issues", len(done_issues))
 
     # Count gated vs. ungated and break down gated by status
-    gated_by_status = {"pass": 0, "fail": 0, "bypassed": 0, "error": 0, "skipped": 0}
+    gated_by_status = {"pass": 0, "fail": 0, "bypassed": 0, "error": 0, "skipped": 0, "scanned": 0}
     ungated_issues = []
     for issue in done_issues:
         issue_id = issue.get("id", "")
@@ -250,10 +263,11 @@ def scan(
             else:
                 # Unknown status, count as skipped
                 gated_by_status["skipped"] += 1
+            gated_by_status["scanned"] += 1
         else:
             ungated_issues.append(issue)
 
-    gated_count = sum(gated_by_status.values())
+    gated_count = sum(v for k, v in gated_by_status.items() if k != "scanned")
     ungated_count = len(ungated_issues)
     log.info(
         "Gated: %d (%s), Ungated: %d (out of %d done issues)",
@@ -311,7 +325,8 @@ def scan(
     return result
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Main entry point for the scan utility."""
     import argparse
 
     logging.basicConfig(
@@ -369,3 +384,7 @@ if __name__ == "__main__":
         print(json.dumps(report, default=str))  # noqa: T201
     else:
         print(json.dumps(report, indent=2, default=str))  # noqa: T201
+
+
+if __name__ == "__main__":
+    main()

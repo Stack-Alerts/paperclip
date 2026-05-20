@@ -52,6 +52,9 @@ from impact_gate.worker import process_issue
 from impact_gate.scan_fix_issues_done import _load_muted_results
 import re
 
+# Alias for tests
+_load_muted_state = _load_muted_results
+
 # Daemon state directories and files
 DAEMON_LOG_DIR = Path(
     os.environ.get(
