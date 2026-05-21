@@ -251,7 +251,8 @@
       "src/api/auth.py",
       "src/api/models.py",
       "src/api/redis_client.py",
-      "src/itm/domain/events.py"
+      "src/itm/domain/events.py",
+      "src/optimizer_v3/database/__init__.py"
     ],
     "src/blast_radius/__main__.py": [
       "src/blast_radius/query.py",
@@ -620,6 +621,7 @@
       "src/touch_index/paperclip_client.py",
       "src/blast_radius/report.py",
       "src/blast_radius/query.py",
+      "src/impact_gate/scan_fix_issues_done.py",
       "src/touch_index/git_extractor.py"
     ],
     "src/indicators/pattern_detectors/detectors/__init__.py": [
@@ -4461,6 +4463,7 @@
       "delete_orphan.py",
       "scripts/migrate_strategy_type.py",
       "scripts/qa_live_1096_training_panel_cache_gate.py",
+      "src/api/app.py",
       "src/optimizer_v3/ui/training_panel.py",
       "src/strategy_builder/integration/strategy_builder_orchestrator.py",
       "src/strategy_builder/ui/backtest_config_panel.py",
@@ -4973,7 +4976,8 @@
       "src/strategies/universal_optimizer/modules/multi_config_simulator.py"
     ],
     "src/impact_gate/scan_fix_issues_done.py": [
-      "scripts/scan_fix_issues_done.py"
+      "scripts/scan_fix_issues_done.py",
+      "src/impact_gate/worker.py"
     ],
     "src/touch_index/quality.py": [
       "scripts/snapshot_touch_index_quality.py",
@@ -8992,6 +8996,6 @@
     "parsed_files": 1386,
     "error_files": 16,
     "parse_rate_pct": 98.86,
-    "edge_count": 2450
+    "edge_count": 2452
   }
 }
