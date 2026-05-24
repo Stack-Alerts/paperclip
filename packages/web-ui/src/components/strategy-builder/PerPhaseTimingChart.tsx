@@ -70,7 +70,6 @@ export const PerPhaseTimingChart: React.FC<PerPhaseTimingChartProps> = ({
     <div
       className={`rounded overflow-x-auto ${className}`}
       style={{ background: 'var(--bg-panel)', border: '1px solid var(--border)', minHeight: chartH }}
-      style={{ minHeight: chartH }}
     >
       <div className="relative" style={{ height: chartH }}>
         <svg width="100%" height={chartH} style={{ position: 'absolute', inset: 0 }}>
