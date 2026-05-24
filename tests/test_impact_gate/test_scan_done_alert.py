@@ -138,7 +138,7 @@ class TestCreateAlert:
         assert "comp-id" in args[0]
         payload = kw["json"]
         assert payload["priority"] == "medium"
-        assert payload["labels"] == ["impact-gate-alert"]
+        assert payload["labelIds"] == ["c9e10806-d766-444c-a873-082d56b3d039"]
         assert "BTCAAAAA-100" in payload["description"]
 
     def test_api_error_returns_false(self):
