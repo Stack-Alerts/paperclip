@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-05-24T14:43:05.481246Z",
+  "impact_gate_scan": {
+    "total_done_fix_issues": 67,
+    "gated": {
+      "pass": 8,
+      "fail": 5,
+      "bypassed": 14,
+      "error": 1,
+      "skipped": 36
+    },
+    "ungated_count": 3,
+    "coverage_pct": 95.5,
+    "window_days": 7,
+    "last_24h": 29
+  }
+}
