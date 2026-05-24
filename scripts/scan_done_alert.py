@@ -28,6 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 CTO_AGENT_ID = "41b5ede6-e209-40ba-b923-dc969c722e6d"
 ALERT_LABEL = "impact-gate-alert"
+ALERT_LABEL_ID = "c9e10806-d766-444c-a873-082d56b3d039"
 
 
 def _setup_session():
@@ -125,7 +126,7 @@ def create_alert(
                 {
                     "title": title,
                     "description": body,
-                    "labels": [ALERT_LABEL],
+                    "labelIds": [ALERT_LABEL_ID],
                     "assigneeAgentId": CTO_AGENT_ID,
                     "priority": "medium",
                 },
@@ -137,7 +138,7 @@ def create_alert(
     payload = {
         "title": title,
         "description": body,
-        "labels": [ALERT_LABEL],
+        "labelIds": [ALERT_LABEL_ID],
         "assigneeAgentId": CTO_AGENT_ID,
         "priority": "medium",
         "status": "todo",
