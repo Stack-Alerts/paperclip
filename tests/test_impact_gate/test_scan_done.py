@@ -467,7 +467,7 @@ class TestScanFunction:
             status = mapping.get(iid, "PASS")
             return [{"body": f"## Impact Gate: {status}"}]
 
-        monkeypatch.setattr(_daemon, "fetch_issue_comments", mock_comments)
+        monkeypatch.setattr(_scan, "fetch_issue_comments", mock_comments)
         result = _scan.scan()
         assert result["total_done_fix_issues"] == 5
         assert result["gated"]["pass"] == 1
@@ -527,7 +527,7 @@ class TestScanFunction:
             if iid in ("u1", "u3"):
                 return [{"body": "## Impact Gate: PASS"}]
             return [{"body": "Other comment"}]
-        monkeypatch.setattr(_daemon, "fetch_issue_comments", mock_comments)
+        monkeypatch.setattr(_scan, "fetch_issue_comments", mock_comments)
         result = _scan.scan()
         l24 = result.get("last_24h", {})
         assert l24["total_done_fix_issues"] == 2, (

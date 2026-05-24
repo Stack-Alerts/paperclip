@@ -22,7 +22,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -91,10 +91,11 @@ def save_muted_gate_result(issue_id: str, status: str) -> None:
     log.debug("Saved muted gate result for %s: %s", issue_id, status)
 
 
-def purge_muted_entries(status: str | None = None) -> int:
+def purge_muted_entries(status: str | set | None = None) -> int:
     """Purge muted cache entries.
 
-    If status is provided, removes all entries with that status.
+    If status is a string, removes all entries with that status (case-insensitive).
+    If status is a set, removes entries matching any status in the set (case-insensitive).
     If status is None, clears the entire cache.
 
     Returns the number of entries removed.
@@ -105,7 +106,19 @@ def purge_muted_entries(status: str | None = None) -> int:
     if status is None:
         results.clear()
     else:
-        results = {k: v for k, v in results.items() if v != status}
+        # Normalize status(es) to lowercase set for case-insensitive comparison
+        if isinstance(status, str):
+            statuses_to_remove = {status.lower()}
+        elif isinstance(status, set):
+            statuses_to_remove = {s.lower() for s in status}
+        else:
+            statuses_to_remove = set()
+
+        results = {
+            k: v
+            for k, v in results.items()
+            if v.lower() not in statuses_to_remove
+        }
 
     _save_muted_results(results)
     removed = before_count - len(results)
@@ -185,10 +198,16 @@ def _is_recent(issue: dict, days_back: int) -> bool:
             if timestamp.endswith("Z"):
                 timestamp = timestamp[:-1]
             timestamp_dt = datetime.fromisoformat(timestamp)
+            # Make timezone-aware (was UTC, now has timezone info)
+            if timestamp_dt.tzinfo is None:
+                timestamp_dt = timestamp_dt.replace(tzinfo=timezone.utc)
         else:
             timestamp_dt = timestamp
+            # Ensure aware if it's a datetime
+            if isinstance(timestamp_dt, datetime) and timestamp_dt.tzinfo is None:
+                timestamp_dt = timestamp_dt.replace(tzinfo=timezone.utc)
 
-        cutoff = datetime.utcnow() - timedelta(days=days_back)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
         return timestamp_dt >= cutoff
     except Exception as exc:
         log.warning("Failed to parse issue timestamp: %s", exc)
@@ -249,21 +268,15 @@ def scan(
         retry_fails,
     )
 
-    # Load and optionally clean muted results
-    muted = _load_muted_results()
-    if retry_errors:
-        before = len(muted)
-        muted = {k: v for k, v in muted.items() if v != "ERROR"}
-        after = len(muted)
-        log.info("Cleared %d ERROR entries from muted cache", before - after)
-    if retry_fails:
-        before = len(muted)
-        muted = {k: v for k, v in muted.items() if v != "FAIL"}
-        after = len(muted)
-        log.info("Cleared %d FAIL entries from muted cache", before - after)
-
-    if not dry_run:
-        _save_muted_results(muted)
+    # Optionally clean muted results before scanning
+    if retry_errors or retry_fails:
+        statuses_to_purge = set()
+        if retry_errors:
+            statuses_to_purge.add("ERROR")
+        if retry_fails:
+            statuses_to_purge.add("FAIL")
+        if not dry_run:
+            purge_muted_entries(statuses_to_purge)
 
     # Fetch done issues
     done_issues = _fetch_done_issues(days_back)
@@ -295,7 +308,6 @@ def scan(
             else:
                 # Unknown status, count as skipped
                 gated_by_status["skipped"] += 1
-            gated_by_status["scanned"] += 1
         else:
             ungated_issues.append(issue)
 
@@ -309,16 +321,45 @@ def scan(
         len(done_issues),
     )
 
-    # Count last 24h for metrics
-    last_24h_count = sum(1 for i in done_issues if _is_recent(i, 1))
+    # Compute last 24h stats (same structure as main result)
+    last_24h_issues = [i for i in done_issues if _is_recent(i, 1)]
+    last_24h_gated_by_status = {"pass": 0, "fail": 0, "bypassed": 0, "error": 0, "skipped": 0, "scanned": 0}
+    last_24h_ungated_count = 0
+    for issue in last_24h_issues:
+        issue_id = issue.get("id", "")
+        if not issue_id:
+            continue
+        gate_status = _check_gate_status(issue_id)
+        if gate_status is not None:
+            status = gate_status.lower()
+            if status == "pass":
+                last_24h_gated_by_status["pass"] += 1
+            elif status == "fail":
+                last_24h_gated_by_status["fail"] += 1
+            elif status == "bypassed":
+                last_24h_gated_by_status["bypassed"] += 1
+            elif status == "error":
+                last_24h_gated_by_status["error"] += 1
+            elif status == "skipped":
+                last_24h_gated_by_status["skipped"] += 1
+            elif status == "scanned":
+                last_24h_gated_by_status["scanned"] += 1
+            else:
+                last_24h_gated_by_status["skipped"] += 1
+        else:
+            last_24h_ungated_count += 1
 
     result = {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "total_done_fix_issues": len(done_issues),
         "gated": gated_by_status,
         "ungated_count": ungated_count,
         "ungated_issues": ungated_issues,
-        "last_24h": last_24h_count,
+        "last_24h": {
+            "total_done_fix_issues": len(last_24h_issues),
+            "gated": last_24h_gated_by_status,
+            "ungated_count": last_24h_ungated_count,
+        },
         "days_back": days_back,
         "dry_run": dry_run,
     }
@@ -343,6 +384,22 @@ def scan(
                     identifier,
                     gate_status,
                 )
+                # Update gated_by_status with retroactive result
+                status = gate_status.lower()
+                if status == "pass":
+                    gated_by_status["pass"] += 1
+                elif status == "fail":
+                    gated_by_status["fail"] += 1
+                elif status == "bypassed":
+                    gated_by_status["bypassed"] += 1
+                elif status == "error":
+                    gated_by_status["error"] += 1
+                elif status == "skipped":
+                    gated_by_status["skipped"] += 1
+                elif status == "scanned":
+                    gated_by_status["scanned"] += 1
+                else:
+                    gated_by_status["skipped"] += 1
             except Exception as exc:
                 log.error("Retroactive gate failed for %s: %s", identifier, exc)
                 retroactive_results.append({
@@ -350,7 +407,12 @@ def scan(
                     "gate_status": "ERROR",
                     "error": str(exc),
                 })
+                gated_by_status["error"] += 1
 
+        # Update ungated count to reflect retroactively gated issues
+        ungated_count = len([r for r in retroactive_results if r.get("gate_status") is None])
+        result["gated"] = gated_by_status
+        result["ungated_count"] = ungated_count
         result["retroactive_results"] = retroactive_results
 
     return result
@@ -398,7 +460,19 @@ def main() -> None:
     parser.add_argument(
         "--json",
         action="store_true",
-        help="Output structured JSON report to stdout",
+        help="Output structured JSON report to stdout (compact, single line)",
+    )
+    parser.add_argument(
+        "--json-summary",
+        action="store_true",
+        help="Output structured JSON summary with worker metadata",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        choices=["json", "pretty"],
+        default=None,
+        help="Output format: json (compact) or pretty (indented)",
     )
 
     args = parser.parse_args()
@@ -411,7 +485,30 @@ def main() -> None:
         retry_fails=args.retry_fails,
     )
 
-    if args.json:
+    # Handle --json-summary format (special summary for worker.py)
+    if args.json_summary:
+        summary = {
+            "worker": "impact-gate-scan-done",
+            "dry_run": args.dry_run,
+            "retroactive": args.retroactive,
+            "retry_errors": args.retry_errors,
+            "retry_fails": args.retry_fails,
+            "days_back": args.days_back,
+            "timestamp": report.get("timestamp"),
+            "total_done_fix_issues": report.get("total_done_fix_issues"),
+            "gated": report.get("gated"),
+            "ungated_count": report.get("ungated_count"),
+            "last_24h": report.get("last_24h"),
+        }
+        if "retroactive_results" in report:
+            summary["retroactive_results"] = report["retroactive_results"]
+        print(json.dumps(summary, default=str))  # noqa: T201
+        return
+
+    # Determine output format: --output takes precedence over --json
+    output_format = args.output if args.output else ("json" if args.json else "pretty")
+
+    if output_format == "json":
         print(json.dumps(report, default=str))  # noqa: T201
     else:
         print(json.dumps(report, indent=2, default=str))  # noqa: T201
