@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { ChevronRight, Search, Filter, Save, Folder, Trash2, Blocks, Plus, ChevronDown, X, Edit2, Check } from 'lucide-react';
+import { ChevronRight, ChevronDown, Search, Filter, Save, Folder, Trash2, Blocks, Plus, X, Edit2, Check, Play } from 'lucide-react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BlockDefinition, BlockType } from '@/lib/strategy-builder/types';
 import { ExitConditionDialog, ExitConditionConfig, AvailableBlock } from './ExitConditionDialog';
 import { RichTooltip, TooltipContent } from './RichTooltip';
 import { QuestionDialog } from './AlertDialog';
+import { resolveBlockIcon } from './blockIcons';
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   [BlockType.ENTRY_CONDITION]:  'Entry Condition',
@@ -17,6 +18,11 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
   [BlockType.INDICATOR]:        'Indicator',
   [BlockType.POSITION_SIZING]:  'Position Sizing',
 };
+
+function getBlockIcon(definition: BlockDefinition): React.ReactNode {
+  const Icon = resolveBlockIcon(definition.name, definition.category);
+  return <Icon size={18} strokeWidth={1.75} />;
+}
 
 const EVENT_CATS   = new Set(['PATTERNS', 'MARKET_STRUCTURE', 'PRICE_ACTION']);
 const SIGNAL_CATS  = new Set(['OSCILLATORS', 'MOVING_AVERAGES', 'VOLATILITY']);
@@ -616,13 +622,30 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
       }}
     >
       <div className="px-3 pt-2.5 pb-1.5">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
+          <span
+            style={{
+              color: 'var(--accent-blue)',
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 26,
+              height: 26,
+              borderRadius: 6,
+              background: 'rgba(46, 140, 255, 0.10)',
+              border: '1px solid rgba(46, 140, 255, 0.35)',
+              boxShadow: '0 0 6px rgba(46, 140, 255, 0.18)',
+            }}
+          >
+            {getBlockIcon(definition)}
+          </span>
           <span className={`text-sm font-medium leading-tight${isBlockUsed ? ' line-through' : ''}`} style={{ color: isBlockUsed ? 'var(--text-muted)' : 'var(--text-primary)', cursor: isBlockUsed ? 'not-allowed' : undefined }}>{definition.name}</span>
         </div>
         <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
           Category: {definition.category}
           {typeLabel && ` | Type: ${typeLabel}`}
-          {weight != null && ` | Weight: ${weight} pts`}
+          {weight != null && ` | Weight: ${weight} points`}
         </div>
       </div>
 
@@ -630,20 +653,19 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
         <RichTooltip content={TT_SHOW_SIGNALS}>
           <button
             onClick={() => setSignalsOpen(v => !v)}
-            className="w-full px-3 pb-2.5 text-left text-xs flex items-center justify-between hover:opacity-80 transition-opacity"
-            style={{ color: 'var(--accent-sky-bright)' }}
+            className="w-full px-3 pt-1.5 pb-2.5 text-left text-xs flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+            style={{
+              color: 'var(--accent-blue)',
+              borderTop: '1px solid rgba(46, 140, 255, 0.35)',
+              marginTop: 2,
+            }}
           >
+            {signalsOpen ? (
+              <ChevronDown size={12} style={{ flexShrink: 0, color: 'var(--accent-blue)' }} />
+            ) : (
+              <Play size={10} fill="currentColor" style={{ flexShrink: 0, color: 'var(--accent-blue)' }} />
+            )}
             <span>{signalsOpen ? `Hide Signals (${visibleSignals.length})` : `Show Signals (${visibleSignals.length})`}</span>
-            <ChevronRight
-              style={{
-                width: 13,
-                height: 13,
-                flexShrink: 0,
-                color: 'var(--accent-sky-bright)',
-                transform: signalsOpen ? 'rotate(90deg)' : 'none',
-                transition: 'transform 0.2s',
-              }}
-            />
           </button>
         </RichTooltip>
       )}
