@@ -665,7 +665,7 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
             ) : (
               <Play size={10} fill="currentColor" style={{ flexShrink: 0, color: 'var(--accent-blue)' }} />
             )}
-            <span>{signalsOpen ? `Hide Signals (${visibleSignals.length})` : `Show Signals (${visibleSignals.length})`}</span>
+            <span style={{ color: '#145ba1' }}>{signalsOpen ? `Hide Signals (${visibleSignals.length})` : `Show Signals (${visibleSignals.length})`}</span>
           </button>
         </RichTooltip>
       )}
