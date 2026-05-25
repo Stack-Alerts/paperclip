@@ -1,5 +1,8 @@
 {
   "forward": {
+    ".rollback-backup/BTCAAAAA-29255-head-snapshot/src/api/app.py": [
+      "src/itm/domain/events.py"
+    ],
     "alembic/env.py": [
       "src/optimizer_v3/database/models.py",
       "src/optimizer_v3/database/config.py"
@@ -84,7 +87,8 @@
     "scripts/impact_gate_polling_daemon.py": [
       "src/touch_index/paperclip_client.py",
       "src/blast_radius/worker.py",
-      "src/impact_gate/worker.py"
+      "src/impact_gate/worker.py",
+      "src/impact_gate/scan_fix_issues_done.py"
     ],
     "scripts/impact_gate_worker.py": [
       "src/impact_gate/worker.py"
@@ -163,6 +167,9 @@
     "scripts/rclone_oauth_health.py": [
       "src/touch_index/paperclip_client.py"
     ],
+    "scripts/report_recovery_health_check.py": [
+      "src/touch_index/paperclip_client.py"
+    ],
     "scripts/repro_btcaaaaa_2172_bars_regression.py": [
       "src/data_manager/unified_manager.py",
       "src/optimizer_v3/core/data_cache_manager.py"
@@ -180,6 +187,9 @@
     "scripts/run_impact_gate_worker.py": [
       "src/blast_radius/worker.py",
       "src/impact_gate/worker.py"
+    ],
+    "scripts/run_recovery_monitor_routine.py": [
+      "src/touch_index/paperclip_client.py"
     ],
     "scripts/run_restore_drill.py": [
       "src/optimizer_v3/database/backup.py"
@@ -4262,6 +4272,7 @@
       "src/impact_gate/polling_worker.py"
     ],
     "tests/test_impact_gate/test_scan_done.py": [
+      "src/impact_gate/scan_fix_issues_done.py",
       "src/touch_index/__init__.py"
     ],
     "tests/test_impact_gate/test_scan_done_alert.py": [
@@ -4422,6 +4433,18 @@
     ]
   },
   "reverse": {
+    "src/itm/domain/events.py": [
+      ".rollback-backup/BTCAAAAA-29255-head-snapshot/src/api/app.py",
+      "src/api/app.py",
+      "src/itm/domain/__init__.py",
+      "src/itm/domain/nt_mapping.py",
+      "src/itm/orchestrator/orchestrator.py",
+      "tests/api/test_event_publisher.py",
+      "tests/itm/domain/test_entities.py",
+      "tests/itm/domain/test_events.py",
+      "tests/itm/domain/test_nt_mapping.py",
+      "tests/itm/orchestrator/test_section_d_integration.py"
+    ],
     "src/optimizer_v3/database/models.py": [
       "alembic/env.py",
       "scripts/sync_trace_issues.py",
@@ -4625,6 +4648,8 @@
       "scripts/paperclip_recovery_monitor_backup.py",
       "scripts/paperclip_stalled_workflow_reporter.py",
       "scripts/rclone_oauth_health.py",
+      "scripts/report_recovery_health_check.py",
+      "scripts/run_recovery_monitor_routine.py",
       "scripts/scan_done_alert.py",
       "src/blast_radius/api_server.py",
       "src/blast_radius/generator.py",
@@ -4783,6 +4808,12 @@
       "scripts/run_impact_gate_worker.py",
       "tests/bug_regression/test_btcaaaaa_25832_regression.py",
       "tests/test_impact_gate/test_worker.py"
+    ],
+    "src/impact_gate/scan_fix_issues_done.py": [
+      "scripts/impact_gate_polling_daemon.py",
+      "scripts/scan_fix_issues_done.py",
+      "src/impact_gate/worker.py",
+      "tests/test_impact_gate/test_scan_done.py"
     ],
     "src/strategy_builder/ui/strategy_builder_main_window.py": [
       "scripts/launch_strategy_builder.py",
@@ -4975,10 +5006,6 @@
       "scripts/run_walkforward_ci.py",
       "src/strategies/universal_optimizer/modules/multi_config_simulator.py"
     ],
-    "src/impact_gate/scan_fix_issues_done.py": [
-      "scripts/scan_fix_issues_done.py",
-      "src/impact_gate/worker.py"
-    ],
     "src/touch_index/quality.py": [
       "scripts/snapshot_touch_index_quality.py",
       "scripts/validate_touch_index_bug.py",
@@ -5022,17 +5049,6 @@
     ],
     "src/api/redis_client.py": [
       "src/api/app.py"
-    ],
-    "src/itm/domain/events.py": [
-      "src/api/app.py",
-      "src/itm/domain/__init__.py",
-      "src/itm/domain/nt_mapping.py",
-      "src/itm/orchestrator/orchestrator.py",
-      "tests/api/test_event_publisher.py",
-      "tests/itm/domain/test_entities.py",
-      "tests/itm/domain/test_events.py",
-      "tests/itm/domain/test_nt_mapping.py",
-      "tests/itm/orchestrator/test_section_d_integration.py"
     ],
     "src/blast_radius/query.py": [
       "src/blast_radius/__main__.py",
@@ -7570,6 +7586,8 @@
     ]
   },
   "all_files": [
+    ".rollback-backup/BTCAAAAA-29255-head-snapshot/src/api/app.py",
+    ".rollback-backup/BTCAAAAA-29255-head-snapshot/src/api/auth.py",
     "alembic/env.py",
     "alembic/versions/20260124_add_strategy_versioning.py",
     "alembic/versions/20260127_add_exit_conditions.py",
@@ -7695,11 +7713,13 @@
     "scripts/rclone_oauth_health.py",
     "scripts/regenerate_dep_graph.py",
     "scripts/reingest/reingest_corrected_utc.py",
+    "scripts/report_recovery_health_check.py",
     "scripts/repro_btcaaaaa_2172_bars_regression.py",
     "scripts/run_backtest_matrix.py",
     "scripts/run_blast_radius_worker.py",
     "scripts/run_impact_gate_polling_worker.py",
     "scripts/run_impact_gate_worker.py",
+    "scripts/run_recovery_monitor_routine.py",
     "scripts/run_restore_drill.py",
     "scripts/run_testnet_dry_run.py",
     "scripts/run_touch_index_bug_worker.py",
@@ -8930,6 +8950,7 @@
     "tests/test_scripts/test_paperclip_recovery_monitor_backup.py",
     "tests/test_scripts/test_paperclip_stalled_workflow_reporter.py",
     "tests/test_scripts/test_rclone_oauth_health.py",
+    "tests/test_scripts/test_report_recovery_health_check.py",
     "tests/test_scripts/test_validate_testnet_env.py",
     "tests/test_touch_index/__init__.py",
     "tests/test_touch_index/conftest.py",
@@ -8992,10 +9013,10 @@
     "src/detectors/building_blocks/patterns/triple_top.py"
   ],
   "stats": {
-    "total_files": 1402,
-    "parsed_files": 1386,
+    "total_files": 1407,
+    "parsed_files": 1391,
     "error_files": 16,
     "parse_rate_pct": 98.86,
-    "edge_count": 2452
+    "edge_count": 2457
   }
 }
