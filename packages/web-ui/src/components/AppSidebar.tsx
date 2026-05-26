@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect } from 'react';
 import {
   LayoutGrid,
   GitBranch,
@@ -34,17 +33,13 @@ const NAV_ITEMS = [
 export function AppSidebar() {
   const pathname = usePathname();
   const { collapsed, setCollapsed } = useSidebar();
-  // Popped-out Strategy Browser window (BTCAAAAA-29377): start with the
-  // sidebar collapsed and hide the AppBrand/logo row so the standalone
-  // window reads as a focused dialog, not the full app shell. All other
-  // routes keep the default expanded sidebar with the logo header.
-  const isStrategyBrowserStandalone = pathname === '/strategy-browser';
 
-  useEffect(() => {
-    if (isStrategyBrowserStandalone) {
-      setCollapsed(true);
-    }
-  }, [isStrategyBrowserStandalone, setCollapsed]);
+  // Popped-out Strategy Browser window (BTCAAAAA-29978): the standalone
+  // /strategy-browser route renders no sidebar at all so the popout reads
+  // as a focused full-screen dialog matching the board reference.
+  if (pathname === '/strategy-browser') {
+    return null;
+  }
 
   return (
     <aside
@@ -55,53 +50,51 @@ export function AppSidebar() {
         color: 'var(--text-primary)',
       }}
     >
-      {!isStrategyBrowserStandalone && (
-        <div
-          className={`flex items-center px-3 py-4 ${collapsed ? 'justify-center' : 'justify-between'}`}
-          style={{ borderBottom: '1px solid var(--border)' }}
-        >
-          {!collapsed && (
-            <div className="flex items-center gap-2.5 flex-1 min-w-0">
-              <BtcWaveformLogo size={28} />
-              <div className="flex flex-col leading-none min-w-0">
-                <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
-                  BTC
-                </span>
-                <span
-                  className="truncate"
-                  style={{
-                    color: 'var(--text-muted)',
-                    letterSpacing: '0.07em',
-                    textTransform: 'uppercase',
-                    fontSize: '9px',
-                    marginTop: 1,
-                  }}
-                >
-                  TRADE ENGINE
-                </span>
-              </div>
+      <div
+        className={`flex items-center px-3 py-4 ${collapsed ? 'justify-center' : 'justify-between'}`}
+        style={{ borderBottom: '1px solid var(--border)' }}
+      >
+        {!collapsed && (
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            <BtcWaveformLogo size={28} />
+            <div className="flex flex-col leading-none min-w-0">
+              <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
+                BTC
+              </span>
+              <span
+                className="truncate"
+                style={{
+                  color: 'var(--text-muted)',
+                  letterSpacing: '0.07em',
+                  textTransform: 'uppercase',
+                  fontSize: '9px',
+                  marginTop: 1,
+                }}
+              >
+                TRADE ENGINE
+              </span>
             </div>
-          )}
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="p-1 rounded transition-colors flex-shrink-0"
-            style={{ color: 'var(--sidebar-item-default)' }}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            onMouseEnter={e => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.color = 'var(--sidebar-item-hover)';
-              el.style.background = 'var(--surface-hover)';
-            }}
-            onMouseLeave={e => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.color = 'var(--sidebar-item-default)';
-              el.style.background = 'transparent';
-            }}
-          >
-            {collapsed ? <Menu className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </button>
-        </div>
-      )}
+          </div>
+        )}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="p-1 rounded transition-colors flex-shrink-0"
+          style={{ color: 'var(--sidebar-item-default)' }}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onMouseEnter={e => {
+            const el = e.currentTarget as HTMLButtonElement;
+            el.style.color = 'var(--sidebar-item-hover)';
+            el.style.background = 'var(--surface-hover)';
+          }}
+          onMouseLeave={e => {
+            const el = e.currentTarget as HTMLButtonElement;
+            el.style.color = 'var(--sidebar-item-default)';
+            el.style.background = 'transparent';
+          }}
+        >
+          {collapsed ? <Menu className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+      </div>
 
       <nav className="flex-1 py-3 space-y-0.5">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {

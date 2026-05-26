@@ -867,10 +867,10 @@ export function StrategyBrowserDialog({
           className="text-sm font-semibold flex items-center gap-3"
           style={{ color: 'var(--text-secondary)' }}
         >
-          {/* AppBrand prefix is dropped in the popped-out window so the
-              focused dialog doesn't double-up on the app logo
-              (BTCAAAAA-29377). Inline modal keeps the prefix. */}
-          {!standalone && <AppBrand size={24} />}
+          {/* AppBrand prefix shows in both inline and standalone modes so the
+              popout header matches the board reference: BTC brand + title at
+              top-left of the dialog (BTCAAAAA-29978). */}
+          <AppBrand size={24} />
           <span className="flex items-center gap-2">
             <TitleIcon style={{ width: 16, height: 16, flexShrink: 0 }} />
             <span>{titleText}</span>

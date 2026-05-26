@@ -12,6 +12,7 @@ Institutional-grade implementation with:
 - Connection pooling
 """
 
+from dataclasses import dataclass
 from typing import Optional
 import logging
 from contextlib import contextmanager
@@ -22,6 +23,23 @@ from sqlalchemy.pool import NullPool
 from .strategy_manager import StrategyDatabaseManager
 from .ai_recommendations_manager import AIRecommendationsManager
 from .test_results_manager import TestResultsManager
+
+
+@dataclass
+class ScopedManagers:
+    """A bundle of specialized managers bound to a single per-call session.
+
+    Returned by :meth:`DatabaseManager.scoped_managers`. Concurrent callers
+    (e.g. FastAPI request handlers) must use this instead of touching the
+    long-lived ``DatabaseManager.strategy`` / ``ai_recommendations`` /
+    ``test_results`` attributes — those share one process-wide session and
+    race under concurrency with ``rollback() is already in progress``.
+    """
+
+    strategy: StrategyDatabaseManager
+    ai_recommendations: AIRecommendationsManager
+    test_results: TestResultsManager
+    session: Session
 
 import logging
 logger = logging.getLogger(__name__)
@@ -141,14 +159,48 @@ class DatabaseManager:
     def get_session(self) -> Session:
         """
         Get a new database session
-        
+
         Note: Caller is responsible for managing session lifecycle
         Use session_scope() context manager for automatic management
-        
+
         Returns:
             Session: New SQLAlchemy session
         """
         return self.SessionLocal()
+
+    @contextmanager
+    def scoped_managers(self):
+        """Yield per-call specialized managers bound to a fresh session.
+
+        Concurrent callers (FastAPI request handlers, threadpool workers)
+        MUST use this instead of the long-lived ``self.strategy`` /
+        ``self.ai_recommendations`` / ``self.test_results`` attributes,
+        which all share one process-wide ``_session``. Sharing causes
+        SQLAlchemy ``Method 'rollback()' can't be called here: method
+        'rollback()' is already in progress`` races when two requests
+        touch the strategy-builder endpoints at once (e.g. inline dialog
+        and popped-out window mounting concurrently — BTCAAAAA-29971).
+
+        Yields:
+            ScopedManagers: Bundle of strategy / ai_recommendations /
+            test_results managers all sharing one fresh ``Session``.
+        """
+        session = self.SessionLocal()
+        try:
+            yield ScopedManagers(
+                strategy=StrategyDatabaseManager(session),
+                ai_recommendations=AIRecommendationsManager(session),
+                test_results=TestResultsManager(session),
+                session=session,
+            )
+        finally:
+            # Drop any uncommitted state so the next consumer of the pool
+            # connection gets a clean session.
+            try:
+                session.rollback()
+            except Exception:
+                pass
+            session.close()
     
     def close(self):
         """

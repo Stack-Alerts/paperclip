@@ -840,21 +840,32 @@ async def sb_list_strategies(_: dict = Depends(require_jwt)) -> list:
         raise _sb_db_unavailable()
 
     def _fetch() -> list:
-        strategies = db.strategy.get_all_strategies()
-        result = []
-        for s in strategies:
-            try:
-                version = db.strategy.get_latest_version(s["strategy_id"])
-                if version is None:
-                    continue
+        # Per-request session (BTCAAAAA-29971): concurrent mounts of the
+        # Strategy Browser (inline dialog + popped-out window) raced on the
+        # shared db._session and produced "rollback() already in progress"
+        # warnings for every strategy in the loop, returning an empty list.
+        with db.scoped_managers() as scoped:
+            strategies = scoped.strategy.get_all_strategies()
+            result = []
+            for s in strategies:
                 try:
-                    tests = db.test_results.get_version_test_results(str(version["version_id"]))
-                except Exception:
-                    tests = []
-                result.append(_build_sb_strategy(s["strategy_id"], version, tests))
-            except Exception as exc:
-                logger.warning("sb_list_strategies: skipping %s: %s", s.get("strategy_id"), exc)
-        return result
+                    version = scoped.strategy.get_latest_version(s["strategy_id"])
+                    if version is None:
+                        continue
+                    try:
+                        tests = scoped.test_results.get_version_test_results(
+                            str(version["version_id"])
+                        )
+                    except Exception:
+                        tests = []
+                    result.append(_build_sb_strategy(s["strategy_id"], version, tests))
+                except Exception as exc:
+                    logger.warning(
+                        "sb_list_strategies: skipping %s: %s",
+                        s.get("strategy_id"),
+                        exc,
+                    )
+            return result
 
     return await asyncio.to_thread(_fetch)
 
@@ -874,21 +885,22 @@ async def sb_get_strategy_versions(
         raise _sb_db_unavailable()
 
     def _fetch() -> list:
-        versions = db.strategy.get_strategy_versions(strategy_id)
-        latest_num = max((v.get("version_number", 0) for v in versions), default=0)
-        return [
-            {
-                "id": str(v["version_id"]),
-                "strategyId": strategy_id,
-                "versionNumber": v.get("version_number"),
-                "createdAt": _iso(v.get("created_at")),
-                "author": v.get("created_by"),
-                "description": v.get("notes") or v.get("description"),
-                "isLatest": v.get("version_number") == latest_num,
-                "changesSummary": v.get("notes"),
-            }
-            for v in versions
-        ]
+        with db.scoped_managers() as scoped:
+            versions = scoped.strategy.get_strategy_versions(strategy_id)
+            latest_num = max((v.get("version_number", 0) for v in versions), default=0)
+            return [
+                {
+                    "id": str(v["version_id"]),
+                    "strategyId": strategy_id,
+                    "versionNumber": v.get("version_number"),
+                    "createdAt": _iso(v.get("created_at")),
+                    "author": v.get("created_by"),
+                    "description": v.get("notes") or v.get("description"),
+                    "isLatest": v.get("version_number") == latest_num,
+                    "changesSummary": v.get("notes"),
+                }
+                for v in versions
+            ]
 
     return await asyncio.to_thread(_fetch)
 
@@ -909,14 +921,17 @@ async def sb_get_strategy_version(
         raise _sb_db_unavailable()
 
     def _fetch() -> Optional[dict]:
-        version = db.strategy.get_strategy_version(version_id)
-        if version is None:
-            return None
-        try:
-            tests = db.test_results.get_version_test_results(str(version["version_id"]))
-        except Exception:
-            tests = []
-        return _build_sb_strategy(strategy_id, version, tests)
+        with db.scoped_managers() as scoped:
+            version = scoped.strategy.get_strategy_version(version_id)
+            if version is None:
+                return None
+            try:
+                tests = scoped.test_results.get_version_test_results(
+                    str(version["version_id"])
+                )
+            except Exception:
+                tests = []
+            return _build_sb_strategy(strategy_id, version, tests)
 
     result = await asyncio.to_thread(_fetch)
     if result is None:
@@ -942,14 +957,17 @@ async def sb_get_strategy(
         raise _sb_db_unavailable()
 
     def _fetch() -> Optional[dict]:
-        version = db.strategy.get_latest_version(strategy_id)
-        if version is None:
-            return None
-        try:
-            tests = db.test_results.get_version_test_results(str(version["version_id"]))
-        except Exception:
-            tests = []
-        return _build_sb_strategy(strategy_id, version, tests)
+        with db.scoped_managers() as scoped:
+            version = scoped.strategy.get_latest_version(strategy_id)
+            if version is None:
+                return None
+            try:
+                tests = scoped.test_results.get_version_test_results(
+                    str(version["version_id"])
+                )
+            except Exception:
+                tests = []
+            return _build_sb_strategy(strategy_id, version, tests)
 
     result = await asyncio.to_thread(_fetch)
     if result is None:
@@ -976,21 +994,22 @@ async def sb_create_strategy(
         raise _sb_db_unavailable()
 
     def _create() -> dict:
-        strategy_id = db.strategy.create_strategy(body.name)
-        version_id = db.strategy.create_strategy_version({
-            "strategy_id": strategy_id,
-            "name": body.name,
-            "description": body.description or "",
-            "blocks": [],
-            "signals": {},
-            "parameters": {},
-            "entry_conditions": {},
-            "exit_conditions": {},
-            "risk_management": {},
-            "backtest_config": {},
-        })
-        version = db.strategy.get_strategy_version(version_id)
-        return _build_sb_strategy(strategy_id, version, [])
+        with db.scoped_managers() as scoped:
+            strategy_id = scoped.strategy.create_strategy(body.name)
+            version_id = scoped.strategy.create_strategy_version({
+                "strategy_id": strategy_id,
+                "name": body.name,
+                "description": body.description or "",
+                "blocks": [],
+                "signals": {},
+                "parameters": {},
+                "entry_conditions": {},
+                "exit_conditions": {},
+                "risk_management": {},
+                "backtest_config": {},
+            })
+            version = scoped.strategy.get_strategy_version(version_id)
+            return _build_sb_strategy(strategy_id, version, [])
 
     return await asyncio.to_thread(_create)
 
@@ -1009,7 +1028,11 @@ async def sb_delete_strategy(
     if db is None:
         raise _sb_db_unavailable()
 
-    deleted = await asyncio.to_thread(db.strategy.delete_strategy, strategy_id)
+    def _delete() -> bool:
+        with db.scoped_managers() as scoped:
+            return scoped.strategy.delete_strategy(strategy_id)
+
+    deleted = await asyncio.to_thread(_delete)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1034,7 +1057,11 @@ async def sb_delete_strategy_versions(
         raise _sb_db_unavailable()
 
     def _delete_versions() -> dict:
-        return {vid: db.strategy.delete_strategy_version(vid) for vid in body.version_ids}
+        with db.scoped_managers() as scoped:
+            return {
+                vid: scoped.strategy.delete_strategy_version(vid)
+                for vid in body.version_ids
+            }
 
     results = await asyncio.to_thread(_delete_versions)
     return {"deleted": results}
@@ -1057,27 +1084,28 @@ async def sb_duplicate_strategy(
         raise _sb_db_unavailable()
 
     def _duplicate() -> Optional[dict]:
-        latest = db.strategy.get_latest_version(strategy_id)
-        if latest is None:
-            return None
+        with db.scoped_managers() as scoped:
+            latest = scoped.strategy.get_latest_version(strategy_id)
+            if latest is None:
+                return None
 
-        # Strip auto-generated fields before re-inserting
-        _strip = {"version_id", "version_number", "timestamp", "created_at",
-                  "config_hash", "validation_timestamp"}
-        version_data = {k: v for k, v in latest.items() if k not in _strip}
+            # Strip auto-generated fields before re-inserting
+            _strip = {"version_id", "version_number", "timestamp", "created_at",
+                      "config_hash", "validation_timestamp"}
+            version_data = {k: v for k, v in latest.items() if k not in _strip}
 
-        if body.scope == "strategy":
-            new_name = body.name or f"{latest['name']} (Copy)"
-            new_strategy_id = db.strategy.create_strategy(new_name)
-            version_data["strategy_id"] = new_strategy_id
-            version_data["name"] = new_name
-        else:
-            new_strategy_id = strategy_id
-            version_data["strategy_id"] = strategy_id
+            if body.scope == "strategy":
+                new_name = body.name or f"{latest['name']} (Copy)"
+                new_strategy_id = scoped.strategy.create_strategy(new_name)
+                version_data["strategy_id"] = new_strategy_id
+                version_data["name"] = new_name
+            else:
+                new_strategy_id = strategy_id
+                version_data["strategy_id"] = strategy_id
 
-        version_id = db.strategy.create_strategy_version(version_data)
-        version = db.strategy.get_strategy_version(version_id)
-        return _build_sb_strategy(new_strategy_id, version, [])
+            version_id = scoped.strategy.create_strategy_version(version_data)
+            version = scoped.strategy.get_strategy_version(version_id)
+            return _build_sb_strategy(new_strategy_id, version, [])
 
     result = await asyncio.to_thread(_duplicate)
     if result is None:
