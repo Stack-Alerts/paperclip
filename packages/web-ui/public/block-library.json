@@ -374,7 +374,7 @@
           "description": "No triple top - Pattern conditions not met. Need exactly 3 similar peaks with proper spacing. Wait for pattern formation.",
           "occurrences": 14817,
           "occurrence_percentage": 86.24,
-          "ui_visible": true
+          "ui_visible": false
         },
         {
           "name": "BULLISH",
@@ -395,21 +395,21 @@
           "description": "No triple top - Market not forming bearish reversal. Wait for three similar peaks with neckline before trading.",
           "occurrences": 100,
           "occurrence_percentage": 50.0,
-          "ui_visible": true
+          "ui_visible": false
         },
         {
           "name": "ERROR",
           "description": "Analysis error - Cannot detect triple top pattern. Check data quality and minimum bars requirement.",
           "occurrences": 100,
           "occurrence_percentage": 50.0,
-          "ui_visible": true
+          "ui_visible": false
         },
         {
           "name": "INSUFFICIENT_DATA",
           "description": "Insufficient data - Need at least 40 candles for triple top detection. Wait for more price history to form three-peak pattern.",
           "occurrences": 100,
           "occurrence_percentage": 50.0,
-          "ui_visible": true
+          "ui_visible": false
         }
       ],
       "direction": "BEARISH",
@@ -3725,14 +3725,14 @@
           "description": "",
           "occurrences": 100,
           "occurrence_percentage": 50.0,
-          "ui_visible": true
+          "ui_visible": false
         },
         {
           "name": "INSUFFICIENT_DATA",
           "description": "",
           "occurrences": 100,
           "occurrence_percentage": 50.0,
-          "ui_visible": true
+          "ui_visible": false
         }
       ],
       "direction": "NEUTRAL",

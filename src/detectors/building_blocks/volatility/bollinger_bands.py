@@ -142,6 +142,16 @@ logger = logging.getLogger(__name__)
                 'points': 0,
                 'ui_visible': False,  # Filter from Strategy Builder UI
                 'description': 'Neutral - Price near middle band. No clear bias. Wait for directional signal before trading.'
+        },
+        'ERROR': {
+                'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI - diagnostic only
+                'description': 'Analysis error - Cannot calculate Bollinger Bands. Check data quality and minimum bars requirement.'
+        },
+        'INSUFFICIENT_DATA': {
+                'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI - diagnostic only
+                'description': 'Insufficient data - Need at least period+1 candles to calculate Bollinger Bands. Wait for more data.'
         }
 }
 )

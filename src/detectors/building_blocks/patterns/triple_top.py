@@ -53,9 +53,10 @@ import numpy as np
         },
         'NO_PATTERN': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI - diagnostic only
                 'description': 'No triple top - Pattern conditions not met. Need exactly 3 similar peaks with proper spacing. Wait for pattern formation.'
         },
-        
+
         # Simple directional - SIMPLE
         'BEARISH': {
                 'base_points': 30,
@@ -69,14 +70,17 @@ import numpy as np
         },
         'NEUTRAL': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI - diagnostic only
                 'description': 'No triple top - Market not forming bearish reversal. Wait for three similar peaks with neckline before trading.'
         },
         'ERROR': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI - diagnostic only
                 'description': 'Analysis error - Cannot detect triple top pattern. Check data quality and minimum bars requirement.'
         },
         'INSUFFICIENT_DATA': {
                 'points': 0,
+                'ui_visible': False,  # Filter from Strategy Builder UI - diagnostic only
                 'description': 'Insufficient data - Need at least 40 candles for triple top detection. Wait for more price history to form three-peak pattern.'
         }
     }
