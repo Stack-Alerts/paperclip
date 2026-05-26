@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect } from 'react';
 import {
   LayoutGrid,
   GitBranch,
@@ -17,6 +17,7 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 import { BtcWaveformLogo } from './shared/AppBrand';
+import { useSidebar } from '@/contexts/SidebarContext';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutGrid },
@@ -32,12 +33,18 @@ const NAV_ITEMS = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { collapsed, setCollapsed } = useSidebar();
   // Popped-out Strategy Browser window (BTCAAAAA-29377): start with the
   // sidebar collapsed and hide the AppBrand/logo row so the standalone
   // window reads as a focused dialog, not the full app shell. All other
   // routes keep the default expanded sidebar with the logo header.
   const isStrategyBrowserStandalone = pathname === '/strategy-browser';
-  const [collapsed, setCollapsed] = useState(isStrategyBrowserStandalone);
+
+  useEffect(() => {
+    if (isStrategyBrowserStandalone) {
+      setCollapsed(true);
+    }
+  }, [isStrategyBrowserStandalone, setCollapsed]);
 
   return (
     <aside

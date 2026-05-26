@@ -21,6 +21,8 @@ import { RichTooltip, TooltipContent } from './RichTooltip';
 import { useTooltipSettings } from './TooltipSettingsContext';
 import { ThemeSelector } from './ThemeSelector';
 import { Plus, FolderOpen, Save, Play, ChevronDown } from 'lucide-react';
+import { useSidebar } from '@/contexts/SidebarContext';
+import { AppBrand } from '@/components/shared/AppBrand';
 
 type DialogKey =
   | 'newStrategy'
@@ -109,6 +111,18 @@ export interface StrategyBuilderMainWindowProps {
 export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps> = ({
   strategyId,
 }) => {
+  const { collapsed } = useSidebar();
+  const [prevCollapsed, setPrevCollapsed] = useState(collapsed);
+  const [showHopAnimation, setShowHopAnimation] = useState(false);
+
+  useEffect(() => {
+    if (prevCollapsed === true && collapsed === false) {
+      setShowHopAnimation(true);
+      setTimeout(() => setShowHopAnimation(false), 400);
+    }
+    setPrevCollapsed(collapsed);
+  }, [collapsed, prevCollapsed]);
+
   const {
     currentStrategy,
     isLoadingStrategy,
@@ -424,7 +438,22 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       style={{ outline: 'none', background: 'var(--shell-bg)' }}
     >
       {/* ── Window title / Menu Bar ─────────────────────────────────────── */}
-      <div className="flex items-center gap-0.5 border-b px-2 py-1 flex-shrink-0" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+      <style>{`
+        @keyframes sidebarHop {
+          0% { transform: translateY(0); opacity: 0; }
+          50% { transform: translateY(-4px); }
+          100% { transform: translateY(0); opacity: 1; }
+        }
+        .hop-animation {
+          animation: sidebarHop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+      `}</style>
+      <div className="flex items-center gap-2 border-b px-2 py-1 flex-shrink-0" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+        {collapsed && (
+          <div className={showHopAnimation ? 'hop-animation' : ''}>
+            <AppBrand size={20} showWordmark={true} />
+          </div>
+        )}
         <MenuDropdown
           label="File"
           items={[
