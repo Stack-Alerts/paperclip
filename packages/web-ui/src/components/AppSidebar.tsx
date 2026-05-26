@@ -50,12 +50,12 @@ export function AppSidebar() {
     >
       {!isStrategyBrowserStandalone && (
         <div
-          className="flex items-center justify-between px-3 py-4"
+          className={`flex items-center px-3 py-4 ${collapsed ? 'justify-center' : 'justify-between'}`}
           style={{ borderBottom: '1px solid var(--border)' }}
         >
-          <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            <BtcWaveformLogo size={collapsed ? 22 : 28} />
-            {!collapsed && (
+          {!collapsed && (
+            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+              <BtcWaveformLogo size={28} />
               <div className="flex flex-col leading-none min-w-0">
                 <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
                   BTC
@@ -73,8 +73,8 @@ export function AppSidebar() {
                   TRADE ENGINE
                 </span>
               </div>
-            )}
-          </div>
+            </div>
+          )}
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="p-1 rounded transition-colors flex-shrink-0"
