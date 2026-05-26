@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronDown, Search, Filter, Save, Folder, Trash2, Blocks, Plus, X, Edit2, Check, Play } from 'lucide-react';
+import { ChevronRight, ChevronDown, Search, Filter, Save, Trash2, Blocks, Plus, X, Edit2, Check, Play } from 'lucide-react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BlockDefinition, BlockType } from '@/lib/strategy-builder/types';
 import { ExitConditionDialog, ExitConditionConfig, AvailableBlock } from './ExitConditionDialog';
@@ -87,7 +87,7 @@ const TT_PRESET: TooltipContent = {
   body: 'Saved combinations of search text, category, and type filters for one-click restore.',
   sections: [
     { header: 'How to use:', items: [
-      'Select a preset in this dropdown, then click 📂 to apply it',
+      'Choose a preset in this dropdown — it is applied instantly',
       'Click 💾 to open the preset browser and save or manage presets',
     ]},
     { header: 'Tip:', items: ['Create presets for views you use often, e.g. "ICT blocks" or "Bullish patterns"'] },
@@ -98,14 +98,6 @@ const TT_PRESET_SAVE: TooltipContent = {
   body: 'Opens the preset browser to save the current filters, rename, or delete existing presets.',
   sections: [
     { header: 'Stored in:', items: ['Browser local storage — persists across sessions on this device'] },
-  ],
-};
-const TT_PRESET_LOAD: TooltipContent = {
-  title: 'Load Filter Preset',
-  body: 'Applies the saved search text, category, and type filter from the selected preset.',
-  sections: [
-    { header: 'How to use:', items: ['Select a preset in the dropdown first, then click here to activate it'] },
-    { header: 'Note:', items: ['Overwrites the current filter state — unsaved filters will be lost'] },
   ],
 };
 const TT_PRESET_DELETE: TooltipContent = {
@@ -834,11 +826,18 @@ export function BlockSearchPanel() {
     setSelectedPreset(preset.name);
   }, []);
 
-  const handleLoadPreset = useCallback(() => {
-    const preset = presets.find(p => p.name === selectedPreset);
-    if (!preset) return;
+  const handlePresetSelectChange = useCallback((name: string) => {
+    if (!name) {
+      setSelectedPreset('');
+      return;
+    }
+    const preset = presets.find(p => p.name === name);
+    if (!preset) {
+      setSelectedPreset(name);
+      return;
+    }
     handleApplyPreset(preset);
-  }, [presets, selectedPreset, handleApplyPreset]);
+  }, [presets, handleApplyPreset]);
 
   // Primary filtered blocks (search + category + type)
   const filteredBlocks = useMemo(() => {
@@ -1077,24 +1076,13 @@ export function BlockSearchPanel() {
           <RichTooltip content={TT_PRESET}>
             <select
               value={selectedPreset}
-              onChange={e => setSelectedPreset(e.target.value)}
+              onChange={e => handlePresetSelectChange(e.target.value)}
               className="flex-1 min-w-0 px-1.5 py-1 rounded border text-xs focus:outline-none"
               style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}
             >
               <option value="">— Select preset —</option>
               {presets.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
             </select>
-          </RichTooltip>
-          <RichTooltip content={TT_PRESET_LOAD}>
-            <button
-              onClick={handleLoadPreset}
-              disabled={!selectedPreset}
-              className="flex items-center justify-center px-1.5 py-1 rounded border flex-shrink-0 disabled:opacity-40 hover:opacity-80 transition-opacity"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-dim)' }}
-              title="Apply selected preset"
-            >
-              <Folder size={13} />
-            </button>
           </RichTooltip>
           <RichTooltip content={TT_PRESET_SAVE}>
             <button
