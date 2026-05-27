@@ -159,9 +159,12 @@
   /* ── Hover-highlight row palette (BlockSearchPanel signal rows) ── */
   --hover-row-bg:                #0D2940;
   --hover-row-bg-top:            #12344F;
-  --hover-row-border:            #1E5D86;
-  --hover-row-border-soft:       #2B7CAA;
-  --hover-row-glow:              #35A9FF;
+  /* BTCAAAAA-30028 finetune 3: desaturate border + glow ~12-15% toward
+     --bg-deep so the hover frame reads as part of the teal-blue panel
+     theme rather than a punchier accent. */
+  --hover-row-border:            color-mix(in srgb, #1E5D86 88%, var(--bg-deep));
+  --hover-row-border-soft:       color-mix(in srgb, #2B7CAA 88%, var(--bg-deep));
+  --hover-row-glow:              color-mix(in srgb, #35A9FF 85%, var(--bg-deep));
   --hover-row-checkbox:          #173147;
   --hover-row-checkbox-border:   #2F86C1;
   --hover-row-text-primary:      #D6E6F2;

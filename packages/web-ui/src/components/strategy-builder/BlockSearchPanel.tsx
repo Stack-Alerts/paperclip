@@ -598,27 +598,38 @@ function SignalRow({ sig, isAdded, isChecked, onToggle }: SignalRowProps) {
   const rowStyle: React.CSSProperties = {
     transition: 'background 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
     borderRadius: 6,
-    border: '1px solid transparent',
+    borderStyle: 'solid',
+    borderWidth: 1,
+    borderColor: 'transparent',
     padding: '4px 6px',
     ...(active ? {
       background: 'linear-gradient(to bottom, var(--hover-row-bg-top), var(--hover-row-bg))',
       borderColor: 'var(--hover-row-border)',
+      // BTCAAAAA-30030: dropped the 10px outer glow — it extended past the
+      // 8px space-y-2 row gap and visually bled onto neighbors, reading as a
+      // "frame on adjacent rows". Inset ring softened 35% -> 15% to dim the
+      // bright "white frame" perceived on the hovered row.
+      // BTCAAAAA-30028 finetune 3: outer-ring opacity 18% -> 12% so the glow
+      // sits closer to the surrounding teal-blue panel theme instead of
+      // popping as a saturated accent.
       boxShadow:
-        'inset 0 0 0 1px color-mix(in srgb, var(--hover-row-border-soft) 35%, transparent), ' +
-        '0 0 0 1px color-mix(in srgb, var(--hover-row-glow) 18%, transparent), ' +
-        '0 0 10px 0 color-mix(in srgb, var(--hover-row-glow) 18%, transparent)',
+        'inset 0 0 0 1px color-mix(in srgb, var(--hover-row-border-soft) 15%, transparent), ' +
+        '0 0 0 1px color-mix(in srgb, var(--hover-row-glow) 12%, transparent)',
     } : {}),
   };
 
   const checkboxStyle: React.CSSProperties = isChecked
     ? {
-        background: active ? 'var(--hover-row-selected-fill)' : 'var(--accent-sky-bright)',
-        borderColor: active ? 'var(--hover-row-selected-fill)' : 'var(--accent-sky-bright)',
+        // BTCAAAAA-30028 board fix 2026-05-27: the unhovered checked state was using
+        // --accent-sky-bright (#2BE8F2 bright cyan) which doesn't appear anywhere
+        // else in the dark theme. Match the hovered fill so hover only adds glow.
+        backgroundColor: 'var(--hover-row-selected-fill)',
+        borderColor: 'var(--hover-row-selected-fill)',
         boxShadow: active ? '0 0 6px 0 color-mix(in srgb, var(--hover-row-selected-glow) 60%, transparent)' : undefined,
         backgroundImage:
           "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='white'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e\")",
         backgroundSize: '100% 100%',
-        transition: 'background 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
+        transition: 'background-color 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
       }
     : {
         background: active ? 'var(--hover-row-checkbox)' : 'transparent',
@@ -790,7 +801,7 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
 
       {signalsOpen && visibleSignals.length > 0 && (
         <div className="px-3 pb-2 bg-[var(--bg-deep)]">
-          <p className="text-xs font-semibold text-sky-400 pt-2 pb-1">Select signals to add:</p>
+          <p className="text-xs font-semibold pt-2 pb-1" style={{ color: 'var(--text-secondary)' }}>Select signals to add:</p>
           <div className="space-y-2">
             {visibleSignals.map((sig, i) => {
               const isAdded = !advancedMode && (addedSignals?.has(sig.name) ?? false);
