@@ -4095,6 +4095,9 @@
       "src/detectors/building_blocks/market_structure/premium_discount_zones.py",
       "src/strategies/strategy_01_reversal_m_pattern.py"
     ],
+    "tests/strategy_builder/conftest.py": [
+      "src/optimizer_v3/database/database_manager.py"
+    ],
     "tests/strategy_builder/core/test_nautilus_code_generator.py": [
       "src/strategy_builder/core/nautilus_code_generator.py",
       "src/strategy_builder/core/strategy_config_engine.py"
@@ -5737,7 +5740,8 @@
       "src/optimizer_v3/database/__init__.py",
       "test_ai_recommendations_text_wrapper_live.py",
       "tests/database/conftest.py",
-      "tests/database/test_database_manager_for_testing.py"
+      "tests/database/test_database_manager_for_testing.py",
+      "tests/strategy_builder/conftest.py"
     ],
     "src/optimizer_v3/database/ai_recommendations_manager.py": [
       "src/optimizer_v3/database/__init__.py",
@@ -8860,6 +8864,7 @@
     "tests/strategies/test_strategy_with_backtest.py",
     "tests/strategies/walkforward_test.py",
     "tests/strategy_builder/__init__.py",
+    "tests/strategy_builder/conftest.py",
     "tests/strategy_builder/core/__init__.py",
     "tests/strategy_builder/core/test_nautilus_code_generator.py",
     "tests/strategy_builder/core/test_registry_interface.py",
@@ -8884,6 +8889,7 @@
     "tests/strategy_builder/test_exit_orchestrator.py",
     "tests/strategy_builder/test_exit_persistence.py",
     "tests/strategy_builder/test_exit_validation.py",
+    "tests/strategy_builder/test_scoped_managers_concurrent_session.py",
     "tests/strategy_builder/test_starting_capital.py",
     "tests/strategy_builder/test_validation_report_fix_signal.py",
     "tests/strategy_builder/testing/__init__.py",
@@ -9013,10 +9019,10 @@
     "src/detectors/building_blocks/patterns/triple_top.py"
   ],
   "stats": {
-    "total_files": 1407,
-    "parsed_files": 1391,
+    "total_files": 1409,
+    "parsed_files": 1393,
     "error_files": 16,
     "parse_rate_pct": 98.86,
-    "edge_count": 2457
+    "edge_count": 2458
   }
 }
