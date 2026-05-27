@@ -421,6 +421,40 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       // inside the panel).
       const titleCase = (s: string) =>
         s.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      // Normalize nested signal exit_condition + recheck_config to the
+      // camelCase shape the panel renderer expects (StrategyBlocksPanel:334
+      // reads cfg.signalName, line 339 reads cfg.recheckBarDelay/recheckEnabled).
+      // Without this the per-signal exit pills and RCHK badges disappear,
+      // which is the layout regression the board flagged vs the signed-off
+      // rendering (board comment 2026-05-27 05:50 UTC on BTCAAAAA-29995).
+      const normalizeExitCondition = (ec: Record<string, unknown>): Record<string, unknown> => {
+        const out: Record<string, unknown> = { ...ec };
+        if (typeof ec.signal_name === 'string') out.signalName = ec.signal_name;
+        if (typeof ec.exit_mode === 'string') out.exitMode = ec.exit_mode;
+        if (typeof ec.binding_level === 'string') out.bindingLevel = ec.binding_level;
+        const rc = ec.recheck_config as Record<string, unknown> | undefined;
+        if (rc && typeof rc === 'object') {
+          if (typeof rc.enabled === 'boolean') out.recheckEnabled = rc.enabled;
+          if (typeof rc.bar_delay === 'number') out.recheckBarDelay = rc.bar_delay;
+          if (typeof rc.mode === 'string') out.recheckMode = rc.mode;
+        }
+        return out;
+      };
+      const normalizeSignal = (sig: Record<string, unknown>): Record<string, unknown> => {
+        const out: Record<string, unknown> = { ...sig };
+        const rc = sig.recheck_config as Record<string, unknown> | undefined;
+        if (rc && typeof rc === 'object') {
+          if (typeof rc.enabled === 'boolean') out.recheckEnabled = rc.enabled;
+          if (typeof rc.bar_delay === 'number') out.recheckBarDelay = rc.bar_delay;
+        }
+        const exits = sig.exit_conditions as unknown;
+        if (Array.isArray(exits)) {
+          out.exit_conditions = exits.map((e) =>
+            e && typeof e === 'object' ? normalizeExitCondition(e as Record<string, unknown>) : e
+          );
+        }
+        return out;
+      };
       const rawBlocks = Array.isArray(strategy.blocks) ? strategy.blocks : [];
       const normalized: Strategy = {
         ...strategy,
@@ -430,11 +464,18 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
           if (isFrontendShape) return b as Block;
           const raw = b as unknown as Record<string, unknown>;
           const rawName = typeof raw.name === 'string' ? raw.name : '';
+          const signals = raw.signals as unknown;
+          const normalizedSignals = Array.isArray(signals)
+            ? signals.map((s) =>
+                s && typeof s === 'object' ? normalizeSignal(s as Record<string, unknown>) : s
+              )
+            : raw.signals;
+          const dataCore: Record<string, unknown> = { ...raw, signals: normalizedSignals };
           return {
             id: `block-${strategy.versionId ?? strategy.id}-${i}`,
             type: BlockType.INDICATOR,
             index: i,
-            data: rawName ? { ...raw, name: titleCase(rawName) } : raw,
+            data: rawName ? { ...dataCore, name: titleCase(rawName) } : dataCore,
           };
         }),
       };
