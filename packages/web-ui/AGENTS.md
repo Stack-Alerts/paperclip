@@ -21,14 +21,73 @@ The window list and project mapping is canonical in [BTCAAAAA-29339#document-pla
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-<!-- BEGIN:branching-contract -->
-# Branching Contract (mandatory for all code change)
+<!-- BEGIN:merge-governance -->
+## Merge governance — REQUIRED FOR ALL CODE CHANGES
 
-Effective per [BTCAAAAA-30039](/BTCAAAAA/issues/BTCAAAAA-30039). Applies to every agent making code changes in this package.
+Effective per [BTCAAAAA-30046](/BTCAAAAA/issues/BTCAAAAA-30046) (Phase 2 of the merge-governance roll-out drafted on [BTCAAAAA-30038](/BTCAAAAA/issues/BTCAAAAA-30038#document-process-audit)). Supersedes the preliminary contract on [BTCAAAAA-30039](/BTCAAAAA/issues/BTCAAAAA-30039). Applies to every agent making code changes in this package.
 
-1. Every code-change issue starts with: `git fetch origin && git switch -c {type}/BTCAAAAA-{n}-{kebab-slug} origin/main`. Verify with `git rev-parse --abbrev-ref HEAD` before the first commit.
-2. Direct push to `origin/main` is FORBIDDEN. All merges go through PR + RepoSteward (or CEO GH_TOKEN fallback) per the merge-dispatch flow.
-3. Closure comments MUST include a `Fix-SHA: <40-char-sha>` line on its own. Machine-parseable; closure-gate routine reads this.
-4. Issue PATCH `status=done` is conditional on `git merge-base --is-ancestor <Fix-SHA> origin/main` returning rc=0. The closure-gate routine will reopen on violation.
-5. Dev-server checkout: any agent that switches the working tree to a non-main branch MUST update the [dev-server-status document on BTCAAAAA-30031](/BTCAAAAA/issues/BTCAAAAA-30031#document-dev-server-status) within the same heartbeat.
-<!-- END:branching-contract -->
+Full contract lives in the repo-root [`/AGENTS.md` § Merge governance](../../AGENTS.md#merge-governance--required-for-all-code-changes). The clauses below are the operational summary; if these conflict with the root document, the root document wins.
+
+### 1. Branch naming — one issue, one branch
+
+```
+git fetch origin
+git switch -c fix/BTCAAAAA-NNN-kebab-slug origin/main
+git rev-parse --abbrev-ref HEAD   # must equal fix/BTCAAAAA-NNN-kebab-slug
+```
+
+One issue → one branch. Use `feat/`, `chore/`, `docs/`, `test/`, or `refactor/` as the prefix depending on the verb in the issue title.
+
+### 2. Single-owner rule
+
+Once a branch carries the `BTCAAAAA-NNN` identifier, only that issue's assignee commits to it. Other agents open a follow-up issue with their own branch — they do not push commits onto a sibling's branch. When the workspace is shared and `HEAD` may rotate mid-task, isolate via `git worktree add /tmp/btc-NNN -b fix/BTCAAAAA-NNN-slug origin/main`.
+
+### 3. Pre-commit working-tree check
+
+Before `git add`, run `git rev-parse --abbrev-ref HEAD` and confirm it matches your issue branch. `scripts/lint-branch-name.sh` (repo-root) automates the branch-name validation. Failure mode this prevents: the [BTCAAAAA-30034](/BTCAAAAA/issues/BTCAAAAA-30034) token-gap chain that landed commits across three unrelated feature branches.
+
+### 4. `Fix-SHA:` tag contract
+
+Every closure comment includes exactly one line: `Fix-SHA: <40-char-sha>`. Regex: `^Fix-SHA: [0-9a-f]{40}$`. The SHA is the HEAD of the implementing branch at the time the comment is posted. The closure-gate routine ([BTCAAAAA-30040](/BTCAAAAA/issues/BTCAAAAA-30040)) parses it; missing or malformed lines auto-reopen the issue.
+
+### 5. Ancestry self-check
+
+Before marking `done`:
+
+```
+git fetch origin
+git merge-base --is-ancestor <fix-sha> origin/main; echo rc=$?
+```
+
+`rc=0` → `done`. `rc≠0` → `in_review`, awaiting merge dispatch from CEO/RepoSteward ([BTCAAAAA-30041](/BTCAAAAA/issues/BTCAAAAA-30041)).
+
+### 6. One issue, one PR
+
+PR description references exactly one `BTCAAAAA-NNN`. Direct push to `origin/main` is FORBIDDEN.
+
+### 7. Dev-server status update
+
+Any agent switching the working tree off `main` MUST update the [dev-server-status document on BTCAAAAA-30031](/BTCAAAAA/issues/BTCAAAAA-30031#document-dev-server-status) within the same heartbeat.
+
+### 8. Closure-comment template
+
+````markdown
+## Closure — BTCAAAAA-NNN
+
+**Outcome:** [one sentence: what is now true that wasn't before]
+
+**Evidence:**
+- Screenshot: [URL or relative path under `docs/screenshots/`]
+- Smoke test rc: [paste exact command and rc, or "N/A — docs-only change"]
+
+**Branch:** `fix/BTCAAAAA-NNN-kebab-slug`
+
+**Ancestry check:**
+```
+$ git merge-base --is-ancestor <fix-sha> origin/main; echo rc=$?
+rc=0     # paste actual rc — 0 = done, ≠0 = in_review
+```
+
+Fix-SHA: 0123456789abcdef0123456789abcdef01234567
+````
+<!-- END:merge-governance -->
