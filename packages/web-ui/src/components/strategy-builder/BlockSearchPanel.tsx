@@ -546,6 +546,97 @@ function PresetBrowserModal({ open, presets, currentFilters, onClose, onApply, o
 }
 
 // ─────────────────────────────────────────────
+// SignalRow — hoverable row in the expanded "Select signals to add" panel.
+// Implements the BTCAAAAA-30005 hover palette (see globals.css --hover-row-*).
+// ─────────────────────────────────────────────
+interface SignalRowProps {
+  sig: { name: string; description?: string; occurrences?: number | null; occurrence_percentage?: number | null };
+  isAdded: boolean;
+  isChecked: boolean;
+  onToggle: () => void;
+}
+
+function SignalRow({ sig, isAdded, isChecked, onToggle }: SignalRowProps) {
+  const [hovered, setHovered] = useState(false);
+  const active = hovered && !isAdded;
+
+  const rowStyle: React.CSSProperties = {
+    transition: 'background 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
+    borderRadius: 6,
+    border: '1px solid transparent',
+    padding: '4px 6px',
+    ...(active ? {
+      background: 'linear-gradient(to bottom, var(--hover-row-bg-top), var(--hover-row-bg))',
+      borderColor: 'var(--hover-row-border)',
+      boxShadow:
+        'inset 0 0 0 1px color-mix(in srgb, var(--hover-row-border-soft) 35%, transparent), ' +
+        '0 0 0 1px color-mix(in srgb, var(--hover-row-glow) 18%, transparent), ' +
+        '0 0 10px 0 color-mix(in srgb, var(--hover-row-glow) 18%, transparent)',
+    } : {}),
+  };
+
+  const checkboxStyle: React.CSSProperties = isChecked
+    ? {
+        background: active ? 'var(--hover-row-selected-fill)' : 'var(--accent-sky-bright)',
+        borderColor: active ? 'var(--hover-row-selected-fill)' : 'var(--accent-sky-bright)',
+        boxShadow: active ? '0 0 6px 0 color-mix(in srgb, var(--hover-row-selected-glow) 60%, transparent)' : undefined,
+        backgroundImage:
+          "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='white'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e\")",
+        backgroundSize: '100% 100%',
+        transition: 'background 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
+      }
+    : {
+        background: active ? 'var(--hover-row-checkbox)' : 'transparent',
+        borderColor: active ? 'var(--hover-row-checkbox-border)' : 'var(--text-faintest)',
+        transition: 'background 150ms ease, border-color 150ms ease',
+      };
+
+  const titleColor = isAdded
+    ? 'var(--text-muted)'
+    : active
+      ? 'var(--hover-row-text-primary)'
+      : 'var(--text-secondary)';
+  const countColor = active ? 'var(--hover-row-text-secondary)' : 'var(--text-muted)';
+  const descColor = active ? 'var(--hover-row-text-description)' : 'var(--text-secondary)';
+
+  return (
+    <div
+      className={`pl-1 ${isAdded ? 'opacity-50' : ''}`}
+      style={rowStyle}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <label className={`flex items-start gap-2 ${isAdded ? 'cursor-default' : 'cursor-pointer'}`}>
+        <input
+          type="checkbox"
+          checked={isChecked}
+          disabled={isAdded}
+          onChange={() => !isAdded && onToggle()}
+          className="mt-0.5 flex-shrink-0 appearance-none w-3.5 h-3.5 rounded-sm border cursor-pointer disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--hover-row-glow)]"
+          style={checkboxStyle}
+        />
+        <div className="min-w-0">
+          <span
+            className={`text-xs font-semibold ${isAdded ? 'line-through' : ''}`}
+            style={{ color: titleColor, transition: 'color 150ms ease' }}
+          >
+            {formatSignalName(sig.name)}
+          </span>
+          {sig.occurrences != null && (
+            <span className="font-normal text-xs ml-1.5" style={{ color: countColor, transition: 'color 150ms ease' }}>
+              ({sig.occurrences.toLocaleString()} found, {sig.occurrence_percentage != null ? sig.occurrence_percentage.toFixed(1) : '?'}%)
+            </span>
+          )}
+          {sig.description ? (
+            <div className="text-xs mt-0.5 italic leading-relaxed" style={{ color: descColor, transition: 'color 150ms ease' }}>{sig.description}</div>
+          ) : null}
+        </div>
+      </label>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // BlockItem
 // ─────────────────────────────────────────────
 interface BlockItemProps {
@@ -670,39 +761,13 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
               const isAdded = !advancedMode && (addedSignals?.has(sig.name) ?? false);
               const isChecked = checkedSignals.has(sig.name);
               return (
-                <div key={i} className={`pl-1 ${isAdded ? 'opacity-50' : ''}`}>
-                  <label className={`flex items-start gap-2 ${isAdded ? 'cursor-default' : 'cursor-pointer'}`}>
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      disabled={isAdded}
-                      onChange={() => !isAdded && toggleSignal(sig.name)}
-                      className="mt-0.5 flex-shrink-0 appearance-none w-3.5 h-3.5 rounded-sm border border-[var(--text-faintest)] cursor-pointer disabled:opacity-50"
-                      style={isChecked ? {
-                        background: 'var(--accent-sky-bright)',
-                        borderColor: 'var(--accent-sky-bright)',
-                        backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='white'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e\")",
-                        backgroundSize: '100% 100%',
-                      } : { background: 'transparent' }}
-                    />
-                    <div className="min-w-0">
-                      <span
-                        className={`text-xs font-semibold ${isAdded ? 'line-through' : ''}`}
-                        style={{ color: isAdded ? 'var(--text-muted)' : 'var(--text-secondary)' }}
-                      >
-                        {formatSignalName(sig.name)}
-                      </span>
-                      {sig.occurrences != null && (
-                        <span className="font-normal text-xs ml-1.5" style={{ color: 'var(--text-muted)' }}>
-                          ({sig.occurrences.toLocaleString()} found, {sig.occurrence_percentage != null ? sig.occurrence_percentage.toFixed(1) : '?'}%)
-                        </span>
-                      )}
-                      {sig.description ? (
-                        <div className="text-xs mt-0.5 italic leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{sig.description}</div>
-                      ) : null}
-                    </div>
-                  </label>
-                </div>
+                <SignalRow
+                  key={i}
+                  sig={sig}
+                  isAdded={isAdded}
+                  isChecked={isChecked}
+                  onToggle={() => toggleSignal(sig.name)}
+                />
               );
             })}
           </div>
