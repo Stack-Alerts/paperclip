@@ -57,17 +57,17 @@ export function SaveStrategyModeDialog({
         <h2
           id="save-mode-dialog-title"
           className="text-base font-semibold mb-2"
-          style={{ color: 'var(--text-primary)' }}
+          style={{ color: 'var(--text-secondary)' }}
         >
           Save renamed strategy
         </h2>
         <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
           The strategy name changed from{' '}
-          <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+          <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>
             “{originalName}”
           </span>{' '}
           to{' '}
-          <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+          <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>
             “{newName}”
           </span>
           . How should it be saved?
