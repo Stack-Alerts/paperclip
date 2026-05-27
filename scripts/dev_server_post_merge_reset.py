@@ -239,17 +239,37 @@ def restart_dev_server() -> bool:
     try:
         logger.info("Restarting dev server...")
 
-        # Kill any existing dev server processes
+        # Kill the process bound to WEBUI_PORT (the actual next-server),
+        # plus any npm run dev wrappers.
+        fuser_result = subprocess.run(
+            ["fuser", "-k", f"{WEBUI_PORT}/tcp"],
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+        logger.info("fuser kill port %d: rc=%d", WEBUI_PORT, fuser_result.returncode)
+
         subprocess.run(
             ["pkill", "-f", "npm run dev"],
-            cwd=REPO_ROOT,
             capture_output=True,
             timeout=10,
             check=False,
         )
 
-        # Wait for clean exit
-        time.sleep(2)
+        # Wait for port to be released
+        for _ in range(10):
+            time.sleep(1)
+            port_check = subprocess.run(
+                ["fuser", f"{WEBUI_PORT}/tcp"],
+                capture_output=True,
+                timeout=5,
+                check=False,
+            )
+            if port_check.returncode != 0:
+                logger.info("Port %d is free", WEBUI_PORT)
+                break
+        else:
+            logger.warning("Port %d still in use after 10s, proceeding anyway", WEBUI_PORT)
 
         # Start the dev server via start.sh in the background
         # We'll monitor it separately
@@ -263,25 +283,36 @@ def restart_dev_server() -> bool:
 
         logger.info("Started dev server (PID %d)", proc.pid)
 
-        # Wait for the server to come up (max 10 seconds)
-        for attempt in range(10):
+        # Wait for the server to come up (max 90 seconds — Turbopack cold-start)
+        for attempt in range(90):
             time.sleep(1)
             try:
-                # Check if the webui is responding
                 resp = requests.get(
                     f"http://localhost:{WEBUI_PORT}",
-                    timeout=2,
+                    timeout=3,
                 )
-                if resp.status_code == 200 and "BTC Trade Engine" in resp.text:
-                    logger.info("Dev server is responding at localhost:%d", WEBUI_PORT)
-                    return True
-            except requests.RequestException:
-                if attempt < 9:
-                    logger.debug("Waiting for server to be ready (attempt %d/10)", attempt + 1)
-                    continue
+                if resp.status_code == 200:
+                    title_found = "BTC Trade Engine" in resp.text
+                    logger.info(
+                        "Dev server HTTP %d at localhost:%d (title_found=%s)",
+                        resp.status_code,
+                        WEBUI_PORT,
+                        title_found,
+                    )
+                    if title_found:
+                        return True
+                    # Server is up but wrong content — keep waiting for compile
+                    logger.debug("Waiting for full compile (attempt %d/90)", attempt + 1)
+                else:
+                    logger.debug(
+                        "Server returned HTTP %d, waiting (attempt %d/90)",
+                        resp.status_code,
+                        attempt + 1,
+                    )
+            except requests.RequestException as exc:
+                logger.debug("Waiting for server (attempt %d/90): %s", attempt + 1, exc)
 
-        logger.error("Dev server did not respond within 10 seconds")
-        # Kill the process if it's not responding
+        logger.error("Dev server did not serve expected content within 90 seconds")
         try:
             os.killpg(os.getpgid(proc.pid), 15)
         except Exception:
@@ -407,20 +438,6 @@ def main(dry_run: bool = False, force: bool = False) -> int:
     if not restart_dev_server():
         logger.error("Failed to restart dev server")
         post_status_comment(current_sha, False, "Server restart failed")
-        return 1
-
-    # Verify server is serving the right title
-    try:
-        resp = requests.get(f"http://localhost:{WEBUI_PORT}", timeout=2)
-        if resp.status_code == 200 and "BTC Trade Engine" in resp.text:
-            logger.info("Dev server validation passed")
-        else:
-            logger.error("Dev server not serving expected content")
-            post_status_comment(current_sha, False, "Content validation failed")
-            return 1
-    except Exception as exc:
-        logger.error("Failed to validate dev server: %s", exc)
-        post_status_comment(current_sha, False, f"Validation failed: {exc}")
         return 1
 
     # Update state
