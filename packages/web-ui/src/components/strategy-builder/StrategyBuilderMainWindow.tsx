@@ -16,7 +16,8 @@ import { StrategyBlocksPanel } from './StrategyBlocksPanel';
 import { BlockSearchPanel } from './BlockSearchPanel';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import * as api from '@/lib/strategy-builder/api';
-import type { BacktestResult, BacktestConfig, Strategy } from '@/lib/strategy-builder/types';
+import type { BacktestResult, BacktestConfig, Strategy, Block } from '@/lib/strategy-builder/types';
+import { BlockType } from '@/lib/strategy-builder/types';
 import { RichTooltip, TooltipContent } from './RichTooltip';
 import { useTooltipSettings } from './TooltipSettingsContext';
 import { ThemeSelector } from './ThemeSelector';
@@ -402,12 +403,34 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // -------------------------------------------------------------------------
   const handleStrategySelect = useCallback(
     (strategy: Strategy) => {
-      // BTCAAAAA-29995: previously this handler reset stepper/snapshot state but
-      // never pushed the selected strategy into the store, so the canvas stayed
-      // on its default empty strategy after Open. The dialog fetches the full
-      // strategy (incl. blocks) via the strategy-builder API — push it through.
-      setCurrentStrategy(strategy);
-      setCleanSnapshot(JSON.stringify({ id: strategy.id, blocks: strategy.blocks, name: strategy.name }));
+      // BTCAAAAA-29995: the dialog fetches strategies from the strategy-builder
+      // API, which returns blocks in the Python domain shape
+      // `{name, logic, signals, ...}`. The frontend Block contract is
+      // `{id, type, index, data}` — StrategyInfoPanel.computeStats reads
+      // block.data.logic / block.data.signals and crashed on the raw shape
+      // ("Cannot read properties of undefined (reading 'logic')"). Wrap each
+      // raw block under .data so existing consumers see the expected shape.
+      // type defaults to INDICATOR — computeStats only special-cases
+      // EXIT_CONDITION; all other types fall through to the logic-based
+      // branches (AND→required, OR→optional, EXIT→exit), which matches the
+      // API payload's own `logic` field.
+      const rawBlocks = Array.isArray(strategy.blocks) ? strategy.blocks : [];
+      const normalized: Strategy = {
+        ...strategy,
+        blocks: rawBlocks.map((b, i): Block => {
+          const isFrontendShape =
+            b && typeof b === 'object' && 'data' in b && 'type' in b;
+          if (isFrontendShape) return b as Block;
+          return {
+            id: `block-${strategy.versionId ?? strategy.id}-${i}`,
+            type: BlockType.INDICATOR,
+            index: i,
+            data: b as unknown as Record<string, unknown>,
+          };
+        }),
+      };
+      setCurrentStrategy(normalized);
+      setCleanSnapshot(JSON.stringify({ id: normalized.id, blocks: normalized.blocks, name: normalized.name }));
       setCurrentStep(0);
       setCompletedSteps(new Set());
       setErrorSteps(new Set());
