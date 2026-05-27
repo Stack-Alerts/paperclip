@@ -360,6 +360,18 @@ function PresetBrowserModal({ open, presets, currentFilters, onClose, onApply, o
   const [editingName, setEditingName] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [presetSearch, setPresetSearch] = useState('');
+
+  const filteredPresets = useMemo(() => {
+    const q = presetSearch.trim().toLowerCase();
+    if (!q) return presets;
+    return presets.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      p.search.toLowerCase().includes(q) ||
+      p.category.toLowerCase().includes(q) ||
+      p.type.toLowerCase().includes(q)
+    );
+  }, [presets, presetSearch]);
 
   if (!open) return null;
 
@@ -380,7 +392,7 @@ function PresetBrowserModal({ open, presets, currentFilters, onClose, onApply, o
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="rounded-xl shadow-2xl border flex flex-col" style={{ background: 'var(--surface-panel)', borderColor: 'var(--border)', width: 480, maxHeight: '80vh' }}>
+      <div className="rounded-xl shadow-2xl border flex flex-col" style={{ background: 'var(--surface-panel)', borderColor: 'var(--border)', width: 'min(820px, 95vw)', height: 'min(820px, 90vh)' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Filter Presets</h3>
@@ -431,6 +443,24 @@ function PresetBrowserModal({ open, presets, currentFilters, onClose, onApply, o
           </div>
         </div>
 
+        {/* Search row — matches Block Library search affordance */}
+        <div className="px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs flex-shrink-0" style={{ color: 'var(--text-muted)', width: 68, justifyContent: 'flex-end' }}>
+              <Search size={13} style={{ flexShrink: 0 }} />
+              <span>Search:</span>
+            </div>
+            <input
+              type="text"
+              placeholder="Search presets by name, search text, category, or type…"
+              value={presetSearch}
+              onChange={e => setPresetSearch(e.target.value)}
+              className="flex-1 px-2.5 py-1.5 rounded border text-xs focus:outline-none"
+              style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
+            />
+          </div>
+        </div>
+
         {/* Preset list */}
         <div className="flex-1 overflow-y-auto px-5 py-3">
           {presets.length === 0 ? (
@@ -438,9 +468,14 @@ function PresetBrowserModal({ open, presets, currentFilters, onClose, onApply, o
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No presets saved yet.</p>
               <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Set filters above and save them for one-click access.</p>
             </div>
+          ) : filteredPresets.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No presets match &ldquo;{presetSearch}&rdquo;.</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Try a different search term or clear the search to see all presets.</p>
+            </div>
           ) : (
             <div className="space-y-2">
-              {presets.map(preset => (
+              {filteredPresets.map(preset => (
                 <div
                   key={preset.name}
                   className="rounded-lg border p-3"
