@@ -430,7 +430,7 @@ def main(dry_run: bool = False, force: bool = False) -> int:
     if not is_clean:
         logger.warning("Working tree has changes outside .next/dev, refusing reset")
         logger.warning("Dirty paths: %s", dirty_paths)
-        post_warning_comment("BTCAAAAA-30052", dirty_paths)
+        post_warning_comment(STATUS_TRACKING_ISSUE, dirty_paths)
         post_status_comment(current_sha, False, f"Dirty tree: {len(dirty_paths)} paths")
         return 1
 
