@@ -363,8 +363,22 @@ def restart_dev_server() -> bool:
 
 
 def post_status_comment(sha: str, success: bool, error_message: str | None = None) -> bool:
-    """Post a status comment on BTCAAAAA-30038 about dev-server health."""
+    """Post a status comment on BTCAAAAA-30038 about dev-server health.
+
+    Skips posting when the tracking issue is in a terminal state
+    (done/cancelled), to avoid the harness `issue_reopened_via_comment`
+    behavior that would otherwise reopen a closed audit on every cycle.
+    """
     try:
+        status = get_issue_status(STATUS_TRACKING_ISSUE)
+        if status in ("done", "cancelled"):
+            logger.info(
+                "Issue %s is in terminal state (%s), skipping status post",
+                STATUS_TRACKING_ISSUE,
+                status,
+            )
+            return True
+
         timestamp = datetime.now(timezone.utc).isoformat()
         status_str = "✅ Healthy" if success else "⚠️ Degraded"
 
