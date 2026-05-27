@@ -413,7 +413,14 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       // type defaults to INDICATOR — computeStats only special-cases
       // EXIT_CONDITION; all other types fall through to the logic-based
       // branches (AND→required, OR→optional, EXIT→exit), which matches the
-      // API payload's own `logic` field.
+      // API payload's own `logic` field. Also Title-Case the API's snake_case
+      // block names (`asia_session_50_percent` → `Asia Session 50 Percent`)
+      // to match the block-library display names — StrategyBlocksPanel reads
+      // block.data.name directly for the block title, so the prettification
+      // has to happen here (formatSignalName is already applied to signals
+      // inside the panel).
+      const titleCase = (s: string) =>
+        s.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
       const rawBlocks = Array.isArray(strategy.blocks) ? strategy.blocks : [];
       const normalized: Strategy = {
         ...strategy,
@@ -421,11 +428,13 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
           const isFrontendShape =
             b && typeof b === 'object' && 'data' in b && 'type' in b;
           if (isFrontendShape) return b as Block;
+          const raw = b as unknown as Record<string, unknown>;
+          const rawName = typeof raw.name === 'string' ? raw.name : '';
           return {
             id: `block-${strategy.versionId ?? strategy.id}-${i}`,
             type: BlockType.INDICATOR,
             index: i,
-            data: b as unknown as Record<string, unknown>,
+            data: rawName ? { ...raw, name: titleCase(rawName) } : raw,
           };
         }),
       };
