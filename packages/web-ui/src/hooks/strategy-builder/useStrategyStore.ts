@@ -15,6 +15,16 @@ import {
   BacktestResult,
   StrategySettings,
 } from '@/lib/strategy-builder/types';
+import { put as apiPut } from '@/lib/strategy-builder/api';
+
+// Strategies loaded from the strategy-builder API have IDs of the form
+// "strategy_<hex>" (see StrategyDatabaseManager.create_strategy); locally
+// drafted strategies use a Date.now()-based ID. Save persists DB-backed
+// strategies via the API so renames/edits survive a reload, and falls back
+// to localStorage only for local drafts (BTCAAAAA-30023).
+function isBackendStrategyId(id: string | undefined | null): boolean {
+  return typeof id === 'string' && id.startsWith('strategy_');
+}
 
 const STORAGE_KEY = 'strategy_builder_strategies';
 
@@ -171,15 +181,50 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     });
   },
 
-  // Save current strategy to localStorage
+  // Save current strategy. For DB-backed strategies (loaded from the
+  // Strategy Browser) this PUTs to /strategy-builder/strategies/{id} so the
+  // rename + metadata edits round-trip to the backend; local drafts only hit
+  // localStorage (BTCAAAAA-30023).
+  //
+  // Scope is intentionally metadata-only (name, description, strategyType,
+  // tags). The block list uses the frontend Block contract
+  // ({id,type,index,data,...synthetic exit blocks}) which does not match the
+  // API's raw {name,logic,signals,exit_conditions} shape — sending blocks
+  // back without a denormalizer corrupts the Strategy Browser list view.
+  // Block-edit persistence is a follow-up once a denormalize step is in.
   saveStrategy: async () => {
     const { currentStrategy } = get();
     if (!currentStrategy) throw new Error('No strategy to save');
 
-    const updated: Strategy = {
+    let updated: Strategy = {
       ...currentStrategy,
       updatedAt: new Date().toISOString(),
     };
+
+    if (isBackendStrategyId(updated.id)) {
+      const saved = await apiPut<Strategy>(
+        `/strategy-builder/strategies/${updated.id}`,
+        {
+          name: updated.name,
+          description: updated.description ?? '',
+          strategyType: (updated as { strategyType?: string }).strategyType,
+          tags: updated.tags,
+        },
+      );
+      // Keep the locally-normalized blocks so the in-flight builder view
+      // doesn't re-shape mid-session; merge server-authoritative metadata
+      // (updated name/description/timestamp/version) over the local copy.
+      updated = {
+        ...updated,
+        name: saved.name ?? updated.name,
+        description: saved.description ?? updated.description,
+        updatedAt: saved.updatedAt ?? updated.updatedAt,
+        versionNumber: (saved as { versionNumber?: number }).versionNumber
+          ?? (updated as { versionNumber?: number }).versionNumber,
+        versionId: (saved as { versionId?: string }).versionId
+          ?? (updated as { versionId?: string }).versionId,
+      };
+    }
 
     const strategies = loadFromStorage();
     const idx = strategies.findIndex((s) => s.id === updated.id);

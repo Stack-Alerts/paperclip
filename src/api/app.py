@@ -826,6 +826,23 @@ class _DuplicateRequest(BaseModel):
     name: Optional[str] = None
 
 
+class _UpdateSBStrategyRequest(BaseModel):
+    """Save-strategy payload from the web-UI Strategy Builder (BTCAAAAA-30023).
+
+    Metadata-only by design. Block editing is intentionally out of scope: the
+    web-UI's Block contract ({id,type,index,data}) does not match the DB's
+    raw {name,logic,signals,exit_conditions} shape, and sending it back
+    without a denormalizer corrupted the Strategy Browser blocks column in
+    early testing. A block-edit save needs a denormalize step both sides
+    agree on; that's a separate change. The previous version's blocks/etc.
+    are re-used verbatim so version history stays append-only.
+    """
+    name: str
+    description: Optional[str] = None
+    strategyType: Optional[str] = None
+    tags: Optional[list] = None
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get(
@@ -970,6 +987,74 @@ async def sb_get_strategy(
             return _build_sb_strategy(strategy_id, version, tests)
 
     result = await asyncio.to_thread(_fetch)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy '{strategy_id}' not found",
+        )
+    return result
+
+
+@app.put(
+    "/strategy-builder/strategies/{strategy_id}",
+    tags=["Strategy Builder"],
+    summary="Update a strategy builder strategy (rename + new version)",
+)
+async def sb_update_strategy(
+    strategy_id: str,
+    body: _UpdateSBStrategyRequest,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Persist edits from the web-UI Strategy Builder Save action (BTCAAAAA-30023).
+
+    Updates the parent ``Strategy.name`` if it changed and appends a new
+    ``StrategyVersion`` row carrying the supplied name/description/blocks on
+    top of the previous version's signal/parameter/condition payload. This
+    preserves the version-history invariant (versions are append-only) while
+    making the Save button persist user edits to the DB so the Strategy
+    Browser shows the renamed/edited strategy on the next round-trip.
+    """
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    def _update() -> Optional[dict]:
+        with db.scoped_managers() as scoped:
+            latest = scoped.strategy.get_latest_version(strategy_id)
+            if latest is None:
+                return None
+
+            # Re-use previous version's payload as the base; the UI only sends
+            # the fields it edits (name/blocks/etc.). Strip auto-generated
+            # columns so create_strategy_version mints fresh ones.
+            _strip = {
+                "version_id", "version_number", "timestamp", "created_at",
+                "config_hash", "validation_timestamp",
+            }
+            version_data: dict = {k: v for k, v in latest.items() if k not in _strip}
+            version_data["strategy_id"] = strategy_id
+            version_data["name"] = body.name
+            if body.description is not None:
+                version_data["description"] = body.description
+            if body.strategyType is not None:
+                version_data["strategy_type"] = body.strategyType
+            if body.tags is not None:
+                version_data["tags"] = body.tags
+
+            # Rename the parent strategy record so list views reflect the new
+            # name even before the new version row is read back. Safe to call
+            # when the name is unchanged (early-returns inside the manager).
+            scoped.strategy.rename_strategy(strategy_id, body.name)
+
+            version_id = scoped.strategy.create_strategy_version(version_data)
+            version = scoped.strategy.get_strategy_version(version_id)
+            try:
+                tests = scoped.test_results.get_version_test_results(str(version_id))
+            except Exception:
+                tests = []
+            return _build_sb_strategy(strategy_id, version, tests)
+
+    result = await asyncio.to_thread(_update)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
