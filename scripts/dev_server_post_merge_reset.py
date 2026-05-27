@@ -271,14 +271,17 @@ def restart_dev_server() -> bool:
         else:
             logger.warning("Port %d still in use after 10s, proceeding anyway", WEBUI_PORT)
 
-        # Start the dev server via start.sh in the background
-        # We'll monitor it separately
+        # Start only the Next.js dev server on the expected port.
+        # start.sh defaults to port 3000 (BTE_WEBUI_PORT unset in .env), so
+        # we invoke npm run dev directly with the explicit port instead.
+        log_path = Path("/tmp") / f"webui-dev-{WEBUI_PORT}.log"
+        log_fh = open(log_path, "a")
         proc = subprocess.Popen(
-            ["bash", str(START_SCRIPT)],
-            cwd=REPO_ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            start_new_session=True,  # Create new process group
+            ["npm", "run", "dev", "--", "--port", str(WEBUI_PORT)],
+            cwd=WEBUI_DIR,
+            stdout=log_fh,
+            stderr=log_fh,
+            start_new_session=True,
         )
 
         logger.info("Started dev server (PID %d)", proc.pid)

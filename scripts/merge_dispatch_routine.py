@@ -6,7 +6,7 @@ and a parseable Fix-SHA in the close-out comment, this routine:
 
 1. Confirms the SHA exists locally (fetch if needed)
 2. Finds the branch containing the SHA
-3. Opens a PR via GitHub API (RepoSteward token, fallback to CEO GH_TOKEN)
+3. Opens a PR via GitHub API (CEO's GH_TOKEN)
 4. Merges the PR with squash
 5. Comments on source issue: 'Merged via PR #N at SHA <merge-sha>. Branch landed on origin/main.'
 6. Sets issue status to done
@@ -17,8 +17,7 @@ Usage:
 
 Requires:
     PAPERCLIP_API_URL, PAPERCLIP_API_KEY, PAPERCLIP_COMPANY_ID
-    GH_REPOSTEWARD_TOKEN (RepoSteward's GitHub token)
-    GH_CEO_TOKEN (CEO's GitHub token for fallback)
+    GH_TOKEN (CEO's GitHub token — has admin access to BTC-Trade-Engine-PaperClip)
 """
 
 from __future__ import annotations
@@ -437,58 +436,32 @@ def process_issue(issue: dict[str, Any]) -> dict[str, Any]:
 
     logger.info("Found branch %s for SHA %s", branch, sha[:8])
 
-    # Step 5: Try to create PR with RepoSteward token
-    reposteward_token = os.environ.get("GH_REPOSTEWARD_TOKEN")
-    if not reposteward_token:
-        logger.warning("GH_REPOSTEWARD_TOKEN not set, using CEO token only")
+    # Step 5: Use CEO token (GH_TOKEN) for GitHub operations
+    # Note: RepoSteward token doesn't work on BTC repo, so we use CEO's token only
+    gh_token = os.environ.get("GH_TOKEN")
+    if not gh_token:
+        escalate_failure(issue_id, issue_identifier, sha, "GH_TOKEN not available")
+        return {
+            "issue": issue_identifier,
+            "action": "failed",
+            "reason": "no_token",
+        }
 
-    session = _github_session(reposteward_token) if reposteward_token else None
-    pr = None
+    session = _github_session(gh_token)
 
-    if session:
-        # Check for existing PR
-        existing_pr = find_existing_pr(session, branch)
-        if existing_pr:
-            logger.info("PR already exists for branch %s: PR #%d", branch, existing_pr.get("number"))
-            return {
-                "issue": issue_identifier,
-                "action": "skip",
-                "reason": "pr_already_exists",
-                "pr_number": existing_pr.get("number"),
-            }
-
+    # Check for existing PR
+    existing_pr = find_existing_pr(session, branch)
+    if existing_pr:
+        logger.info("PR already exists for branch %s: PR #%d", branch, existing_pr.get("number"))
+        pr = existing_pr
+    else:
         # Try to create PR
         title = f"[Automated] Merge {branch} ({sha[:8]})"
         body = f"Automated merge dispatch for [{issue_identifier}](/BTCAAAAA/issues/{issue_identifier}).\n\nBranch: {branch}\nFix-SHA: {sha}"
         pr = create_pr(session, branch, title, body)
 
-    # Step 6: Fallback to CEO token if RepoSteward failed
     if not pr:
-        logger.info("RepoSteward token failed or unavailable, trying CEO token")
-        ceo_token = os.environ.get("GH_CEO_TOKEN")
-        if not ceo_token:
-            escalate_failure(issue_id, issue_identifier, sha, "No GitHub tokens available")
-            return {
-                "issue": issue_identifier,
-                "action": "failed",
-                "reason": "no_tokens",
-            }
-
-        session = _github_session(ceo_token)
-
-        # Check for existing PR
-        existing_pr = find_existing_pr(session, branch)
-        if existing_pr:
-            logger.info("PR already exists for branch %s: PR #%d", branch, existing_pr.get("number"))
-            pr = existing_pr
-        else:
-            # Try to create PR
-            title = f"[Automated] Merge {branch} ({sha[:8]})"
-            body = f"Automated merge dispatch for [{issue_identifier}](/BTCAAAAA/issues/{issue_identifier}).\n\nBranch: {branch}\nFix-SHA: {sha}"
-            pr = create_pr(session, branch, title, body)
-
-    if not pr:
-        escalate_failure(issue_id, issue_identifier, sha, "Failed to create PR with both tokens")
+        escalate_failure(issue_id, issue_identifier, sha, "Failed to create PR")
         return {
             "issue": issue_identifier,
             "action": "failed",
