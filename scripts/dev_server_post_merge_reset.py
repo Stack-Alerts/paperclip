@@ -167,14 +167,19 @@ def check_working_tree_clean() -> tuple[bool, list[str]]:
 
         dirty_paths = []
         for line in result.stdout.strip().split("\n"):
-            if not line:
+            if not line or len(line) < 4:
                 continue
-            # Format: XY PATH (X = staged, Y = unstaged)
-            path = line[3:].strip()
+            # Porcelain v1 format: "XY PATH" where XY is 2-char status, space, then path.
+            # Extract path by finding the space and taking everything after it.
+            status = line[:2]
+            path = line[3:] if len(line) > 3 else ""
+
+            if not path:
+                continue
 
             # Allow .next/dev/* to be dirty
             if path.startswith("packages/web-ui/.next/dev/"):
-                logger.debug("Allowing dirty .next/dev path: %s", path)
+                logger.debug("Allowing dirty .next/dev path: %s (status: %s)", path, status)
                 continue
 
             # Any other dirt is a blocker
