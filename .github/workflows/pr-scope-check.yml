@@ -1,0 +1,88 @@
+name: PR Scope-Creep Check
+
+# Phase 6b routine — BTCAAAAA-30054.
+# Walks every open PR on this repo and flags commits whose subjects reference
+# a BTCAAAAA-NNN identifier that does NOT match the PR head branch.
+
+on:
+  schedule:
+    # Every 10 minutes
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (do not post comments or labels)'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: pr-scope-check
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  scan:
+    name: Scan open PRs for scope-creep
+    runs-on: self-hosted
+
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+      PAPERCLIP_RUN_ID: ${{ github.run_id }}
+
+    steps:
+      - uses: actions/checkout@v4.2.0
+
+      - name: Resolve flags
+        id: flags
+        run: |
+          DRY="${{ github.event.inputs.dry_run || 'false' }}"
+          if [ "$DRY" = "true" ]; then
+            echo "extra=--dry-run" >> "$GITHUB_OUTPUT"
+          else
+            echo "extra=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run pr-scope-check routine
+        run: |
+          python3 scripts/pr_scope_check_routine.py --json ${{ steps.flags.outputs.extra }} \
+            > /tmp/pr-scope-check.json
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: pr-scope-check-report
+          path: /tmp/pr-scope-check.json
+          retention-days: 30
+
+      - name: Append run summary
+        if: always()
+        run: |
+          if [ -f /tmp/pr-scope-check.json ]; then
+            {
+              echo "## PR Scope-Creep Check"
+              echo
+              python3 -c "
+import json
+d=json.load(open('/tmp/pr-scope-check.json'))
+print(f\"- Open PRs scanned: {d['open_prs']}\")
+print(f\"- Scope-creep flagged: {d['scope_creep']}\")
+print(f\"- Dry run: {d['dry_run']}\")
+print(f\"- Paperclip notify: {d['paperclip_notify']}\")
+print()
+for r in d['results']:
+    if r.get('result') == 'scope-creep':
+        offs=', '.join(f\"{o['sha'][:12]}→{','.join(o['foreign'])}\" for o in r['offenders'])
+        print(f\"- PR #{r['pr']} \`{r['branch']}\` (id=\`{r['branch_id']}\`): {offs}\")
+    elif r.get('result') == 'error':
+        print(f\"- PR #{r['pr']} \`{r['branch']}\` — error: {r.get('error')}\")
+"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

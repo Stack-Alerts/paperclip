@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# .git/hooks/pre-push — Phase 6b scope-creep gate (BTCAAAAA-30054)
+#
+# Refuses to push a branch whose commits reference a different BTCAAAAA-NNN
+# than the branch name. Backed by scripts/lint-pr-scope.sh.
+#
+# To install on a fresh clone:
+#   cp scripts/hooks/pre-push .git/hooks/pre-push
+#   chmod +x .git/hooks/pre-push
+#
+# To disable temporarily (single push):
+#   NO_PR_SCOPE_CHECK=1 git push
+
+set -u
+
+if [ "${NO_PR_SCOPE_CHECK:-0}" = "1" ]; then
+  echo "[pre-push] NO_PR_SCOPE_CHECK=1 — skipping scope-creep lint." >&2
+  exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [ -z "$REPO_ROOT" ]; then
+  echo "[pre-push] not a git repo — skipping." >&2
+  exit 0
+fi
+
+LINT="$REPO_ROOT/scripts/lint-pr-scope.sh"
+if [ ! -x "$LINT" ]; then
+  echo "[pre-push] $LINT missing or not executable — skipping." >&2
+  exit 0
+fi
+
+zero_sha="0000000000000000000000000000000000000000"
+exit_rc=0
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "$local_ref" ] && continue
+  if [ "$local_sha" = "$zero_sha" ]; then
+    continue
+  fi
+  branch="${local_ref#refs/heads/}"
+  case "$branch" in
+    main|main-merge) continue ;;
+  esac
+  if ! bash "$LINT" --branch "$branch"; then
+    exit_rc=1
+  fi
+done
+
+if [ "$exit_rc" -ne 0 ]; then
+  cat >&2 <<EOF
+
+[pre-push] Push refused: scope-creep detected. Address the offending commit(s)
+above before retrying. To bypass intentionally (rare, requires justification),
+set NO_PR_SCOPE_CHECK=1.
+EOF
+fi
+
+exit "$exit_rc"
