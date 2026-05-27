@@ -469,11 +469,20 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             )
           : raw.signals;
         const dataCore: Record<string, unknown> = { ...raw, signals: normalizedSignals };
+        // definitionId links the canvas block to its library entry (BlockSearchPanel
+        // matches library.id). API gives raw snake_case (e.g. asia_session_50_percent)
+        // and public/block-library.json entries use id=<same snake_case>, so the raw
+        // name IS the join key. Without this, clicking a signal in the canvas can't
+        // expand/highlight the matching block in the library panel — the UX feature
+        // the board flagged as missing (BTCAAAAA-29995 comment 2026-05-27 06:24 UTC).
+        const dataWithId: Record<string, unknown> = rawName
+          ? { ...dataCore, name: titleCase(rawName), definitionId: rawName }
+          : dataCore;
         return {
           id: `block-${strategy.versionId ?? strategy.id}-${i}`,
           type: BlockType.INDICATOR,
           index: i,
-          data: rawName ? { ...dataCore, name: titleCase(rawName) } : dataCore,
+          data: dataWithId,
         };
       });
       // Flatten each signal.exit_conditions[] into synthetic EXIT_CONDITION
@@ -510,6 +519,10 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
               blockName: parentName,
               parentSignalName,
             };
+            // Inherit the parent block's library link so clicking the exit-pill
+            // name highlights the same library entry the parent signal does
+            // (parent.data.definitionId was set above to the raw snake_case API name).
+            const parentDefinitionId = parent.data.definitionId as string | undefined;
             exitBlocks.push({
               id: `exit-${strategy.versionId ?? strategy.id}-${parentName}-${parentSignalName}-${ei}`,
               type: BlockType.EXIT_CONDITION,
@@ -518,6 +531,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
                 name: exitSignalDisplay,
                 logic: 'EXIT',
                 exitConfig,
+                ...(parentDefinitionId ? { definitionId: parentDefinitionId } : {}),
               },
             });
           });
