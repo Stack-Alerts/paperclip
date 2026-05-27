@@ -456,28 +456,76 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         return out;
       };
       const rawBlocks = Array.isArray(strategy.blocks) ? strategy.blocks : [];
+      const mainBlocks: Block[] = rawBlocks.map((b, i): Block => {
+        const isFrontendShape =
+          b && typeof b === 'object' && 'data' in b && 'type' in b;
+        if (isFrontendShape) return b as Block;
+        const raw = b as unknown as Record<string, unknown>;
+        const rawName = typeof raw.name === 'string' ? raw.name : '';
+        const signals = raw.signals as unknown;
+        const normalizedSignals = Array.isArray(signals)
+          ? signals.map((s) =>
+              s && typeof s === 'object' ? normalizeSignal(s as Record<string, unknown>) : s
+            )
+          : raw.signals;
+        const dataCore: Record<string, unknown> = { ...raw, signals: normalizedSignals };
+        return {
+          id: `block-${strategy.versionId ?? strategy.id}-${i}`,
+          type: BlockType.INDICATOR,
+          index: i,
+          data: rawName ? { ...dataCore, name: titleCase(rawName) } : dataCore,
+        };
+      });
+      // Flatten each signal.exit_conditions[] into synthetic EXIT_CONDITION
+      // blocks at the top level. StrategyBlocksPanel renders the red ↳ exit
+      // pills by walking blocks where type === EXIT_CONDITION (or data.logic
+      // === 'EXIT'), keyed by `${blockName}::${parentSignalName}` and grouped
+      // per signal via signalExitsByKey. Without this flatten the API's
+      // nested exit_conditions never reach the renderer and the signed-off
+      // rich rendering can't render — even with shape normalization in place.
+      const exitBlocks: Block[] = [];
+      mainBlocks.forEach((parent) => {
+        const parentName = (parent.data.name as string | undefined) ?? '';
+        const sigs = parent.data.signals as Array<Record<string, unknown>> | undefined;
+        if (!Array.isArray(sigs)) return;
+        sigs.forEach((sig) => {
+          const parentSignalName = typeof sig.name === 'string' ? sig.name : '';
+          const exits = sig.exit_conditions as Array<Record<string, unknown>> | undefined;
+          if (!Array.isArray(exits)) return;
+          exits.forEach((ec, ei) => {
+            const exitSignalRaw = typeof ec.signal_name === 'string' ? ec.signal_name : '';
+            const exitSignalDisplay = exitSignalRaw
+              ? exitSignalRaw.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+              : 'Exit';
+            const rc = ec.recheck_config as Record<string, unknown> | undefined;
+            const exitConfig: Record<string, unknown> = {
+              signalName: exitSignalRaw,
+              percentage: typeof ec.percentage === 'number' ? ec.percentage : undefined,
+              exitMode: typeof ec.exit_mode === 'string' ? ec.exit_mode : undefined,
+              bindingLevel: typeof ec.binding_level === 'string' ? ec.binding_level : 'SIGNAL',
+              tpProximityThreshold: typeof ec.tp_proximity_threshold === 'number' ? ec.tp_proximity_threshold : undefined,
+              reversalTrigger: typeof ec.reversal_trigger === 'number' ? ec.reversal_trigger : undefined,
+              recheckEnabled: rc && typeof rc === 'object' && typeof rc.enabled === 'boolean' ? rc.enabled : undefined,
+              recheckBarDelay: rc && typeof rc === 'object' && typeof rc.bar_delay === 'number' ? rc.bar_delay : undefined,
+              blockName: parentName,
+              parentSignalName,
+            };
+            exitBlocks.push({
+              id: `exit-${strategy.versionId ?? strategy.id}-${parentName}-${parentSignalName}-${ei}`,
+              type: BlockType.EXIT_CONDITION,
+              index: mainBlocks.length + exitBlocks.length,
+              data: {
+                name: exitSignalDisplay,
+                logic: 'EXIT',
+                exitConfig,
+              },
+            });
+          });
+        });
+      });
       const normalized: Strategy = {
         ...strategy,
-        blocks: rawBlocks.map((b, i): Block => {
-          const isFrontendShape =
-            b && typeof b === 'object' && 'data' in b && 'type' in b;
-          if (isFrontendShape) return b as Block;
-          const raw = b as unknown as Record<string, unknown>;
-          const rawName = typeof raw.name === 'string' ? raw.name : '';
-          const signals = raw.signals as unknown;
-          const normalizedSignals = Array.isArray(signals)
-            ? signals.map((s) =>
-                s && typeof s === 'object' ? normalizeSignal(s as Record<string, unknown>) : s
-              )
-            : raw.signals;
-          const dataCore: Record<string, unknown> = { ...raw, signals: normalizedSignals };
-          return {
-            id: `block-${strategy.versionId ?? strategy.id}-${i}`,
-            type: BlockType.INDICATOR,
-            index: i,
-            data: rawName ? { ...dataCore, name: titleCase(rawName) } : dataCore,
-          };
-        }),
+        blocks: [...mainBlocks, ...exitBlocks],
       };
       setCurrentStrategy(normalized);
       setCleanSnapshot(JSON.stringify({ id: normalized.id, blocks: normalized.blocks, name: normalized.name }));
