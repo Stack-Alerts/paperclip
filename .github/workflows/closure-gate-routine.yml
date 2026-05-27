@@ -1,0 +1,92 @@
+name: Closure-Gate Routine
+
+on:
+  schedule:
+    # Every 15 minutes
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (log results only — no comments)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: closure-gate-routine
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Verify done issues have SHAs on origin/main
+    runs-on: self-hosted
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+
+    steps:
+      - uses: actions/checkout@v4.2.0
+        with:
+          fetch-depth: 0
+          clean: true
+          token: ${{ github.token }}
+
+      - name: Set up Python
+        run: |
+          python3 --version
+          python3 -m pip install --upgrade pip
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install -r requirements.txt
+          python3 -m pip install requests python-dotenv
+
+      - name: Ensure data directory exists
+        run: mkdir -p data
+
+      - name: Validate GH_TOKEN (fail loudly if expired)
+        run: |
+          if [ -z "${{ secrets.GH_TOKEN }}" ]; then
+            echo "ERROR: GH_TOKEN not set in secrets"
+            exit 1
+          fi
+          echo "GH_TOKEN is configured (length: ${#{{ secrets.GH_TOKEN }}})"
+
+      - name: Run closure-gate routine
+        id: gate
+        env:
+          PYTHONPATH: src
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          python3 scripts/closure_gate_routine.py > /tmp/closure-gate-output.json 2>&1
+          echo "gate_exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Upload closure-gate output artifact
+        if: always()
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: closure-gate-output
+          path: /tmp/closure-gate-output.json
+          retention-days: 30
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## Closure-Gate Routine" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f /tmp/closure-gate-output.json ]; then
+            cat /tmp/closure-gate-output.json >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Status:** Routine executed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check routine exit code
+        if: steps.gate.outputs.gate_exit_code != '0'
+        run: |
+          echo "⚠️ Closure-gate routine failed"
+          cat /tmp/closure-gate-output.json || echo "No output available"
+          exit 1

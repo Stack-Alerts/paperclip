@@ -1,0 +1,85 @@
+name: Merge Dispatch Routine
+
+on:
+  schedule:
+    # Every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (log results only — no PR creation or comments)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: merge-dispatch-routine
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    name: Check in_review issues and dispatch PRs
+    runs-on: self-hosted
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4.2.0
+        with:
+          fetch-depth: 0
+          clean: true
+          token: ${{ github.token }}
+
+      - name: Set up Python
+        run: |
+          python3 --version
+          python3 -m pip install --upgrade pip
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install -r requirements.txt
+          python3 -m pip install requests python-dotenv
+
+      - name: Ensure data directory exists
+        run: mkdir -p data
+
+      - name: Run merge dispatch routine
+        id: dispatch
+        env:
+          PYTHONPATH: src
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          python3 scripts/merge_dispatch_routine.py > /tmp/dispatch-output.json 2>&1
+          echo "dispatch_exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Upload dispatch output artifact
+        if: always()
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: merge-dispatch-output
+          path: /tmp/dispatch-output.json
+          retention-days: 30
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## Merge Dispatch Routine" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f /tmp/dispatch-output.json ]; then
+            cat /tmp/dispatch-output.json >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Status:** Routine executed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check routine exit code
+        if: steps.dispatch.outputs.dispatch_exit_code != '0'
+        run: |
+          echo "⚠️ Merge dispatch routine failed"
+          cat /tmp/dispatch-output.json || echo "No output available"
+          exit 1
