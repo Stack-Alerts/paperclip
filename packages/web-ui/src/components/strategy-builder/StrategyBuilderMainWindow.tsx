@@ -402,13 +402,18 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // -------------------------------------------------------------------------
   const handleStrategySelect = useCallback(
     (strategy: Strategy) => {
+      // BTCAAAAA-29995: previously this handler reset stepper/snapshot state but
+      // never pushed the selected strategy into the store, so the canvas stayed
+      // on its default empty strategy after Open. The dialog fetches the full
+      // strategy (incl. blocks) via the strategy-builder API — push it through.
+      setCurrentStrategy(strategy);
       setCleanSnapshot(JSON.stringify({ id: strategy.id, blocks: strategy.blocks, name: strategy.name }));
       setCurrentStep(0);
       setCompletedSteps(new Set());
       setErrorSteps(new Set());
       close();
     },
-    [close]
+    [close, setCurrentStrategy]
   );
 
   // Pop In: receive state from a popped-out Strategy Browser window and
