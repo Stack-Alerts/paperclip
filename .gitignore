@@ -149,3 +149,8 @@ config/optimizer_003_hod_continuation.yaml
 
 # Impact Gate auto-generated state
 .impact_gate_muted_state.json
+
+# Routine-generated completion artifacts (workflow/automation engine outputs)
+*COMPLETION*.md
+.completion_report_*.md
+.hindsight_completion_report_*.md
