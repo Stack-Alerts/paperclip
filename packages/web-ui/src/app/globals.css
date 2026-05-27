@@ -136,6 +136,26 @@
   --tooltip-bullet:      color-mix(in srgb, var(--core-border-subtle) 80%, transparent);
   --tooltip-text:        var(--core-text-primary);
 
+  /* ── Shared semantic tokens (BTCAAAAA-29987) ─────────── */
+  /* Dark theme aliases — no visual change; tokens exist so ocean can override. */
+  --surface-workspace:       var(--core-bg-app);
+  --surface-panel-primary:   var(--core-surface-panel);
+  --surface-panel-secondary: var(--core-bg-elevated);
+  --surface-section-header:  var(--core-surface-panel);
+  --surface-input:           var(--core-bg-elevated);
+  --border-strong:           var(--core-border-subtle);
+  --border-soft:             var(--core-border-subtle);
+  --border-hairline:         var(--core-border-subtle);
+  --interactive-primary:     var(--core-accent-blue);
+  --interactive-hover:       var(--core-accent-cyan);
+  --focus-ring:              var(--core-accent-cyan);
+  --link:                    var(--core-accent-cyan);
+  --text-tertiary:           var(--core-text-muted);
+  --status-success:          var(--core-success);
+  --status-danger:           var(--core-danger);
+  --status-danger-hover:     color-mix(in srgb, var(--core-danger) 80%, white);
+  --status-danger-tint:      color-mix(in srgb, var(--core-danger) 18%, var(--core-bg-shell));
+
   /* ── Hover-highlight row palette (BlockSearchPanel signal rows) ── */
   --hover-row-bg:                #0D2940;
   --hover-row-bg-top:            #12344F;
@@ -151,35 +171,79 @@
   --hover-row-selected-glow:     #2A8FE8;
 }
 
-/* ─── Ocean theme — overrides only ───────────────────────────────────────── */
+/* ─── Ocean theme — overrides only (BTCAAAAA-29987) ──────────────────────── */
+/* Sidebar #031320 and topbar #051624 are LOCKED — see BTCAAAAA-29410.        */
+/* All values below are scoped to [data-theme="ocean"] only; dark is untouched.*/
 [data-theme="ocean"] {
-  --core-bg-app:         #050911;
-  --core-bg-shell:       #0D141E;
-  --core-bg-elevated:    #1A232D;
-  --core-surface-panel:  #354958;
-  --core-surface-card:   #1A232D;
-  --core-border-subtle:  #6DA6BE;
-  --core-text-primary:   #F2F7FF;
-  --core-text-secondary: #A9B7C9;
-  --core-text-muted:     #6F7E95;
-  --core-accent-blue:    #2EA8FF;
-  --core-accent-cyan:    #39E7E5;
-  --core-accent-teal:    #1EC8D6;
-  --core-danger:         #C4515A;
-  --core-success:        #1EC8D6;
-  --core-warning:        #F59E0B;
+  /* ── Core tokens (retuned to ocean palette) ───────────── */
+  --core-bg-app:         #667F92;  /* workspace canvas — behind content panes */
+  --core-bg-shell:       #051624;  /* topbar lock — also feeds tooltips */
+  --core-bg-elevated:    #193B55;  /* input bg */
+  --core-surface-panel:  #081C2A;  /* section header strips */
+  --core-surface-card:   #1B3850;  /* result rows / block cards */
+  --core-border-subtle:  #1A3C56;  /* default border / soft outlines */
+  --core-text-primary:   #D6E6F2;
+  --core-text-secondary: #93AFC4;
+  --core-text-muted:     #6F8A9F;
+  --core-accent-blue:    #0C62B8;  /* interactive primary — selected actions */
+  --core-accent-cyan:    #2A8FE8;  /* hover glow */
+  --core-accent-teal:    #35A9FF;  /* focus ring */
+  --core-danger:         #A63D4B;
+  --core-success:        #22C58B;
+  --core-warning:        #E7B257;
 
-  /* Accent overrides specific to ocean */
-  --accent-green-dark:   #0A3A40;
-  --accent-green-mid:    #0E5B64;
-  --accent-green-bright: #52F3FF;
-  --accent-blue-dark:    #0A2A40;
-  --accent-blue-mid:     #1A4A6A;
-  --accent-sky-bright:   #52F3FF;
-  --accent-teal-dark:    #0A3A40;
-  --accent-teal-mid:     #0E5B64;
+  /* ── Locked surfaces (BTCAAAAA-29410) ─────────────────── */
+  --sidebar-bg:          #031320;  /* LOCKED — vertical sidebar */
+  --topbar-bg:           #051624;  /* LOCKED — menu bar / command bar */
 
-  --toolbar-accent:      var(--core-border-subtle);
+  /* ── Re-map legacy surface aliases to ocean palette ───── */
+  --bg-deep:             #112A3D;  /* primary panel shells / large containers */
+  --bg-hover:            #163046;  /* secondary panel / hover surface */
+  --surface-hover:       #163046;
+  --surface-selected:    #1B3850;
+
+  /* ── New shared semantic tokens (ocean palette) ───────── */
+  --surface-workspace:       #667F92;
+  --surface-panel-primary:   #112A3D;
+  --surface-panel-secondary: #163046;
+  --surface-section-header:  #081C2A;
+  --surface-input:           #193B55;
+  --border-strong:           #0D2131;
+  --border-soft:             #1A3C56;
+  --border-hairline:         #274B67;
+  --interactive-primary:     #0C62B8;
+  --interactive-hover:       #2A8FE8;
+  --focus-ring:              #35A9FF;
+  --link:                    #2AA7E8;
+  --text-tertiary:           #6F8A9F;
+  --status-success:          #22C58B;
+  --status-danger:           #A63D4B;
+  --status-danger-hover:     #C24B5A;
+  --status-danger-tint:      #2A141A;
+
+  /* ── Accent token overrides — keep ocean-themed tints ── */
+  --accent-green:        #22C58B;
+  --accent-green-dark:   color-mix(in srgb, #22C58B 18%, #112A3D);
+  --accent-green-mid:    color-mix(in srgb, #22C58B 32%, #112A3D);
+  --accent-green-bright: #4DE3A8;
+  --accent-blue-dark:    color-mix(in srgb, #0C62B8 22%, #112A3D);
+  --accent-blue-mid:     color-mix(in srgb, #0C62B8 40%, #112A3D);
+  --accent-blue-alt:     #2A8FE8;
+  --accent-blue-bright:  #35A9FF;
+  --accent-sky:          #2AA7E8;
+  --accent-sky-bright:   #35A9FF;
+  --accent-red:          #A63D4B;
+  --accent-red-dark:     #2A141A;
+  --accent-red-deeper:   #1A0A10;
+  --accent-orange:       #E7B257;
+  --accent-teal:         #2A8FE8;
+  --accent-teal-dark:    color-mix(in srgb, #2A8FE8 18%, #112A3D);
+  --accent-teal-mid:     color-mix(in srgb, #2A8FE8 32%, #112A3D);
+
+  /* ── Toolbar / focus indicators ────────────────────────── */
+  --toolbar-accent:      var(--core-text-secondary);
+  --border-focus:        #35A9FF;
+  --input-focus:         #35A9FF;
 }
 
 /* ─── Global base styles ─────────────────────────────────────────────────── */
