@@ -167,19 +167,23 @@ def check_working_tree_clean() -> tuple[bool, list[str]]:
 
         dirty_paths = []
         for line in result.stdout.strip().split("\n"):
-            if not line or len(line) < 4:
+            if not line:
                 continue
-            # Porcelain v1 format: "XY PATH" where XY is 2-char status, space, then path.
-            # Extract path by finding the space and taking everything after it.
-            status = line[:2]
-            path = line[3:] if len(line) > 3 else ""
+            # Porcelain v1 format: "XY PATH" (2 chars status + space + path)
+            # But git sometimes outputs "X PATH" (1 char status + space + path)
+            # Find the first space to split status from path.
+            space_idx = line.find(" ")
+            if space_idx < 0 or space_idx > 2:
+                logger.debug("Skipping line with unexpected format: %s", line[:20])
+                continue
 
+            path = line[space_idx + 1:].strip()
             if not path:
                 continue
 
             # Allow .next/dev/* to be dirty
             if path.startswith("packages/web-ui/.next/dev/"):
-                logger.debug("Allowing dirty .next/dev path: %s (status: %s)", path, status)
+                logger.debug("Allowing dirty .next/dev path: %s", path)
                 continue
 
             # Any other dirt is a blocker
