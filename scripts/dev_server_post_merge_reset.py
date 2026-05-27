@@ -148,9 +148,16 @@ def get_origin_main_sha() -> str | None:
 
 
 def check_working_tree_clean() -> tuple[bool, list[str]]:
-    """Check if working tree is clean or only .next/dev is dirty.
+    """Check if working tree is clean or only routine-managed files are dirty.
 
-    Returns: (is_clean_or_safe, list_of_dirty_paths_outside_next_dev)
+    Ignorable paths:
+    - packages/web-ui/.next/dev/* (Next.js dev cache)
+    - data_quality_impact_gate_*.json (impact-gate routine)
+    - *IMPLEMENTATION_SUMMARY*.md (completion artifacts)
+    - tests/integration/test_merge_dispatch_routine.py (WIP test file)
+    - *.tmp.* (atomic-write temp files)
+
+    Returns: (is_clean_or_safe, list_of_dirty_paths_outside_ignorable)
     """
     try:
         result = subprocess.run(
@@ -186,11 +193,31 @@ def check_working_tree_clean() -> tuple[bool, list[str]]:
                 logger.debug("Allowing dirty .next/dev path: %s", path)
                 continue
 
+            # Allow data_quality_impact_gate_*.json (impact-gate routine)
+            if "data_quality_impact_gate_" in path and path.endswith(".json"):
+                logger.debug("Allowing dirty impact-gate file: %s", path)
+                continue
+
+            # Allow *IMPLEMENTATION_SUMMARY*.md (completion artifacts)
+            if "IMPLEMENTATION_SUMMARY" in path and path.endswith(".md"):
+                logger.debug("Allowing dirty completion artifact: %s", path)
+                continue
+
+            # Allow tests/integration/test_merge_dispatch_routine.py (WIP test)
+            if path == "tests/integration/test_merge_dispatch_routine.py":
+                logger.debug("Allowing dirty WIP test file: %s", path)
+                continue
+
+            # Allow *.tmp.* atomic-write temp files
+            if ".tmp." in path:
+                logger.debug("Allowing dirty temp file: %s", path)
+                continue
+
             # Any other dirt is a blocker
             dirty_paths.append(path)
 
         is_clean = len(dirty_paths) == 0
-        logger.info("Working tree clean: %s (dirty outside .next/dev: %d)", is_clean, len(dirty_paths))
+        logger.info("Working tree clean: %s (dirty outside ignorable paths: %d)", is_clean, len(dirty_paths))
         return is_clean, dirty_paths
     except Exception as exc:
         logger.error("Failed to check working tree: %s", exc)
@@ -366,20 +393,44 @@ def post_status_comment(sha: str, success: bool, error_message: str | None = Non
         return False
 
 
-def post_warning_comment(issue: str, dirty_paths: list[str]) -> bool:
-    """Post a warning comment when reset is refused."""
+def get_issue_status(issue: str) -> str | None:
+    """Get the current status of an issue."""
     try:
+        with _http_session() as sess:
+            resp = sess.get(
+                f"{_base()}/api/issues/{issue}",
+                timeout=API_TIMEOUT,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            status = data.get("status")
+            logger.info("Issue %s status: %s", issue, status)
+            return status
+    except Exception as exc:
+        logger.error("Failed to get issue status for %s: %s", issue, exc)
+        return None
+
+
+def post_warning_comment(issue: str, dirty_paths: list[str]) -> bool:
+    """Post a warning comment when reset is refused, unless issue is terminal."""
+    try:
+        # Check issue status before posting
+        status = get_issue_status(issue)
+        if status in ("done", "cancelled"):
+            logger.info("Issue %s is in terminal state (%s), skipping warning post", issue, status)
+            return True
+
         paths_str = "\n".join([f"  - {p}" for p in dirty_paths])
         body = f"""**Dev-server reset REFUSED: dirty working tree**
 
-The dev server reset was skipped because the working tree has uncommitted changes outside `.next/dev`:
+The dev server reset was skipped because the working tree has uncommitted changes outside ignorable paths (`.next/dev`, `data_quality_impact_gate_*.json`, `*IMPLEMENTATION_SUMMARY*.md`, `test_merge_dispatch_routine.py`, `*.tmp.*`):
 
 ```
 {paths_str}
 ```
 
 **Action required:**
-1. Commit or stash changes outside `.next/dev`
+1. Commit or stash changes outside ignorable paths
 2. The next reset will proceed automatically once the tree is clean
 
 _Automated check from BTCAAAAA-30052 (Phase 5)._
