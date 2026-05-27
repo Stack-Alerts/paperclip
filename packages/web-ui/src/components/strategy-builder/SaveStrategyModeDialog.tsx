@@ -96,11 +96,13 @@ export function SaveStrategyModeDialog({
             type="button"
             disabled={busy}
             onClick={onRenameExisting}
-            className="px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm transition-colors disabled:opacity-50"
             style={{
-              background: 'var(--accent-blue)',
-              color: 'var(--btn-primary-text)',
-              border: '1px solid var(--accent-blue-dark)',
+              background: 'var(--accent-blue-dark)',
+              color: 'var(--accent-blue)',
+              fontWeight: 600,
+              border: '1px solid var(--border)',
+              borderRadius: 4,
             }}
           >
             Rename existing strategy
@@ -109,11 +111,12 @@ export function SaveStrategyModeDialog({
             type="button"
             disabled={busy}
             onClick={onSaveAsNew}
-            className="px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm transition-colors disabled:opacity-50"
             style={{
               background: 'var(--bg-card)',
-              color: 'var(--text-secondary)',
+              color: 'var(--text-muted)',
               border: '1px solid var(--border)',
+              borderRadius: 4,
             }}
           >
             Save as new strategy v1
@@ -122,11 +125,12 @@ export function SaveStrategyModeDialog({
             type="button"
             disabled={busy}
             onClick={onCancel}
-            className="px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 mt-1"
+            className="px-4 py-2 text-sm transition-colors disabled:opacity-50 mt-1"
             style={{
               background: 'transparent',
               color: 'var(--text-muted)',
               border: '1px solid transparent',
+              borderRadius: 4,
             }}
           >
             Cancel
