@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { NewStrategyDialog } from './NewStrategyDialog';
 import { StrategyBrowserDialog } from './StrategyBrowserDialog';
+import { SaveStrategyModeDialog } from './SaveStrategyModeDialog';
 import { BacktestConfigDialog } from './BacktestConfigDialog';
 import { ValidationDialog } from './ValidationDialog';
 import { DataUpdateModal } from './DataUpdateModal';
@@ -131,6 +132,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     loadStrategy,
     loadBlockLibrary,
     saveStrategy,
+    saveStrategyAsNew,
     runBacktest,
     validateStrategy,
     setCurrentStrategy,
@@ -306,8 +308,39 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // -------------------------------------------------------------------------
   // File menu handlers
   // -------------------------------------------------------------------------
+
+  // BTCAAAAA-30023: when Save is clicked on a backend-loaded strategy
+  // (id starts with "strategy_") whose name has changed since load/last
+  // save, ask whether to rename the existing strategy or fork a new one
+  // at v1. Plain rename or plain content edit (no name change) saves
+  // directly without the modal.
+  const [pendingSaveMode, setPendingSaveMode] = useState<{
+    originalName: string;
+    newName: string;
+  } | null>(null);
+  const [saveModeBusy, setSaveModeBusy] = useState(false);
+
+  const finalizeSavedAsRename = useCallback(() => {
+    setCleanSnapshot(strategySnapshot);
+    setStatusText('Strategy saved');
+    setTimeout(() => setStatusText('Ready'), 2000);
+  }, [strategySnapshot]);
+
   const handleSave = useCallback(async () => {
     if (isSavingRef.current) return;
+    if (!currentStrategy) return;
+    const id = currentStrategy.id as unknown as string;
+    const isBackend = typeof id === 'string' && id.startsWith('strategy_');
+    if (isBackend) {
+      const loadedName = (() => {
+        try { return JSON.parse(cleanSnapshot || '{}').name as string | undefined; }
+        catch { return undefined; }
+      })();
+      if (loadedName != null && loadedName !== currentStrategy.name) {
+        setPendingSaveMode({ originalName: loadedName, newName: currentStrategy.name });
+        return;
+      }
+    }
     isSavingRef.current = true;
     try {
       await saveStrategy();
@@ -319,7 +352,42 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     } finally {
       isSavingRef.current = false;
     }
-  }, [saveStrategy, strategySnapshot]);
+  }, [saveStrategy, strategySnapshot, currentStrategy, cleanSnapshot]);
+
+  const handleSaveModeRenameExisting = useCallback(async () => {
+    if (saveModeBusy) return;
+    setSaveModeBusy(true);
+    try {
+      await saveStrategy();
+      finalizeSavedAsRename();
+      setPendingSaveMode(null);
+    } catch (e) {
+      setStatusText('Save failed');
+    } finally {
+      setSaveModeBusy(false);
+    }
+  }, [saveStrategy, finalizeSavedAsRename, saveModeBusy]);
+
+  const handleSaveModeSaveAsNew = useCallback(async () => {
+    if (saveModeBusy || !pendingSaveMode) return;
+    setSaveModeBusy(true);
+    try {
+      const forked = await saveStrategyAsNew(pendingSaveMode.newName);
+      setCleanSnapshot(JSON.stringify({ id: forked.id, blocks: forked.blocks, name: forked.name }));
+      setStatusText(`Saved as new strategy v${(forked as { versionNumber?: number }).versionNumber ?? 1}`);
+      setTimeout(() => setStatusText('Ready'), 2500);
+      setPendingSaveMode(null);
+    } catch (e) {
+      setStatusText('Save-as-new failed');
+    } finally {
+      setSaveModeBusy(false);
+    }
+  }, [saveStrategyAsNew, pendingSaveMode, saveModeBusy]);
+
+  const handleSaveModeCancel = useCallback(() => {
+    if (saveModeBusy) return;
+    setPendingSaveMode(null);
+  }, [saveModeBusy]);
 
   const handleSaveAs = useCallback(async () => {
     if (!currentStrategy) return;
@@ -824,6 +892,16 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       />
 
       <SettingsDialog open={activeDialog === 'settings'} onClose={close} />
+
+      <SaveStrategyModeDialog
+        open={pendingSaveMode !== null}
+        originalName={pendingSaveMode?.originalName ?? ''}
+        newName={pendingSaveMode?.newName ?? ''}
+        busy={saveModeBusy}
+        onRenameExisting={handleSaveModeRenameExisting}
+        onSaveAsNew={handleSaveModeSaveAsNew}
+        onCancel={handleSaveModeCancel}
+      />
 
       <QuickPreviewResultsDialog
         open={activeDialog === 'quickPreview'}
