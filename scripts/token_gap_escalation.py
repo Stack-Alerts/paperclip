@@ -87,21 +87,28 @@ class TokenGapEscalationMonitor:
                     return True
         return False
 
-    def _has_ceo_escalation_comment(self, issue_id: str) -> bool:
-        """Check if issue already has CEO escalation comment (idempotency check)."""
+    def _has_existing_escalation(self, issue_id: str) -> bool:
+        """Check if issue already has an active escalation task (idempotency check)."""
+        # Check both for existing comments and for pending escalation subtasks
+        issue = self._api_request("GET", f"/api/issues/{issue_id}")
+        if not issue:
+            return False
+
+        # Check for comments with escalation marker
         comments = self._api_request("GET", f"/api/issues/{issue_id}/comments")
-        if not comments:
-            return False
+        if comments:
+            items = comments if isinstance(comments, list) else comments.get("items", [])
+            escalation_marker = "🚨 Token-Gap Escalation"
+            for comment in items:
+                if escalation_marker in comment.get("body", ""):
+                    return True
 
-        # Handle both array and object responses
-        items = comments if isinstance(comments, list) else comments.get("items", [])
-        if not items:
-            return False
+        # Check if there are pending CEO escalation subtasks
+        if "blocks" in issue:
+            for blocking_issue in issue.get("blocks", []):
+                if "escalat" in blocking_issue.get("title", "").lower() and blocking_issue.get("status") in ["todo", "in_progress"]:
+                    return True
 
-        escalation_marker = "🚨 Token-Gap Escalation"
-        for comment in items:
-            if escalation_marker in comment.get("body", ""):
-                return True
         return False
 
     def _get_issue_blocker_duration(self, issue: dict) -> Optional[int]:
@@ -121,33 +128,58 @@ class TokenGapEscalationMonitor:
         except Exception:
             return None
 
-    def escalate_issue(self, issue_id: str, issue_identifier: str, blocked_minutes: int) -> bool:
-        """Post escalation comment to CEO."""
+    def escalate_issue(self, issue_id: str, issue_identifier: str, blocked_minutes: int, escalation_issue_id: Optional[str] = None) -> bool:
+        """Create escalation task for CEO to handle."""
         hours = blocked_minutes // 60
         minutes = blocked_minutes % 60
 
-        comment = f"""## 🚨 Token-Gap Escalation
+        # Create an escalation issue that the CEO will handle
+        escalation_title = f"Escalate token-gap blocker: {issue_identifier}"
+        escalation_description = f"""Token-gap escalation required
+
+**Blocked Issue:** [{issue_identifier}](/{self.company_id.split('-')[0]}/issues/{issue_identifier})
+
+**Duration:** {hours}h {minutes}m (threshold: 4h)
+
+**Required Action:** Post CEO escalation comment on the blocked issue to notify relevant parties about GitHub token gap issue.
+
+**Comment to Post:**
+```
+## 🚨 Token-Gap Escalation
 
 This PR-merge issue has been blocked by a GitHub API token gap for **{hours}h {minutes}m**.
-
-**Issue:** [{issue_identifier}](/{self.company_id.split('-')[0]}/issues/{issue_identifier})
 
 **Action Required:** Review GitHub token configuration and resolve authentication issue to unblock this merge.
 
 _Auto-escalated by Token-Gap Escalation Routine_
+```
+
+This escalation task is idempotent - only one such task per blocked issue will be created per routine run.
 """
+
+        # Create escalation subtask for the CEO
+        escalation_data = {
+            "title": escalation_title,
+            "description": escalation_description,
+            "status": "todo",
+            "priority": "critical",
+            "assigneeAgentId": "73e7ef43-1337-47f8-9cf2-8db91ebcf555",  # CEO agent ID
+            "parentId": escalation_issue_id or issue_id,
+            "projectId": self.project_id if hasattr(self, 'project_id') else None
+        }
 
         response = self._api_request(
             "POST",
-            f"/api/issues/{issue_id}/comments",
-            {"body": comment}
+            f"/api/companies/{self.company_id}/issues",
+            escalation_data
         )
 
         if response:
-            print(f"✓ Escalated {issue_identifier} (blocked {hours}h {minutes}m)")
+            escalation_id = response.get("id")
+            print(f"✓ Created escalation task {escalation_id} for {issue_identifier} (blocked {hours}h {minutes}m)")
             return True
         else:
-            print(f"✗ Failed to escalate {issue_identifier}", file=sys.stderr)
+            print(f"✗ Failed to create escalation for {issue_identifier}", file=sys.stderr)
             return False
 
     def find_and_escalate_token_gaps(self) -> dict:
@@ -192,11 +224,11 @@ _Auto-escalated by Token-Gap Escalation Routine_
                 continue
 
             # Check if already escalated (idempotency)
-            if self._has_ceo_escalation_comment(issue_id):
+            if self._has_existing_escalation(issue_id):
                 print(f"⊘ Already escalated {issue_identifier}")
                 continue
 
-            # Escalate to CEO
+            # Escalate to CEO by creating escalation task
             if self.escalate_issue(issue_id, issue_identifier, blocked_minutes):
                 result["escalated"] += 1
                 result["issues"].append({
