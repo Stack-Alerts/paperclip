@@ -225,7 +225,15 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
       const clean = name.replace(/\s*\(v\d+\)\s*$/, '').trim();
       if (!clean) return;
       setCurrentStrategy({ ...currentStrategy, name: clean });
-      saveStrategy().catch(console.error);
+      // Auto-save renames for local-only drafts (id is a Date.now() string).
+      // For backend-loaded strategies (id starts with "strategy_") the
+      // rename is staged only — Save in the toolbar then surfaces the
+      // "Rename existing vs Save as new strategy" modal so the user picks
+      // the destination explicitly (BTCAAAAA-30023 board feedback).
+      const id = currentStrategy.id as unknown as string;
+      if (typeof id !== 'string' || !id.startsWith('strategy_')) {
+        saveStrategy().catch(console.error);
+      }
     },
     [currentStrategy, setCurrentStrategy, saveStrategy]
   );
@@ -234,7 +242,12 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
     (type: 'Bullish' | 'Bearish') => {
       if (!currentStrategy) return;
       setCurrentStrategy({ ...currentStrategy, strategyType: type });
-      saveStrategy().catch(console.error);
+      // Local-draft autosave only; backend strategies wait for explicit Save
+      // so the rename-disambiguation modal can fire on the bundled change.
+      const id = currentStrategy.id as unknown as string;
+      if (typeof id !== 'string' || !id.startsWith('strategy_')) {
+        saveStrategy().catch(console.error);
+      }
     },
     [currentStrategy, setCurrentStrategy, saveStrategy]
   );

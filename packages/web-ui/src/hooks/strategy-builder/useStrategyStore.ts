@@ -15,6 +15,16 @@ import {
   BacktestResult,
   StrategySettings,
 } from '@/lib/strategy-builder/types';
+import { put as apiPut, post as apiPost } from '@/lib/strategy-builder/api';
+
+// Strategies loaded from the strategy-builder API have IDs of the form
+// "strategy_<hex>" (see StrategyDatabaseManager.create_strategy); locally
+// drafted strategies use a Date.now()-based ID. Save persists DB-backed
+// strategies via the API so renames/edits survive a reload, and falls back
+// to localStorage only for local drafts (BTCAAAAA-30023).
+function isBackendStrategyId(id: string | undefined | null): boolean {
+  return typeof id === 'string' && id.startsWith('strategy_');
+}
 
 const STORAGE_KEY = 'strategy_builder_strategies';
 
@@ -100,6 +110,7 @@ interface StrategyStoreState {
   loadStrategy: (id: string) => Promise<void>;
   createStrategy: (name: string, description?: string) => Promise<void>;
   saveStrategy: () => Promise<Strategy>;
+  saveStrategyAsNew: (newName: string) => Promise<Strategy>;
   deleteBlock: (index: number) => void;
   addBlock: (type: BlockType, position: number) => void;
   updateBlock: (index: number, data: BlockData) => void;
@@ -171,15 +182,50 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     });
   },
 
-  // Save current strategy to localStorage
+  // Save current strategy. For DB-backed strategies (loaded from the
+  // Strategy Browser) this PUTs to /strategy-builder/strategies/{id} so the
+  // rename + metadata edits round-trip to the backend; local drafts only hit
+  // localStorage (BTCAAAAA-30023).
+  //
+  // Scope is intentionally metadata-only (name, description, strategyType,
+  // tags). The block list uses the frontend Block contract
+  // ({id,type,index,data,...synthetic exit blocks}) which does not match the
+  // API's raw {name,logic,signals,exit_conditions} shape — sending blocks
+  // back without a denormalizer corrupts the Strategy Browser list view.
+  // Block-edit persistence is a follow-up once a denormalize step is in.
   saveStrategy: async () => {
     const { currentStrategy } = get();
     if (!currentStrategy) throw new Error('No strategy to save');
 
-    const updated: Strategy = {
+    let updated: Strategy = {
       ...currentStrategy,
       updatedAt: new Date().toISOString(),
     };
+
+    if (isBackendStrategyId(updated.id)) {
+      const saved = await apiPut<Strategy>(
+        `/strategy-builder/strategies/${updated.id}`,
+        {
+          name: updated.name,
+          description: updated.description ?? '',
+          strategyType: (updated as { strategyType?: string }).strategyType,
+          tags: updated.tags,
+        },
+      );
+      // Keep the locally-normalized blocks so the in-flight builder view
+      // doesn't re-shape mid-session; merge server-authoritative metadata
+      // (updated name/description/timestamp/version) over the local copy.
+      updated = {
+        ...updated,
+        name: saved.name ?? updated.name,
+        description: saved.description ?? updated.description,
+        updatedAt: saved.updatedAt ?? updated.updatedAt,
+        versionNumber: (saved as { versionNumber?: number }).versionNumber
+          ?? (updated as { versionNumber?: number }).versionNumber,
+        versionId: (saved as { versionId?: string }).versionId
+          ?? (updated as { versionId?: string }).versionId,
+      };
+    }
 
     const strategies = loadFromStorage();
     const idx = strategies.findIndex((s) => s.id === updated.id);
@@ -191,6 +237,61 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     saveToStorage(strategies);
     set({ currentStrategy: updated, strategyList: strategies });
     return updated;
+  },
+
+  // Fork the currently-loaded strategy into a brand-new strategy_id with
+  // the user-provided name. Backed by POST /strategy-builder/strategies/
+  // {id}/duplicate?scope=strategy which copies the latest server version
+  // under a new parent Strategy. The new strategy starts at version 1.
+  // Returns the new Strategy so the caller can load it into the builder.
+  // BTCAAAAA-30023 board feedback 2026-05-27: when Save is clicked after
+  // renaming, the UI offers this fork as an alternative to "Rename existing".
+  saveStrategyAsNew: async (newName: string) => {
+    const { currentStrategy } = get();
+    if (!currentStrategy) throw new Error('No strategy to fork');
+    if (!isBackendStrategyId(currentStrategy.id)) {
+      throw new Error('Cannot fork a local-only draft; save it first');
+    }
+    const cleanName = newName.trim();
+    if (!cleanName) throw new Error('New strategy name is required');
+
+    const forked = await apiPost<Strategy>(
+      `/strategy-builder/strategies/${currentStrategy.id}/duplicate`,
+      { scope: 'strategy', name: cleanName },
+    );
+
+    // The server response carries blocks in the raw API shape
+    // ({name, logic, signals, ...}). Preserve the user's already-normalized
+    // frontend Block objects in the live store — they correspond to the
+    // same content because the fork copied the latest server version.
+    // Swapping just the identifying metadata keeps the builder view valid
+    // (computeStats reads block.data.logic which only exists on the
+    // normalized shape) and avoids re-running the StrategyBrowserDialog
+    // normalize transform here.
+    const merged: Strategy = {
+      ...currentStrategy,
+      id: forked.id,
+      name: forked.name,
+      description: forked.description ?? currentStrategy.description,
+      strategyType: (forked as { strategyType?: string }).strategyType
+        ?? (currentStrategy as { strategyType?: string }).strategyType,
+      versionNumber: (forked as { versionNumber?: number }).versionNumber
+        ?? (currentStrategy as { versionNumber?: number }).versionNumber,
+      versionId: (forked as { versionId?: string }).versionId
+        ?? (currentStrategy as { versionId?: string }).versionId,
+      createdAt: forked.createdAt ?? currentStrategy.createdAt,
+      updatedAt: forked.updatedAt ?? currentStrategy.updatedAt,
+      tags: forked.tags ?? currentStrategy.tags,
+    };
+
+    // Mirror the fork into localStorage so the Strategy Browser shows it
+    // immediately on next open (the next list fetch will overwrite this
+    // with the authoritative server list).
+    const strategies = loadFromStorage();
+    strategies.push(merged);
+    saveToStorage(strategies);
+    set({ currentStrategy: merged, strategyList: strategies });
+    return merged;
   },
 
   // Add block to strategy

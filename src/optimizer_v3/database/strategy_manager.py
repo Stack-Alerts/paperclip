@@ -99,6 +99,36 @@ class StrategyDatabaseManager:
             self.logger.error(f"Failed to create strategy '{name_clean}': {e}")
             raise
     
+    def rename_strategy(self, strategy_id: str, new_name: str) -> bool:
+        """Rename the parent strategy record. Returns False if the strategy is not found.
+
+        Only the parent ``Strategy.name`` is updated; strategy versions retain
+        their historical names because the version table is append-only.
+        BTCAAAAA-30023: needed by the strategy-builder Save flow so that the
+        Strategy Browser (which reads ``version.name`` for the latest version
+        anyway) reflects the renamed strategy after a new version is appended.
+        """
+        from src.optimizer_v3.database.models import Strategy
+
+        name_clean = new_name.strip() if new_name else ''
+        if not name_clean:
+            raise ValueError("Strategy name cannot be empty")
+
+        try:
+            strategy = self.session.query(Strategy).filter_by(strategy_id=strategy_id).first()
+            if strategy is None:
+                return False
+            if strategy.name == name_clean:
+                return True
+            strategy.name = name_clean
+            strategy.updated_at = datetime.now(timezone.utc)
+            self.session.commit()
+            self.logger.info(f"Renamed strategy {strategy_id}: {name_clean!r}")
+            return True
+        except Exception:
+            self.session.rollback()
+            raise
+
     def create_strategy_version(self, strategy_data: Dict[str, Any]) -> str:
         """
         Create new strategy version with complete configuration using ORM
