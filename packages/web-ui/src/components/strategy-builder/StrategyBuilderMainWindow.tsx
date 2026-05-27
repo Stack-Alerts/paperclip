@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { NewStrategyDialog } from './NewStrategyDialog';
 import { StrategyBrowserDialog } from './StrategyBrowserDialog';
+import { SaveStrategyModeDialog } from './SaveStrategyModeDialog';
 import { BacktestConfigDialog } from './BacktestConfigDialog';
 import { ValidationDialog } from './ValidationDialog';
 import { DataUpdateModal } from './DataUpdateModal';
@@ -16,7 +17,8 @@ import { StrategyBlocksPanel } from './StrategyBlocksPanel';
 import { BlockSearchPanel } from './BlockSearchPanel';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import * as api from '@/lib/strategy-builder/api';
-import type { BacktestResult, BacktestConfig, Strategy } from '@/lib/strategy-builder/types';
+import type { BacktestResult, BacktestConfig, Strategy, Block } from '@/lib/strategy-builder/types';
+import { BlockType } from '@/lib/strategy-builder/types';
 import { RichTooltip, TooltipContent } from './RichTooltip';
 import { useTooltipSettings } from './TooltipSettingsContext';
 import { ThemeSelector } from './ThemeSelector';
@@ -130,6 +132,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     loadStrategy,
     loadBlockLibrary,
     saveStrategy,
+    saveStrategyAsNew,
     runBacktest,
     validateStrategy,
     setCurrentStrategy,
@@ -208,28 +211,66 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   }, []);
 
   // Resizable splitter — persists position to localStorage.
-  const SPLIT_MIN = 30; // default and max-left: right panel (block library) dominates
+  // SPLIT_MIN: percentage floor (keeps right panel readable on very wide monitors).
+  // LEFT_PANEL_MIN_PX: absolute floor for the left panel — measured against the
+  // Strategy Info stats row "Time Constraint: Yes/No" wrap threshold (~605px). 620
+  // gives a small buffer; below this the stat row wraps onto a second line.
+  const SPLIT_MIN = 30;
+  const SPLIT_MAX = 75;
+  const LEFT_PANEL_MIN_PX = 620;
   const [leftPercent, setLeftPercent] = useState(30);
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Restore saved split position after mount (avoids SSR hydration mismatch).
+  const clampSplit = useCallback((pct: number, containerWidth: number) => {
+    const minFromPx = containerWidth > 0 ? (LEFT_PANEL_MIN_PX / containerWidth) * 100 : 0;
+    const effectiveMin = Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, minFromPx));
+    return Math.min(SPLIT_MAX, Math.max(effectiveMin, pct));
+  }, []);
+
+  // Restore saved split position after mount (avoids SSR hydration mismatch) and
+  // re-clamp against the current container width so a previously-saved narrow
+  // position cannot survive a viewport change.
   useEffect(() => {
+    const containerWidth = containerRef.current?.getBoundingClientRect().width ?? 0;
+    let initial = leftPercent;
     try {
       const saved = localStorage.getItem('sb_panel_split');
       if (saved) {
         const val = parseFloat(saved);
-        if (!isNaN(val) && val >= SPLIT_MIN && val <= 75) setLeftPercent(val);
+        if (!isNaN(val)) initial = val;
       }
     } catch {}
+    const clamped = clampSplit(initial, containerWidth);
+    setLeftPercent(clamped);
+    try { localStorage.setItem('sb_panel_split', String(clamped)); } catch {}
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-clamp when the container resizes (window resize, sidebar collapse, etc.).
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      const w = node.getBoundingClientRect().width;
+      if (w === 0) return;
+      setLeftPercent(prev => {
+        const next = clampSplit(prev, w);
+        if (next !== prev) {
+          try { localStorage.setItem('sb_panel_split', String(next)); } catch {}
+        }
+        return next;
+      });
+    });
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, [clampSplit]);
 
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
       if (!isDragging.current || !containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const pct = ((e.clientX - rect.left) / rect.width) * 100;
-      const clamped = Math.max(SPLIT_MIN, Math.min(75, pct));
+      const clamped = clampSplit(pct, rect.width);
       setLeftPercent(clamped);
       try { localStorage.setItem('sb_panel_split', String(clamped)); } catch {}
     };
@@ -240,7 +281,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clampSplit]);
 
   const open = useCallback((key: DialogKey) => setActiveDialog(key), []);
   const close = useCallback(() => setActiveDialog(null), []);
@@ -267,8 +308,39 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // -------------------------------------------------------------------------
   // File menu handlers
   // -------------------------------------------------------------------------
+
+  // BTCAAAAA-30023: when Save is clicked on a backend-loaded strategy
+  // (id starts with "strategy_") whose name has changed since load/last
+  // save, ask whether to rename the existing strategy or fork a new one
+  // at v1. Plain rename or plain content edit (no name change) saves
+  // directly without the modal.
+  const [pendingSaveMode, setPendingSaveMode] = useState<{
+    originalName: string;
+    newName: string;
+  } | null>(null);
+  const [saveModeBusy, setSaveModeBusy] = useState(false);
+
+  const finalizeSavedAsRename = useCallback(() => {
+    setCleanSnapshot(strategySnapshot);
+    setStatusText('Strategy saved');
+    setTimeout(() => setStatusText('Ready'), 2000);
+  }, [strategySnapshot]);
+
   const handleSave = useCallback(async () => {
     if (isSavingRef.current) return;
+    if (!currentStrategy) return;
+    const id = currentStrategy.id as unknown as string;
+    const isBackend = typeof id === 'string' && id.startsWith('strategy_');
+    if (isBackend) {
+      const loadedName = (() => {
+        try { return JSON.parse(cleanSnapshot || '{}').name as string | undefined; }
+        catch { return undefined; }
+      })();
+      if (loadedName != null && loadedName !== currentStrategy.name) {
+        setPendingSaveMode({ originalName: loadedName, newName: currentStrategy.name });
+        return;
+      }
+    }
     isSavingRef.current = true;
     try {
       await saveStrategy();
@@ -280,7 +352,42 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     } finally {
       isSavingRef.current = false;
     }
-  }, [saveStrategy, strategySnapshot]);
+  }, [saveStrategy, strategySnapshot, currentStrategy, cleanSnapshot]);
+
+  const handleSaveModeRenameExisting = useCallback(async () => {
+    if (saveModeBusy) return;
+    setSaveModeBusy(true);
+    try {
+      await saveStrategy();
+      finalizeSavedAsRename();
+      setPendingSaveMode(null);
+    } catch (e) {
+      setStatusText('Save failed');
+    } finally {
+      setSaveModeBusy(false);
+    }
+  }, [saveStrategy, finalizeSavedAsRename, saveModeBusy]);
+
+  const handleSaveModeSaveAsNew = useCallback(async () => {
+    if (saveModeBusy || !pendingSaveMode) return;
+    setSaveModeBusy(true);
+    try {
+      const forked = await saveStrategyAsNew(pendingSaveMode.newName);
+      setCleanSnapshot(JSON.stringify({ id: forked.id, blocks: forked.blocks, name: forked.name }));
+      setStatusText(`Saved as new strategy v${(forked as { versionNumber?: number }).versionNumber ?? 1}`);
+      setTimeout(() => setStatusText('Ready'), 2500);
+      setPendingSaveMode(null);
+    } catch (e) {
+      setStatusText('Save-as-new failed');
+    } finally {
+      setSaveModeBusy(false);
+    }
+  }, [saveStrategyAsNew, pendingSaveMode, saveModeBusy]);
+
+  const handleSaveModeCancel = useCallback(() => {
+    if (saveModeBusy) return;
+    setPendingSaveMode(null);
+  }, [saveModeBusy]);
 
   const handleSaveAs = useCallback(async () => {
     if (!currentStrategy) return;
@@ -364,13 +471,152 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // -------------------------------------------------------------------------
   const handleStrategySelect = useCallback(
     (strategy: Strategy) => {
-      setCleanSnapshot(JSON.stringify({ id: strategy.id, blocks: strategy.blocks, name: strategy.name }));
+      // BTCAAAAA-29995: the dialog fetches strategies from the strategy-builder
+      // API, which returns blocks in the Python domain shape
+      // `{name, logic, signals, ...}`. The frontend Block contract is
+      // `{id, type, index, data}` — StrategyInfoPanel.computeStats reads
+      // block.data.logic / block.data.signals and crashed on the raw shape
+      // ("Cannot read properties of undefined (reading 'logic')"). Wrap each
+      // raw block under .data so existing consumers see the expected shape.
+      // type defaults to INDICATOR — computeStats only special-cases
+      // EXIT_CONDITION; all other types fall through to the logic-based
+      // branches (AND→required, OR→optional, EXIT→exit), which matches the
+      // API payload's own `logic` field. Also Title-Case the API's snake_case
+      // block names (`asia_session_50_percent` → `Asia Session 50 Percent`)
+      // to match the block-library display names — StrategyBlocksPanel reads
+      // block.data.name directly for the block title, so the prettification
+      // has to happen here (formatSignalName is already applied to signals
+      // inside the panel).
+      const titleCase = (s: string) =>
+        s.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      // Normalize nested signal exit_condition + recheck_config to the
+      // camelCase shape the panel renderer expects (StrategyBlocksPanel:334
+      // reads cfg.signalName, line 339 reads cfg.recheckBarDelay/recheckEnabled).
+      // Without this the per-signal exit pills and RCHK badges disappear,
+      // which is the layout regression the board flagged vs the signed-off
+      // rendering (board comment 2026-05-27 05:50 UTC on BTCAAAAA-29995).
+      const normalizeExitCondition = (ec: Record<string, unknown>): Record<string, unknown> => {
+        const out: Record<string, unknown> = { ...ec };
+        if (typeof ec.signal_name === 'string') out.signalName = ec.signal_name;
+        if (typeof ec.exit_mode === 'string') out.exitMode = ec.exit_mode;
+        if (typeof ec.binding_level === 'string') out.bindingLevel = ec.binding_level;
+        const rc = ec.recheck_config as Record<string, unknown> | undefined;
+        if (rc && typeof rc === 'object') {
+          if (typeof rc.enabled === 'boolean') out.recheckEnabled = rc.enabled;
+          if (typeof rc.bar_delay === 'number') out.recheckBarDelay = rc.bar_delay;
+          if (typeof rc.mode === 'string') out.recheckMode = rc.mode;
+        }
+        return out;
+      };
+      const normalizeSignal = (sig: Record<string, unknown>): Record<string, unknown> => {
+        const out: Record<string, unknown> = { ...sig };
+        const rc = sig.recheck_config as Record<string, unknown> | undefined;
+        if (rc && typeof rc === 'object') {
+          if (typeof rc.enabled === 'boolean') out.recheckEnabled = rc.enabled;
+          if (typeof rc.bar_delay === 'number') out.recheckBarDelay = rc.bar_delay;
+        }
+        const exits = sig.exit_conditions as unknown;
+        if (Array.isArray(exits)) {
+          out.exit_conditions = exits.map((e) =>
+            e && typeof e === 'object' ? normalizeExitCondition(e as Record<string, unknown>) : e
+          );
+        }
+        return out;
+      };
+      const rawBlocks = Array.isArray(strategy.blocks) ? strategy.blocks : [];
+      const mainBlocks: Block[] = rawBlocks.map((b, i): Block => {
+        const isFrontendShape =
+          b && typeof b === 'object' && 'data' in b && 'type' in b;
+        if (isFrontendShape) return b as Block;
+        const raw = b as unknown as Record<string, unknown>;
+        const rawName = typeof raw.name === 'string' ? raw.name : '';
+        const signals = raw.signals as unknown;
+        const normalizedSignals = Array.isArray(signals)
+          ? signals.map((s) =>
+              s && typeof s === 'object' ? normalizeSignal(s as Record<string, unknown>) : s
+            )
+          : raw.signals;
+        const dataCore: Record<string, unknown> = { ...raw, signals: normalizedSignals };
+        // definitionId links the canvas block to its library entry (BlockSearchPanel
+        // matches library.id). API gives raw snake_case (e.g. asia_session_50_percent)
+        // and public/block-library.json entries use id=<same snake_case>, so the raw
+        // name IS the join key. Without this, clicking a signal in the canvas can't
+        // expand/highlight the matching block in the library panel — the UX feature
+        // the board flagged as missing (BTCAAAAA-29995 comment 2026-05-27 06:24 UTC).
+        const dataWithId: Record<string, unknown> = rawName
+          ? { ...dataCore, name: titleCase(rawName), definitionId: rawName }
+          : dataCore;
+        return {
+          id: `block-${strategy.versionId ?? strategy.id}-${i}`,
+          type: BlockType.INDICATOR,
+          index: i,
+          data: dataWithId,
+        };
+      });
+      // Flatten each signal.exit_conditions[] into synthetic EXIT_CONDITION
+      // blocks at the top level. StrategyBlocksPanel renders the red ↳ exit
+      // pills by walking blocks where type === EXIT_CONDITION (or data.logic
+      // === 'EXIT'), keyed by `${blockName}::${parentSignalName}` and grouped
+      // per signal via signalExitsByKey. Without this flatten the API's
+      // nested exit_conditions never reach the renderer and the signed-off
+      // rich rendering can't render — even with shape normalization in place.
+      const exitBlocks: Block[] = [];
+      mainBlocks.forEach((parent) => {
+        const parentName = (parent.data.name as string | undefined) ?? '';
+        const sigs = parent.data.signals as Array<Record<string, unknown>> | undefined;
+        if (!Array.isArray(sigs)) return;
+        sigs.forEach((sig) => {
+          const parentSignalName = typeof sig.name === 'string' ? sig.name : '';
+          const exits = sig.exit_conditions as Array<Record<string, unknown>> | undefined;
+          if (!Array.isArray(exits)) return;
+          exits.forEach((ec, ei) => {
+            const exitSignalRaw = typeof ec.signal_name === 'string' ? ec.signal_name : '';
+            const exitSignalDisplay = exitSignalRaw
+              ? exitSignalRaw.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+              : 'Exit';
+            const rc = ec.recheck_config as Record<string, unknown> | undefined;
+            const exitConfig: Record<string, unknown> = {
+              signalName: exitSignalRaw,
+              percentage: typeof ec.percentage === 'number' ? ec.percentage : undefined,
+              exitMode: typeof ec.exit_mode === 'string' ? ec.exit_mode : undefined,
+              bindingLevel: typeof ec.binding_level === 'string' ? ec.binding_level : 'SIGNAL',
+              tpProximityThreshold: typeof ec.tp_proximity_threshold === 'number' ? ec.tp_proximity_threshold : undefined,
+              reversalTrigger: typeof ec.reversal_trigger === 'number' ? ec.reversal_trigger : undefined,
+              recheckEnabled: rc && typeof rc === 'object' && typeof rc.enabled === 'boolean' ? rc.enabled : undefined,
+              recheckBarDelay: rc && typeof rc === 'object' && typeof rc.bar_delay === 'number' ? rc.bar_delay : undefined,
+              blockName: parentName,
+              parentSignalName,
+            };
+            // Inherit the parent block's library link so clicking the exit-pill
+            // name highlights the same library entry the parent signal does
+            // (parent.data.definitionId was set above to the raw snake_case API name).
+            const parentDefinitionId = parent.data.definitionId as string | undefined;
+            exitBlocks.push({
+              id: `exit-${strategy.versionId ?? strategy.id}-${parentName}-${parentSignalName}-${ei}`,
+              type: BlockType.EXIT_CONDITION,
+              index: mainBlocks.length + exitBlocks.length,
+              data: {
+                name: exitSignalDisplay,
+                logic: 'EXIT',
+                exitConfig,
+                ...(parentDefinitionId ? { definitionId: parentDefinitionId } : {}),
+              },
+            });
+          });
+        });
+      });
+      const normalized: Strategy = {
+        ...strategy,
+        blocks: [...mainBlocks, ...exitBlocks],
+      };
+      setCurrentStrategy(normalized);
+      setCleanSnapshot(JSON.stringify({ id: normalized.id, blocks: normalized.blocks, name: normalized.name }));
       setCurrentStep(0);
       setCompletedSteps(new Set());
       setErrorSteps(new Set());
       close();
     },
-    [close]
+    [close, setCurrentStrategy]
   );
 
   // Pop In: receive state from a popped-out Strategy Browser window and
@@ -646,6 +892,16 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       />
 
       <SettingsDialog open={activeDialog === 'settings'} onClose={close} />
+
+      <SaveStrategyModeDialog
+        open={pendingSaveMode !== null}
+        originalName={pendingSaveMode?.originalName ?? ''}
+        newName={pendingSaveMode?.newName ?? ''}
+        busy={saveModeBusy}
+        onRenameExisting={handleSaveModeRenameExisting}
+        onSaveAsNew={handleSaveModeSaveAsNew}
+        onCancel={handleSaveModeCancel}
+      />
 
       <QuickPreviewResultsDialog
         open={activeDialog === 'quickPreview'}

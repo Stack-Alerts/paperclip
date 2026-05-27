@@ -170,6 +170,20 @@
   --status-danger:           var(--core-danger);
   --status-danger-hover:     color-mix(in srgb, var(--core-danger) 80%, white);
   --status-danger-tint:      color-mix(in srgb, var(--core-danger) 18%, var(--core-bg-shell));
+
+  /* ── Hover-highlight row palette (BlockSearchPanel signal rows) ── */
+  --hover-row-bg:                #0D2940;
+  --hover-row-bg-top:            #12344F;
+  --hover-row-border:            #1E5D86;
+  --hover-row-border-soft:       #2B7CAA;
+  --hover-row-glow:              #35A9FF;
+  --hover-row-checkbox:          #173147;
+  --hover-row-checkbox-border:   #2F86C1;
+  --hover-row-text-primary:      #D6E6F2;
+  --hover-row-text-secondary:    #93AFC4;
+  --hover-row-text-description:  #A9BED0;
+  --hover-row-selected-fill:     #0C62B8;
+  --hover-row-selected-glow:     #2A8FE8;
 }
 
 /* ─── Ocean theme — overrides only (BTCAAAAA-29987) ──────────────────────── */
