@@ -208,28 +208,66 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   }, []);
 
   // Resizable splitter — persists position to localStorage.
-  const SPLIT_MIN = 30; // default and max-left: right panel (block library) dominates
+  // SPLIT_MIN: percentage floor (keeps right panel readable on very wide monitors).
+  // LEFT_PANEL_MIN_PX: absolute floor for the left panel — measured against the
+  // Strategy Info stats row "Time Constraint: Yes/No" wrap threshold (~605px). 620
+  // gives a small buffer; below this the stat row wraps onto a second line.
+  const SPLIT_MIN = 30;
+  const SPLIT_MAX = 75;
+  const LEFT_PANEL_MIN_PX = 620;
   const [leftPercent, setLeftPercent] = useState(30);
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Restore saved split position after mount (avoids SSR hydration mismatch).
+  const clampSplit = useCallback((pct: number, containerWidth: number) => {
+    const minFromPx = containerWidth > 0 ? (LEFT_PANEL_MIN_PX / containerWidth) * 100 : 0;
+    const effectiveMin = Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, minFromPx));
+    return Math.min(SPLIT_MAX, Math.max(effectiveMin, pct));
+  }, []);
+
+  // Restore saved split position after mount (avoids SSR hydration mismatch) and
+  // re-clamp against the current container width so a previously-saved narrow
+  // position cannot survive a viewport change.
   useEffect(() => {
+    const containerWidth = containerRef.current?.getBoundingClientRect().width ?? 0;
+    let initial = leftPercent;
     try {
       const saved = localStorage.getItem('sb_panel_split');
       if (saved) {
         const val = parseFloat(saved);
-        if (!isNaN(val) && val >= SPLIT_MIN && val <= 75) setLeftPercent(val);
+        if (!isNaN(val)) initial = val;
       }
     } catch {}
+    const clamped = clampSplit(initial, containerWidth);
+    setLeftPercent(clamped);
+    try { localStorage.setItem('sb_panel_split', String(clamped)); } catch {}
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-clamp when the container resizes (window resize, sidebar collapse, etc.).
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      const w = node.getBoundingClientRect().width;
+      if (w === 0) return;
+      setLeftPercent(prev => {
+        const next = clampSplit(prev, w);
+        if (next !== prev) {
+          try { localStorage.setItem('sb_panel_split', String(next)); } catch {}
+        }
+        return next;
+      });
+    });
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, [clampSplit]);
 
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
       if (!isDragging.current || !containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const pct = ((e.clientX - rect.left) / rect.width) * 100;
-      const clamped = Math.max(SPLIT_MIN, Math.min(75, pct));
+      const clamped = clampSplit(pct, rect.width);
       setLeftPercent(clamped);
       try { localStorage.setItem('sb_panel_split', String(clamped)); } catch {}
     };
@@ -240,7 +278,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clampSplit]);
 
   const open = useCallback((key: DialogKey) => setActiveDialog(key), []);
   const close = useCallback(() => setActiveDialog(null), []);
