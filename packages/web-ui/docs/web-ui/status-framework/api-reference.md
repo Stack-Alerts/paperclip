@@ -8,7 +8,7 @@ Emits a new status entry to the status bar.
 - `text` (string): The status message to display
 - `options` (optional):
   - `variant` ('idle' | 'info' | 'success' | 'warning' | 'error'): Message variant (default: 'info')
-  - `duration` (number): Milliseconds until auto-dismiss (default: 2000; use -1 for no auto-dismiss)
+  - `duration` (number): Milliseconds until auto-dismiss (default: 2000). Use any non-positive value (e.g., -1, 0) to create a persistent status that does not auto-dismiss
 
 **Returns:** `string` — The unique ID of the emitted status entry
 
@@ -33,6 +33,9 @@ Updates the text of an existing status entry (useful for countdown timers).
 **Parameters:**
 - `id` (string): The status entry ID (returned from `status.emit()`)
 - `text` (string): The new text to display
+
+**Limitations:**
+- Only the `text` field can be updated; `variant` cannot be changed after the status is emitted. If you need to change the variant, dismiss the current status and emit a new one.
 
 **Example:**
 ```typescript
