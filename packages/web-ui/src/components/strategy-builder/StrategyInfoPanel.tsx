@@ -278,7 +278,7 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
       </RichTooltip>
       <span style={{ color: 'var(--text-muted)' }}>|</span>
       <RichTooltip content={TT_STAT_TIMING}>
-        <span style={{ color: 'var(--text-dim)', cursor: 'default' }}>Time Constraint: <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{stats.timeConstrained > 0 ? 'Yes' : 'No'}</span></span>
+        <span style={{ color: 'var(--text-dim)', cursor: 'default' }}>Time Constraint: <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>{stats.timeConstrained > 0 ? 'Yes' : 'No'}</span></span>
       </RichTooltip>
     </>
   );
@@ -442,7 +442,7 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
             </RichTooltip>
             <span style={{ color: 'var(--text-secondary)' }}>|</span>
             <RichTooltip content={TT_STAT_TIMING}>
-              <span style={{ color: 'var(--text-dim)', cursor: 'default' }}>Time Constraint: <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{stats.timeConstrained > 0 ? 'Yes' : 'No'}</span></span>
+              <span style={{ color: 'var(--text-dim)', cursor: 'default' }}>Time Constraint: <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>{stats.timeConstrained > 0 ? 'Yes' : 'No'}</span></span>
             </RichTooltip>
           </>
         )}
