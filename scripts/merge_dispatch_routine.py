@@ -92,72 +92,78 @@ def _github_session(token: str) -> requests.Session:
 
 def fetch_issue_comments(issue_id: str) -> list[dict[str, Any]]:
     """Fetch all comments for an issue."""
+    sess = _http_session()
     try:
-        with _http_session() as sess:
-            resp = sess.get(
-                f"{os.environ.get('PAPERCLIP_API_URL')}/api/issues/{issue_id}/comments",
-                timeout=30,
-            )
-            resp.raise_for_status()
-            comments = resp.json()
-            if isinstance(comments, list):
-                return comments
-            return []
+        resp = sess.get(
+            f"{os.environ.get('PAPERCLIP_API_URL')}/api/issues/{issue_id}/comments",
+            timeout=30,
+        )
+        resp.raise_for_status()
+        comments = resp.json()
+        if isinstance(comments, list):
+            return comments
+        return []
     except Exception as exc:
         logger.error("Failed to fetch comments for issue %s: %s", issue_id, exc)
         return []
+    finally:
+        sess.close()
 
 
 def fetch_issue_interactions(issue_id: str) -> list[dict[str, Any]]:
     """Fetch interactions for an issue."""
+    sess = _http_session()
     try:
-        with _http_session() as sess:
-            resp = sess.get(
-                f"{os.environ.get('PAPERCLIP_API_URL')}/api/issues/{issue_id}/interactions",
-                timeout=30,
-            )
-            resp.raise_for_status()
-            interactions = resp.json()
-            if isinstance(interactions, list):
-                return interactions
-            return []
+        resp = sess.get(
+            f"{os.environ.get('PAPERCLIP_API_URL')}/api/issues/{issue_id}/interactions",
+            timeout=30,
+        )
+        resp.raise_for_status()
+        interactions = resp.json()
+        if isinstance(interactions, list):
+            return interactions
+        return []
     except Exception as exc:
         logger.error("Failed to fetch interactions for issue %s: %s", issue_id, exc)
         return []
+    finally:
+        sess.close()
 
 
 def find_in_review_issues() -> list[dict[str, Any]]:
     """Find all in_review issues."""
+    company_id = os.environ.get("PAPERCLIP_COMPANY_ID", "")
+    if not company_id:
+        logger.error("PAPERCLIP_COMPANY_ID not set")
+        return []
+
+    sess = _http_session()
     try:
-        company_id = os.environ.get("PAPERCLIP_COMPANY_ID", "")
-        if not company_id:
-            logger.error("PAPERCLIP_COMPANY_ID not set")
+        resp = sess.get(
+            f"{os.environ.get('PAPERCLIP_API_URL')}/api/companies/{company_id}/issues",
+            params={
+                "status": "in_review",
+                "limit": 200,
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        issues = resp.json()
+        if isinstance(issues, dict) and "issues" in issues:
+            issues_list = issues["issues"]
+        elif isinstance(issues, list):
+            issues_list = issues
+        else:
+            logger.warning("Unexpected response format from issues API")
             return []
 
-        with _http_session() as sess:
-            resp = sess.get(
-                f"{os.environ.get('PAPERCLIP_API_URL')}/api/companies/{company_id}/issues",
-                params={
-                    "status": "in_review",
-                    "limit": 200,
-                },
-                timeout=30,
-            )
-            resp.raise_for_status()
-            issues = resp.json()
-            if isinstance(issues, dict) and "issues" in issues:
-                issues_list = issues["issues"]
-            elif isinstance(issues, list):
-                issues_list = issues
-            else:
-                logger.warning("Unexpected response format from issues API")
-                return []
-
-            logger.info("Found %d in_review issues", len(issues_list))
-            return issues_list
+        logger.info("Found %d in_review issues", len(issues_list))
+        return issues_list
     except Exception as exc:
         logger.error("Failed to find in_review issues: %s", exc)
         return []
+    finally:
+        sess.close()
 
 
 def extract_fix_sha_from_comments(comments: list[dict[str, Any]]) -> str | None:
@@ -330,40 +336,44 @@ def merge_pr(session: requests.Session, pr_number: int) -> dict | None:
 
 def comment_on_issue(issue_id: str, body: str) -> bool:
     """Post a comment to an issue."""
+    sess = _http_session()
     try:
-        with _http_session() as sess:
-            resp = sess.post(
-                f"{os.environ.get('PAPERCLIP_API_URL')}/api/issues/{issue_id}/comments",
-                json={"body": body},
-                timeout=30,
-            )
-            resp.raise_for_status()
-            logger.info("Posted comment on issue %s", issue_id)
-            return True
+        resp = sess.post(
+            f"{os.environ.get('PAPERCLIP_API_URL')}/api/issues/{issue_id}/comments",
+            json={"body": body},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        logger.info("Posted comment on issue %s", issue_id)
+        return True
     except Exception as exc:
         logger.error("Failed to post comment on issue %s: %s", issue_id, exc)
         return False
+    finally:
+        sess.close()
 
 
 def update_issue_status(issue_id: str, status: str, comment: str = "") -> bool:
     """Update issue status."""
-    try:
-        payload = {"status": status}
-        if comment:
-            payload["comment"] = comment
+    payload = {"status": status}
+    if comment:
+        payload["comment"] = comment
 
-        with _http_session() as sess:
-            resp = sess.patch(
-                f"{os.environ.get('PAPERCLIP_API_URL')}/api/issues/{issue_id}",
-                json=payload,
-                timeout=30,
-            )
-            resp.raise_for_status()
-            logger.info("Updated issue %s to status %s", issue_id, status)
-            return True
+    sess = _http_session()
+    try:
+        resp = sess.patch(
+            f"{os.environ.get('PAPERCLIP_API_URL')}/api/issues/{issue_id}",
+            json=payload,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        logger.info("Updated issue %s to status %s", issue_id, status)
+        return True
     except Exception as exc:
         logger.error("Failed to update issue %s: %s", issue_id, exc)
         return False
+    finally:
+        sess.close()
 
 
 def escalate_failure(issue_id: str, issue_identifier: str, sha: str, reason: str) -> None:
