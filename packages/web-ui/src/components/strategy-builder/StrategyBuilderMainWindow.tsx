@@ -1065,7 +1065,7 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, tooltip, onClick, 
         disabled
           ? 'text-[var(--text-muted)] bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.05)] cursor-not-allowed'
           : pulse
-          ? 'text-[var(--text-primary)] bg-[rgba(255,255,255,0.06)] border-[var(--accent-orange)] button-amber-pulse hover:bg-[rgba(255,255,255,0.10)]'
+          ? 'text-[var(--text-primary)] bg-[rgba(255,255,255,0.06)] border-[rgba(231,178,87,0.2)] button-amber-pulse hover:bg-[rgba(255,255,255,0.10)]'
           : accent
           ? 'font-medium border-[var(--accent-blue-dark)] bg-[var(--accent-blue)] text-[var(--btn-primary-text)] hover:bg-[var(--accent-blue-mid)]'
           : active
