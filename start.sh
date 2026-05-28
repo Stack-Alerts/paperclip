@@ -37,10 +37,10 @@ BACKEND_HOST="${BTE_API_HOST:-0.0.0.0}"
 BACKEND_PORT="${BTE_API_PORT:-8765}"
 WEBUI_PORT="${BTE_WEBUI_PORT:-3000}"
 
-# --- pre-flight: refuse to start if either port is already in use ------------
+# --- pre-flight: check ports and probe health if in use ----------------------
 
-check_port() {
-  local port="$1" label="$2" pid=""
+get_port_pid() {
+  local port="$1" pid=""
 
   # Prefer `ss` (works without root for current-user sockets and catches both
   # IPv4 and IPv6 listeners); fall back to `lsof` if `ss` is missing.
@@ -52,15 +52,47 @@ check_port() {
     pid="$(lsof -ti tcp:"$port" -sTCP:LISTEN 2>/dev/null | head -n1 || true)"
   fi
 
-  if [[ -n "$pid" ]]; then
-    echo "ERROR: port $port ($label) is already in use by PID $pid" >&2
-    echo "       refusing to start — stop that process first, or set a different port." >&2
-    return 1
-  fi
+  echo "$pid"
 }
 
-check_port "$BACKEND_PORT" backend
-check_port "$WEBUI_PORT"   webui
+probe_health() {
+  local port="$1" label="$2"
+  # Just check if the service is accepting connections (any HTTP response).
+  # This is more resilient than validating specific response codes.
+  curl -s -o /dev/null -m 2 "http://127.0.0.1:$port/" 2>/dev/null && return 0
+  return 1
+}
+
+check_or_skip() {
+  local port="$1" label="$2" pid=""
+
+  pid="$(get_port_pid "$port")"
+
+  if [[ -z "$pid" ]]; then
+    # Port is free, service will be started later
+    return 0
+  fi
+
+  # Port is in use; probe health
+  if probe_health "$port" "$label"; then
+    echo "$label already up on :$port (pid $pid) — skipping launch"
+    # Mark this as "already running" (by appending to EXISTING_PIDS)
+    EXISTING_PIDS+=("$label:$pid")
+    return 0
+  fi
+
+  # Port in use but unhealthy — refuse
+  echo "ERROR: port $port ($label) is already in use by PID $pid" >&2
+  echo "       and the service appears unhealthy (health probe failed)." >&2
+  echo "       refusing to start — stop that process first, or set a different port." >&2
+  return 1
+}
+
+# Track PIDs of services that existed before this script ran
+EXISTING_PIDS=()
+
+check_or_skip "$BACKEND_PORT" backend || exit 1
+check_or_skip "$WEBUI_PORT"   webui   || exit 1
 
 # --- resolve interpreters ----------------------------------------------------
 
@@ -98,8 +130,9 @@ kill_group() {
 cleanup() {
   trap - INT TERM EXIT
   echo
-  echo "Stopping services..."
+  echo "Stopping services (only those started by this invocation)..."
 
+  # Only kill services this invocation started, not pre-existing ones
   kill_group "$BACKEND_PID" -TERM
   kill_group "$WEBUI_PID"   -TERM
 
@@ -130,22 +163,76 @@ echo "  (Ctrl+C to stop)"
 echo
 
 # Backend (FastAPI via uvicorn); sed -u keeps the prefixed stream unbuffered.
-setsid bash -c "
-  cd '$REPO_ROOT' || exit 1
-  '$PYTHON' -m uvicorn src.api.app:app \
-    --host '$BACKEND_HOST' \
-    --port '$BACKEND_PORT' 2>&1 \
-    | sed -u 's/^/[backend] /'
-" &
-BACKEND_PID=$!
+BACKEND_EXISTING=0
+for existing in "${EXISTING_PIDS[@]}"; do
+  if [[ "$existing" == backend:* ]]; then
+    BACKEND_EXISTING=1
+    break
+  fi
+done
+
+if [[ $BACKEND_EXISTING -eq 0 ]]; then
+  setsid bash -c "
+    cd '$REPO_ROOT' || exit 1
+    '$PYTHON' -m uvicorn src.api.app:app \
+      --host '$BACKEND_HOST' \
+      --port '$BACKEND_PORT' 2>&1 \
+      | sed -u 's/^/[backend] /'
+  " &
+  BACKEND_PID=$!
+fi
 
 # Frontend (Next.js dev server)
-setsid bash -c "
-  cd '$REPO_ROOT/packages/web-ui' || exit 1
-  '$NPM' run dev -- --port '$WEBUI_PORT' 2>&1 \
-    | sed -u 's/^/[webui] /'
-" &
-WEBUI_PID=$!
+WEBUI_EXISTING=0
+for existing in "${EXISTING_PIDS[@]}"; do
+  if [[ "$existing" == webui:* ]]; then
+    WEBUI_EXISTING=1
+    break
+  fi
+done
+
+if [[ $WEBUI_EXISTING -eq 0 ]]; then
+  setsid bash -c "
+    cd '$REPO_ROOT/packages/web-ui' || exit 1
+    '$NPM' run dev -- --port '$WEBUI_PORT' 2>&1 \
+      | sed -u 's/^/[webui] /'
+  " &
+  WEBUI_PID=$!
+fi
+
+# Print summary
+echo "Status:"
+if [[ -n "$BACKEND_PID" ]]; then
+  echo "  backend: started PID $BACKEND_PID"
+elif [[ $BACKEND_EXISTING -eq 1 ]]; then
+  # Extract PID from EXISTING_PIDS
+  for existing in "${EXISTING_PIDS[@]}"; do
+    if [[ "$existing" == backend:* ]]; then
+      echo "  backend: already up PID ${existing#backend:}"
+      break
+    fi
+  done
+fi
+
+if [[ -n "$WEBUI_PID" ]]; then
+  echo "  webui: started PID $WEBUI_PID"
+elif [[ $WEBUI_EXISTING -eq 1 ]]; then
+  # Extract PID from EXISTING_PIDS
+  for existing in "${EXISTING_PIDS[@]}"; do
+    if [[ "$existing" == webui:* ]]; then
+      echo "  webui: already up PID ${existing#webui:}"
+      break
+    fi
+  done
+fi
+
+echo
+
+# If neither service was started, exit immediately (both were already running)
+if [[ -z "$BACKEND_PID" && -z "$WEBUI_PID" ]]; then
+  echo "Both services already up. Exiting (nothing to supervise)."
+  exit 0
+fi
 
 # If either side dies, fall through and let `cleanup` shut the other down.
 wait -n 2>/dev/null || true
