@@ -410,6 +410,40 @@ check_or_skip() {
   return 1
 }
 
+# --- redis preflight (BTCAAAAA-30663) -----------------------------------------
+#
+# The backend pub/sub layer requires Redis. If redis-cli ping fails, attempt to
+# start redis-server as a sidecar. If that also fails, refuse to boot the backend
+# with a named error — a silent start without Redis is worse than no start.
+REDIS_PORT="${BTE_REDIS_PORT:-6379}"
+REDIS_HOST="${BTE_REDIS_HOST:-127.0.0.1}"
+
+check_redis() {
+  redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" --no-auth-warning ping 2>/dev/null | grep -q PONG
+}
+
+if ! check_redis; then
+  echo "[redis-preflight] localhost:${REDIS_PORT} is not reachable — attempting sidecar start"
+  if command -v redis-server >/dev/null 2>&1; then
+    redis-server --daemonize yes --port "$REDIS_PORT" --loglevel warning 2>/dev/null || true
+    sleep 1
+    if check_redis; then
+      echo "[redis-preflight] sidecar redis-server started on :${REDIS_PORT}"
+    else
+      echo "ERROR: Redis is not reachable on ${REDIS_HOST}:${REDIS_PORT} and sidecar start failed." >&2
+      echo "       Install and start Redis before running start.sh:" >&2
+      echo "         sudo apt-get install redis-server && sudo systemctl start redis-server" >&2
+      exit 1
+    fi
+  else
+    echo "ERROR: redis-cli/redis-server not found. Redis is required by the backend." >&2
+    echo "         sudo apt-get install redis-server && sudo systemctl start redis-server" >&2
+    exit 1
+  fi
+else
+  echo "[redis-preflight] Redis OK on ${REDIS_HOST}:${REDIS_PORT}"
+fi
+
 # Track PIDs of services that existed before this script ran
 EXISTING_PIDS=()
 

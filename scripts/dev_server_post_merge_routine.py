@@ -113,6 +113,24 @@ def get_dev_server_status_doc(session: requests.Session) -> dict[str, Any]:
         return {}
 
 
+def probe_redis_health(host: str = "127.0.0.1", port: int = 6379) -> dict[str, str]:
+    """Probe Redis with redis-cli ping; return status dict."""
+    try:
+        result = subprocess.run(
+            ["redis-cli", "-h", host, "-p", str(port), "--no-auth-warning", "ping"],
+            capture_output=True, text=True, timeout=2,
+        )
+        if result.returncode == 0 and "PONG" in result.stdout:
+            return {"status": "✅ UP", "detail": f"PONG on {host}:{port}"}
+        return {"status": "❌ DOWN", "detail": result.stderr.strip() or result.stdout.strip() or "no response"}
+    except FileNotFoundError:
+        return {"status": "❌ redis-cli not found", "detail": "install redis-server"}
+    except subprocess.TimeoutExpired:
+        return {"status": "❌ TIMEOUT", "detail": f"no response within 2s on {host}:{port}"}
+    except Exception as exc:
+        return {"status": "❌ ERROR", "detail": str(exc)}
+
+
 def update_dev_server_status_doc(
     session: requests.Session,
     reset_result: dict[str, Any],
@@ -120,21 +138,25 @@ def update_dev_server_status_doc(
     """Update dev-server-status document."""
     if reset_result.get("status") not in ("success", "skipped"):
         return False
-    
+
     logger.info("Updating dev-server-status document...")
     api_url = os.environ.get("PAPERCLIP_API_URL", "http://127.0.0.1:3100")
     doc_url = f"{api_url}/api/issues/{DEV_SERVER_STATUS_ISSUE}/documents/{DEV_SERVER_STATUS_DOC_KEY}"
-    
+
     current_doc = get_dev_server_status_doc(session)
     base_revision_id = current_doc.get("latestRevisionId")
-    
+
     current_sha = reset_result.get("current_sha", "unknown")
     current_branch = reset_result.get("current_branch", "unknown")
     timestamp = reset_result.get("timestamp") or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     status_msg = "✅ RESET SUCCESSFUL" if reset_result.get("status") == "success" else "⚠️ SKIPPED"
     if reset_result.get("status") == "skipped":
         status_msg += " — uncommitted changes detected"
-    
+
+    redis_host = os.environ.get("BTE_REDIS_HOST", "127.0.0.1")
+    redis_port = int(os.environ.get("BTE_REDIS_PORT", "6379"))
+    redis_info = probe_redis_health(redis_host, redis_port)
+
     new_body = f"""# Dev Server Status Board
 
 **Refresh policy:** Auto-updated on every merge by **BTCAAAAA-30043** post-merge reset routine.
@@ -153,6 +175,14 @@ def update_dev_server_status_doc(
 | **Last reset timestamp** | {timestamp} |
 | **Visual-verification safety** | ✅ On main — safe for verification |
 | **Owning agent right now** | None (between tasks) |
+
+## Redis — `{redis_host}:{redis_port}`
+
+| Field | Value |
+|---|---|
+| **Status** | {redis_info["status"]} |
+| **Detail** | {redis_info["detail"]} |
+| **Last probed** | {timestamp} |
 """
     
     payload = {
