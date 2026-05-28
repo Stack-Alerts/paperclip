@@ -264,7 +264,7 @@ function CombinedFilterMenu({ selectedCategory, selectedType, onCategoryChange, 
           style={{
             background: activeCount > 0 ? 'color-mix(in srgb, var(--accent-blue) 15%, var(--input-bg))' : 'var(--input-bg)',
             borderColor: activeCount > 0 ? 'var(--accent-blue)' : 'var(--input-border)',
-            color: activeCount > 0 ? 'var(--accent-blue)' : 'var(--input-text)',
+            color: activeCount > 0 ? 'var(--accent-blue)' : 'var(--text-secondary)',
           }}
         >
           <span className="truncate max-w-[110px]">{buttonLabel}</span>
@@ -395,7 +395,7 @@ function PresetBrowserModal({ open, presets, currentFilters, onClose, onApply, o
       <div className="rounded-xl shadow-2xl border flex flex-col" style={{ background: 'var(--surface-panel)', borderColor: 'var(--border)', width: 'min(820px, 95vw)', height: 'min(820px, 90vh)' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Filter Presets</h3>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Filter Presets</h3>
           <button onClick={onClose} className="p-1 rounded hover:opacity-70 transition-opacity" style={{ color: 'var(--text-muted)' }}>
             <X size={15} />
           </button>

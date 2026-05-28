@@ -68,7 +68,7 @@ export function BlockConfigDialog({ open, block, blockIndex, onSave, onClose }: 
       <div className="rounded-lg shadow-2xl w-[500px] max-h-[80vh] flex flex-col" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
-          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Configure Block #{blockIndex + 1}</h2>
+          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Configure Block #{blockIndex + 1}</h2>
           <button onClick={onClose} className="text-lg leading-none transition-colors" style={{ color: 'var(--text-muted)' }}>✕</button>
         </div>
 

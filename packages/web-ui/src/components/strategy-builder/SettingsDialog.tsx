@@ -277,7 +277,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
         <div className="rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[85vh] border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
           <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
-            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Settings</h2>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>Settings</h2>
             <button onClick={onClose} className="transition-colors" style={{ color: 'var(--text-muted)' }}
               onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
               onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}>

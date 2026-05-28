@@ -25,9 +25,9 @@ export function DuplicateStrategyModal({ strategy, onConfirm, onCancel }: Duplic
         className="rounded-lg p-6 shadow-2xl max-w-sm w-full mx-4 space-y-4"
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
       >
-        <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Duplicate Strategy</h3>
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Duplicate Strategy</h3>
         <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-          Choose how to duplicate <strong style={{ color: 'var(--text-primary)' }}>{strategy.name}</strong>:
+          Choose how to duplicate <strong style={{ color: 'var(--text-secondary)' }}>{strategy.name}</strong>:
         </p>
 
         <div className="space-y-2">

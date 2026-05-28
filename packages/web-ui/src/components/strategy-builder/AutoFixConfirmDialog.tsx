@@ -95,7 +95,7 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
         <div className="flex items-center gap-3 border-b px-6 py-4 sticky top-0 z-10" style={{ borderColor: 'var(--border)', background: 'var(--bg-panel)' }}>
           <span className="text-xl">🔧</span>
           <div>
-            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>
               Auto-Fix: {fixType}
             </h2>
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Review proposed changes before applying</p>

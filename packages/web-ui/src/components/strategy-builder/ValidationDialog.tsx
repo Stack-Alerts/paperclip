@@ -25,7 +25,7 @@ export const ValidationDialog: React.FC<ValidationDialogProps> = ({ open, onClos
         >
           <div className="flex items-center gap-3">
             <span className="text-xl">✅</span>
-            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Strategy Validation</h2>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>Strategy Validation</h2>
           </div>
           <button
             onClick={onClose}

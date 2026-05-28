@@ -37,9 +37,9 @@ export function DeleteStrategyModal({ strategy, versions, onConfirm, onCancel }:
         className="rounded-lg p-6 shadow-2xl max-w-sm w-full mx-4 space-y-4"
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
       >
-        <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Delete Strategy</h3>
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Delete Strategy</h3>
         <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-          Choose what to delete for <strong style={{ color: 'var(--text-primary)' }}>{strategy.name}</strong>:
+          Choose what to delete for <strong style={{ color: 'var(--text-secondary)' }}>{strategy.name}</strong>:
         </p>
 
         <div className="space-y-2">

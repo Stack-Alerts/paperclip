@@ -88,7 +88,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
       <div className="relative w-full max-w-xl rounded-lg shadow-2xl mx-4" style={{ border: '1px solid var(--border)', background: 'var(--bg-panel)' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--bg-card)' }}>
-          <h2 id="backtest-dialog-title" className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <h2 id="backtest-dialog-title" className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>
             🧪 Backtest Configuration
           </h2>
           <button onClick={onClose} className="text-lg" style={{ color: 'var(--text-muted)' }} aria-label="Close dialog">

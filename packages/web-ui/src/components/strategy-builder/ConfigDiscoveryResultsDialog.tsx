@@ -121,7 +121,7 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
       <div className="rounded-lg shadow-2xl w-full max-w-6xl mx-4 max-h-[90vh] flex flex-col border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between border-b px-6 py-4 flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
           <div>
-            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Config Discovery Results</h2>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>Config Discovery Results</h2>
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{results.length} scenarios evaluated</p>
           </div>
           <button

@@ -156,7 +156,7 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
       {/* ── Primary row header ── */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-sm font-bold min-w-[3rem]" style={{ color: 'var(--text-primary)' }}>{timeframe}</span>
+          <span className="text-sm font-bold min-w-[3rem]" style={{ color: 'var(--text-secondary)' }}>{timeframe}</span>
           <span className="px-2 py-0.5 rounded text-xs font-semibold" style={statusStyle}>
             {statusLabel}
           </span>
@@ -338,7 +338,7 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
           <div className="flex items-center gap-3">
             <span className="text-xl">🔍</span>
             <div>
-              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Data Verification</h2>
+              <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>Data Verification</h2>
               <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                 Gap detection and repair for BTCUSDT Perpetual OHLCV data across all timeframes
               </p>

@@ -374,7 +374,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
       <div className="relative w-full max-w-5xl mx-4 rounded-lg shadow-2xl flex flex-col max-h-[90vh]" style={{ border: '1px solid var(--border)', background: 'var(--bg-panel)' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 shrink-0" style={{ borderBottom: '1px solid var(--bg-card)' }}>
-          <h2 id="bcp-title" className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <h2 id="bcp-title" className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
             🧪 Backtest — {currentStrategy?.name ?? 'No strategy selected'}
           </h2>
           <div className="flex items-center gap-2">

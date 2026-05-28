@@ -110,7 +110,7 @@ export const TimingConstraintDialog: React.FC<TimingConstraintDialogProps> = ({
         <div className="flex items-center gap-3 border-b px-6 py-4" style={{ borderColor: 'var(--border)' }}>
           <span className="text-xl">⏱</span>
           <div>
-            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Timing Constraint</h2>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>Timing Constraint</h2>
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
               {blockName} › {signalName}
             </p>

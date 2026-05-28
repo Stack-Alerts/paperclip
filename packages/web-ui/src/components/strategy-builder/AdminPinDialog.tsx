@@ -60,7 +60,7 @@ export const AdminPinDialog: React.FC<AdminPinDialogProps> = ({
       <div className="rounded-lg shadow-2xl w-full max-w-sm mx-4 border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         <div className="flex items-center gap-3 border-b px-6 py-4" style={{ borderColor: 'var(--border)' }}>
           <span className="text-xl">🔐</span>
-          <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>
             {setupMode ? 'Set Admin PIN' : 'Admin Authentication'}
           </h2>
         </div>

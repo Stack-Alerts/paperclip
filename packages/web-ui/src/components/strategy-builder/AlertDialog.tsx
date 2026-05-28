@@ -28,10 +28,10 @@ export const AlertDialog: React.FC<AlertDialogProps> = ({
       <div className="rounded-lg shadow-2xl w-full max-w-2xl mx-4 border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         <div className="flex items-center gap-3 border-b px-6 py-4" style={{ borderColor: 'var(--border)' }}>
           <span className="text-2xl">{icon}</span>
-          <h2 className="text-base font-semibold flex-1" style={{ color: 'var(--text-primary)' }}>{title}</h2>
+          <h2 className="text-base font-semibold flex-1" style={{ color: 'var(--text-secondary)' }}>{title}</h2>
         </div>
         <div className="px-6 py-5 space-y-3">
-          <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{heading}</p>
+          <p className="text-lg font-semibold" style={{ color: 'var(--text-secondary)' }}>{heading}</p>
           <p
             className="text-sm leading-relaxed"
             style={{ color: 'var(--text-secondary)' }}
@@ -78,10 +78,10 @@ export const QuestionDialog: React.FC<QuestionDialogProps> = ({
       <div className="rounded-lg shadow-2xl w-full max-w-2xl mx-4 border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         <div className="flex items-center gap-3 border-b px-6 py-4" style={{ borderColor: 'var(--border)' }}>
           <span className="text-2xl">{icon}</span>
-          <h2 className="text-base font-semibold flex-1" style={{ color: 'var(--text-primary)' }}>{title}</h2>
+          <h2 className="text-base font-semibold flex-1" style={{ color: 'var(--text-secondary)' }}>{title}</h2>
         </div>
         <div className="px-6 py-5 space-y-3">
-          <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{heading}</p>
+          <p className="text-lg font-semibold" style={{ color: 'var(--text-secondary)' }}>{heading}</p>
           <p
             className="text-sm leading-relaxed"
             style={{ color: 'var(--text-secondary)' }}

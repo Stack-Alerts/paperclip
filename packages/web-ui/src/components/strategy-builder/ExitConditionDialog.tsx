@@ -165,7 +165,7 @@ export function ExitConditionDialog({
           className="flex items-center justify-between px-4 py-2 border-b rounded-t flex-shrink-0"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
         >
-          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Configure Exit Condition</span>
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Configure Exit Condition</span>
           <div className="flex items-center gap-1">
             <span className="w-5 h-5 rounded text-xs flex items-center justify-center" style={{ background: 'var(--border)', color: 'var(--text-secondary)' }}>─</span>
             <span className="w-5 h-5 rounded text-xs flex items-center justify-center" style={{ background: 'var(--border)', color: 'var(--text-secondary)' }}>□</span>
@@ -188,7 +188,7 @@ export function ExitConditionDialog({
             {/* Exit Binding Level — hidden in edit mode */}
             {!isEditMode && (
               <section className="border rounded p-3 space-y-2" style={{ borderColor: 'var(--border)' }}>
-                <div className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Exit Binding Level</div>
+                <div className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Exit Binding Level</div>
                 {BINDING_OPTIONS.map(opt => (
                   <div key={opt.value}>
                     <div
@@ -250,7 +250,7 @@ export function ExitConditionDialog({
 
             {/* Exit Percentage */}
             <section className="border rounded p-3" style={{ borderColor: 'var(--border)' }}>
-              <div className="text-xs font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Exit Percentage</div>
+              <div className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Exit Percentage</div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>Close % of Position:</span>
                 <input
@@ -272,7 +272,7 @@ export function ExitConditionDialog({
 
             {/* Exit Mode */}
             <section className="border rounded p-3 space-y-2" style={{ borderColor: 'var(--border)' }}>
-              <div className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Exit Mode</div>
+              <div className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Exit Mode</div>
               {MODE_OPTIONS.map(opt => (
                 <div key={opt.value}>
                   <div className="flex items-center gap-2 cursor-pointer" onClick={() => setExitMode(opt.value)}>
@@ -355,7 +355,7 @@ export function ExitConditionDialog({
 
             {/* RECHECK Validation */}
             <section className="border rounded p-3" style={{ borderColor: 'var(--border)' }}>
-              <div className="text-xs font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>RECHECK Validation</div>
+              <div className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>RECHECK Validation</div>
               <div
                 className="flex items-center gap-2 cursor-pointer"
                 onClick={() => setRecheckEnabled(v => !v)}
@@ -368,7 +368,7 @@ export function ExitConditionDialog({
                   }}
                 >
                   {recheckEnabled && (
-                    <span className="text-white leading-none" style={{ fontSize: 10, fontWeight: 700 }}>✓</span>
+                    <span className="leading-none" style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-primary)' }}>✓</span>
                   )}
                 </div>
                 <span className="text-sm" style={{ color: recheckEnabled ? 'var(--text-primary)' : 'var(--text-secondary)' }}>

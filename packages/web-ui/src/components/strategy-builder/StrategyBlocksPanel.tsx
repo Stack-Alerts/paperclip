@@ -223,7 +223,7 @@ function RecheckConfigModal({ open, signalName, enabled, barDelay, mode, onSave,
       <div className="rounded border shadow-2xl w-[620px]" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         {/* Title bar */}
         <div className="flex items-center justify-between px-4 py-2 border-b rounded-t" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Configure RECHECK Validation</span>
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Configure RECHECK Validation</span>
           <div className="flex items-center gap-1">
             <span className="w-5 h-5 rounded text-xs flex items-center justify-center" style={{ background: 'var(--border)', color: 'var(--text-secondary)' }}>─</span>
             <span className="w-5 h-5 rounded text-xs flex items-center justify-center" style={{ background: 'var(--border)', color: 'var(--text-secondary)' }}>□</span>
@@ -233,7 +233,7 @@ function RecheckConfigModal({ open, signalName, enabled, barDelay, mode, onSave,
 
         {/* Body */}
         <div className="px-4 pt-4 pb-3 space-y-3">
-          <div className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Signal: {formatSignalName(signalName)}</div>
+          <div className="text-base font-bold" style={{ color: 'var(--text-secondary)' }}>Signal: {formatSignalName(signalName)}</div>
 
           {/* Enable toggle */}
           <div
@@ -243,8 +243,8 @@ function RecheckConfigModal({ open, signalName, enabled, barDelay, mode, onSave,
           >
             <div className="w-10 h-5 rounded-full flex items-center px-0.5 transition-colors flex-shrink-0"
               style={{ background: isEnabled ? 'var(--accent-green)' : 'var(--text-faint)' }}>
-              <div className="w-4 h-4 rounded-full bg-white shadow transition-transform"
-                style={{ transform: isEnabled ? 'translateX(20px)' : 'translateX(0)' }} />
+              <div className="w-4 h-4 rounded-full shadow transition-transform"
+                style={{ background: 'var(--text-secondary)', transform: isEnabled ? 'translateX(20px)' : 'translateX(0)' }} />
             </div>
             <span className="text-sm font-semibold" style={{ color: isEnabled ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
               {isEnabled ? 'RECHECK Enabled' : 'RECHECK Disabled — click to enable'}
@@ -262,7 +262,7 @@ function RecheckConfigModal({ open, signalName, enabled, barDelay, mode, onSave,
                 className="w-full px-3 py-2 rounded border text-sm focus:outline-none"
                 style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--input-text)' }}
               />
-              <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>RECHECK Mode:</div>
+              <div className="text-sm font-bold" style={{ color: 'var(--text-secondary)' }}>RECHECK Mode:</div>
               <div className="rounded border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
                 {MODES.map((opt, i) => {
                   const selected = recheckMode === opt.value;
@@ -731,7 +731,7 @@ function ReorderConfirmModal({ fromName, toName, direction, onConfirm, onCancel 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="rounded border shadow-2xl w-[480px]" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}>
-          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Reorder Building Blocks</span>
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Reorder Building Blocks</span>
         </div>
         <div className="px-4 py-4 space-y-2.5">
           <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
