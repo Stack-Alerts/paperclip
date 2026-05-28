@@ -47,6 +47,8 @@ pylint>=2.15.0
 
 # Configuration Management
 python-dotenv>=0.21.0
+pydantic>=2.0
+pydantic-settings>=2.0
 
 # Security: OS keyring for secrets storage, bcrypt for PIN hashing
 keyring>=24.0.0

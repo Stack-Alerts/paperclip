@@ -14,9 +14,6 @@ from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine, and_, or_, text
 from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv
-import os
-
 import logging
 logger = logging.getLogger(__name__)
 
@@ -34,17 +31,16 @@ class SessionHistory:
         Args:
             db_url: Database URL (default: from environment)
         """
-        load_dotenv()
-        
-        # Get database URL from environment if not provided
+        # Get database URL from pydantic-settings (.env auto-loaded) — BTCAAAAA-30576
         if db_url is None:
-            host = os.getenv('POSTGRES_HOST', 'localhost')
-            port = os.getenv('POSTGRES_PORT', '5432')
-            database = os.getenv('POSTGRES_DB', 'optimizer_v3')
-            user = os.getenv('POSTGRES_USER', 'optimizer_admin')
-            password = os.getenv('POSTGRES_PASSWORD', 'secure_password_change_me')
-            
-            db_url = f"postgresql://{user}:{password}@{host}:{port}/{database}"
+            from src.optimizer_v3.database.settings import get_database_settings
+
+            s = get_database_settings()
+            password = s.POSTGRES_PASSWORD or 'secure_password_change_me'
+            db_url = (
+                f"postgresql://{s.POSTGRES_USER}:{password}"
+                f"@{s.POSTGRES_HOST}:{s.POSTGRES_PORT}/{s.POSTGRES_DB}"
+            )
         
         self.db_url = db_url
         self.engine = None

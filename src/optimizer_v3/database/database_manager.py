@@ -279,35 +279,26 @@ class DatabaseManagerFactory:
     @staticmethod
     def from_env() -> DatabaseManager:
         """
-        Create DatabaseManager from environment variables
-        
-        Expected environment variables:
-        - POSTGRES_HOST: Database host
-        - POSTGRES_PORT: Database port
-        - POSTGRES_DB: Database name
-        - POSTGRES_USER: Database user
-        - POSTGRES_PASSWORD: Database password
-        
+        Create DatabaseManager from environment variables (via pydantic-settings).
+
+        Reads POSTGRES_* from process env and `.env` (BTCAAAAA-30576). Requires
+        POSTGRES_PASSWORD to be set explicitly — every other field has a safe
+        default in `DatabaseSettings`.
+
         Returns:
             DatabaseManager: Configured database manager instance
-            
+
         Raises:
-            EnvironmentError: If required environment variables missing
+            EnvironmentError: If POSTGRES_PASSWORD is unset (no safe default).
         """
-        import os
-        
-        required = ['POSTGRES_HOST', 'POSTGRES_PORT', 'POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD']
-        missing = [var for var in required if not os.getenv(var)]
-        
-        if missing:
-            raise EnvironmentError(f"Missing required environment variables: {', '.join(missing)}")
-        
-        connection_string = (
-            f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}"
-            f"@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}"
-        )
-        
-        return DatabaseManager(connection_string)
+        from .settings import get_database_settings
+
+        s = get_database_settings()
+        if not s.POSTGRES_PASSWORD:
+            raise EnvironmentError(
+                "Missing required environment variable: POSTGRES_PASSWORD"
+            )
+        return DatabaseManager(s.database_url())
     
     @staticmethod
     def from_connection_string(connection_string: str, **kwargs) -> DatabaseManager:
@@ -352,13 +343,16 @@ class DatabaseManagerFactory:
             DatabaseManager: Test database manager instance backed by
                 PostgreSQL, not SQLite.
         """
-        import os
+        from .settings import get_database_settings
 
-        host = os.environ.get("POSTGRES_HOST", "localhost")
-        port = os.environ.get("POSTGRES_PORT", "5432")
-        db = os.environ.get("POSTGRES_DB", "optimizer_v3")
-        user = os.environ.get("POSTGRES_USER", "optimizer_admin")
-        password = os.environ.get("POSTGRES_PASSWORD", "secure_password_change_me")
+        s = get_database_settings()
+        host = s.POSTGRES_HOST
+        port = str(s.POSTGRES_PORT)
+        db = s.POSTGRES_DB
+        user = s.POSTGRES_USER
+        # for_testing() keeps a non-empty fallback so test runs don't blow up
+        # when .env is absent (the production from_env() path raises instead).
+        password = s.POSTGRES_PASSWORD or "secure_password_change_me"
 
         connection_string = f"postgresql://{user}:{password}@{host}:{port}/{db}"
 

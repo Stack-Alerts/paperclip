@@ -32,14 +32,21 @@ for arg in "$@"; do
   esac
 done
 
-# Export only the env vars start.sh, uvicorn, and the strategy-builder DB code
-# actually consume from .env. We deliberately do NOT `source .env`: it contains
-# values like `TP_FIBONACCI_LEVELS=[1.618, 2.618, 3.618]` whose unquoted
-# whitespace bash would parse as KEY=firstToken followed by spurious commands,
-# aborting the script under `set -e`. Pydantic-settings-backed config loads
-# .env directly; but `src/optimizer_v3/database/database_manager.py` reads
-# POSTGRES_* via raw os.getenv (BTCAAAAA-30562), so those must be exported
-# here too, otherwise /strategy-builder/strategies returns 503.
+# Export only the launcher/server-bind env vars start.sh and uvicorn need
+# from .env. We deliberately do NOT `source .env`: it contains values like
+# `TP_FIBONACCI_LEVELS=[1.618, 2.618, 3.618]` whose unquoted whitespace bash
+# would parse as KEY=firstToken followed by spurious commands, aborting the
+# script under `set -e`.
+#
+# DB config (POSTGRES_*) is loaded inside the Python process by
+# `src/optimizer_v3/database/settings.py::DatabaseSettings` (pydantic-settings),
+# which reads `.env` directly — see BTCAAAAA-30576. Adding a new POSTGRES_*
+# to `.env` no longer requires touching this allowlist.
+#
+# POSTGRES_* are still exported below as a best-effort safety net so legacy
+# shell-outs (psql/pg_dump invocations) inherit the same values. New DB env
+# vars should be added to `DatabaseSettings` (pydantic); the bash allowlist
+# is no longer authoritative.
 if [[ -f "$REPO_ROOT/.env" ]]; then
   while IFS= read -r line; do
     line="${line%$'\r'}"

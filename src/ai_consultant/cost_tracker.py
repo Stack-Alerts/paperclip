@@ -14,12 +14,10 @@ Usage:
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import QueuePool
@@ -75,14 +73,10 @@ def _estimate_cost(provider: str, model: str, input_tokens: int, output_tokens: 
 
 
 def _build_db_url() -> str:
-    """Construct DB URL from environment variables."""
-    load_dotenv()
-    host = os.getenv("POSTGRES_HOST", "localhost")
-    port = os.getenv("POSTGRES_PORT", "5432")
-    db = os.getenv("POSTGRES_DB", "optimizer_v3")
-    user = os.getenv("POSTGRES_USER", "optimizer_admin")
-    password = os.getenv("POSTGRES_PASSWORD", "")
-    return f"postgresql://{user}:{password}@{host}:{port}/{db}"
+    """Construct DB URL via pydantic-settings (.env auto-loaded — BTCAAAAA-30576)."""
+    from src.optimizer_v3.database.settings import get_database_settings
+
+    return get_database_settings().database_url()
 
 
 class CostTracker:

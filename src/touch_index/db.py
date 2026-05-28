@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
-import os
-
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 
 def get_engine(pool_size: int = 2) -> Engine:
-    host = os.getenv("POSTGRES_HOST", "localhost")
-    port = os.getenv("POSTGRES_PORT", "5432")
-    db = os.getenv("POSTGRES_DB", "optimizer_v3")
-    user = os.getenv("POSTGRES_USER", "optimizer_admin")
-    password = os.getenv("POSTGRES_PASSWORD", "")
-    url = f"postgresql://{user}:{password}@{host}:{port}/{db}"
-    return create_engine(url, pool_size=pool_size, max_overflow=0, pool_pre_ping=True)
+    # POSTGRES_* loaded via pydantic-settings (BTCAAAAA-30576) — .env is the
+    # single source of truth, no start.sh allowlist needed.
+    from src.optimizer_v3.database.settings import get_database_settings
+
+    s = get_database_settings()
+    return create_engine(
+        s.database_url(),
+        pool_size=pool_size,
+        max_overflow=0,
+        pool_pre_ping=True,
+    )
 
 
 def health_check(engine: Engine) -> bool:

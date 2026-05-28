@@ -9,7 +9,6 @@ Write failures are logged to stderr and never propagate to callers.
 
 import asyncio
 import json
-import os
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -48,15 +47,13 @@ VALUES
 
 
 def _get_db_url() -> Optional[str]:
-    """Build asyncpg DSN from environment, return None if not configured."""
-    host = os.getenv("POSTGRES_HOST", "localhost")
-    port = os.getenv("POSTGRES_PORT", "5432")
-    db = os.getenv("POSTGRES_DB", "optimizer_v3")
-    user = os.getenv("POSTGRES_USER", "optimizer_admin")
-    password = os.getenv("POSTGRES_PASSWORD", "")
-    if not password:
+    """Build asyncpg DSN from pydantic-settings (.env auto-loaded — BTCAAAAA-30576)."""
+    from src.optimizer_v3.database.settings import get_database_settings
+
+    s = get_database_settings()
+    if not s.POSTGRES_PASSWORD:
         return None
-    return f"postgresql://{user}:{password}@{host}:{port}/{db}"
+    return s.database_url()
 
 
 class AuditWriter:

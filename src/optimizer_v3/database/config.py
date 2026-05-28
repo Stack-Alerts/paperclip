@@ -2,18 +2,21 @@
 Database Configuration Management
 Task 0.2: PostgreSQL Configuration Loading
 
-Loads database configuration from environment variables (.env file)
+Loads database configuration from environment variables (.env file) via the
+pydantic-settings `DatabaseSettings` class (BTCAAAAA-30576). `.env` is the
+single source of truth; pydantic loads it directly, so adding a new POSTGRES_*
+to `.env` does NOT require a `start.sh` allowlist amendment.
 """
 
-import os
 from typing import Dict, Any
-from dotenv import load_dotenv
+
+from .settings import get_database_settings
 
 
 def get_db_config() -> Dict[str, Any]:
     """
     Load database configuration from environment
-    
+
     Returns:
         Dictionary containing database connection parameters:
         - host: PostgreSQL host address
@@ -29,28 +32,27 @@ def get_db_config() -> Dict[str, Any]:
         - pool_timeout: Connection timeout in seconds
         - pool_recycle: Connection recycle time in seconds
     """
-    load_dotenv()
-    
+    s = get_database_settings()
     return {
-        'host': os.getenv('POSTGRES_HOST', 'localhost'),
-        'port': int(os.getenv('POSTGRES_PORT', '5432')),
-        'database': os.getenv('POSTGRES_DB', 'optimizer_v3'),
-        'user': os.getenv('POSTGRES_USER', 'optimizer_admin'),
-        'password': os.getenv('POSTGRES_PASSWORD', ''),
-        'ssl': os.getenv('POSTGRES_SSL', 'false').lower() == 'true',
-        'ssl_cert_path': os.getenv('POSTGRES_SSL_CERT_PATH'),
-        'ssl_key_path': os.getenv('POSTGRES_SSL_KEY_PATH'),
-        'pool_size': int(os.getenv('POSTGRES_POOL_SIZE', '10')),
-        'max_overflow': int(os.getenv('POSTGRES_MAX_OVERFLOW', '20')),
-        'pool_timeout': int(os.getenv('POSTGRES_POOL_TIMEOUT', '30')),
-        'pool_recycle': int(os.getenv('POSTGRES_POOL_RECYCLE', '3600'))
+        'host': s.POSTGRES_HOST,
+        'port': s.POSTGRES_PORT,
+        'database': s.POSTGRES_DB,
+        'user': s.POSTGRES_USER,
+        'password': s.POSTGRES_PASSWORD,
+        'ssl': s.POSTGRES_SSL,
+        'ssl_cert_path': s.POSTGRES_SSL_CERT_PATH,
+        'ssl_key_path': s.POSTGRES_SSL_KEY_PATH,
+        'pool_size': s.POSTGRES_POOL_SIZE,
+        'max_overflow': s.POSTGRES_MAX_OVERFLOW,
+        'pool_timeout': s.POSTGRES_POOL_TIMEOUT,
+        'pool_recycle': s.POSTGRES_POOL_RECYCLE,
     }
 
 
 def get_performance_config() -> Dict[str, Any]:
     """
     Load performance configuration from environment
-    
+
     Returns:
         Dictionary containing PostgreSQL performance settings:
         - shared_buffers: Shared memory buffer size
@@ -62,95 +64,85 @@ def get_performance_config() -> Dict[str, Any]:
         - random_page_cost: Random page access cost
         - effective_io_concurrency: Expected concurrent I/O operations
     """
-    load_dotenv()
-    
+    s = get_database_settings()
     return {
-        'shared_buffers': os.getenv('POSTGRES_SHARED_BUFFERS', '1GB'),
-        'work_mem': os.getenv('POSTGRES_WORK_MEM', '32MB'),
-        'maintenance_work_mem': os.getenv('POSTGRES_MAINTENANCE_WORK_MEM', '256MB'),
-        'effective_cache_size': os.getenv('POSTGRES_EFFECTIVE_CACHE_SIZE', '3GB'),
-        'wal_buffers': os.getenv('POSTGRES_WAL_BUFFERS', '16MB'),
-        'checkpoint_timeout': os.getenv('POSTGRES_CHECKPOINT_TIMEOUT', '10min'),
-        'random_page_cost': float(os.getenv('POSTGRES_RANDOM_PAGE_COST', '1.1')),
-        'effective_io_concurrency': int(os.getenv('POSTGRES_EFFECTIVE_IO_CONCURRENCY', '200'))
+        'shared_buffers': s.POSTGRES_SHARED_BUFFERS,
+        'work_mem': s.POSTGRES_WORK_MEM,
+        'maintenance_work_mem': s.POSTGRES_MAINTENANCE_WORK_MEM,
+        'effective_cache_size': s.POSTGRES_EFFECTIVE_CACHE_SIZE,
+        'wal_buffers': s.POSTGRES_WAL_BUFFERS,
+        'checkpoint_timeout': s.POSTGRES_CHECKPOINT_TIMEOUT,
+        'random_page_cost': s.POSTGRES_RANDOM_PAGE_COST,
+        'effective_io_concurrency': s.POSTGRES_EFFECTIVE_IO_CONCURRENCY,
     }
 
 
 def get_monitoring_config() -> Dict[str, Any]:
     """
     Load monitoring configuration from environment
-    
+
     Returns:
         Dictionary containing monitoring settings:
         - log_min_duration: Minimum query duration to log (ms)
         - log_connections: Log new connections
         - log_disconnections: Log disconnections
     """
-    load_dotenv()
-    
+    s = get_database_settings()
     return {
-        'log_min_duration': int(os.getenv('POSTGRES_LOG_MIN_DURATION', '1000')),
-        'log_connections': os.getenv('POSTGRES_LOG_CONNECTIONS', 'false').lower() == 'true',
-        'log_disconnections': os.getenv('POSTGRES_LOG_DISCONNECTIONS', 'false').lower() == 'true'
+        'log_min_duration': s.POSTGRES_LOG_MIN_DURATION,
+        'log_connections': s.POSTGRES_LOG_CONNECTIONS,
+        'log_disconnections': s.POSTGRES_LOG_DISCONNECTIONS,
     }
 
 
 def get_backup_config() -> Dict[str, Any]:
     """
     Load backup configuration from environment
-    
+
     Returns:
         Dictionary containing backup settings:
         - backup_path: Path to store backups
         - retention_days: Number of days to keep backups
         - compression: Enable backup compression
     """
-    load_dotenv()
-    
+    s = get_database_settings()
     return {
-        'backup_path': os.getenv('POSTGRES_BACKUP_PATH', '/tmp/optimizer_v3_backups'),
-        'retention_days': int(os.getenv('POSTGRES_BACKUP_RETENTION_DAYS', '30')),
-        'compression': os.getenv('POSTGRES_BACKUP_COMPRESSION', 'true').lower() == 'true'
+        'backup_path': s.POSTGRES_BACKUP_PATH,
+        'retention_days': s.POSTGRES_BACKUP_RETENTION_DAYS,
+        'compression': s.POSTGRES_BACKUP_COMPRESSION,
     }
 
 
 def get_db_url() -> str:
     """
     Generate PostgreSQL database URL from configuration
-    
+
     Returns:
         PostgreSQL connection URL string
         Format: postgresql://user:password@host:port/database
     """
-    config = get_db_config()
-    return (
-        f"postgresql://{config['user']}:"
-        f"{config['password']}@"
-        f"{config['host']}:"
-        f"{config['port']}/"
-        f"{config['database']}"
-    )
+    return get_database_settings().database_url()
 
 
 def validate_config() -> bool:
     """
     Validate that all required configuration is present
-    
+
     Returns:
         True if configuration is valid, raises ValueError otherwise
-    
+
     Raises:
         ValueError: If required configuration is missing
     """
     config = get_db_config()
-    
+
     required_fields = ['host', 'port', 'database', 'user', 'password']
     missing_fields = [field for field in required_fields if not config.get(field)]
-    
+
     if missing_fields:
         raise ValueError(
             f"Missing required database configuration: {', '.join(missing_fields)}\n"
             f"Please check your .env file and ensure all POSTGRES_* variables are set."
         )
-    
+
     return True

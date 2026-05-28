@@ -13,12 +13,10 @@ Connection pool:  separate pool connecting as the `ai_readonly` DB role,
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Sequence
 
-from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import QueuePool
@@ -135,13 +133,10 @@ class ConfigDiff:
 
 
 def _build_readonly_url() -> str:
-    """Construct the DB URL for the ai_readonly role from env vars."""
-    load_dotenv()
-    host = os.getenv("POSTGRES_HOST", "localhost")
-    port = os.getenv("POSTGRES_PORT", "5432")
-    db = os.getenv("POSTGRES_DB", "optimizer_v3")
-    password = os.getenv("AI_READONLY_PASSWORD", "")
-    return f"postgresql://ai_readonly:{password}@{host}:{port}/{db}"
+    """Construct the DB URL for the ai_readonly role via pydantic-settings (BTCAAAAA-30576)."""
+    from src.optimizer_v3.database.settings import get_database_settings
+
+    return get_database_settings().readonly_url()
 
 
 class _ReadonlyPool:
@@ -150,12 +145,15 @@ class _ReadonlyPool:
     _instance: Optional[_ReadonlyPool] = None
 
     def __init__(self) -> None:
+        from src.optimizer_v3.database.settings import get_database_settings
+
+        s = get_database_settings()
         url = _build_readonly_url()
         self._engine = create_engine(
             url,
             poolclass=QueuePool,
-            pool_size=int(os.getenv("AI_READONLY_POOL_SIZE", "5")),
-            max_overflow=int(os.getenv("AI_READONLY_MAX_OVERFLOW", "10")),
+            pool_size=s.AI_READONLY_POOL_SIZE,
+            max_overflow=s.AI_READONLY_MAX_OVERFLOW,
             pool_timeout=30,
             pool_recycle=1800,
             pool_pre_ping=True,
