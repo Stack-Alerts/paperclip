@@ -507,19 +507,20 @@ function BlockCard({
         </div>
       </div>
 
-      {/* Action row: # + Config (always shown) + Remove */}
+      {/* Action row: # + Config (block #2+ only) + Remove */}
       <div className="flex items-center gap-2 px-3 pt-2 pb-1">
         <span className="text-sm font-bold" style={{ color: 'var(--accent-blue-mid)' }}>#{mainIndex + 1}</span>
         <div className="flex-1" />
         <div className="flex items-center gap-1.5">
-          <RichTooltip content={TT_TIMING_CONFIG}>
-            <button
-              onClick={() => onConfig(index)}
-              disabled={mainIndex === 0}
-              className="hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition-opacity"
-              style={{ ...BTN, background: 'var(--accent-blue-mid)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-blue-dark)', gap: 5 }}
-            ><GearIcon size={11} /> Config</button>
-          </RichTooltip>
+          {mainIndex > 0 && (
+            <RichTooltip content={TT_TIMING_CONFIG}>
+              <button
+                onClick={() => onConfig(index)}
+                className="hover:opacity-80 transition-opacity"
+                style={{ ...BTN, background: 'var(--accent-blue-mid)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-blue-dark)', gap: 5 }}
+              ><GearIcon size={11} /> Config</button>
+            </RichTooltip>
+          )}
           <RichTooltip content={TT_REMOVE_BLOCK}>
             <button
               onClick={() => onRemove(index)}
