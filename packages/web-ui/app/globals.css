@@ -73,10 +73,10 @@
   --btn-secondary-bg:    var(--core-surface-panel);
   --btn-secondary-text:  var(--core-text-secondary);
   --btn-secondary-border: var(--core-border-subtle);
-  --btn-cancel-bg:       #465A70;
-  --btn-cancel-bg-hover: #5A6F88;
-  --btn-confirm-bg:      #3E6BA0;
-  --btn-confirm-bg-hover: #5279B8;
+  --btn-cancel-bg:       #314255;
+  --btn-cancel-bg-hover: #3D5168;
+  --btn-confirm-bg:      #32557c;
+  --btn-confirm-bg-hover: #3F6A9C;
 
   /* ── Semantic inputs ─────────────────────────────────── */
   --input-bg:            var(--core-bg-elevated);
