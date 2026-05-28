@@ -157,7 +157,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // Sync clean snapshot whenever the strategy changes (from hydration or load).
   useEffect(() => {
     if (mounted) setCleanSnapshot(strategySnapshot);
-  }, [currentStrategy?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentStrategy?.id, mounted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Dialog state
   const [activeDialog, setActiveDialog] = useState<DialogKey>(null);
@@ -322,6 +322,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   }, [strategySnapshot]);
 
   const handleSave = useCallback(async () => {
+    if (!isModified) return;
     if (isSavingRef.current) return;
     if (!currentStrategy) return;
     const id = currentStrategy.id as unknown as string;
@@ -713,6 +714,23 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         .hop-animation {
           animation: sidebarHop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
+        @keyframes amberPulse {
+          0%, 100% {
+            box-shadow: 0 0 8px rgba(251, 146, 60, 0.6), inset 0 0 8px rgba(251, 146, 60, 0.3);
+          }
+          50% {
+            box-shadow: 0 0 16px rgba(251, 146, 60, 1), inset 0 0 12px rgba(251, 146, 60, 0.5);
+          }
+        }
+        .button-amber-pulse {
+          animation: amberPulse 1.8s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .button-amber-pulse {
+            animation: none;
+            box-shadow: 0 0 8px rgba(251, 146, 60, 0.6), inset 0 0 8px rgba(251, 146, 60, 0.3);
+          }
+        }
       `}</style>
       <div className="flex items-center gap-2 border-b px-2 py-1 flex-shrink-0" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         {collapsed && (
@@ -726,7 +744,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             { label: 'New Strategy',     onClick: handleNewStrategy,              shortcut: 'Ctrl+N' },
             { label: 'Open Strategy…',   onClick: () => open('strategyBrowser'),  shortcut: 'Ctrl+O' },
             { label: '—', onClick: () => {} },
-            { label: 'Save',             onClick: handleSave,                     shortcut: 'Ctrl+S' },
+            { label: 'Save',             onClick: handleSave,                     shortcut: 'Ctrl+S', disabled: !isModified },
             { label: '—', onClick: () => {} },
             { label: 'Exit',             onClick: handleExit },
           ]}
@@ -784,6 +802,8 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             trailing={<ChevronDown size={11} strokeWidth={1.5} />}
             tooltip={TT_SAVE}
             onClick={handleSave}
+            disabled={!isModified}
+            pulse={isModified}
           />
           <div className="w-px h-5 mx-1 flex-shrink-0" style={{ background: 'var(--border)' }} />
           <ToolbarButton
@@ -1031,11 +1051,12 @@ interface ToolbarButtonProps {
   disabled?: boolean;
   active?: boolean;
   accent?: boolean;
+  pulse?: boolean;
   icon?: React.ReactNode;
   trailing?: React.ReactNode;
 }
 
-const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, tooltip, onClick, disabled, active, accent, icon, trailing }) => (
+const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, tooltip, onClick, disabled, active, accent, pulse, icon, trailing }) => (
   <RichTooltip content={tooltip}>
     <button
       onClick={onClick}
@@ -1043,6 +1064,8 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, tooltip, onClick, 
       className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors border ${
         disabled
           ? 'text-[var(--text-muted)] bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.05)] cursor-not-allowed'
+          : pulse
+          ? 'text-[var(--text-primary)] bg-[rgba(255,255,255,0.06)] border-[var(--accent-orange)] button-amber-pulse hover:bg-[rgba(255,255,255,0.10)]'
           : accent
           ? 'font-medium border-[var(--accent-blue-dark)] bg-[var(--accent-blue)] text-[var(--btn-primary-text)] hover:bg-[var(--accent-blue-mid)]'
           : active
@@ -1064,6 +1087,7 @@ interface MenuItem {
   label: string;
   shortcut?: string;
   onClick: () => void;
+  disabled?: boolean;
 }
 
 const MenuDropdown: React.FC<{ label: string; items: MenuItem[] }> = ({ label, items }) => {
@@ -1087,11 +1111,16 @@ const MenuDropdown: React.FC<{ label: string; items: MenuItem[] }> = ({ label, i
               <button
                 key={i}
                 onClick={() => { setOpen(false); item.onClick(); }}
-                className="flex items-center justify-between w-full px-4 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition-colors text-left gap-8 whitespace-nowrap"
+                disabled={item.disabled}
+                className={`flex items-center justify-between w-full px-4 py-1.5 text-sm transition-colors text-left gap-8 whitespace-nowrap ${
+                  item.disabled
+                    ? 'text-[var(--text-muted)] cursor-not-allowed'
+                    : 'text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
+                }`}
               >
                 <span>{item.label}</span>
                 {item.shortcut && (
-                  <span className="text-xs text-[var(--text-muted)]">{item.shortcut}</span>
+                  <span className={`text-xs ${item.disabled ? 'text-[var(--text-muted)]' : 'text-[var(--text-muted)]'}`}>{item.shortcut}</span>
                 )}
               </button>
             )

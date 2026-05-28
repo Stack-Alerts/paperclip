@@ -280,3 +280,25 @@ body {
 *::-webkit-scrollbar-thumb:hover {
   background-color: var(--text-secondary);
 }
+
+/* ─── Amber pulse animation for dirty state ──────────────────────────────── */
+@keyframes amber-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(230, 183, 87, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(230, 183, 87, 0.1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .button-amber-pulse {
+    animation: amber-pulse 1.8s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button-amber-pulse {
+    box-shadow: 0 0 0 2px var(--accent-orange);
+  }
+}
