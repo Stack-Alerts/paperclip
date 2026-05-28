@@ -861,7 +861,32 @@ export function StrategyBlocksPanel() {
 
   const handleDuplicateExit = useCallback(
     (exitGlobalIndex: number) => {
-      duplicateBlock(exitGlobalIndex, exitGlobalIndex + 1);
+      const latestBlocks = useStrategyStore.getState().currentStrategy?.blocks ?? [];
+      const sourceBlock = latestBlocks[exitGlobalIndex];
+      if (!sourceBlock) return;
+
+      const cfg = sourceBlock.data.exitConfig as StoredExitConfig | undefined;
+
+      // For signal-level exits, group duplicates with other exits bound to the same signal
+      if (cfg?.bindingLevel === 'SIGNAL' && cfg?.blockName && cfg?.parentSignalName) {
+        let insertPosition = exitGlobalIndex + 1;
+        let lastSameSignalIndex = -1;
+
+        for (let i = 0; i < latestBlocks.length; i++) {
+          const c = latestBlocks[i].data.exitConfig as StoredExitConfig | undefined;
+          if (c?.bindingLevel === 'SIGNAL' && c?.blockName === cfg.blockName && c?.parentSignalName === cfg.parentSignalName) {
+            lastSameSignalIndex = i;
+          }
+        }
+
+        if (lastSameSignalIndex >= 0) {
+          insertPosition = lastSameSignalIndex + 1;
+        }
+
+        duplicateBlock(exitGlobalIndex, insertPosition);
+      } else {
+        duplicateBlock(exitGlobalIndex, exitGlobalIndex + 1);
+      }
     },
     [duplicateBlock]
   );
