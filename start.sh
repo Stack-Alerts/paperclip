@@ -37,6 +37,17 @@ BACKEND_HOST="${BTE_API_HOST:-0.0.0.0}"
 BACKEND_PORT="${BTE_API_PORT:-8765}"
 WEBUI_PORT="${BTE_WEBUI_PORT:-3000}"
 
+# --- resolve client-facing backend URL for frontend ---------------------------
+# Backend bind host (0.0.0.0) isn't a valid client URL; default the client-facing
+# host to localhost. Next.js inlines NEXT_PUBLIC_* env vars at the dev-server's
+# process start, so these must be exported before the webui launch.
+BACKEND_PUBLIC_HOST="${BTE_API_PUBLIC_HOST:-${BACKEND_HOST}}"
+if [[ "$BACKEND_PUBLIC_HOST" == "0.0.0.0" || -z "$BACKEND_PUBLIC_HOST" ]]; then
+  BACKEND_PUBLIC_HOST="localhost"
+fi
+export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-http://${BACKEND_PUBLIC_HOST}:${BACKEND_PORT}}"
+export NEXT_PUBLIC_BRIDGE_WS_URL="${NEXT_PUBLIC_BRIDGE_WS_URL:-ws://${BACKEND_PUBLIC_HOST}:${BACKEND_PORT}}"
+
 # --- pre-flight: check ports and probe health if in use ----------------------
 
 get_port_pid() {
@@ -159,6 +170,8 @@ trap cleanup INT TERM EXIT
 echo "Starting BTC Trade Engine..."
 echo "  Backend: http://localhost:${BACKEND_PORT}"
 echo "  WebUI:   http://localhost:${WEBUI_PORT}"
+echo "  api url: $NEXT_PUBLIC_API_URL"
+echo "  ws url:  $NEXT_PUBLIC_BRIDGE_WS_URL"
 echo "  (Ctrl+C to stop)"
 echo
 
