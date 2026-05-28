@@ -27,17 +27,20 @@ for arg in "$@"; do
   esac
 done
 
-# Export only the env vars start.sh and uvicorn actually consume from .env.
-# We deliberately do NOT `source .env`: it contains values like
-# `TP_FIBONACCI_LEVELS=[1.618, 2.618, 3.618]` whose unquoted whitespace bash
-# would parse as KEY=firstToken followed by spurious commands, aborting the
-# script under `set -e`. .env is consumed by Pydantic Settings / python-dotenv
-# inside the app, which handles those literal values correctly.
+# Export only the env vars start.sh, uvicorn, and the strategy-builder DB code
+# actually consume from .env. We deliberately do NOT `source .env`: it contains
+# values like `TP_FIBONACCI_LEVELS=[1.618, 2.618, 3.618]` whose unquoted
+# whitespace bash would parse as KEY=firstToken followed by spurious commands,
+# aborting the script under `set -e`. Pydantic-settings-backed config loads
+# .env directly; but `src/optimizer_v3/database/database_manager.py` reads
+# POSTGRES_* via raw os.getenv (BTCAAAAA-30562), so those must be exported
+# here too, otherwise /strategy-builder/strategies returns 503.
 if [[ -f "$REPO_ROOT/.env" ]]; then
   while IFS= read -r line; do
     line="${line%$'\r'}"
     case "$line" in
-      BTE_API_DEV_MODE=*|BTE_API_HOST=*|BTE_API_PORT=*|BTE_API_LOG=*|BTE_WEBUI_PORT=*)
+      BTE_API_DEV_MODE=*|BTE_API_HOST=*|BTE_API_PORT=*|BTE_API_LOG=*|BTE_WEBUI_PORT=*|\
+      POSTGRES_HOST=*|POSTGRES_PORT=*|POSTGRES_DB=*|POSTGRES_USER=*|POSTGRES_PASSWORD=*|POSTGRES_SCHEMA=*)
         export "${line?}"
         ;;
     esac
