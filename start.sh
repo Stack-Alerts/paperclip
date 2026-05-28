@@ -2,7 +2,7 @@
 # start.sh — launch the BTC Trade Engine FastAPI backend and Next.js WebUI together.
 #
 # Usage:
-#   ./start.sh [--refuse-unhealthy]
+#   ./start.sh [--refuse-unhealthy] [--branch <name>] [--skip-branch-gate]
 #
 # Environment overrides:
 #   BTE_API_HOST          backend bind host (default: 0.0.0.0)
@@ -14,6 +14,14 @@
 #                         REST endpoints already short-circuit auth under this flag.
 #                         Non-loopback origins are NEVER auto-trusted.
 #                         NEVER set this in production.
+#   BTE_SKIP_BRANCH_GATE  if 1, bypass the main-branch enforcement (debug only).
+#
+# Branch-gate (BTCAAAAA-30590):
+#   By default start.sh refuses to launch unless HEAD is origin/main and ff-clean,
+#   or `--branch <name>` is explicitly passed. This eliminates the recurring
+#   "dev server boots on a stale fix branch and 503s" cycle. If the working tree
+#   has modifications under src/, start.sh, or packages/web-ui/src/, the gate
+#   refuses; the operator must commit/stash/discard or pass an override.
 #
 # Ctrl+C (SIGINT) or SIGTERM cleanly stops both processes.
 
@@ -22,15 +30,136 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
-# Parse flags
+# Parse flags (supports --branch <name>, --branch=name, --skip-branch-gate,
+# --refuse-unhealthy)
 REFUSE_UNHEALTHY="${BTE_REFUSE_UNHEALTHY:-0}"
+BRANCH_OVERRIDE=""
+SKIP_BRANCH_GATE="${BTE_SKIP_BRANCH_GATE:-0}"
+prev_arg=""
 for arg in "$@"; do
+  if [[ "$prev_arg" == "--branch" ]]; then
+    BRANCH_OVERRIDE="$arg"
+    prev_arg=""
+    continue
+  fi
   case "$arg" in
     --refuse-unhealthy)
       REFUSE_UNHEALTHY=1
       ;;
+    --branch)
+      prev_arg="--branch"
+      ;;
+    --branch=*)
+      BRANCH_OVERRIDE="${arg#--branch=}"
+      ;;
+    --skip-branch-gate)
+      SKIP_BRANCH_GATE=1
+      ;;
   esac
 done
+
+# --- branch-gate: refuse to run on stale code (BTCAAAAA-30590) ---------------
+#
+# The recurring "Dev Server Offline / API error" cycle traces back to dev
+# servers being launched from whichever feature branch the shared worktree
+# happened to be on. Code merged to origin/main never reached the running
+# process. The gate below makes it structurally impossible to launch on a
+# branch other than origin/main without an explicit override.
+#
+# Behaviour:
+#   --branch <name>        — switch to <name> first (no ff-clean check).
+#   --skip-branch-gate     — print warning and continue on whatever is checked out.
+#   (default)              — fetch origin/main, refuse if load-bearing files are
+#                            dirty, else switch the worktree to origin/main
+#                            (using `--detach` when another worktree owns the
+#                            local main branch) and ff-pull.
+
+if [[ "$SKIP_BRANCH_GATE" == "1" ]]; then
+  echo "[branch-gate] skipped via --skip-branch-gate / BTE_SKIP_BRANCH_GATE=1" >&2
+elif command -v git >/dev/null 2>&1 && git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  if [[ -n "$BRANCH_OVERRIDE" ]]; then
+    echo "[branch-gate] --branch override: switching to $BRANCH_OVERRIDE"
+    git -C "$REPO_ROOT" fetch --quiet origin "$BRANCH_OVERRIDE" 2>/dev/null || true
+    if ! git -C "$REPO_ROOT" switch "$BRANCH_OVERRIDE" 2>/dev/null; then
+      # Branch may exist only on origin, or be in use by another worktree.
+      if ! git -C "$REPO_ROOT" switch --detach "origin/$BRANCH_OVERRIDE" 2>/dev/null; then
+        echo "ERROR: cannot switch to '$BRANCH_OVERRIDE' (no such branch?)" >&2
+        exit 1
+      fi
+    fi
+  else
+    # Default path: enforce main.
+    echo "[branch-gate] enforcing branch = origin/main"
+    git -C "$REPO_ROOT" fetch --quiet origin main || {
+      echo "WARNING: 'git fetch origin main' failed; continuing with cached refs" >&2
+    }
+
+    # Refuse if load-bearing files are modified. We tolerate dirt outside these
+    # paths (e.g. impact-gate JSON snapshots, ad-hoc test scripts) because the
+    # board has explicitly OK'd "warn-and-continue on tracked dirt that isn't
+    # load-bearing" — see acceptance criteria on BTCAAAAA-30590.
+    LOAD_BEARING_DIRT=""
+    if ! git -C "$REPO_ROOT" diff --quiet -- src/ start.sh packages/web-ui/src/ 2>/dev/null; then
+      LOAD_BEARING_DIRT="unstaged"
+    fi
+    if ! git -C "$REPO_ROOT" diff --quiet --cached -- src/ start.sh packages/web-ui/src/ 2>/dev/null; then
+      LOAD_BEARING_DIRT="${LOAD_BEARING_DIRT:+$LOAD_BEARING_DIRT,}staged"
+    fi
+    if [[ -n "$LOAD_BEARING_DIRT" ]]; then
+      echo "ERROR: working tree has $LOAD_BEARING_DIRT modifications under" >&2
+      echo "       src/, start.sh, or packages/web-ui/src/." >&2
+      echo "       commit / stash / discard them, then re-run, or pass" >&2
+      echo "       --branch <name> / --skip-branch-gate to override." >&2
+      git -C "$REPO_ROOT" status --short -- src/ start.sh packages/web-ui/src/ >&2 || true
+      exit 1
+    fi
+
+    current_sha="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo)"
+    main_sha="$(git -C "$REPO_ROOT" rev-parse origin/main 2>/dev/null || echo)"
+    current_branch="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)"
+
+    if [[ -z "$main_sha" ]]; then
+      echo "ERROR: cannot resolve origin/main; aborting." >&2
+      echo "       run 'git fetch origin main' manually and retry." >&2
+      exit 1
+    fi
+
+    if [[ "$current_sha" != "$main_sha" ]]; then
+      echo "[branch-gate] current = $current_branch ($current_sha); switching to origin/main ($main_sha)"
+      # Prefer switching to the local 'main' branch and fast-forwarding it.
+      # Fall back to detached HEAD on origin/main if another worktree owns 'main'.
+      if git -C "$REPO_ROOT" switch main 2>/dev/null; then
+        if ! git -C "$REPO_ROOT" merge --ff-only "$main_sha" 2>/dev/null; then
+          echo "ERROR: local 'main' is not ff-clean with origin/main; aborting." >&2
+          echo "       resolve the divergence (rebase / hard-reset) and re-run." >&2
+          exit 1
+        fi
+      else
+        echo "[branch-gate] another worktree holds 'main'; using detached HEAD"
+        if ! git -C "$REPO_ROOT" switch --detach "$main_sha" 2>/dev/null; then
+          echo "ERROR: cannot detach to origin/main ($main_sha)" >&2
+          exit 1
+        fi
+      fi
+    else
+      echo "[branch-gate] already on origin/main ($main_sha)"
+    fi
+  fi
+else
+  echo "[branch-gate] not a git working tree; skipping" >&2
+fi
+
+# Compute the running SHA + branch so the banner, /health, and screenshots can
+# cross-reference what's actually running.
+if command -v git >/dev/null 2>&1 && git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  RUNNING_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
+  RUNNING_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)"
+else
+  RUNNING_SHA="unknown"
+  RUNNING_BRANCH="unknown"
+fi
+export BTE_RUNNING_SHA="$RUNNING_SHA"
+export BTE_RUNNING_BRANCH="$RUNNING_BRANCH"
 
 # Export only the launcher/server-bind env vars start.sh and uvicorn need
 # from .env. We deliberately do NOT `source .env`: it contains values like
@@ -278,6 +407,7 @@ echo "  Backend: http://localhost:${BACKEND_PORT}"
 echo "  WebUI:   http://localhost:${WEBUI_PORT}"
 echo "  api url: $NEXT_PUBLIC_API_URL"
 echo "  ws url:  $NEXT_PUBLIC_BRIDGE_WS_URL"
+echo "  commit:  $RUNNING_SHA ($RUNNING_BRANCH)"
 echo "  (Ctrl+C to stop)"
 echo
 

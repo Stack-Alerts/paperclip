@@ -43,9 +43,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import subprocess
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 
 import redis.asyncio as aioredis
@@ -81,6 +84,58 @@ logger = logging.getLogger(__name__)
 
 _redis: Optional[aioredis.Redis] = None
 _start_time: float = time.monotonic()
+
+
+def _resolve_running_revision() -> tuple[Optional[str], Optional[str]]:
+    """Resolve the (commit_sha, branch) of the currently running code.
+
+    Preference order (BTCAAAAA-30590):
+      1. BTE_RUNNING_SHA / BTE_RUNNING_BRANCH env vars (set by start.sh).
+      2. Live `git rev-parse` from the repo root (works when uvicorn is
+         launched directly, outside start.sh, e.g. by a developer running
+         `python -m uvicorn src.api.app:app` from the repo root).
+      3. None if neither is available (deployed container without git).
+    """
+    sha = os.environ.get("BTE_RUNNING_SHA") or None
+    branch = os.environ.get("BTE_RUNNING_BRANCH") or None
+
+    if sha and branch:
+        return sha, branch
+
+    # Walk up from this file to the repo root (src/api/app.py -> parents[2]).
+    repo_root = Path(__file__).resolve().parents[2]
+    if not (repo_root / ".git").exists():
+        return sha, branch
+
+    def _git(args: list[str]) -> Optional[str]:
+        try:
+            out = subprocess.run(
+                ["git", *args],
+                cwd=str(repo_root),
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if out.returncode == 0:
+                return out.stdout.strip() or None
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return None
+        return None
+
+    if not sha:
+        sha = _git(["rev-parse", "HEAD"])
+    if not branch:
+        branch = _git(["rev-parse", "--abbrev-ref", "HEAD"])
+    return sha, branch
+
+
+_running_sha, _running_branch = _resolve_running_revision()
+if _running_sha:
+    logger.info(
+        "BTC Trade Engine running commit %s on branch %s",
+        _running_sha,
+        _running_branch or "unknown",
+    )
 
 # P2: StrategyRegistry injected via configure() before server.start()
 # Typed as Any to avoid importing ITM modules at module load time when
@@ -328,12 +383,19 @@ def _build_strategy_model(s: dict) -> StrategyModel:
 
 @app.get("/health", response_model=HealthResponse, tags=["System"])
 async def health(_: dict = Depends(require_jwt)) -> HealthResponse:
-    """Liveness probe. Returns 200 when the API is running."""
+    """Liveness probe. Returns 200 when the API is running.
+
+    BTCAAAAA-30590: includes `commit_sha` and `branch` of the running code so
+    the board can cross-reference the running build against
+    `git rev-parse origin/main` without trusting the dev banner.
+    """
     redis_ok = await _redis_ping()
     return HealthResponse(
         status="ok" if redis_ok else "degraded",
         redis=redis_ok,
         uptime_seconds=time.monotonic() - _start_time,
+        commit_sha=_running_sha,
+        branch=_running_branch,
     )
 
 

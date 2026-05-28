@@ -21,6 +21,14 @@ class HealthResponse(BaseModel):
     redis: bool
     uptime_seconds: float
     version: str = "1.0.0"
+    # BTCAAAAA-30590: expose the running git commit + branch so screenshots /
+    # curl probes can cross-reference what's actually running against
+    # `git rev-parse origin/main`. Resolved by start.sh into BTE_RUNNING_SHA /
+    # BTE_RUNNING_BRANCH; falls back to a live `git rev-parse` from the
+    # process CWD when those env vars are absent (e.g. uvicorn launched
+    # outside start.sh).
+    commit_sha: Optional[str] = None
+    branch: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
