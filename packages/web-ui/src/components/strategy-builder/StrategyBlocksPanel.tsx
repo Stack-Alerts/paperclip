@@ -567,11 +567,17 @@ function BlockCard({
                     <div style={BTN_GROUP}>
                       {si > 0 && (
                         <RichTooltip content={TT_TIMING_CONFIG}>
-                          <button
-                            onClick={() => onConfigSignalTiming(index, si)}
-                            className="hover:opacity-80 transition-opacity"
-                            style={{ ...BTN, background: 'var(--accent-blue-mid)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-blue-dark)', gap: 5, padding: '4px 8px' }}
-                          ><GearIcon size={9} /> Config</button>
+                          <div className="relative" style={{ display: 'inline-flex' }}>
+                            <button
+                              onClick={() => onConfigSignalTiming(index, si)}
+                              className="hover:opacity-80"
+                              style={GEAR_STYLE}>
+                              <GearIcon />
+                            </button>
+                            {hasTiming && (
+                              <span className="absolute -top-px -right-px w-1.5 h-1.5 rounded-full" style={{ background: 'var(--accent-orange)', border: '1px solid var(--bg-deep)' }} />
+                            )}
+                          </div>
                         </RichTooltip>
                       )}
                       <RichTooltip content={TT_RECHECK_CONFIG}>
