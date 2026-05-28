@@ -498,7 +498,7 @@ function PresetBrowserModal({ open, presets, currentFilters, onClose, onApply, o
                         style={{ background: 'var(--input-bg)', borderColor: 'var(--accent-blue)', color: 'var(--input-text)' }}
                       />
                     ) : (
-                      <span className="flex-1 text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{preset.name}</span>
+                      <span className="flex-1 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>{preset.name}</span>
                     )}
                     <button
                       onClick={() => editingName === preset.name ? commitRename(preset.name) : startEdit(preset.name)}
@@ -769,7 +769,7 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
           >
             {getBlockIcon(definition)}
           </span>
-          <span className={`text-sm font-medium leading-tight${isBlockUsed ? ' line-through' : ''}`} style={{ color: isBlockUsed ? 'var(--text-muted)' : 'var(--text-primary)', cursor: isBlockUsed ? 'not-allowed' : undefined }}>{definition.name}</span>
+          <span className={`text-sm font-medium leading-tight${isBlockUsed ? ' line-through' : ''}`} style={{ color: isBlockUsed ? 'var(--text-muted)' : 'var(--text-secondary)', cursor: isBlockUsed ? 'not-allowed' : undefined }}>{definition.name}</span>
         </div>
         <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
           Category: {definition.category}
