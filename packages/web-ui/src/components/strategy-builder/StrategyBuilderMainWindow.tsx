@@ -716,10 +716,10 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         }
         @keyframes amberPulse {
           0%, 100% {
-            box-shadow: 0 0 8px rgba(251, 146, 60, 0.3), inset 0 0 8px rgba(251, 146, 60, 0.15);
+            box-shadow: 0 0 8px rgba(251, 146, 60, 0.075), inset 0 0 8px rgba(251, 146, 60, 0.038);
           }
           50% {
-            box-shadow: 0 0 16px rgba(251, 146, 60, 0.5), inset 0 0 12px rgba(251, 146, 60, 0.25);
+            box-shadow: 0 0 16px rgba(251, 146, 60, 0.125), inset 0 0 12px rgba(251, 146, 60, 0.063);
           }
         }
         .button-amber-pulse {
@@ -728,7 +728,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         @media (prefers-reduced-motion: reduce) {
           .button-amber-pulse {
             animation: none;
-            box-shadow: 0 0 8px rgba(251, 146, 60, 0.3), inset 0 0 8px rgba(251, 146, 60, 0.15);
+            box-shadow: 0 0 8px rgba(251, 146, 60, 0.075), inset 0 0 8px rgba(251, 146, 60, 0.038);
           }
         }
       `}</style>
