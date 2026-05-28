@@ -3,6 +3,7 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import * as api from '@/lib/strategy-builder/api';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
+import { status } from '@/lib/status';
 import {
   ValidationLevel,
   ValidationMessage,
@@ -366,13 +367,7 @@ function ValidationPanel({ currentVersionId }, ref) {
   const [lastValidatedAt, setLastValidatedAt] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isBacktesting, setIsBacktesting] = useState(false);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const autoValidateEnabledRef = useRef(false);
-
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
-  };
 
   const handleValidate = useCallback(async () => {
     try {
@@ -419,9 +414,9 @@ function ValidationPanel({ currentVersionId }, ref) {
     setIsSaving(true);
     try {
       await saveStrategy();
-      showToast('Strategy saved successfully');
+      status.emit('Strategy saved', { variant: 'success' });
     } catch (err) {
-      showToast(`Save failed: ${err instanceof Error ? err.message : String(err)}`);
+      status.emit(`Save failed: ${err instanceof Error ? err.message : String(err)}`, { variant: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -429,7 +424,7 @@ function ValidationPanel({ currentVersionId }, ref) {
 
   const handleRunBacktest = useCallback(async () => {
     if (!currentStrategy) {
-      showToast('No strategy loaded');
+      status.emit('No strategy loaded', { variant: 'warning' });
       return;
     }
     setIsBacktesting(true);
@@ -442,16 +437,16 @@ function ValidationPanel({ currentVersionId }, ref) {
         commissionPercentage: 0.1,
       };
       await runBacktest(config);
-      showToast('Backtest started');
+      status.emit('Backtest started', { variant: 'info' });
     } catch (err) {
-      showToast(`Backtest failed: ${err instanceof Error ? err.message : String(err)}`);
+      status.emit(`Backtest failed: ${err instanceof Error ? err.message : String(err)}`, { variant: 'error' });
     } finally {
       setIsBacktesting(false);
     }
   }, [currentStrategy, runBacktest]);
 
   const handleGenerateCode = useCallback(() => {
-    showToast('Generate Code is a P2 feature — coming soon');
+    status.emit('Generate Code — coming in P2', { variant: 'info' });
   }, []);
 
   // Derived state
@@ -472,13 +467,6 @@ function ValidationPanel({ currentVersionId }, ref) {
 
   return (
     <div className="flex flex-col border-t" style={{ maxHeight: '22rem', background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
-      {/* Toast notification */}
-      {toastMsg && (
-        <div className="absolute bottom-16 right-4 z-50 text-xs px-3 py-2 rounded shadow-lg animate-fade-in" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
-          {toastMsg}
-        </div>
-      )}
-
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-4 py-1.5 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
         <span className="text-xs font-semibold flex-1" style={{ color: 'var(--text-secondary)' }}>Validation</span>
