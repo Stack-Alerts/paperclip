@@ -57,16 +57,58 @@ class TokenGapEscalationMonitor:
             print(f"Warning: API request exception: {str(e)}", file=sys.stderr)
             return None
 
-    def _has_github_token_error(self, issue_id: str) -> bool:
-        """Check if issue has comments indicating GitHub API token gap error."""
+    def _get_issue_comments(self, issue_id: str) -> list:
+        """Fetch comments for an issue, handling both array and object responses."""
         comments = self._api_request("GET", f"/api/issues/{issue_id}/comments")
         if not comments:
-            return False
+            return []
+        return comments if isinstance(comments, list) else comments.get("items", [])
 
-        # Handle both array and object responses
-        items = comments if isinstance(comments, list) else comments.get("items", [])
-        if not items:
-            return False
+    def _has_github_token_error(self, comments: list) -> bool:
+        """Check if comments indicate GitHub API token gap error."""
+        token_error_patterns = [
+            r"github.*token",
+            r"authentication.*failed",
+            r"bad credentials",
+            r"invalid token",
+            r"token.*expired",
+            r"token.*invalid",
+            r"401.*github",
+            r"github.*401",
+            r"permission denied.*github"
+        ]
+
+        for comment in comments:
+            body = comment.get("body", "").lower()
+            for pattern in token_error_patterns:
+                if re.search(pattern, body):
+                    return True
+        return False
+
+    def _has_existing_escalation(self, issue_id: str, comments: list) -> bool:
+        """Check if issue already has an active escalation task (idempotency check)."""
+        # Check for comments with escalation marker
+        escalation_marker = "🚨 Token-Gap Escalation"
+        for comment in comments:
+            if escalation_marker in comment.get("body", ""):
+                return True
+
+        # Check if there are pending CEO escalation subtasks
+        issue = self._api_request("GET", f"/api/issues/{issue_id}")
+        if issue and "blocks" in issue:
+            for blocking_issue in issue.get("blocks", []):
+                if "escalat" in blocking_issue.get("title", "").lower() and blocking_issue.get("status") in ["todo", "in_progress"]:
+                    return True
+
+        return False
+
+    def _get_issue_blocker_duration(self, issue: dict, comments: list) -> Optional[int]:
+        """Get how long (in minutes) an issue has been blocked by finding earliest token-gap comment."""
+        if issue.get("status") != "blocked":
+            return None
+
+        if not comments:
+            return None
 
         token_error_patterns = [
             r"github.*token",
@@ -80,50 +122,27 @@ class TokenGapEscalationMonitor:
             r"permission denied.*github"
         ]
 
-        for comment in items:
+        earliest_error_time = None
+        for comment in comments:
             body = comment.get("body", "").lower()
             for pattern in token_error_patterns:
                 if re.search(pattern, body):
-                    return True
-        return False
+                    created_at = comment.get("createdAt")
+                    if created_at:
+                        try:
+                            comment_time = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                            if earliest_error_time is None or comment_time < earliest_error_time:
+                                earliest_error_time = comment_time
+                        except Exception:
+                            pass
+                    break
 
-    def _has_existing_escalation(self, issue_id: str) -> bool:
-        """Check if issue already has an active escalation task (idempotency check)."""
-        # Check both for existing comments and for pending escalation subtasks
-        issue = self._api_request("GET", f"/api/issues/{issue_id}")
-        if not issue:
-            return False
-
-        # Check for comments with escalation marker
-        comments = self._api_request("GET", f"/api/issues/{issue_id}/comments")
-        if comments:
-            items = comments if isinstance(comments, list) else comments.get("items", [])
-            escalation_marker = "🚨 Token-Gap Escalation"
-            for comment in items:
-                if escalation_marker in comment.get("body", ""):
-                    return True
-
-        # Check if there are pending CEO escalation subtasks
-        if "blocks" in issue:
-            for blocking_issue in issue.get("blocks", []):
-                if "escalat" in blocking_issue.get("title", "").lower() and blocking_issue.get("status") in ["todo", "in_progress"]:
-                    return True
-
-        return False
-
-    def _get_issue_blocker_duration(self, issue: dict) -> Optional[int]:
-        """Get how long (in minutes) an issue has been blocked."""
-        if issue.get("status") != "blocked":
-            return None
-
-        blocked_at = issue.get("updatedAt")
-        if not blocked_at:
+        if not earliest_error_time:
             return None
 
         try:
-            blocked_time = datetime.fromisoformat(blocked_at.replace("Z", "+00:00"))
             now = datetime.now(timezone.utc)
-            duration = (now - blocked_time).total_seconds() / 60
+            duration = (now - earliest_error_time).total_seconds() / 60
             return int(duration)
         except Exception:
             return None
@@ -164,8 +183,7 @@ This escalation task is idempotent - only one such task per blocked issue will b
             "status": "todo",
             "priority": "critical",
             "assigneeAgentId": "73e7ef43-1337-47f8-9cf2-8db91ebcf555",  # CEO agent ID
-            "parentId": escalation_issue_id or issue_id,
-            "projectId": self.project_id if hasattr(self, 'project_id') else None
+            "parentId": escalation_issue_id or issue_id
         }
 
         response = self._api_request(
@@ -214,17 +232,20 @@ This escalation task is idempotent - only one such task per blocked issue will b
             if not is_pr_merge_issue:
                 continue
 
+            # Fetch comments once per issue
+            comments = self._get_issue_comments(issue_id)
+
             # Check for token gap error in comments
-            if not self._has_github_token_error(issue_id):
+            if not self._has_github_token_error(comments):
                 continue
 
             # Check how long it's been blocked
-            blocked_minutes = self._get_issue_blocker_duration(issue)
+            blocked_minutes = self._get_issue_blocker_duration(issue, comments)
             if not blocked_minutes or blocked_minutes < (threshold_hours * 60):
                 continue
 
             # Check if already escalated (idempotency)
-            if self._has_existing_escalation(issue_id):
+            if self._has_existing_escalation(issue_id, comments):
                 print(f"⊘ Already escalated {issue_identifier}")
                 continue
 
