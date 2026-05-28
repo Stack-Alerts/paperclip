@@ -290,8 +290,8 @@ function RecheckConfigModal({ open, signalName, enabled, barDelay, mode, onSave,
 
         {/* Footer */}
         <div className="flex border-t rounded-b overflow-hidden" style={{ borderColor: 'var(--border)' }}>
-          <button onClick={onCancel} className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90" style={{ background: 'var(--accent-red)', color: 'var(--btn-primary-text)' }}>✕ Cancel</button>
-          <button onClick={() => onSave(isEnabled, delay, recheckMode)} className="flex-1 py-3 text-sm font-semibold transition-opacity hover:opacity-90" style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}>✓ OK</button>
+          <button onClick={onCancel} className="flex-1 py-3 text-sm font-semibold transition-colors hover:brightness-110" style={{ background: 'var(--btn-cancel-bg)', color: 'var(--btn-primary-text)' }}>✕ Cancel</button>
+          <button onClick={() => onSave(isEnabled, delay, recheckMode)} className="flex-1 py-3 text-sm font-semibold transition-colors hover:brightness-110" style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}>✓ OK</button>
         </div>
       </div>
     </div>
@@ -743,8 +743,8 @@ function ReorderConfirmModal({ fromName, toName, direction, onConfirm, onCancel 
           </p>
         </div>
         <div className="flex border-t overflow-hidden" style={{ borderColor: 'var(--border)' }}>
-          <button onClick={onCancel} className="flex-1 py-2.5 text-sm font-semibold hover:opacity-80" style={{ background: 'var(--accent-red)', color: 'var(--btn-primary-text)' }}>✕ Cancel</button>
-          <button onClick={onConfirm} className="flex-1 py-2.5 text-sm font-semibold hover:opacity-80" style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}>✓ Confirm</button>
+          <button onClick={onCancel} className="flex-1 py-2.5 text-sm font-semibold transition-colors hover:brightness-110" style={{ background: 'var(--btn-cancel-bg)', color: 'var(--btn-primary-text)' }}>✕ Cancel</button>
+          <button onClick={onConfirm} className="flex-1 py-2.5 text-sm font-semibold transition-colors hover:brightness-110" style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}>✓ Confirm</button>
         </div>
       </div>
     </div>

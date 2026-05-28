@@ -270,7 +270,7 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
               disabled={!selected}
               onClick={() => selected && onApplyConfig(selected)}
               className="px-4 py-2 rounded text-sm font-medium disabled:opacity-40 transition-colors"
-              style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
+              style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
             >
               Apply Config
             </button>

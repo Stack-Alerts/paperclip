@@ -185,7 +185,7 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
           <button
             onClick={handleConfirm}
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
+            style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
           >
             ✅ Apply Fix
           </button>

@@ -522,9 +522,9 @@ function ValidationPanel({ currentVersionId }, ref) {
             onClick={handleValidate}
             disabled={isValidating}
             className="px-2 py-0.5 rounded text-xs font-medium disabled:opacity-50 transition-colors"
-            style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-green-mid)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent-green)')}
+            style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--btn-confirm-bg-hover)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--btn-confirm-bg)')}
           >
             {isValidating ? 'Validating…' : 'Validate'}
           </button>
@@ -606,9 +606,9 @@ function ValidationPanel({ currentVersionId }, ref) {
             onClick={handleSave}
             disabled={!isSafeToSave || isSaving}
             className="px-3 py-1 rounded text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
-            onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--accent-green-mid)'; }}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent-green)')}
+            style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
+            onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--btn-confirm-bg-hover)'; }}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--btn-confirm-bg)')}
             title="Save the validated strategy to the database"
           >
             {isSaving ? 'Saving…' : '💾 Save Strategy'}

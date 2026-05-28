@@ -191,7 +191,7 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
               onClick={onRepair}
               disabled={isRepairing}
               className="px-3 py-1 rounded text-xs font-medium disabled:opacity-50 transition-colors"
-              style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
+              style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
             >
               {isRepairing ? 'Repairing…' : 'Fix Gaps'}
             </button>
@@ -443,7 +443,7 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
                   if (first) handleRepair(first.timeframe);
                 }}
                 className="px-4 py-2 rounded text-sm font-medium transition-colors"
-                style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
+                style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
               >
                 Fix Gaps
               </button>

@@ -672,7 +672,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                 <button
                   onClick={onSkip}
                   className="px-4 py-2 rounded text-sm font-medium transition-colors"
-                  style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
+                  style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
                 >
                   ✅ Continue
                   {autoCloseSeconds !== null && autoCloseSeconds > 0
@@ -727,7 +727,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                 <button
                   onClick={onSkip}
                   className="px-4 py-2 rounded text-sm font-medium transition-colors"
-                  style={{ background: 'var(--accent-green)', color: 'var(--btn-primary-text)' }}
+                  style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
                 >
                   ✅ Continue
                   {autoMode && autoCloseSeconds !== null && autoCloseSeconds > 0
