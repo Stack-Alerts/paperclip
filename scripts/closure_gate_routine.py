@@ -2,19 +2,24 @@
 """Closure-Gate Routine: Verify done issues have SHA ancestors on origin/main.
 
 This routine:
-1. Scans done issues updated in the last 24h
+1. Scans done issues updated in the last 24h (or --backfill-days N for first run)
 2. Extracts Fix-SHA from closure comments via regex ^Fix-SHA: ([0-9a-f]{40})$
 3. Verifies SHA is an ancestor of origin/main via git merge-base
 4. Detects fabrication: SHA existence, author match, file:line validity
-5. Reopens issues with unmerged SHAs to in_review, assigns to closer's manager
-6. Requests Fix-SHA tags for orphaned done issues without commit evidence
+5. Detects unfiled deferrals: closure comments promising follow-ups
+   ("out of scope / deferred / tracking issue / ...") without a filed BTCAAAAA-NNNNN
+6. Reopens issues with unmerged SHAs to in_review, assigns to closer's manager
+7. Requests Fix-SHA tags for orphaned done issues without commit evidence
+8. Aggregates unfiled-deferral flags into routine report at BTCAAAAA-30040
 
 Usage:
     python scripts/closure_gate_routine.py
+    python scripts/closure_gate_routine.py --backfill-days 30
 """
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import logging
@@ -53,6 +58,25 @@ FIX_SHA_PATTERN = re.compile(r"^Fix-SHA: ([0-9a-f]{40})$", re.MULTILINE)
 
 # CEO mention for notifications
 CEO_MENTION = "@CEO"
+
+# Deferral lexicon (BTCAAAAA-30577): phrases that signal a closure promised
+# follow-up work outside the current ticket. If a closure-comment paragraph
+# contains any of these AND does not name a filed BTCAAAAA-NNNNN follow-up,
+# the routine raises an unfiled-deferral flag.
+DEFERRAL_LEXICON = (
+    r"out of scope",
+    r"deferred",
+    r"defer\b",
+    r"follow-?up",
+    r"file a separate",
+    r"audit other",
+    r"tracking issue",
+    r"cleanup",
+)
+DEFERRAL_REGEX = re.compile("|".join(DEFERRAL_LEXICON), re.IGNORECASE)
+TICKET_REF_PATTERN = re.compile(r"\b(BTCAAAAA-\d+)\b")
+PARAGRAPH_SPLIT_RE = re.compile(r"\n\s*\n")
+DEFERRAL_SNIPPET_MAX = 400
 
 
 def _http_session() -> requests.Session:
@@ -100,8 +124,8 @@ def compute_action_hash(issue_id: str, sha: str, action: str) -> str:
     return hashlib.sha256(data.encode()).hexdigest()[:8]
 
 
-def find_done_issues() -> list[dict[str, Any]]:
-    """Find done issues updated in the last 24 hours."""
+def find_done_issues(hours: int = 24) -> list[dict[str, Any]]:
+    """Find done issues updated in the last `hours` hours (default 24)."""
     try:
         company_id = os.environ.get("PAPERCLIP_COMPANY_ID", "")
         if not company_id:
@@ -113,7 +137,7 @@ def find_done_issues() -> list[dict[str, Any]]:
                 f"{_base()}/api/companies/{company_id}/issues",
                 params={
                     "status": "done",
-                    "limit": 200,
+                    "limit": 500 if hours > 168 else 200,
                 },
                 timeout=API_TIMEOUT,
             )
@@ -127,9 +151,8 @@ def find_done_issues() -> list[dict[str, Any]]:
                 logger.warning("Unexpected response format from issues API")
                 return []
 
-            # Filter to last 24h
             now = datetime.now(timezone.utc)
-            cutoff = now - timedelta(hours=24)
+            cutoff = now - timedelta(hours=hours)
             filtered = []
             for issue in issues_list:
                 updated_at = issue.get("updatedAt")
@@ -141,7 +164,7 @@ def find_done_issues() -> list[dict[str, Any]]:
                     except (ValueError, AttributeError):
                         pass
 
-            logger.info("Found %d done issues updated in last 24h", len(filtered))
+            logger.info("Found %d done issues updated in last %dh", len(filtered), hours)
             return filtered
     except Exception as exc:
         logger.error("Failed to find done issues: %s", exc)
@@ -385,6 +408,142 @@ def detect_fabrication(issue_id: str, issue_identifier: str, sha: str, comments:
 # === End Fabrication Detection ===
 
 
+# === Unfiled Deferral Detection (Phase 3 extension — BTCAAAAA-30577) ===
+
+def split_paragraphs(text: str) -> list[str]:
+    """Split comment body into paragraphs on blank lines."""
+    if not text:
+        return []
+    return [p.strip() for p in PARAGRAPH_SPLIT_RE.split(text) if p.strip()]
+
+
+def fetch_issue_by_identifier(identifier: str) -> dict[str, Any] | None:
+    """Fetch issue by identifier (e.g. BTCAAAAA-30040). Returns None on 404."""
+    try:
+        with _http_session() as sess:
+            resp = sess.get(
+                f"{_base()}/api/issues/{identifier}",
+                timeout=API_TIMEOUT,
+            )
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            data = resp.json()
+            if isinstance(data, dict):
+                return data
+            return None
+    except Exception as exc:
+        logger.warning("Failed to fetch follow-up issue %s: %s", identifier, exc)
+        return None
+
+
+def followup_links_to_source(
+    followup: dict[str, Any],
+    source_id: str,
+    source_identifier: str,
+    source_project_id: str | None,
+) -> bool:
+    """Decide whether `followup` is a valid filed follow-up for the source issue.
+
+    Per BTCAAAAA-30577 acceptance criterion 3: a follow-up "links back" if any of:
+      - followup.parentId == source.id
+      - followup.description or followup.title cites source identifier
+      - followup is in the same project AND cites source identifier
+    """
+    if not followup:
+        return False
+    if followup.get("parentId") == source_id:
+        return True
+
+    description = followup.get("description") or ""
+    title = followup.get("title") or ""
+    cites_source = source_identifier in description or source_identifier in title
+    if cites_source:
+        return True
+
+    followup_project = followup.get("projectId")
+    if source_project_id and followup_project == source_project_id and cites_source:
+        return True
+
+    return False
+
+
+def detect_unfiled_deferrals(
+    issue: dict[str, Any],
+    comments: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Detect closure paragraphs that promise follow-up work without filing it.
+
+    Returns a list of flag dicts; empty list means no flags.
+    Each flag:
+        {
+          "source_identifier": "BTCAAAAA-XXXXX",
+          "source_id": "...",
+          "comment_id": "...",
+          "paragraph": "snippet (<=400 chars)",
+          "candidate_refs": ["BTCAAAAA-YYYYY", ...],
+          "reason": "no_refs" | "refs_invalid",
+        }
+    """
+    flags: list[dict[str, Any]] = []
+    source_id = issue.get("id", "")
+    source_identifier = issue.get("identifier", "")
+    source_project_id = issue.get("projectId")
+
+    for comment in comments or []:
+        body = comment.get("body", "") or ""
+        if not body or not DEFERRAL_REGEX.search(body):
+            continue
+        for paragraph in split_paragraphs(body):
+            if not DEFERRAL_REGEX.search(paragraph):
+                continue
+
+            # Candidate refs in this paragraph, excluding self-references.
+            candidate_refs = [
+                ref
+                for ref in TICKET_REF_PATTERN.findall(paragraph)
+                if ref != source_identifier
+            ]
+
+            snippet = paragraph[:DEFERRAL_SNIPPET_MAX]
+            comment_id = comment.get("id", "")
+
+            if not candidate_refs:
+                flags.append({
+                    "source_identifier": source_identifier,
+                    "source_id": source_id,
+                    "comment_id": comment_id,
+                    "paragraph": snippet,
+                    "candidate_refs": [],
+                    "reason": "no_refs",
+                })
+                continue
+
+            valid = False
+            for ref in candidate_refs:
+                followup = fetch_issue_by_identifier(ref)
+                if followup and followup_links_to_source(
+                    followup, source_id, source_identifier, source_project_id
+                ):
+                    valid = True
+                    break
+
+            if not valid:
+                flags.append({
+                    "source_identifier": source_identifier,
+                    "source_id": source_id,
+                    "comment_id": comment_id,
+                    "paragraph": snippet,
+                    "candidate_refs": candidate_refs,
+                    "reason": "refs_invalid",
+                })
+
+    return flags
+
+
+# === End Unfiled Deferral Detection ===
+
+
 def verify_sha_on_main(sha: str) -> bool:
     """Verify that SHA is an ancestor of origin/main using git."""
     try:
@@ -536,13 +695,36 @@ _Requests without a Fix-SHA tag cannot be verified by automation._
         return False
 
 
-def process_issue(issue: dict[str, Any], state: dict[str, Any]) -> tuple[str, bool]:
-    """Process a single done issue. Returns (action_type, success)."""
+def process_issue(
+    issue: dict[str, Any],
+    state: dict[str, Any],
+    deferral_flags: list[dict[str, Any]] | None = None,
+) -> tuple[str, bool]:
+    """Process a single done issue.
+
+    Returns (action_type, success). When `deferral_flags` is provided, any
+    unfiled-deferral flags discovered in this issue's comments are appended to
+    it (BTCAAAAA-30577).
+    """
     issue_id = issue.get("id", "")
     issue_identifier = issue.get("identifier", "")
 
     # Fetch comments separately
     comments = fetch_issue_comments(issue_id)
+
+    # Unfiled-deferral check (BTCAAAAA-30577). Runs independently of the
+    # Fix-SHA path so we still flag promised follow-ups on issues that have
+    # not yet been tagged with a Fix-SHA.
+    if deferral_flags is not None:
+        try:
+            deferral_flags.extend(detect_unfiled_deferrals(issue, comments))
+        except Exception as exc:
+            logger.error(
+                "Unfiled-deferral check failed for issue %s: %s",
+                issue_identifier,
+                exc,
+            )
+
     sha = extract_fix_sha_from_comments(comments)
 
     if not sha:
@@ -599,17 +781,33 @@ def process_issue(issue: dict[str, Any], state: dict[str, Any]) -> tuple[str, bo
         return "reopen", False
 
 
-def main() -> None:
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Closure-gate routine")
+    parser.add_argument(
+        "--backfill-days",
+        type=int,
+        default=None,
+        help=(
+            "Override the scan window in days (default: 1 day / 24h). "
+            "Use --backfill-days 30 for the first-deployment backfill required by "
+            "BTCAAAAA-30577 acceptance criterion 7."
+        ),
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> None:
     """Main routine execution."""
-    logger.info("Starting closure-gate routine")
+    args = _parse_args(argv)
+    hours = args.backfill_days * 24 if args.backfill_days else 24
+    logger.info("Starting closure-gate routine (window=%dh)", hours)
 
     # Load previous state
     state = load_state()
     logger.info("Loaded closure-gate state: %d tracked", len(state))
 
     # Find done issues
-    done_issues = find_done_issues()
-    logger.info("Found %d done issues updated in last 24h", len(done_issues))
+    done_issues = find_done_issues(hours=hours)
 
     stats = {
         "verified": 0,
@@ -618,9 +816,10 @@ def main() -> None:
         "flagged_fabrication": 0,
         "errors": 0,
     }
+    deferral_flags: list[dict[str, Any]] = []
 
     for issue in done_issues:
-        action_type, success = process_issue(issue, state)
+        action_type, success = process_issue(issue, state, deferral_flags)
         if action_type == "verified":
             stats["verified"] += 1
         elif action_type == "reopened":
@@ -645,26 +844,46 @@ def main() -> None:
         logger.info("Saved updated closure-gate state")
 
     # Report results
-    report = format_routine_report(len(done_issues), stats)
+    report = format_routine_report(
+        len(done_issues),
+        stats,
+        deferral_flags=deferral_flags,
+        window_hours=hours,
+    )
     if post_comment(TRACKING_ISSUE, report):
-        logger.info("Closure-gate routine completed successfully")
+        logger.info(
+            "Closure-gate routine completed successfully (deferral_flags=%d)",
+            len(deferral_flags),
+        )
     else:
         logger.error("Failed to post routine report, but processing completed")
         sys.exit(1)
 
 
-def format_routine_report(total_done: int, stats: dict[str, int]) -> str:
+def format_routine_report(
+    total_done: int,
+    stats: dict[str, int],
+    deferral_flags: list[dict[str, Any]] | None = None,
+    window_hours: int = 24,
+) -> str:
     """Format the routine execution report."""
+    deferral_flags = deferral_flags or []
+    if window_hours >= 48 and window_hours % 24 == 0:
+        window_label = f"{window_hours // 24}d window"
+    else:
+        window_label = f"{window_hours}h window"
+
     lines = [
         "## Closure-Gate Routine Report",
         "",
         f"**Time:** {datetime.now(timezone.utc).isoformat()}",
         "",
-        f"**Done issues scanned (24h window):** {total_done}",
+        f"**Done issues scanned ({window_label}):** {total_done}",
         f"**Verified on main:** {stats['verified']}",
         f"**Reopened (unmerged):** {stats['reopened']}",
         f"**Flagged (fabrication):** {stats['flagged_fabrication']}",
         f"**Requested Fix-SHA tag:** {stats['requested_sha']}",
+        f"**Unfiled deferrals:** {len(deferral_flags)}",
         f"**Errors:** {stats['errors']}",
         "",
     ]
@@ -687,7 +906,36 @@ def format_routine_report(total_done: int, stats: dict[str, int]) -> str:
             f"Requested Fix-SHA tags on {stats['requested_sha']} issue(s) without closure commit evidence.",
         ])
 
-    if stats["verified"] > 0:
+    if deferral_flags:
+        lines.extend([
+            "",
+            "### unfiled_deferrals[]",
+            (
+                f"Flagged {len(deferral_flags)} closure paragraph(s) that promised "
+                "follow-up work without filing a tracking issue (BTCAAAAA-30577). "
+                "CEO files the missing tickets; routine does NOT auto-create."
+            ),
+            "",
+        ])
+        for flag in deferral_flags:
+            source = flag.get("source_identifier", "?")
+            comment_id = flag.get("comment_id", "")
+            reason = flag.get("reason", "")
+            refs = flag.get("candidate_refs", []) or []
+            refs_str = ", ".join(refs) if refs else "—"
+            snippet = (flag.get("paragraph", "") or "").replace("\n", " ")
+            comment_link = (
+                f"[{comment_id[:8]}](/BTCAAAAA/issues/{source}#comment-{comment_id})"
+                if comment_id
+                else "(comment id unavailable)"
+            )
+            lines.append(
+                f"- [{source}](/BTCAAAAA/issues/{source}) "
+                f"— reason: `{reason}` — candidate refs: {refs_str} — comment: {comment_link}"
+            )
+            lines.append(f"  > {snippet}")
+
+    if stats["verified"] > 0 and not deferral_flags:
         lines.extend([
             "### Status",
             f"All scanned issues remain `done` (SHAs verified on origin/main).",
