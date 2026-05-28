@@ -365,6 +365,7 @@ interface BlockCardProps {
   onRemove: (index: number) => void;
   onConfig: (index: number) => void;
   onConfigRecheck: (blockIndex: number, signalIndex: number) => void;
+  onConfigSignalTiming: (blockIndex: number, signalIndex: number) => void;
   onRemoveRecheck: (blockIndex: number, signalIndex: number) => void;
   onDuplicateSignal: (blockIndex: number, signalIndex: number) => void;
   onRemoveSignal: (blockIndex: number, signalIndex: number) => void;
@@ -450,7 +451,7 @@ function XIcon({ size = 8 }: { size?: number }) {
 function BlockCard({
   block, index, mainIndex, mainTotal,
   onMoveUp, onMoveDown, onRemove, onConfig,
-  onConfigRecheck, onRemoveRecheck, onDuplicateSignal, onRemoveSignal,
+  onConfigRecheck, onConfigSignalTiming, onRemoveRecheck, onDuplicateSignal, onRemoveSignal,
   onHighlightInLibrary,
   blockExits, signalExits, onEditExit, onRemoveExit, onDuplicateExit,
 }: BlockCardProps) {
@@ -564,6 +565,15 @@ function BlockCard({
                       )}
                     </span>
                     <div style={BTN_GROUP}>
+                      {si > 0 && (
+                        <RichTooltip content={TT_TIMING_CONFIG}>
+                          <button
+                            onClick={() => onConfigSignalTiming(index, si)}
+                            className="hover:opacity-80 transition-opacity"
+                            style={{ ...BTN, background: 'var(--accent-blue-mid)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-blue-dark)', gap: 5, padding: '4px 8px' }}
+                          ><GearIcon size={9} /> Config</button>
+                        </RichTooltip>
+                      )}
                       <RichTooltip content={TT_RECHECK_CONFIG}>
                         <div className="relative" style={{ display: 'inline-flex' }}>
                           <button
@@ -762,6 +772,7 @@ export function StrategyBlocksPanel() {
 
   const [timingDialogIndex, setTimingDialogIndex] = useState<number | null>(null);
   const [recheckTarget, setRecheckTarget] = useState<{ blockIndex: number; signalIndex: number } | null>(null);
+  const [signalTimingTarget, setSignalTimingTarget] = useState<{ blockIndex: number; signalIndex: number } | null>(null);
   const [editingExitIndex, setEditingExitIndex] = useState<number | null>(null);
   const [reorderConfirm, setReorderConfirm] = useState<{
     fromIndex: number; toIndex: number; fromName: string; toName: string; direction: 'up' | 'down';
@@ -815,6 +826,10 @@ export function StrategyBlocksPanel() {
 
   const handleRemove = useCallback((index: number) => { deleteBlock(index); }, [deleteBlock]);
   const handleConfig = useCallback((index: number) => { setTimingDialogIndex(index); }, []);
+
+  const handleConfigSignalTiming = useCallback((blockIndex: number, signalIndex: number) => {
+    setSignalTimingTarget({ blockIndex, signalIndex });
+  }, []);
 
   const handleConfigRecheck = useCallback((blockIndex: number, signalIndex: number) => {
     setRecheckTarget({ blockIndex, signalIndex });
@@ -919,6 +934,27 @@ export function StrategyBlocksPanel() {
       setTimingDialogIndex(null);
     },
     [timingDialogIndex, blocks, updateBlock]
+  );
+
+  const handleSignalTimingConstraintSave = useCallback(
+    (constraint: TimingConstraint) => {
+      if (!signalTimingTarget) return;
+      const { blockIndex, signalIndex } = signalTimingTarget;
+      const block = blocks[blockIndex];
+      if (!block) return;
+      const signals = [...((block.data.signals as BlockSignal[] | undefined) ?? [])];
+      if (!signals[signalIndex]) return;
+      signals[signalIndex] = {
+        ...signals[signalIndex],
+        timing_constraint: constraint.enabled ? {
+          reference_signal: constraint.referenceName,
+          max_candles: constraint.candleCount,
+        } : undefined,
+      };
+      updateBlock(blockIndex, { signals });
+      setSignalTimingTarget(null);
+    },
+    [signalTimingTarget, blocks, updateBlock]
   );
 
   const handleExitConfigSave = useCallback(
@@ -1036,6 +1072,7 @@ export function StrategyBlocksPanel() {
                 onRemove={handleRemove}
                 onConfig={handleConfig}
                 onConfigRecheck={handleConfigRecheck}
+                onConfigSignalTiming={handleConfigSignalTiming}
                 onRemoveRecheck={handleRemoveRecheck}
                 onDuplicateSignal={handleDuplicateSignal}
                 onRemoveSignal={handleRemoveSignal}
@@ -1071,6 +1108,49 @@ export function StrategyBlocksPanel() {
           onCancel={() => setTimingDialogIndex(null)}
         />
       )}
+
+      {/* Per-Signal Timing Constraint Dialog */}
+      {signalTimingTarget && (() => {
+        const { blockIndex, signalIndex } = signalTimingTarget;
+        const block = blocks[blockIndex];
+        const signals = (block?.data.signals as BlockSignal[] | undefined) ?? [];
+        const sig = signals[signalIndex];
+
+        if (!sig) return null;
+
+        const blockName = (block?.data.name as string | undefined) ?? `Block #${blockIndex + 1}`;
+        const signalName = sig.name;
+        const availableSignalRefs = signals
+          .slice(0, signalIndex)
+          .map((s, idx) => ({
+            displayName: `Signal ${idx + 1}: ${s.name}`,
+            referenceId: s.name,
+          }));
+
+        const currentTiming = sig.timing_constraint ? {
+          enabled: true,
+          candleCount: sig.timing_constraint.max_candles ?? 5,
+          referenceId: sig.timing_constraint.reference_signal ?? '',
+          referenceName: sig.timing_constraint.reference_signal ?? '',
+        } : {
+          enabled: false,
+          candleCount: 5,
+          referenceId: '',
+          referenceName: '',
+        };
+
+        return (
+          <TimingConstraintDialog
+            open={true}
+            blockName={blockName}
+            signalName={signalName}
+            availableReferences={availableSignalRefs}
+            currentConstraint={currentTiming}
+            onSave={handleSignalTimingConstraintSave}
+            onCancel={() => setSignalTimingTarget(null)}
+          />
+        );
+      })()}
 
       {/* Recheck Config Modal */}
       {recheckTarget && (() => {

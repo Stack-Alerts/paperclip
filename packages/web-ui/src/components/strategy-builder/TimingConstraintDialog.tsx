@@ -223,18 +223,18 @@ export const TimingConstraintDialog: React.FC<TimingConstraintDialogProps> = ({
           <button
             onClick={onCancel}
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+            style={{ background: 'var(--btn-cancel-bg)', color: 'var(--btn-primary-text)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--btn-cancel-bg-hover)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--btn-cancel-bg)')}
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-blue-mid)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent-blue)')}
+            style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--btn-confirm-bg-hover)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--btn-confirm-bg)')}
           >
             Save Constraint
           </button>
