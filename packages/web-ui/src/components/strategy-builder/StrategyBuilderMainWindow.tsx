@@ -24,6 +24,7 @@ import { ThemeSelector } from './ThemeSelector';
 import { Plus, FolderOpen, Save, Play, ChevronDown } from 'lucide-react';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { AppBrand } from '@/components/shared/AppBrand';
+import { status } from '@/lib/status';
 
 type DialogKey =
   | 'strategyBrowser'
@@ -183,7 +184,6 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   const isSavingRef = useRef(false);
 
   // Status bar countdown — aligns to real 15-minute UTC candle boundaries (+0.2 s)
-  const [statusText, setStatusText] = useState('Ready');
   const nextCheckRef = useRef<Date>(
     (() => {
       const now = Date.now();
@@ -191,18 +191,24 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       return new Date((Math.floor(now / interval) + 1) * interval + 200);
     })()
   );
+  const countdownIdRef = useRef<string | null>(null);
   useEffect(() => {
     const timer = setInterval(() => {
       const diff = Math.max(0, nextCheckRef.current.getTime() - Date.now());
       if (diff < 500) {
         const interval = 15 * 60 * 1000;
         nextCheckRef.current = new Date((Math.floor(Date.now() / interval) + 1) * interval + 200);
-        setStatusText('Checking data…');
-        setTimeout(() => setStatusText('Data check complete'), 2000);
+        countdownIdRef.current = status.emit('Checking data…', { duration: -1 });
+        setTimeout(() => status.emit('Data check complete', { duration: 2000 }), 2000);
       } else {
         const mins = Math.floor(diff / 60000);
         const secs = Math.floor((diff % 60000) / 1000);
-        setStatusText(`Next data check in ${mins}m ${secs}s`);
+        const text = `Next data check in ${mins}m ${secs}s`;
+        if (countdownIdRef.current) {
+          status.update(countdownIdRef.current, text);
+        } else {
+          countdownIdRef.current = status.emit(text, { duration: -1 });
+        }
       }
     }, 1000);
     return () => clearInterval(timer);
@@ -317,8 +323,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 
   const finalizeSavedAsRename = useCallback(() => {
     setCleanSnapshot(strategySnapshot);
-    setStatusText('Strategy saved');
-    setTimeout(() => setStatusText('Ready'), 2000);
+    status.emit('Strategy saved', { duration: 2000 });
   }, [strategySnapshot]);
 
   const handleSave = useCallback(async () => {
@@ -341,10 +346,9 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     try {
       await saveStrategy();
       setCleanSnapshot(strategySnapshot);
-      setStatusText('Strategy saved');
-      setTimeout(() => setStatusText('Ready'), 2000);
+      status.emit('Strategy saved', { duration: 2000 });
     } catch (e) {
-      setStatusText('Save failed');
+      status.emit('Save failed', { duration: 2000, variant: 'error' });
     } finally {
       isSavingRef.current = false;
     }
@@ -358,7 +362,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       finalizeSavedAsRename();
       setPendingSaveMode(null);
     } catch (e) {
-      setStatusText('Save failed');
+      status.emit('Save failed', { duration: 2000, variant: 'error' });
     } finally {
       setSaveModeBusy(false);
     }
@@ -370,11 +374,10 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     try {
       const forked = await saveStrategyAsNew(pendingSaveMode.newName);
       setCleanSnapshot(JSON.stringify({ id: forked.id, blocks: forked.blocks, name: forked.name }));
-      setStatusText(`Saved as new strategy v${(forked as { versionNumber?: number }).versionNumber ?? 1}`);
-      setTimeout(() => setStatusText('Ready'), 2500);
+      status.emit(`Saved as new strategy v${(forked as { versionNumber?: number }).versionNumber ?? 1}`, { duration: 2500 });
       setPendingSaveMode(null);
     } catch (e) {
-      setStatusText('Save-as-new failed');
+      status.emit('Save-as-new failed', { duration: 2000, variant: 'error' });
     } finally {
       setSaveModeBusy(false);
     }
@@ -483,7 +486,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       setQuickPreviewResult(result);
       open('quickPreview');
     } catch (e) {
-      setStatusText('Quick preview failed');
+      status.emit('Quick preview failed', { duration: 2000, variant: 'error' });
     }
   }, [currentStrategy, runBacktest, open, backTestInProgress]);
 
@@ -891,11 +894,6 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         <div className="flex flex-col overflow-hidden flex-1 min-w-0">
           <BlockSearchPanel />
         </div>
-      </div>
-
-      {/* ── Status Bar ──────────────────────────────────────────────────── */}
-      <div className="h-6 border-t px-3 flex items-center flex-shrink-0" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
-        <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{statusText}</span>
       </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────────────── */}
