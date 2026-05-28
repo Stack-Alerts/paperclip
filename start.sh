@@ -2,12 +2,13 @@
 # start.sh — launch the BTC Trade Engine FastAPI backend and Next.js WebUI together.
 #
 # Usage:
-#   ./start.sh
+#   ./start.sh [--refuse-unhealthy]
 #
 # Environment overrides:
-#   BTE_API_HOST   backend bind host (default: 0.0.0.0)
-#   BTE_API_PORT   backend port      (default: 8765)
-#   BTE_WEBUI_PORT WebUI port        (default: 3000)
+#   BTE_API_HOST          backend bind host (default: 0.0.0.0)
+#   BTE_API_PORT          backend port      (default: 8765)
+#   BTE_WEBUI_PORT        WebUI port        (default: 3000)
+#   BTE_REFUSE_UNHEALTHY  if 1, preserve old behaviour (refuse instead of kill)
 #
 # Ctrl+C (SIGINT) or SIGTERM cleanly stops both processes.
 
@@ -15,6 +16,16 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
+
+# Parse flags
+REFUSE_UNHEALTHY="${BTE_REFUSE_UNHEALTHY:-0}"
+for arg in "$@"; do
+  case "$arg" in
+    --refuse-unhealthy)
+      REFUSE_UNHEALTHY=1
+      ;;
+  esac
+done
 
 # Export only the env vars start.sh and uvicorn actually consume from .env.
 # We deliberately do NOT `source .env`: it contains values like
@@ -68,9 +79,77 @@ get_port_pid() {
 
 probe_health() {
   local port="$1" label="$2"
-  # Just check if the service is accepting connections (any HTTP response).
-  # This is more resilient than validating specific response codes.
-  curl -s -o /dev/null -m 2 "http://127.0.0.1:$port/" 2>/dev/null && return 0
+  # Check if the service is accepting connections (any HTTP response).
+  # Try IPv4, then IPv6; return 0 if either succeeds.
+  # Timeout 5s per attempt to allow for cold-start compilation spikes.
+
+  # Try IPv4
+  curl -s -4 -o /dev/null -m 5 "http://127.0.0.1:$port/" 2>/dev/null && return 0
+
+  # Try IPv6
+  curl -s -6 -o /dev/null -m 5 "http://[::1]:$port/" 2>/dev/null && return 0
+
+  # First attempt failed; sleep 1s and retry (catches mid-compile transients)
+  sleep 1
+
+  # Retry IPv4
+  curl -s -4 -o /dev/null -m 5 "http://127.0.0.1:$port/" 2>/dev/null && return 0
+
+  # Retry IPv6
+  curl -s -6 -o /dev/null -m 5 "http://[::1]:$port/" 2>/dev/null && return 0
+
+  return 1
+}
+
+kill_unhealthy_service() {
+  local port="$1" label="$2" pid="$3"
+  echo "port $port ($label) is in use by PID $pid but health probe failed — killing and restarting"
+
+  # Get the process group ID (pgid) of the PID
+  local pgid
+  pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | xargs || echo "")
+
+  if [[ -n "$pgid" && "$pgid" != "-" ]]; then
+    # PID is a pgid leader; kill the whole group
+    kill -TERM "-$pgid" 2>/dev/null || true
+  else
+    # Not a group leader; kill the PID directly
+    kill -TERM "$pid" 2>/dev/null || true
+  fi
+
+  # Wait up to 5s for graceful exit
+  for _ in 1 2 3 4 5; do
+    kill -0 "$pid" 2>/dev/null || return 0
+    sleep 1
+  done
+
+  # Still alive; escalate to -KILL
+  if [[ -n "$pgid" && "$pgid" != "-" ]]; then
+    kill -KILL "-$pgid" 2>/dev/null || true
+  else
+    kill -KILL "$pid" 2>/dev/null || true
+  fi
+
+  # Wait up to 3s for the process to vanish
+  for _ in 1 2 3; do
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 1
+  done
+
+  # Re-check the port is free (busy-wait up to 8s)
+  for i in {1..8}; do
+    local new_pid
+    new_pid="$(get_port_pid "$port")"
+    if [[ -z "$new_pid" ]]; then
+      echo "port $port ($label) is now free — restarting service"
+      return 0
+    fi
+    sleep 1
+  done
+
+  # Port still busy after 8s
+  echo "ERROR: port $port ($label) still in use after killing PID $pid" >&2
+  echo "       (possibly a different process now owns the port)." >&2
   return 1
 }
 
@@ -92,10 +171,22 @@ check_or_skip() {
     return 0
   fi
 
-  # Port in use but unhealthy — refuse
-  echo "ERROR: port $port ($label) is already in use by PID $pid" >&2
-  echo "       and the service appears unhealthy (health probe failed)." >&2
-  echo "       refusing to start — stop that process first, or set a different port." >&2
+  # Port in use but unhealthy
+  if [[ "$REFUSE_UNHEALTHY" == "1" ]]; then
+    # Old behaviour: refuse
+    echo "ERROR: port $port ($label) is already in use by PID $pid" >&2
+    echo "       and the service appears unhealthy (health probe failed)." >&2
+    echo "       refusing to start — stop that process first, or set a different port." >&2
+    return 1
+  fi
+
+  # New behaviour: kill and restart
+  if kill_unhealthy_service "$port" "$label" "$pid"; then
+    # Port is now free; fall through to normal launch
+    return 0
+  fi
+
+  # Kill failed; refuse
   return 1
 }
 
