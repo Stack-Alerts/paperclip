@@ -190,3 +190,105 @@ def test_ws_multiple_sequential_messages(ws_setup, path, channel):
             sync_r.publish(channel, msg)
             received = json.loads(ws.receive_text())
             assert received["seq"] == i
+
+
+# ---------------------------------------------------------------------------
+# TC-WS-9: BTE_API_DEV_MODE=1 + loopback peer → accepted without token
+#          (BTCAAAAA-30563: WebUI 6 channels reject with 403 because the
+#          browser cannot mint a JWT; dev-mode loopback bypass.)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path,channel", _CHANNELS, ids=_DOMAIN_IDS)
+def test_ws_dev_mode_loopback_accepted_without_token(ws_setup, path, channel, monkeypatch):
+    client, sync_r = ws_setup
+    from src.api import auth as auth_mod
+
+    monkeypatch.setattr(auth_mod, "_DEV_MODE", True)
+    monkeypatch.setattr(auth_mod, "_is_loopback", lambda ws: True)
+
+    with client.websocket_connect(path) as ws:
+        msg = json.dumps({"dev_bypass": True, "ts": _now()})
+        sync_r.publish(channel, msg)
+        assert ws.receive_text() == msg
+
+
+# ---------------------------------------------------------------------------
+# TC-WS-10: BTE_API_DEV_MODE=1 + non-loopback peer → still rejected without
+#           token. Non-loopback origins are NEVER auto-trusted even in dev.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path,channel", _CHANNELS, ids=_DOMAIN_IDS)
+def test_ws_dev_mode_non_loopback_rejected_without_token(ws_setup, path, channel, monkeypatch):
+    client, _ = ws_setup
+    from src.api import auth as auth_mod
+
+    monkeypatch.setattr(auth_mod, "_DEV_MODE", True)
+    monkeypatch.setattr(auth_mod, "_is_loopback", lambda ws: False)
+
+    with pytest.raises(Exception):
+        with client.websocket_connect(path) as ws:
+            ws.receive_text()
+
+
+# ---------------------------------------------------------------------------
+# TC-WS-11: BTE_API_DEV_MODE=1 with a valid token still works
+#           (testers can opt into the full auth code path even in dev).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path,channel", _CHANNELS, ids=_DOMAIN_IDS)
+def test_ws_dev_mode_with_valid_token_still_accepts(ws_setup, path, channel, monkeypatch):
+    client, sync_r = ws_setup
+    from src.api import auth as auth_mod
+
+    monkeypatch.setattr(auth_mod, "_DEV_MODE", True)
+    # _is_loopback irrelevant when a real token is provided
+
+    token = make_token()
+    with client.websocket_connect(f"{path}?token={token}") as ws:
+        msg = json.dumps({"with_token_in_dev": True, "ts": _now()})
+        sync_r.publish(channel, msg)
+        assert ws.receive_text() == msg
+
+
+# ---------------------------------------------------------------------------
+# TC-WS-12: BTE_API_DEV_MODE=1 + loopback + INVALID token → still rejected
+#           (bypass triggers only when token is absent, not when one is
+#           supplied and bogus).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path,channel", _CHANNELS, ids=_DOMAIN_IDS)
+def test_ws_dev_mode_loopback_with_bad_token_rejected(ws_setup, path, channel, monkeypatch):
+    client, _ = ws_setup
+    from src.api import auth as auth_mod
+
+    monkeypatch.setattr(auth_mod, "_DEV_MODE", True)
+    monkeypatch.setattr(auth_mod, "_is_loopback", lambda ws: True)
+
+    with pytest.raises(Exception):
+        with client.websocket_connect(f"{path}?token=not.a.jwt") as ws:
+            ws.receive_text()
+
+
+# ---------------------------------------------------------------------------
+# TC-WS-13: _is_loopback recognises IPv4, IPv6, IPv4-mapped-IPv6 hosts.
+# ---------------------------------------------------------------------------
+
+
+def test_is_loopback_recognises_known_hosts():
+    from src.api.auth import _is_loopback
+    from types import SimpleNamespace
+
+    def fake_ws(host):
+        return SimpleNamespace(client=SimpleNamespace(host=host))
+
+    assert _is_loopback(fake_ws("127.0.0.1")) is True
+    assert _is_loopback(fake_ws("::1")) is True
+    assert _is_loopback(fake_ws("::ffff:127.0.0.1")) is True
+    assert _is_loopback(fake_ws("10.0.0.1")) is False
+    assert _is_loopback(fake_ws("192.168.1.50")) is False
+    assert _is_loopback(fake_ws("testclient")) is False
+    assert _is_loopback(SimpleNamespace(client=None)) is False

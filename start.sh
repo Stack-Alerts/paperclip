@@ -9,6 +9,11 @@
 #   BTE_API_PORT          backend port      (default: 8765)
 #   BTE_WEBUI_PORT        WebUI port        (default: 3000)
 #   BTE_REFUSE_UNHEALTHY  if 1, preserve old behaviour (refuse instead of kill)
+#   BTE_API_DEV_MODE      if 1, accept loopback WebSocket handshakes WITHOUT a JWT
+#                         (dev-only — the WebUI cannot mint browser-side tokens).
+#                         REST endpoints already short-circuit auth under this flag.
+#                         Non-loopback origins are NEVER auto-trusted.
+#                         NEVER set this in production.
 #
 # Ctrl+C (SIGINT) or SIGTERM cleanly stops both processes.
 

@@ -9,12 +9,28 @@ All REST and WebSocket endpoints call require_jwt() / ws_require_jwt().
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Optional
 
 import jwt
 from fastapi import Depends, HTTPException, Query, WebSocket, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+logger = logging.getLogger(__name__)
+
+# Hosts treated as loopback for the WS dev-mode bypass. IPv4, IPv6, and
+# IPv4-mapped-IPv6 are all covered; anything outside this set is treated as
+# remote and must present a JWT even when BTE_API_DEV_MODE=1.
+_LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "::1", "::ffff:127.0.0.1"})
+
+
+def _is_loopback(websocket: WebSocket) -> bool:
+    """Return True iff the WS peer is a loopback address."""
+    client = websocket.client
+    if client is None:
+        return False
+    return client.host in _LOOPBACK_HOSTS
 
 # ---------------------------------------------------------------------------
 # Embedded RSA-2048 public key (BTE API v1, 2026-05-16)
@@ -91,15 +107,38 @@ async def require_jwt(
 
 async def ws_require_jwt(
     websocket: WebSocket,
-    token: str = Query(..., description="JWT access token"),
+    token: Optional[str] = Query(None, description="JWT access token"),
 ) -> dict[str, Any]:
     """Validate JWT for WebSocket upgrades.
 
     Accepts token as ``?token=<jwt>`` query parameter.
     Closes the socket with 1008 (Policy Violation) on failure.
+
+    Dev-mode bypass: when ``BTE_API_DEV_MODE=1`` AND the peer is a loopback
+    address (127.0.0.1, ::1, ::ffff:127.0.0.1), the handshake is accepted
+    without a token. Non-loopback origins are NEVER auto-trusted even in
+    dev mode — they must still present a valid JWT.
     """
+    if _DEV_MODE and token is None and _is_loopback(websocket):
+        logger.info(
+            "WS dev-mode bypass: accepting handshake from loopback %s without JWT",
+            websocket.client.host if websocket.client else "unknown",
+        )
+        return {"sub": "dev", "dev_mode": True, "loopback": True}
+
+    if token is None:
+        # Reject the handshake before upgrade. Starlette translates HTTPException
+        # raised from a WS dependency into a 403 response without sending a close
+        # frame (the connection was never accepted), so we MUST NOT call
+        # websocket.close() here — doing so emits a duplicate ASGI send and
+        # raises a RuntimeError inside uvicorn even though the 403 still ships.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Missing token",
+        )
+
     try:
         return _decode(token)
     except HTTPException:
-        await websocket.close(code=1008, reason="Unauthorized")
+        # Same reasoning as above — the upgrade has not been accepted yet.
         raise
