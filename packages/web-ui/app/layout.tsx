@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { StatusBarProvider } from "@/contexts/StatusContext";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,12 +34,14 @@ export default function RootLayout({
     >
       <body className="h-full flex" style={{ background: 'var(--app-bg)', color: 'var(--text-primary)' }}>
         <ThemeProvider>
-          <SidebarProvider>
-            <AppSidebar />
-            <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-              {children}
-            </main>
-          </SidebarProvider>
+          <StatusBarProvider>
+            <SidebarProvider>
+              <AppSidebar />
+              <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                {children}
+              </main>
+            </SidebarProvider>
+          </StatusBarProvider>
         </ThemeProvider>
       </body>
     </html>

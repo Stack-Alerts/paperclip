@@ -19,4 +19,8 @@ export interface StatusEmitOptions {
 export interface StatusBarSettings {
   tickerMode: boolean;
   maxVisible: number;
+  errorPersist: boolean;
+  errorDuration: number;
+  successDuration: number;
+  warningDuration: number;
 }

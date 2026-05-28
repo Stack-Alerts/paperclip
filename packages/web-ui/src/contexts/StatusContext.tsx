@@ -12,12 +12,46 @@ interface StatusContextType {
 
 const StatusContext = createContext<StatusContextType | undefined>(undefined);
 
+const DEFAULT_SETTINGS: StatusBarSettings = {
+  tickerMode: false,
+  maxVisible: 3,
+  errorPersist: true,
+  errorDuration: 10,
+  successDuration: 4000,
+  warningDuration: 6000,
+};
+
 export function StatusBarProvider({ children }: { children: React.ReactNode }) {
   const [entries, setEntries] = useState<StatusEntry[]>([]);
-  const [settings, setSettings] = useState<StatusBarSettings>({
-    tickerMode: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_TICKER_MODE === 'true' : false,
-    maxVisible: 3,
-  });
+  const [settings, setSettings] = useState<StatusBarSettings>(DEFAULT_SETTINGS);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const stored = localStorage.getItem('status-bar-settings');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setSettings(prev => ({ ...prev, ...parsed }));
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'status-bar-settings' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setSettings(prev => ({ ...prev, ...parsed }));
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   useEffect(() => {
     const unsubscribeEmit = statusBus.on('emit', (entry: StatusEntry) => {
@@ -65,7 +99,11 @@ export function StatusBarProvider({ children }: { children: React.ReactNode }) {
   }, [settings.tickerMode]);
 
   const updateSettings = (newSettings: Partial<StatusBarSettings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    const updated = { ...settings, ...newSettings };
+    setSettings(updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('status-bar-settings', JSON.stringify(updated));
+    }
   };
 
   return (
