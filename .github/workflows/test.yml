@@ -28,7 +28,9 @@ jobs:
           POSTGRES_USER: optimizer_admin
           POSTGRES_PASSWORD: secure_password_change_me
         ports:
-          - 5432:5432
+          # Host port 55432 avoids collision with hindsight postgres on
+          # the sirrus-local self-hosted runner (BTCAAAAA-30505).
+          - 55432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -47,7 +49,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-xkb1 \
-            xvfb libgl1-mesa-glx
+            xvfb libgl1
 
       - name: Install Python dependencies
         run: |
@@ -67,7 +69,7 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
           POSTGRES_HOST: localhost
-          POSTGRES_PORT: 5432
+          POSTGRES_PORT: 55432
           POSTGRES_DB: optimizer_v3
           POSTGRES_USER: optimizer_admin
           POSTGRES_PASSWORD: secure_password_change_me
@@ -141,7 +143,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-xkb1 \
-            xvfb libgl1-mesa-glx
+            xvfb libgl1
 
       - name: Install Python dependencies
         run: |
