@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
     "10.0.0.0/8",
     "172.16.0.0/12",
   ],
+  // Public environment variables exposed to browser
+  // NEXT_PUBLIC_TICKER_MODE: Enable multi-message status bar ticker with TTL auto-expire, dismiss buttons, and pinned countdown
 };
 
 export default nextConfig;

@@ -6,13 +6,17 @@ export interface StatusEntry {
   variant: StatusVariant;
   createdAt: number;
   expiresAt?: number;
+  pinned?: boolean;
+  dismissed?: boolean;
 }
 
 export interface StatusEmitOptions {
   variant?: StatusVariant;
   duration?: number;
+  pinned?: boolean;
 }
 
 export interface StatusBarSettings {
   tickerMode: boolean;
+  maxVisible: number;
 }

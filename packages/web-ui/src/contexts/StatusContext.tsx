@@ -14,7 +14,10 @@ const StatusContext = createContext<StatusContextType | undefined>(undefined);
 
 export function StatusBarProvider({ children }: { children: React.ReactNode }) {
   const [entries, setEntries] = useState<StatusEntry[]>([]);
-  const [settings, setSettings] = useState<StatusBarSettings>({ tickerMode: false });
+  const [settings, setSettings] = useState<StatusBarSettings>({
+    tickerMode: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_TICKER_MODE === 'true' : false,
+    maxVisible: 3,
+  });
 
   useEffect(() => {
     const unsubscribeEmit = statusBus.on('emit', (entry: StatusEntry) => {
@@ -42,6 +45,24 @@ export function StatusBarProvider({ children }: { children: React.ReactNode }) {
       unsubscribeClear();
     };
   }, []);
+
+  useEffect(() => {
+    if (!settings.tickerMode) return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setEntries(prev =>
+        prev.filter(e => {
+          if (e.pinned) return true;
+          if (e.dismissed) return false;
+          if (e.expiresAt && e.expiresAt <= now) return false;
+          return true;
+        })
+      );
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [settings.tickerMode]);
 
   const updateSettings = (newSettings: Partial<StatusBarSettings>) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
