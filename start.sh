@@ -297,6 +297,82 @@ kill_unhealthy_service() {
   return 1
 }
 
+kill_orphan_next_processes() {
+  local webui_dir="$1"
+  local killed=()
+
+  # Find all 'npm run dev' and 'next-server' processes.
+  # We check both to catch the npm parent and any node/next-server children.
+  # This matches the process tree: npm -> node -> next-server
+  local pids
+  # Combine results from two searches (npm dev processes and next-server)
+  pids=$(
+    (pgrep -f 'npm.*run dev' 2>/dev/null || true; \
+     pgrep -f 'next-server' 2>/dev/null || true) | sort -u
+  )
+
+  [[ -z "$pids" ]] && return 0
+
+  # For each candidate, check if its cwd matches the webui directory
+  while IFS= read -r pid; do
+    [[ -z "$pid" ]] && continue
+
+    # Read the symlink /proc/<pid>/cwd to get the process's working directory
+    local proc_cwd
+    proc_cwd=$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)
+
+    # Resolve webui_dir to an absolute path for comparison
+    local abs_webui_dir
+    abs_webui_dir=$(readlink -f "$webui_dir" 2>/dev/null || echo "$webui_dir")
+
+    # Match on realpath
+    if [[ "$proc_cwd" == "$abs_webui_dir" ]]; then
+      # This orphan is in the right directory; get uptime info for logging
+      local start_time
+      start_time=$(ps -o lstart= -p "$pid" 2>/dev/null | xargs || echo "unknown")
+
+      # Kill the process group (like kill_unhealthy_service does)
+      local pgid
+      pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | xargs || echo "")
+
+      if [[ -n "$pgid" && "$pgid" != "-" ]]; then
+        kill -TERM "-$pgid" 2>/dev/null || true
+      else
+        kill -TERM "$pid" 2>/dev/null || true
+      fi
+
+      # Wait up to 5s for graceful exit
+      for _ in 1 2 3 4 5; do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 1
+      done
+
+      # Still alive; escalate to -KILL
+      if [[ -n "$pgid" && "$pgid" != "-" ]]; then
+        kill -KILL "-$pgid" 2>/dev/null || true
+      else
+        kill -KILL "$pid" 2>/dev/null || true
+      fi
+
+      # Wait for it to vanish
+      for _ in 1 2 3; do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 1
+      done
+
+      killed+=("$pid")
+    fi
+  done <<< "$pids"
+
+  # Log what was killed
+  if [[ ${#killed[@]} -gt 0 ]]; then
+    echo "[webui] killed orphan next dev processes: ${killed[*]}"
+    return 0
+  fi
+
+  return 0
+}
+
 check_or_skip() {
   local port="$1" label="$2" pid=""
 
@@ -338,6 +414,15 @@ check_or_skip() {
 EXISTING_PIDS=()
 
 check_or_skip "$BACKEND_PORT" backend || exit 1
+
+# Pre-kill orphan 'next dev' processes whose cwd matches the webui directory
+# (BTCAAAAA-30626: Next.js refuses to start a second dev instance globally per
+# project, regardless of port). This must run before check_or_skip so we clear
+# the lock before the port check fails.
+if [[ "$REFUSE_UNHEALTHY" != "1" ]]; then
+  kill_orphan_next_processes "$REPO_ROOT/packages/web-ui" || exit 1
+fi
+
 check_or_skip "$WEBUI_PORT"   webui   || exit 1
 
 # --- resolve interpreters ----------------------------------------------------
