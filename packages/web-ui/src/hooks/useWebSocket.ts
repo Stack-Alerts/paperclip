@@ -1,15 +1,19 @@
 'use client';
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { status } from '@/lib/status';
+import { useStatusSettings } from '@/contexts/StatusContext';
 
 export type WsStatus = 'connecting' | 'open' | 'closed' | 'error';
 
 export function useWebSocket<T>(url: string) {
   const [data, setData] = useState<T | null>(null);
-  const [status, setStatus] = useState<WsStatus>('connecting');
+  const [status_ws, setStatus] = useState<WsStatus>('connecting');
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmounted = useRef(false);
   const connectRef = useRef<() => void>(() => { /* populated by effect */ });
+  const statusTickerId = useRef<string | null>(null);
+  const { settings } = useStatusSettings();
 
   const connect = useCallback(() => {
     if (unmounted.current) return;
@@ -19,7 +23,12 @@ export function useWebSocket<T>(url: string) {
       setStatus('connecting');
 
       ws.onopen = () => {
-        if (!unmounted.current) setStatus('open');
+        if (!unmounted.current) {
+          setStatus('open');
+          if (settings.tickerMode) {
+            status.emit('WebSocket connected', { variant: 'success', duration: 2000 });
+          }
+        }
       };
 
       ws.onmessage = (evt) => {
@@ -32,19 +41,30 @@ export function useWebSocket<T>(url: string) {
       };
 
       ws.onerror = () => {
-        if (!unmounted.current) setStatus('error');
+        if (!unmounted.current) {
+          setStatus('error');
+          if (settings.tickerMode) {
+            status.emit('WebSocket error', { variant: 'error', duration: 4000 });
+          }
+        }
       };
 
       ws.onclose = () => {
         if (unmounted.current) return;
         setStatus('closed');
+        if (settings.tickerMode) {
+          status.emit('WebSocket disconnected', { variant: 'warning', duration: 2000 });
+        }
         reconnectTimer.current = setTimeout(connectRef.current, 3000);
       };
     } catch {
       setStatus('error');
+      if (settings.tickerMode) {
+        status.emit('WebSocket connection failed', { variant: 'error', duration: 4000 });
+      }
       reconnectTimer.current = setTimeout(connectRef.current, 5000);
     }
-  }, [url]);
+  }, [url, settings.tickerMode]);
 
   useEffect(() => {
     connectRef.current = connect;
@@ -58,5 +78,5 @@ export function useWebSocket<T>(url: string) {
     };
   }, [connect]);
 
-  return { data, status };
+  return { data, status: status_ws };
 }

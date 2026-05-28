@@ -3,6 +3,8 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import type { AlertsMessage, AlertSeverity } from '@/types/itm';
 import { Tooltip } from './Tooltip';
 import type { WsStatus } from '@/hooks/useWebSocket';
+import { useEffect, useRef } from 'react';
+import { status } from '@/lib/status';
 
 const SEV_STYLE: Record<AlertSeverity, string> = {
   INFO: 'border-sky-700 bg-sky-900/30 text-sky-300',
@@ -27,10 +29,27 @@ interface Props {
 }
 
 export function B5AlertBanner({ wsBaseUrl }: Props) {
-  const { data, status } = useWebSocket<AlertsMessage>(`${wsBaseUrl}/ws/alerts`);
+  const { data, status: wsStatus } = useWebSocket<AlertsMessage>(`${wsBaseUrl}/ws/alerts`);
+  const emittedAlertIdsRef = useRef<Set<string>>(new Set());
 
   const active = data?.active_alerts.filter((a) => !a.acknowledged) ?? [];
   const hasCritical = active.some((a) => a.severity === 'CRITICAL');
+
+  // Emit new alerts to the global status ticker (dual-display with banner)
+  useEffect(() => {
+    active.forEach((alert) => {
+      if (!emittedAlertIdsRef.current.has(alert.id)) {
+        emittedAlertIdsRef.current.add(alert.id);
+        const variant = alert.severity === 'CRITICAL' ? 'error' : alert.severity === 'WARN' ? 'warning' : 'info';
+        const duration = alert.severity === 'CRITICAL' ? -1 : 4000;
+        status.emit(alert.message, { variant, duration });
+      }
+    });
+    // Clean up dismissed alerts from tracking
+    emittedAlertIdsRef.current = new Set(
+      Array.from(emittedAlertIdsRef.current).filter(id => active.some(a => a.id === id))
+    );
+  }, [active]);
 
   return (
     <div
@@ -50,7 +69,7 @@ export function B5AlertBanner({ wsBaseUrl }: Props) {
           <Tooltip tip="Number of unacknowledged active alerts.">
             <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{active.length} active</span>
           </Tooltip>
-          <WsStatusMini status={status} />
+          <WsStatusMini status={wsStatus} />
         </div>
       </div>
 
