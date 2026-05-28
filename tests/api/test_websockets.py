@@ -292,3 +292,74 @@ def test_is_loopback_recognises_known_hosts():
     assert _is_loopback(fake_ws("192.168.1.50")) is False
     assert _is_loopback(fake_ws("testclient")) is False
     assert _is_loopback(SimpleNamespace(client=None)) is False
+
+
+# ---------------------------------------------------------------------------
+# TC-WS-14 (BTCAAAAA-30658): Redis unavailable → WS closes 1011 with reason
+# `upstream:redis_unavailable`, single WARNING log line, no ERROR stack trace.
+# ---------------------------------------------------------------------------
+
+
+class _PingFailsClient:
+    """Async-context Redis stub that raises ConnectionError on `ping()`.
+
+    Mirrors enough of the redis.asyncio.Redis surface used by _ws_subscribe
+    to trigger the graceful-degradation branch without standing up fakeredis.
+    """
+
+    def __init__(self) -> None:
+        self.ping_calls = 0
+        self.pubsub_calls = 0
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_exc):
+        return None
+
+    async def ping(self):
+        self.ping_calls += 1
+        import redis.exceptions as redis_exc
+
+        raise redis_exc.ConnectionError(
+            "Error 111 connecting to localhost:6379. Connection refused."
+        )
+
+    def pubsub(self):  # pragma: no cover - should not be reached on this path
+        self.pubsub_calls += 1
+        raise AssertionError("pubsub() should not be called when ping fails")
+
+
+@pytest.mark.parametrize("path,channel", _CHANNELS, ids=_DOMAIN_IDS)
+def test_ws_redis_unavailable_closes_1011_with_reason(
+    ws_setup, path, channel, monkeypatch, caplog
+):
+    import logging
+    from starlette.websockets import WebSocketDisconnect
+    import src.api.app as api_app
+
+    client, _ = ws_setup
+    fake = _PingFailsClient()
+    monkeypatch.setattr(api_app, "make_async_client", lambda: fake)
+
+    token = make_token()
+    caplog.set_level(logging.WARNING, logger="src.api.app")
+
+    with client.websocket_connect(f"{path}?token={token}") as ws:
+        with pytest.raises(WebSocketDisconnect) as exc_info:
+            ws.receive_text()
+
+    assert exc_info.value.code == 1011
+    assert exc_info.value.reason == "upstream:redis_unavailable"
+    assert fake.ping_calls == 1
+
+    # Exactly one WARNING about this channel, and no ERROR-level traceback.
+    warnings = [
+        r for r in caplog.records
+        if r.levelno == logging.WARNING
+        and r.name == "src.api.app"
+        and channel in r.getMessage()
+    ]
+    assert len(warnings) == 1, f"expected 1 WARNING, got {[r.getMessage() for r in warnings]}"
+    errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert errors == [], f"unexpected ERROR records: {[r.getMessage() for r in errors]}"

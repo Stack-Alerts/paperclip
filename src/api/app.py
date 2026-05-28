@@ -52,6 +52,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import redis.asyncio as aioredis
+from redis.exceptions import RedisError
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -1269,21 +1270,46 @@ async def sb_duplicate_strategy(
 
 
 async def _ws_subscribe(websocket: WebSocket, channel: str) -> None:
-    """Accept the WebSocket and relay all messages from a Redis pub/sub channel."""
+    """Accept the WebSocket and relay all messages from a Redis pub/sub channel.
+
+    If Redis is unavailable the socket is closed with code 1011 and reason
+    ``upstream:redis_unavailable``. A single ``WARNING`` line is logged per
+    connection instead of letting redis.ConnectionError propagate as a full
+    ASGI stack trace (see BTCAAAAA-30658).
+    """
     await websocket.accept()
     async with make_async_client() as r:
-        pubsub = r.pubsub()
-        await pubsub.subscribe(channel)
+        try:
+            await r.ping()
+            pubsub = r.pubsub()
+            await pubsub.subscribe(channel)
+        except RedisError as exc:
+            logger.warning(
+                "WS %s: Redis unavailable (%s); closing 1011", channel, exc
+            )
+            await websocket.close(code=1011, reason="upstream:redis_unavailable")
+            return
         try:
             async for message in pubsub.listen():
                 if message["type"] == "message":
                     await websocket.send_text(message["data"])
         except WebSocketDisconnect:
             pass
+        except RedisError as exc:
+            logger.warning(
+                "WS %s: Redis stream error (%s); closing 1011", channel, exc
+            )
+            try:
+                await websocket.close(code=1011, reason="upstream:redis_unavailable")
+            except RuntimeError:
+                pass
         except Exception as exc:
             logger.error("WS %s error: %s", channel, exc)
         finally:
-            await pubsub.unsubscribe(channel)
+            try:
+                await pubsub.unsubscribe(channel)
+            except RedisError:
+                pass
 
 
 # ---------------------------------------------------------------------------
