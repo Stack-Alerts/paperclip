@@ -68,6 +68,9 @@
     "scripts/blast_radius_monitor.py": [
       "src/touch_index/paperclip_client.py"
     ],
+    "scripts/closure_gate_routine.py": [
+      "src/touch_index/paperclip_client.py"
+    ],
     "scripts/deadman_switch_local_monitor.py": [
       "src/touch_index/paperclip_client.py"
     ],
@@ -77,6 +80,9 @@
     "scripts/demo_signal_catalog.py": [
       "src/ai_consultant/signal_catalog.py",
       "src/optimizer_v3/database/config.py"
+    ],
+    "scripts/dev_server_post_merge_reset.py": [
+      "src/touch_index/paperclip_client.py"
     ],
     "scripts/fix_month_boundary_parquet.py": [
       "src/data_manager/config.py"
@@ -4271,6 +4277,9 @@
     "tests/test_blast_radius/test_worker.py": [
       "src/blast_radius/worker.py"
     ],
+    "tests/test_fabrication_detector.py": [
+      "scripts/closure_gate_routine.py"
+    ],
     "tests/test_impact_gate/test_polling_worker.py": [
       "src/impact_gate/polling_worker.py"
     ],
@@ -4640,8 +4649,10 @@
       "scripts/backup_deadman_switch.py",
       "scripts/backup_deadman_switch_monitor.py",
       "scripts/blast_radius_monitor.py",
+      "scripts/closure_gate_routine.py",
       "scripts/deadman_switch_local_monitor.py",
       "scripts/deadman_switch_monitor.py",
+      "scripts/dev_server_post_merge_reset.py",
       "scripts/impact_gate_polling_daemon.py",
       "scripts/lock_exception_signoff.py",
       "scripts/lock_gate_create_signoff.py",
@@ -7549,6 +7560,9 @@
     "src/strategy_builder/ui/validation_dialog.py": [
       "tests/strategy_builder/ui/test_window_maximize_resize_btcaaaaa390.py"
     ],
+    "scripts/closure_gate_routine.py": [
+      "tests/test_fabrication_detector.py"
+    ],
     "scripts/backup_deadman_switch.py": [
       "tests/test_scripts/test_backup_deadman_switch.py"
     ],
@@ -7674,11 +7688,14 @@
     "scripts/binance/download_binance_liquidations.py",
     "scripts/blast_radius_cli.py",
     "scripts/blast_radius_monitor.py",
+    "scripts/closure_gate_routine.py",
     "scripts/deadman_switch_local_monitor.py",
     "scripts/deadman_switch_monitor.py",
     "scripts/demo_signal_catalog.py",
     "scripts/dep_extractor.py",
     "scripts/depgraph.py",
+    "scripts/dev_server_post_merge_reset.py",
+    "scripts/dev_server_post_merge_routine.py",
     "scripts/fix_month_boundary_parquet.py",
     "scripts/generate_strategy.py",
     "scripts/hindsight_feedback_collector.py",
@@ -7696,6 +7713,7 @@
     "scripts/lock_module_verify.py",
     "scripts/manage_backups.py",
     "scripts/manage_migrations.py",
+    "scripts/merge_dispatch_routine.py",
     "scripts/migrate_strategy_type.py",
     "scripts/nightly_test_alert.py",
     "scripts/opencode_watchdog.py",
@@ -7705,6 +7723,7 @@
     "scripts/paperclip_recovery_monitor_backup.py",
     "scripts/paperclip_stalled_workflow_reporter.py",
     "scripts/patches/0002-add-stale-run-evaluation-dedup.py",
+    "scripts/pr_scope_check_routine.py",
     "scripts/provider_dashboard.py",
     "scripts/provider_monitor.py",
     "scripts/qa_btcaaaaa_1089_cache_key_fix.py",
@@ -8761,6 +8780,7 @@
     "tests/integration/test_exit_conditions_comprehensive.py",
     "tests/integration/test_exit_flexible_mode.py",
     "tests/integration/test_exit_workflow.py",
+    "tests/integration/test_merge_dispatch_routine.py",
     "tests/integration/test_multiple_strategies.py",
     "tests/integration/test_nautilus_integration.py",
     "tests/integration/test_recheck_system.py",
@@ -8934,6 +8954,8 @@
     "tests/test_blast_radius/test_report.py",
     "tests/test_blast_radius/test_runner.py",
     "tests/test_blast_radius/test_worker.py",
+    "tests/test_closure_gate_routine.py",
+    "tests/test_fabrication_detector.py",
     "tests/test_impact_gate/__init__.py",
     "tests/test_impact_gate/conftest.py",
     "tests/test_impact_gate/test_e2e.py",
@@ -8943,6 +8965,7 @@
     "tests/test_impact_gate/test_scan_done_alert.py",
     "tests/test_impact_gate/test_scan_health.py",
     "tests/test_impact_gate/test_worker.py",
+    "tests/test_pr_scope_check_routine.py",
     "tests/test_provider_monitor.py",
     "tests/test_scripts/__init__.py",
     "tests/test_scripts/test_backup_deadman_switch.py",
@@ -9019,10 +9042,10 @@
     "src/detectors/building_blocks/patterns/triple_top.py"
   ],
   "stats": {
-    "total_files": 1409,
-    "parsed_files": 1393,
+    "total_files": 1418,
+    "parsed_files": 1402,
     "error_files": 16,
-    "parse_rate_pct": 98.86,
-    "edge_count": 2458
+    "parse_rate_pct": 98.87,
+    "edge_count": 2461
   }
 }
