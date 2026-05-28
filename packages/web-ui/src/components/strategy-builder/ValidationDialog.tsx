@@ -30,7 +30,7 @@ export const ValidationDialog: React.FC<ValidationDialogProps> = ({ open, onClos
           <button
             onClick={onClose}
             className="transition-colors text-xl leading-none"
-            style={{ color: closeHover ? 'var(--text-primary)' : 'var(--text-secondary)' }}
+            style={{ color: closeHover ? 'var(--text-secondary)' : 'var(--text-secondary)' }}
             onMouseEnter={() => setCloseHover(true)}
             onMouseLeave={() => setCloseHover(false)}
           >
@@ -51,7 +51,7 @@ export const ValidationDialog: React.FC<ValidationDialogProps> = ({ open, onClos
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-panel)')}
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--bg-panel)', color: 'var(--text-primary)' }}
+            style={{ background: 'var(--bg-panel)', color: 'var(--text-secondary)' }}
           >
             Close
           </button>

@@ -22,7 +22,7 @@ const LEVEL_COLORS: Record<string, string> = {
   WARNING: 'var(--accent-orange)',
   TRADE_OPENED: 'var(--accent-green)',
   TRADE_CLOSED: 'var(--accent-teal)',
-  INFO: 'var(--text-primary)',
+  INFO: 'var(--text-secondary)',
   SYSTEM: 'var(--accent-blue)',
   DEBUG: 'var(--text-muted)',
 };
@@ -52,7 +52,7 @@ type Tab = (typeof TABS)[number];
 
 function levelColor(level: string): string {
   const normalized = level.toUpperCase().replace(/\s+/g, '_');
-  return LEVEL_COLORS[normalized] ?? 'var(--text-primary)';
+  return LEVEL_COLORS[normalized] ?? 'var(--text-secondary)';
 }
 
 function entryMatchesTab(entry: LogEntry, tab: Tab): boolean {
@@ -129,12 +129,12 @@ export function LogViewerWindow({ open, onClose, logs = [], onClear }: LogViewer
       <div className="flex flex-col w-[1100px] max-w-[95vw] h-[720px] max-h-[90vh] rounded-lg shadow-2xl overflow-hidden" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border)' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-deep)' }}>
-          <h2 className="text-sm font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>Log Viewer</h2>
+          <h2 className="text-sm font-semibold tracking-wide" style={{ color: 'var(--text-secondary)' }}>Log Viewer</h2>
           <button
             onClick={onClose}
             className="transition-colors text-lg leading-none px-1"
             style={{ color: 'var(--text-secondary)' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)'; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
             aria-label="Close"
           >
@@ -180,7 +180,7 @@ export function LogViewerWindow({ open, onClose, logs = [], onClear }: LogViewer
           <button
             onClick={toggleAll}
             className="ml-1 px-2 py-0.5 rounded text-xs transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
           >
@@ -196,7 +196,7 @@ export function LogViewerWindow({ open, onClose, logs = [], onClear }: LogViewer
             onChange={(e) => setSearchText(e.target.value)}
             placeholder="Search log content..."
             className="flex-1 px-3 py-1.5 rounded text-xs focus:outline-none"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
           />
           <label className="flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap">
             <input
@@ -237,10 +237,10 @@ export function LogViewerWindow({ open, onClose, logs = [], onClear }: LogViewer
         <div className="flex items-center justify-between px-4 py-2 flex-shrink-0" style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-panel)' }}>
           <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--text-secondary)' }}>
             <span>
-              Total: <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{logs.length}</span>
+              Total: <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>{logs.length}</span>
             </span>
             <span>
-              Displayed: <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{visibleEntries.length}</span>
+              Displayed: <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>{visibleEntries.length}</span>
             </span>
             {copyFeedback && (
               <span className="font-medium" style={{ color: 'var(--accent-green)' }}>{copyFeedback}</span>
@@ -250,7 +250,7 @@ export function LogViewerWindow({ open, onClose, logs = [], onClear }: LogViewer
             <button
               onClick={clearLogs}
               className="px-3 py-1.5 rounded text-xs transition-colors"
-              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
             >
@@ -259,7 +259,7 @@ export function LogViewerWindow({ open, onClose, logs = [], onClear }: LogViewer
             <button
               onClick={copyLog}
               className="px-3 py-1.5 rounded text-xs transition-colors"
-              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
             >
@@ -268,7 +268,7 @@ export function LogViewerWindow({ open, onClose, logs = [], onClear }: LogViewer
             <button
               onClick={onClose}
               className="px-3 py-1.5 rounded text-xs transition-colors"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
             >

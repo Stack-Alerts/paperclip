@@ -140,7 +140,7 @@ function stepClasses(status: StepStatus, clickable: boolean): string {
     case 'error':
       return `${BASE_CLASSES} ${cursor} bg-[var(--accent-red-deeper)] border-[var(--accent-red-dark)] text-[var(--accent-red)] hover:bg-[var(--accent-red-dark)]`;
     default:
-      return `${BASE_CLASSES} ${cursor} bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.08)] text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text-primary)] hover:border-[rgba(255,255,255,0.15)]`;
+      return `${BASE_CLASSES} ${cursor} bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.08)] text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text-secondary)] hover:border-[rgba(255,255,255,0.15)]`;
   }
 }
 

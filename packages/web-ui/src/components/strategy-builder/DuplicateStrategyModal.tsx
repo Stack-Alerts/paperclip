@@ -41,7 +41,7 @@ export function DuplicateStrategyModal({ strategy, onConfirm, onCancel }: Duplic
               className="mt-0.5 accent-blue-500"
             />
             <div>
-              <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Duplicate as new version of existing strategy</span>
+              <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Duplicate as new version of existing strategy</span>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Creates a new version under the same strategy ID.</p>
             </div>
           </label>
@@ -56,7 +56,7 @@ export function DuplicateStrategyModal({ strategy, onConfirm, onCancel }: Duplic
               className="mt-0.5 accent-blue-500"
             />
             <div>
-              <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Duplicate as new strategy</span>
+              <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Duplicate as new strategy</span>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Creates a completely separate strategy with its own ID.</p>
             </div>
           </label>
@@ -88,7 +88,7 @@ export function DuplicateStrategyModal({ strategy, onConfirm, onCancel }: Duplic
             className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
             style={{
               background: cancelHover ? 'var(--bg-hover)' : 'var(--bg-panel)',
-              color: 'var(--text-primary)',
+              color: 'var(--text-secondary)',
             }}
           >
             Cancel

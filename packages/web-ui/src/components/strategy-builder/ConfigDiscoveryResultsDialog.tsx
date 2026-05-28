@@ -31,7 +31,7 @@ export interface ConfigDiscoveryResultsDialogProps {
 
 const BADGE_INLINE_STYLES: Record<string, React.CSSProperties> = {
   gold: { background: 'color-mix(in srgb, #eab308 20%, transparent)', color: '#eab308', border: '1px solid #ca8a04' },
-  silver: { background: 'color-mix(in srgb, var(--text-secondary) 20%, transparent)', color: 'var(--text-primary)', border: '1px solid var(--border)' },
+  silver: { background: 'color-mix(in srgb, var(--text-secondary) 20%, transparent)', color: 'var(--text-secondary)', border: '1px solid var(--border)' },
   bronze: { background: 'color-mix(in srgb, var(--accent-orange) 20%, transparent)', color: 'var(--accent-orange)', border: '1px solid var(--accent-orange)' },
   baseline: { background: 'color-mix(in srgb, var(--accent-blue) 20%, transparent)', color: 'var(--accent-blue)', border: '1px solid var(--accent-blue-dark)' },
   '': { background: 'var(--bg-card)', color: 'var(--text-secondary)' },
@@ -65,7 +65,7 @@ function ColHeader({
       onClick={() => onSort(sortK)}
       className="px-3 py-2 text-left text-xs font-semibold cursor-pointer select-none whitespace-nowrap"
       style={{ color: 'var(--text-secondary)' }}
-      onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+      onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
       onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
     >
       {label}
@@ -128,7 +128,7 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
             onClick={onClose}
             className="transition-colors text-xl leading-none"
             style={{ color: 'var(--text-secondary)' }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
             onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
           >
             ×
@@ -146,7 +146,7 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
             onChange={(e) => setMinTrades(Number(e.target.value))}
             className="w-32"
           />
-          <span className="text-xs w-8" style={{ color: 'var(--text-primary)' }}>{minTrades}</span>
+          <span className="text-xs w-8" style={{ color: 'var(--text-secondary)' }}>{minTrades}</span>
           <span className="text-xs ml-2" style={{ color: 'var(--text-muted)' }}>{filtered.length} shown</span>
         </div>
 
@@ -197,7 +197,7 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
                     }
                   }}
                 >
-                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-primary)' }}>{row.rank}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>{row.rank}</td>
                   <td className="px-3 py-2">
                     <span
                       className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
@@ -206,9 +206,9 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
                       {BADGE_ICONS[row.badge]} {row.badge || '—'}
                     </span>
                   </td>
-                  <td className="px-3 py-2 max-w-xs truncate" style={{ color: 'var(--text-primary)' }}>{row.scenario}</td>
-                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-primary)' }}>{row.trades}</td>
-                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-primary)' }}>{row.winRate.toFixed(1)}%</td>
+                  <td className="px-3 py-2 max-w-xs truncate" style={{ color: 'var(--text-secondary)' }}>{row.scenario}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>{row.trades}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>{row.winRate.toFixed(1)}%</td>
                   <td
                     className="px-3 py-2 font-mono font-semibold"
                     style={{ color: row.totalPnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}
@@ -221,7 +221,7 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
                   >
                     ${row.avgPnl.toFixed(2)}
                   </td>
-                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-primary)' }}>{row.sharpe.toFixed(2)}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>{row.sharpe.toFixed(2)}</td>
                   <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>{row.tp1}</td>
                   <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>{row.tp2}</td>
                   <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>{row.tp3}</td>
@@ -260,7 +260,7 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
             <button
               onClick={onClose}
               className="px-4 py-2 rounded text-sm font-medium transition-colors"
-              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
             >

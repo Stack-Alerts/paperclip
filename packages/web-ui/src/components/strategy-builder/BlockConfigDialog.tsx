@@ -116,7 +116,7 @@ export function BlockConfigDialog({ open, block, blockIndex, onSave, onClose }: 
               <label className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Signals</label>
               {signals.map((sig, idx) => (
                 <div key={idx} className="rounded p-3 space-y-2" style={{ border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
-                  <div className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{sig.name}</div>
+                  <div className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{sig.name}</div>
 
                   {/* Signal logic */}
                   {!isExit && (

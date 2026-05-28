@@ -105,7 +105,7 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
         <div className="px-6 py-5 space-y-5">
 
           {/* Description */}
-          <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{fixDescription}</p>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{fixDescription}</p>
 
           {/* ── Before / Arrow / After ── */}
           <div className="flex items-start gap-3">
@@ -114,7 +114,7 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--accent-red)' }}>
                 ❌ Current State (Has Issues)
               </p>
-              <pre className="rounded p-3 text-xs overflow-auto max-h-48 font-mono whitespace-pre-wrap break-words border" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+              <pre className="rounded p-3 text-xs overflow-auto max-h-48 font-mono whitespace-pre-wrap break-words border" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
                 {beforeFormatted}
               </pre>
             </div>
@@ -129,7 +129,7 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--accent-green)' }}>
                 ✅ After Fix (Corrected)
               </p>
-              <pre className="rounded p-3 text-xs overflow-auto max-h-48 font-mono whitespace-pre-wrap break-words border" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+              <pre className="rounded p-3 text-xs overflow-auto max-h-48 font-mono whitespace-pre-wrap break-words border" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
                 {afterFormatted}
               </pre>
             </div>
@@ -140,7 +140,7 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
             <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--accent-blue)' }}>
               📊 Impact Analysis
             </p>
-            <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{impactAnalysis}</p>
+            <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>{impactAnalysis}</p>
           </div>
 
           {/* ── Checkbox Options ── */}
@@ -162,7 +162,7 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
                     className="mt-0.5 w-4 h-4 rounded cursor-pointer flex-shrink-0"
                     style={{ borderColor: 'var(--border)', background: 'var(--bg-card)', accentColor: 'var(--accent-blue)' }}
                   />
-                  <span className="text-sm transition-colors" style={{ color: 'var(--text-primary)' }}>
+                  <span className="text-sm transition-colors" style={{ color: 'var(--text-secondary)' }}>
                     {opt.label}
                   </span>
                 </label>
@@ -176,7 +176,7 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
           <button
             onClick={onCancel}
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
           >

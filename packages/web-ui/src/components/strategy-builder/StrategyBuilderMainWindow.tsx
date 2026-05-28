@@ -54,22 +54,22 @@ function QuickPreviewResultsDialog({ open, result, onClose }: QuickPreviewResult
   const winRate = result.winRate * 100;
   const rows: [string, string, string][] = [
     ['Win Rate',       `${winRate.toFixed(1)}%`,         winRate >= 50 ? 'var(--accent-green)' : 'var(--accent-red)'],
-    ['Total Trades',   String(result.totalTrades),        'var(--text-primary)'],
+    ['Total Trades',   String(result.totalTrades),        'var(--text-secondary)'],
     ['Winning Trades', String(result.winningTrades),      'var(--accent-green)'],
     ['Total Return',   `${result.returnPercentage >= 0 ? '+' : ''}${result.returnPercentage.toFixed(2)}%`,
       result.returnPercentage >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'],
     ['Max Drawdown',   `${result.maxDrawdown.toFixed(2)}%`,  'var(--accent-red)'],
-    ['Sharpe Ratio',   result.sharpeRatio.toFixed(2),     'var(--text-primary)'],
-    ['Profit Factor',  result.profitFactor.toFixed(2),    'var(--text-primary)'],
+    ['Sharpe Ratio',   result.sharpeRatio.toFixed(2),     'var(--text-secondary)'],
+    ['Profit Factor',  result.profitFactor.toFixed(2),    'var(--text-secondary)'],
   ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="rounded-lg shadow-2xl w-96 p-6 border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>30-Day Backtest Summary</h2>
+          <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>30-Day Backtest Summary</h2>
           <button onClick={onClose} className="text-xl leading-none" style={{ color: 'var(--text-muted)' }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
             onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}>✕</button>
         </div>
         <div className="space-y-1.5">
@@ -784,7 +784,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         {mounted && currentStrategy && (
           <span className="ml-auto text-xs truncate max-w-xs pr-2" style={{ color: 'var(--text-secondary)' }}>
             BTC Trade Engine — Strategy Builder —{' '}
-            <span style={{ color: 'var(--text-primary)' }}>{currentStrategy.name}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{currentStrategy.name}</span>
             {isModified && <span className="ml-1" style={{ color: 'var(--accent-orange)' }} title="Unsaved changes">●</span>}
           </span>
         )}
@@ -950,7 +950,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="rounded-lg shadow-2xl w-2/3 max-h-[70vh] flex flex-col p-6 border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Debug Log Viewer</h2>
+              <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>Debug Log Viewer</h2>
               <div className="flex gap-2 items-center">
                 <button onClick={() => setConsoleLogs([])} className="text-xs px-2 py-1 rounded transition-colors" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
@@ -959,7 +959,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}>Download</button>
                 <button onClick={close} className="text-xl leading-none ml-2" style={{ color: 'var(--text-muted)' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
                   onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}>✕</button>
               </div>
             </div>
@@ -1065,12 +1065,12 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, tooltip, onClick, 
         disabled
           ? 'text-[var(--text-muted)] bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.05)] cursor-not-allowed'
           : pulse
-          ? 'text-[var(--text-primary)] bg-[rgba(255,255,255,0.06)] border-[rgba(231,178,87,0.2)] button-amber-pulse hover:bg-[rgba(255,255,255,0.10)]'
+          ? 'text-[var(--text-secondary)] bg-[rgba(255,255,255,0.06)] border-[rgba(231,178,87,0.2)] button-amber-pulse hover:bg-[rgba(255,255,255,0.10)]'
           : accent
           ? 'font-medium border-[var(--accent-blue-dark)] bg-[var(--accent-blue)] text-[var(--btn-primary-text)] hover:bg-[var(--accent-blue-mid)]'
           : active
-          ? 'text-[var(--text-primary)] bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.12)] hover:bg-[rgba(255,255,255,0.10)]'
-          : 'text-[var(--text-secondary)] bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text-primary)] hover:border-[rgba(255,255,255,0.15)]'
+          ? 'text-[var(--text-secondary)] bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.12)] hover:bg-[rgba(255,255,255,0.10)]'
+          : 'text-[var(--text-secondary)] bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--text-secondary)] hover:border-[rgba(255,255,255,0.15)]'
       }`}
     >
       {icon}
@@ -1098,7 +1098,7 @@ const MenuDropdown: React.FC<{ label: string; items: MenuItem[] }> = ({ label, i
       <button
         onClick={() => setOpen(v => !v)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        className="px-3 py-1 text-sm text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] rounded transition-colors"
+        className="px-3 py-1 text-sm text-[var(--text-dim)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-card)] rounded transition-colors"
       >
         {label}
       </button>
@@ -1115,7 +1115,7 @@ const MenuDropdown: React.FC<{ label: string; items: MenuItem[] }> = ({ label, i
                 className={`flex items-center justify-between w-full px-4 py-1.5 text-sm transition-colors text-left gap-8 whitespace-nowrap ${
                   item.disabled
                     ? 'text-[var(--text-muted)] cursor-not-allowed'
-                    : 'text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-card)]'
                 }`}
               >
                 <span>{item.label}</span>

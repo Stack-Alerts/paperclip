@@ -71,7 +71,7 @@ export const AdminPinDialog: React.FC<AdminPinDialogProps> = ({
               : 'Enter your admin PIN to access restricted settings.'}
           </p>
           <div className="space-y-2">
-            <label className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>PIN</label>
+            <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>PIN</label>
             <input
               ref={inputRef}
               type="password"
@@ -90,7 +90,7 @@ export const AdminPinDialog: React.FC<AdminPinDialogProps> = ({
           </div>
           {setupMode && (
             <div className="space-y-2">
-              <label className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Confirm PIN</label>
+              <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Confirm PIN</label>
               <input
                 type="password"
                 inputMode="numeric"
@@ -113,7 +113,7 @@ export const AdminPinDialog: React.FC<AdminPinDialogProps> = ({
               type="button"
               onClick={onCancel}
               className="px-4 py-2 rounded text-sm font-medium transition-colors"
-              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
             >

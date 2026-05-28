@@ -101,7 +101,7 @@ function SortHeader({
       onClick={() => onClick(col)}
       className={className || "px-3 py-2 text-left text-xs font-medium uppercase tracking-wide cursor-pointer whitespace-nowrap select-none"}
       style={{ color: 'var(--text-secondary)' }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}
     >
       {label}
@@ -906,7 +906,7 @@ export function StrategyBrowserDialog({
             className="text-lg transition-colors"
             aria-label="Close dialog"
             style={{ color: 'var(--text-muted)' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)'; }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
           >✕</button>
         </div>
@@ -1166,7 +1166,7 @@ export function StrategyBrowserDialog({
               const t = e.currentTarget as HTMLButtonElement;
               t.style.background = 'rgba(255,255,255,0.08)';
               t.style.borderColor = 'rgba(255,255,255,0.15)';
-              t.style.color = 'var(--text-primary)';
+              t.style.color = 'var(--text-secondary)';
             }}
             onMouseLeave={e => {
               const t = e.currentTarget as HTMLButtonElement;

@@ -69,7 +69,7 @@ const SEVERITY_STYLES: Record<
   [ValidationSeverity.INFO]: {
     text: { color: 'var(--text-muted)' },
     bg: { background: 'var(--bg-card)' },
-    badge: { background: 'var(--bg-hover)', color: 'var(--text-primary)' },
+    badge: { background: 'var(--bg-hover)', color: 'var(--text-secondary)' },
   },
 };
 
@@ -118,7 +118,7 @@ function CollapsibleSection({
           <button
             onClick={onMaximize}
             className="px-3 py-1 rounded text-xs font-medium transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
           >
             🗖 Maximize
           </button>
@@ -131,7 +131,7 @@ function CollapsibleSection({
         >
           <pre
             className="text-xs font-mono overflow-x-auto whitespace-pre-wrap break-words"
-            style={{ color: 'var(--text-primary)' }}
+            style={{ color: 'var(--text-secondary)' }}
           >
             {content}
           </pre>
@@ -168,22 +168,22 @@ function IssuesTable({
             className="border-b"
             style={{ borderColor: 'var(--border)', background: 'var(--bg-panel)' }}
           >
-            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-primary)' }}>
+            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-secondary)' }}>
               Severity
             </th>
-            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-primary)' }}>
+            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-secondary)' }}>
               Category
             </th>
-            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-primary)' }}>
+            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-secondary)' }}>
               Issue
             </th>
-            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-primary)' }}>
+            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-secondary)' }}>
               Location
             </th>
-            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-primary)' }}>
+            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-secondary)' }}>
               Description &amp; Guidance
             </th>
-            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-primary)' }}>
+            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-secondary)' }}>
               Action
             </th>
           </tr>
@@ -212,10 +212,10 @@ function IssuesTable({
                     {issue.severity}
                   </span>
                 </td>
-                <td className="px-4 py-3" style={{ color: 'var(--text-primary)' }}>
+                <td className="px-4 py-3" style={{ color: 'var(--text-secondary)' }}>
                   {issue.category}
                 </td>
-                <td className="px-4 py-3 font-bold" style={{ color: 'var(--text-primary)' }}>
+                <td className="px-4 py-3 font-bold" style={{ color: 'var(--text-secondary)' }}>
                   {issue.rule_name}
                 </td>
                 <td
@@ -224,7 +224,7 @@ function IssuesTable({
                 >
                   {formatLocation(issue.location)}
                 </td>
-                <td className="px-4 py-3 max-w-md" style={{ color: 'var(--text-primary)' }}>
+                <td className="px-4 py-3 max-w-md" style={{ color: 'var(--text-secondary)' }}>
                   <div className="whitespace-normal break-words">
                     {issue.message}
                     {issue.suggestion && (
@@ -763,7 +763,7 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
               onClick={onClose}
               className="transition-colors text-2xl"
               style={{ color: 'var(--text-secondary)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
               onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
               aria-label="Close"
             >
@@ -792,7 +792,7 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
         {/* Summary bar */}
         <div
           className="flex-shrink-0 px-6 py-2 border-b flex gap-4 flex-wrap items-center text-xs"
-          style={{ borderColor: 'var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)' }}
+          style={{ borderColor: 'var(--border)', background: 'var(--bg-card)', color: 'var(--text-secondary)' }}
         >
           {issueCounts.critical > 0 && <span>Critical: {issueCounts.critical}</span>}
           {issueCounts.errors > 0 && <span>Errors: {issueCounts.errors}</span>}
@@ -818,7 +818,7 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
               }
               onMouseEnter={(e) => {
                 if (currentTab !== tab) {
-                  e.currentTarget.style.color = 'var(--text-primary)';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
                 }
               }}
               onMouseLeave={(e) => {
@@ -851,7 +851,7 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
                     <div className="font-bold" style={{ color: 'var(--accent-red)' }}>
                       Critical
                     </div>
-                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-primary)' }}>
+                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-secondary)' }}>
                       {issueCounts.critical}
                     </div>
                   </div>
@@ -859,7 +859,7 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
                     <div className="font-bold" style={{ color: 'var(--accent-orange)' }}>
                       Errors
                     </div>
-                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-primary)' }}>
+                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-secondary)' }}>
                       {issueCounts.errors}
                     </div>
                   </div>
@@ -867,7 +867,7 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
                     <div className="font-bold" style={{ color: 'var(--accent-orange)' }}>
                       Warnings
                     </div>
-                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-primary)' }}>
+                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-secondary)' }}>
                       {issueCounts.warnings}
                     </div>
                   </div>
@@ -875,7 +875,7 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
                     <div className="font-bold" style={{ color: 'var(--accent-blue)' }}>
                       Notices
                     </div>
-                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-primary)' }}>
+                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-secondary)' }}>
                       {issueCounts.notices}
                     </div>
                   </div>
@@ -883,7 +883,7 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
                     <div className="font-bold" style={{ color: 'var(--text-muted)' }}>
                       Info
                     </div>
-                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-primary)' }}>
+                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-secondary)' }}>
                       {issueCounts.info}
                     </div>
                   </div>
@@ -903,7 +903,7 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
                     <div key={idx} className="rounded p-3" style={{ background: 'var(--bg-panel)' }}>
                       <div className="flex justify-between items-center">
                         <span style={{ color: 'var(--text-secondary)' }}>{item.label}:</span>
-                        <div className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>
+                        <div className="font-bold text-lg" style={{ color: 'var(--text-secondary)' }}>
                           {item.count}
                         </div>
                       </div>
@@ -998,7 +998,7 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
           <button
             onClick={handleExportCSV}
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-card)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
           >
@@ -1009,7 +1009,7 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
             onClick={handleUndo}
             disabled={undoStack.length === 0}
             className="px-4 py-2 rounded disabled:opacity-50 text-sm font-medium transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
             onMouseEnter={(e) => {
               if (undoStack.length > 0) e.currentTarget.style.background = 'var(--bg-card)';
             }}

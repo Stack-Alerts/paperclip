@@ -63,7 +63,7 @@ function MessageRow({ message, onClick }: MessageRowProps) {
       >
         {lvlStyle.icon}
       </span>
-      <span className="flex-1 leading-relaxed" style={{ color: 'var(--text-primary)' }}>{message.text}</span>
+      <span className="flex-1 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{message.text}</span>
       {message.blockIndex != null && (
         <span className="flex-shrink-0 font-mono" style={{ color: 'var(--text-muted)' }}>#{message.blockIndex + 1}</span>
       )}
@@ -282,7 +282,7 @@ function ReportSection({ config, issues, passItems, hidden }: ReportSectionProps
                 {severityIcon(issue.severity)}
               </span>
               <div className="flex-1">
-                <span style={{ color: 'var(--text-primary)' }}>{issue.message}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{issue.message}</span>
                 {issue.location && (
                   <span className="ml-1.5 font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>
                     [{issue.location}]
@@ -474,7 +474,7 @@ function ValidationPanel({ currentVersionId }, ref) {
     <div className="flex flex-col border-t" style={{ maxHeight: '22rem', background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
       {/* Toast notification */}
       {toastMsg && (
-        <div className="absolute bottom-16 right-4 z-50 text-xs px-3 py-2 rounded shadow-lg animate-fade-in" style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}>
+        <div className="absolute bottom-16 right-4 z-50 text-xs px-3 py-2 rounded shadow-lg animate-fade-in" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
           {toastMsg}
         </div>
       )}

@@ -21,7 +21,7 @@ export function InfoTooltip({ id, children, className = '' }: InfoTooltipProps) 
     >
       {children}
       {tooltip && (
-        <span className="ml-1 inline-flex items-center justify-center w-4 h-4 text-xs rounded-full" style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}>
+        <span className="ml-1 inline-flex items-center justify-center w-4 h-4 text-xs rounded-full" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
           ?
         </span>
       )}

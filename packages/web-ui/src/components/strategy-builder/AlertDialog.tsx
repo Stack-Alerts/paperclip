@@ -92,7 +92,7 @@ export const QuestionDialog: React.FC<QuestionDialogProps> = ({
           <button
             onClick={() => onResult('cancel')}
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
           >
@@ -101,7 +101,7 @@ export const QuestionDialog: React.FC<QuestionDialogProps> = ({
           <button
             onClick={() => onResult('no')}
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
           >

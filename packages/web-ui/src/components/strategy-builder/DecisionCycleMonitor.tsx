@@ -123,7 +123,7 @@ export const DecisionCycleMonitor: React.FC<DecisionCycleMonitorProps> = ({ clas
     <div className={`rounded-lg overflow-hidden border ${className}`} style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: 'var(--border)' }}>
-        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
+        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
           Decision Cycle Monitor
         </span>
         <span
@@ -144,11 +144,11 @@ export const DecisionCycleMonitor: React.FC<DecisionCycleMonitorProps> = ({ clas
             <>
               <div className="flex items-center justify-between">
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Bar Close UTC</span>
-                <span className="text-sm font-mono" style={{ color: 'var(--text-primary)' }}>{aggregate.barCloseUtc}</span>
+                <span className="text-sm font-mono" style={{ color: 'var(--text-secondary)' }}>{aggregate.barCloseUtc}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Checkpoint Seq</span>
-                <span className="text-sm font-mono" style={{ color: 'var(--text-primary)' }}>{aggregate.checkpointSeq}</span>
+                <span className="text-sm font-mono" style={{ color: 'var(--text-secondary)' }}>{aggregate.checkpointSeq}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Cycle ID</span>

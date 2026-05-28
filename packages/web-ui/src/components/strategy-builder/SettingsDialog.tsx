@@ -83,7 +83,7 @@ function SecretField({ label, storageKey }: { label: string; storageKey: string 
             title="Reveal for 10s"
             className="mt-5 p-1.5 rounded transition-colors"
             style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
           >
             {showing ? <EyeOff size={13} /> : <Eye size={13} />}
@@ -279,7 +279,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
           <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
             <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>Settings</h2>
             <button onClick={onClose} className="transition-colors" style={{ color: 'var(--text-muted)' }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
               onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}>
               <X size={16} />
             </button>
@@ -294,7 +294,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
                 style={activeTab === id
                   ? { color: 'var(--accent-blue)', borderBottom: '2px solid var(--accent-blue)', marginBottom: -1 }
                   : { color: 'var(--text-secondary)' }}
-                onMouseEnter={e => { if (activeTab !== id) e.currentTarget.style.color = 'var(--text-primary)'; }}
+                onMouseEnter={e => { if (activeTab !== id) e.currentTarget.style.color = 'var(--text-secondary)'; }}
                 onMouseLeave={e => { if (activeTab !== id) e.currentTarget.style.color = 'var(--text-secondary)'; }}
               >
                 {id === 'admin' && !adminUnlocked ? `🔒 ${label}` : label}
@@ -313,7 +313,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
             <button
               onClick={onClose}
               className="px-5 py-2 rounded-lg text-sm font-medium transition-colors"
-              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
             >

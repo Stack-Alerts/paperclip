@@ -133,7 +133,7 @@ export const TimingConstraintDialog: React.FC<TimingConstraintDialogProps> = ({
             <label
               htmlFor="tc-enabled"
               className="text-sm font-semibold cursor-pointer"
-              style={{ color: 'var(--text-primary)' }}
+              style={{ color: 'var(--text-secondary)' }}
             >
               Enable timing constraint
             </label>
@@ -223,7 +223,7 @@ export const TimingConstraintDialog: React.FC<TimingConstraintDialogProps> = ({
           <button
             onClick={onCancel}
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
           >

@@ -117,7 +117,7 @@ function SpinField({
           value={value}
           onChange={(e) => onChange(parseFloat(e.target.value))}
           className="w-full px-2 py-1.5 rounded text-sm focus:outline-none"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
         />
         {suffix && <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>{suffix}</span>}
       </div>
@@ -138,7 +138,7 @@ function SelectField<T extends string>({
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
         className="w-full px-2 py-1.5 rounded text-sm focus:outline-none"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
@@ -152,7 +152,7 @@ function MetricCard({ label, value, sub }: { label: string; value: string; sub?:
   return (
     <div className="rounded p-3 space-y-0.5" style={{ background: 'var(--bg-card)' }}>
       <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>{label}</div>
-      <div className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{value}</div>
+      <div className="text-lg font-semibold" style={{ color: 'var(--text-secondary)' }}>{value}</div>
       {sub && <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{sub}</div>}
     </div>
   );
@@ -178,7 +178,7 @@ function PresetButtonRow({
             key={v}
             onClick={() => onSelect(v)}
             className="px-2 py-1 rounded text-xs font-medium transition-colors"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
           >
@@ -384,7 +384,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
               disabled={backTestInProgress}
               title="Run N config permutations and rank results"
               className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
-              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
             >
@@ -395,7 +395,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
               disabled={!backTestResult}
               title="View most recent backtest results"
               className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
-              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
             >
@@ -413,7 +413,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
               onClick={handlePause}
               disabled={!backTestInProgress}
               className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
-              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
             >
@@ -423,7 +423,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
               onClick={handleStop}
               disabled={!backTestInProgress}
               className="px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 transition-colors"
-              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
             >
@@ -471,7 +471,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
               <div className="grid grid-cols-4 gap-5">
                 {/* Column 1: Lookback / Training / Testing Windows */}
                 <div className="space-y-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-primary)' }}>Time Windows</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Time Windows</p>
 
                   <SpinField
                     label="Historical Data Lookback"
@@ -519,7 +519,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                   />
 
                   <div className="border-t pt-3 space-y-2" style={{ borderColor: 'var(--border)' }}>
-                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-primary)' }}>Mode</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Mode</p>
                     <div className="flex flex-col gap-2">
                       {[
                         { label: 'Mode 1 — Historical', value: 'historical' },
@@ -533,7 +533,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                             onChange={() => patch('mode', option.value as 'historical' | 'live_replay')}
                             className="accent-blue-500"
                           />
-                          <span className="text-xs" style={{ color: 'var(--text-primary)' }}>{option.label}</span>
+                          <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{option.label}</span>
                         </label>
                       ))}
                     </div>
@@ -542,7 +542,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
 
                 {/* Column 2: Basic Settings & Capital */}
                 <div className="space-y-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-primary)' }}>Basic Settings</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Basic Settings</p>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
@@ -552,7 +552,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                         value={config.startDate}
                         onChange={(e) => patch('startDate', e.target.value)}
                         className="w-full px-2 py-1.5 rounded text-xs focus:outline-none"
-                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                       />
                     </div>
                     <div className="space-y-1">
@@ -562,7 +562,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                         value={config.endDate}
                         onChange={(e) => patch('endDate', e.target.value)}
                         className="w-full px-2 py-1.5 rounded text-xs focus:outline-none"
-                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                       />
                     </div>
                   </div>
@@ -598,7 +598,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                         min={500}
                         step={1000}
                         className="w-full px-2 py-1.5 rounded text-sm focus:outline-none"
-                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                       />
                       <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Current: ${config.initialCapital.toLocaleString('en-US')}</div>
                     </div>
@@ -622,7 +622,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
 
                 {/* Column 3: Adaptive SL v2.0 */}
                 <div className="space-y-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-primary)' }}>Adaptive SL v2.0</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Adaptive SL v2.0</p>
 
                   {/* Preset radio buttons */}
                   <div className="flex flex-col gap-1.5">
@@ -640,7 +640,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                             }}
                             className="accent-blue-500"
                           />
-                          <span className="text-xs capitalize" style={{ color: 'var(--text-primary)' }}>{icons[p]} {p}</span>
+                          <span className="text-xs capitalize" style={{ color: 'var(--text-secondary)' }}>{icons[p]} {p}</span>
                         </label>
                       );
                     })}
@@ -653,7 +653,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                       onChange={(e) => patchAdaptiveSL('enabled', e.target.checked)}
                       className="accent-blue-500"
                     />
-                    <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Enable Adaptive SL</span>
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Enable Adaptive SL</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -663,7 +663,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                       onChange={(e) => patchAdaptiveSL('delayEnabled', e.target.checked)}
                       className="accent-blue-500"
                     />
-                    <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Delay SL</span>
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Delay SL</span>
                   </label>
 
                   <SpinField label="Delay Bars" value={config.adaptiveSL.delayBars} onChange={(v) => patchAdaptiveSL('delayBars', v)} min={0} max={20} />
@@ -719,13 +719,13 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                       onChange={(e) => patchAdaptiveSL('useStructureSl', e.target.checked)}
                       className="accent-blue-500"
                     />
-                    <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Market Structure SL</span>
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Market Structure SL</span>
                   </label>
                 </div>
 
                 {/* Column 4: Risk / Reward + Advanced */}
                 <div className="space-y-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-primary)' }}>Risk / Reward</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Risk / Reward</p>
 
                   <SpinField label="Risk per Trade %" value={config.riskPerTradePct} onChange={(v) => patch('riskPerTradePct', v)} min={1} max={100} step={1} suffix="%" />
                   <PresetButtonRow
@@ -751,7 +751,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                   />
 
                   <div className="border-t pt-3 space-y-3" style={{ borderColor: 'var(--border)' }}>
-                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-primary)' }}>Advanced</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Advanced</p>
 
                     <SpinField label="Max Leverage" value={config.maxLeverage ?? 10} onChange={(v) => patch('maxLeverage', v)} min={1} max={100} suffix="x" />
                     <PresetButtonRow
@@ -768,7 +768,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                         <button
                           onClick={() => patch('confluenceThreshold', Math.max(0, (config.confluenceThreshold ?? 40) - 2))}
                           className="flex-1 px-2 py-1 rounded text-xs font-medium transition-colors"
-                          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                           onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
                           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
                         >
@@ -777,7 +777,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                         <button
                           onClick={() => patch('confluenceThreshold', Math.max(0, (config.confluenceThreshold ?? 40) - 1))}
                           className="flex-1 px-2 py-1 rounded text-xs font-medium transition-colors"
-                          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                           onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
                           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
                         >
@@ -786,7 +786,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                         <button
                           onClick={() => patch('confluenceThreshold', Math.min(100, (config.confluenceThreshold ?? 40) + 1))}
                           className="flex-1 px-2 py-1 rounded text-xs font-medium transition-colors"
-                          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                           onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
                           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
                         >
@@ -795,7 +795,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                         <button
                           onClick={() => patch('confluenceThreshold', Math.min(100, (config.confluenceThreshold ?? 40) + 2))}
                           className="flex-1 px-2 py-1 rounded text-xs font-medium transition-colors"
-                          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                           onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
                           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
                         >
@@ -811,7 +811,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                     <button
                       onClick={() => addLog('🔄 Reset From Strategy — calculating recommended confluence threshold...', 'SYSTEM')}
                       className="w-full px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                      style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+                      style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
                     >
@@ -820,11 +820,11 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                   </div>
 
                   <div className="border-t pt-3" style={{ borderColor: 'var(--border)' }}>
-                    <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-primary)' }}>Actions</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-secondary)' }}>Actions</p>
                     <button
                       onClick={saveAsCompare}
                       className="w-full px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                      style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+                      style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
                     >
@@ -845,14 +845,14 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                 )}
                 {logs.map((l, i) => {
                   const colorMap: Record<string, string> = {
-                    INFO: 'var(--text-primary)',
+                    INFO: 'var(--text-secondary)',
                     WARNING: 'var(--accent-orange)',
                     ERROR: 'var(--accent-red)',
                     RISK: 'var(--accent-orange)',
                     SIGNAL: 'var(--accent-teal)',
                     SYSTEM: 'var(--accent-blue)',
                   };
-                  const color = colorMap[l.level] ?? 'var(--text-primary)';
+                  const color = colorMap[l.level] ?? 'var(--text-secondary)';
                   return (
                     <div key={i} style={{ color }}>
                       <span style={{ color: 'var(--text-faintest)' }}>[{l.timestamp.slice(11, 19)}]</span>{' '}
@@ -873,7 +873,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                 <p className="text-sm italic" style={{ color: 'var(--text-muted)' }}>No trades recorded yet.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse" style={{ color: 'var(--text-primary)' }}>
+                  <table className="w-full text-xs border-collapse" style={{ color: 'var(--text-secondary)' }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
                         {['Entry Time', 'Entry Price', 'Exit Time', 'Exit Price', 'Qty', 'P&L', 'P&L %', 'Bars', 'Exit Type', 'Status'].map((h) => (
@@ -904,7 +904,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                                   ? { background: 'var(--accent-red-deeper)', color: 'var(--accent-red)' }
                                   : t.exitType?.startsWith('TP')
                                   ? { background: 'var(--accent-green-dark)', color: 'var(--accent-green)' }
-                                  : { background: 'var(--bg-hover)', color: 'var(--text-primary)' }
+                                  : { background: 'var(--bg-hover)', color: 'var(--text-secondary)' }
                               }
                             >
                               {t.exitType ?? '—'}
@@ -1006,7 +1006,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                 <p className="text-sm italic" style={{ color: 'var(--text-muted)' }}>Run a backtest first to generate AI recommendations.</p>
               ) : (
                 <>
-                  <div className="rounded p-3 text-xs font-mono space-y-1" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
+                  <div className="rounded p-3 text-xs font-mono space-y-1" style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)' }}>
                     <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>Auto-generated request preview:</p>
                     <p>Strategy: {currentStrategy?.name}</p>
                     <p>Win Rate: {fmt(result.winRate * 100, 1)}% | Sharpe: {fmt(result.sharpeRatio, 2)} | Drawdown: {fmt(result.maxDrawdown, 2)}%</p>
@@ -1020,7 +1020,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                       rows={4}
                       placeholder="e.g. How can I improve the win rate while reducing drawdown?"
                       className="w-full px-3 py-2 rounded text-sm focus:outline-none resize-none"
-                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                     />
                   </div>
                   <button
@@ -1046,11 +1046,11 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
               ) : (
                 <div className="grid grid-cols-2 gap-5">
                   <div>
-                    <p className="text-xs font-semibold mb-3 uppercase tracking-wide" style={{ color: 'var(--text-primary)' }}>Baseline Config</p>
+                    <p className="text-xs font-semibold mb-3 uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Baseline Config</p>
                     <ConfigSummary cfg={compareConfig} />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold mb-3 uppercase tracking-wide" style={{ color: 'var(--text-primary)' }}>Current Config</p>
+                    <p className="text-xs font-semibold mb-3 uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Current Config</p>
                     <ConfigSummary cfg={config} />
                   </div>
                 </div>
@@ -1096,7 +1096,7 @@ function ConfigSummary({ cfg }: { cfg: BacktestConfigFull }) {
       {rows.map(([label, value]) => (
         <div key={label} className="flex justify-between text-xs">
           <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
-          <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{value}</span>
+          <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>{value}</span>
         </div>
       ))}
     </div>

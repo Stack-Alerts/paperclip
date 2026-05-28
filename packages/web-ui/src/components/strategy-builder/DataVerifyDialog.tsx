@@ -184,7 +184,7 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
         <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
           <span>
             Most recent data:{' '}
-            <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{formatLastCandle(lastCandleTs)}</span>
+            <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>{formatLastCandle(lastCandleTs)}</span>
           </span>
           {repairableCount > 0 && (
             <button
@@ -237,9 +237,9 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
                   onMouseEnter={e => ((e.currentTarget as HTMLTableRowElement).style.background = 'color-mix(in srgb, var(--bg-hover) 20%, transparent)')}
                   onMouseLeave={e => ((e.currentTarget as HTMLTableRowElement).style.background = '')}
                 >
-                  <td className="px-3 py-1.5 font-mono" style={{ color: 'var(--text-primary)' }}>{gap.gapStart}</td>
-                  <td className="px-3 py-1.5 font-mono" style={{ color: 'var(--text-primary)' }}>{gap.gapEnd}</td>
-                  <td className="px-3 py-1.5 text-right font-medium" style={{ color: 'var(--text-primary)' }}>{gap.missingBars}</td>
+                  <td className="px-3 py-1.5 font-mono" style={{ color: 'var(--text-secondary)' }}>{gap.gapStart}</td>
+                  <td className="px-3 py-1.5 font-mono" style={{ color: 'var(--text-secondary)' }}>{gap.gapEnd}</td>
+                  <td className="px-3 py-1.5 text-right font-medium" style={{ color: 'var(--text-secondary)' }}>{gap.missingBars}</td>
                   <td className="px-3 py-1.5">
                     <span className="px-1.5 py-0.5 rounded text-xs" style={{ background: 'color-mix(in srgb, var(--accent-green) 20%, transparent)', color: 'var(--accent-green)' }}>
                       Repairable
@@ -254,9 +254,9 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
                   onMouseEnter={e => ((e.currentTarget as HTMLTableRowElement).style.background = 'color-mix(in srgb, var(--bg-hover) 20%, transparent)')}
                   onMouseLeave={e => ((e.currentTarget as HTMLTableRowElement).style.background = '')}
                 >
-                  <td className="px-3 py-1.5 font-mono" style={{ color: 'var(--text-primary)' }}>{gap.gapStart}</td>
-                  <td className="px-3 py-1.5 font-mono" style={{ color: 'var(--text-primary)' }}>{gap.gapEnd}</td>
-                  <td className="px-3 py-1.5 text-right font-medium" style={{ color: 'var(--text-primary)' }}>{gap.missingBars}</td>
+                  <td className="px-3 py-1.5 font-mono" style={{ color: 'var(--text-secondary)' }}>{gap.gapStart}</td>
+                  <td className="px-3 py-1.5 font-mono" style={{ color: 'var(--text-secondary)' }}>{gap.gapEnd}</td>
+                  <td className="px-3 py-1.5 text-right font-medium" style={{ color: 'var(--text-secondary)' }}>{gap.missingBars}</td>
                   <td className="px-3 py-1.5">
                     <span className="px-1.5 py-0.5 rounded text-xs" style={{ background: 'color-mix(in srgb, var(--accent-orange) 20%, transparent)', color: 'var(--accent-orange)' }}>
                       Too Old
@@ -348,7 +348,7 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
             onClick={onClose}
             className="transition-colors text-xl leading-none"
             style={{ color: 'var(--text-secondary)' }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
             onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
             aria-label="Close"
           >
@@ -427,7 +427,7 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
                 onClick={handleVerify}
                 disabled={isVerifying || !!isRepairing}
                 className="px-4 py-2 rounded text-sm font-medium disabled:opacity-50 transition-colors"
-                style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+                style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
               >
@@ -452,7 +452,7 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
           <button
             onClick={onClose}
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
           >

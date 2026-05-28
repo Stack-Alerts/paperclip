@@ -99,7 +99,7 @@ export const SystemConfigWindow: React.FC<SystemConfigWindowProps> = ({
     step?: number
   ) => (
     <div className="flex items-center justify-between py-2 last:border-0" style={{ borderBottom: '1px solid var(--bg-card)' }}>
-      <label className="text-sm" style={{ color: 'var(--text-primary)' }}>{label}</label>
+      <label className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</label>
       {type === 'checkbox' ? (
         <input
           type="checkbox"
@@ -116,7 +116,7 @@ export const SystemConfigWindow: React.FC<SystemConfigWindowProps> = ({
             onChange(type === 'number' ? parseFloat(e.target.value) : e.target.value)
           }
           className="w-40 rounded px-2 py-1 text-sm focus:outline-none"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
         />
       )}
     </div>
@@ -128,13 +128,13 @@ export const SystemConfigWindow: React.FC<SystemConfigWindowProps> = ({
         <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-3">
             <span className="text-xl">⚙️</span>
-            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>System Configuration</h2>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>System Configuration</h2>
           </div>
           <button
             onClick={onClose}
             className="text-xl leading-none transition-colors"
             style={{ color: 'var(--text-secondary)' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)'; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
           >
             ×
@@ -234,7 +234,7 @@ export const SystemConfigWindow: React.FC<SystemConfigWindowProps> = ({
             onClick={handleReset}
             disabled={!hasChanges}
             className="px-4 py-2 rounded text-sm font-medium disabled:opacity-40 transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
           >
@@ -244,7 +244,7 @@ export const SystemConfigWindow: React.FC<SystemConfigWindowProps> = ({
             <button
               onClick={onClose}
               className="px-4 py-2 rounded text-sm font-medium transition-colors"
-              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
             >

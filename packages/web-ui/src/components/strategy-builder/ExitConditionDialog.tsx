@@ -69,7 +69,7 @@ const MODE_OPTIONS = [
     value: 'ABSOLUTE' as const,
     label: 'ABSOLUTE - Exit Immediately',
     desc: '└─ Executes partial exit as soon as signal fires',
-    color: 'var(--text-primary)',
+    color: 'var(--text-secondary)',
   },
   {
     value: 'FLEXIBLE' as const,
@@ -172,7 +172,7 @@ export function ExitConditionDialog({
             <button
               onClick={onCancel}
               className="w-5 h-5 rounded text-xs flex items-center justify-center hover:opacity-80"
-              style={{ background: 'var(--accent-red-dark)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--accent-red-dark)', color: 'var(--text-secondary)' }}
             >✕</button>
           </div>
         </div>
@@ -368,10 +368,10 @@ export function ExitConditionDialog({
                   }}
                 >
                   {recheckEnabled && (
-                    <span className="leading-none" style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-primary)' }}>✓</span>
+                    <span className="leading-none" style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-secondary)' }}>✓</span>
                   )}
                 </div>
-                <span className="text-sm" style={{ color: recheckEnabled ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                <span className="text-sm" style={{ color: recheckEnabled ? 'var(--text-secondary)' : 'var(--text-secondary)' }}>
                   Enable RECHECK for this exit condition
                 </span>
               </div>

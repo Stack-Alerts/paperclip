@@ -53,7 +53,7 @@ export function DeleteStrategyModal({ strategy, versions, onConfirm, onCancel }:
               className="mt-0.5 accent-red-500"
             />
             <div>
-              <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+              <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                 Delete entire strategy — All {versions.length} version{versions.length !== 1 ? 's' : ''}
               </span>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Permanently removes all versions. Cannot be undone.</p>
@@ -71,7 +71,7 @@ export function DeleteStrategyModal({ strategy, versions, onConfirm, onCancel }:
               className="mt-0.5 accent-red-500"
             />
             <div>
-              <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Delete specific version only</span>
+              <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Delete specific version only</span>
               {versions.length <= 1 && (
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Only one version — delete entire strategy to remove.</p>
               )}
@@ -100,7 +100,7 @@ export function DeleteStrategyModal({ strategy, versions, onConfirm, onCancel }:
                     onChange={() => toggleVersion(v.id)}
                     className="accent-red-500"
                   />
-                  <span className="text-xs" style={{ color: 'var(--text-primary)' }}>v{v.versionNumber}</span>
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>v{v.versionNumber}</span>
                   {v.isLatest && (
                     <span
                       className="text-xs px-1.5 py-0.5 rounded"
@@ -128,7 +128,7 @@ export function DeleteStrategyModal({ strategy, versions, onConfirm, onCancel }:
             className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
             style={{
               background: cancelHover ? 'var(--bg-hover)' : 'var(--bg-panel)',
-              color: 'var(--text-primary)',
+              color: 'var(--text-secondary)',
             }}
           >
             Cancel

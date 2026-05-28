@@ -227,7 +227,7 @@ function RecheckConfigModal({ open, signalName, enabled, barDelay, mode, onSave,
           <div className="flex items-center gap-1">
             <span className="w-5 h-5 rounded text-xs flex items-center justify-center" style={{ background: 'var(--border)', color: 'var(--text-secondary)' }}>─</span>
             <span className="w-5 h-5 rounded text-xs flex items-center justify-center" style={{ background: 'var(--border)', color: 'var(--text-secondary)' }}>□</span>
-            <button onClick={onCancel} className="w-5 h-5 rounded text-xs flex items-center justify-center hover:opacity-80" style={{ background: 'var(--accent-red-dark)', color: 'var(--text-primary)' }}>✕</button>
+            <button onClick={onCancel} className="w-5 h-5 rounded text-xs flex items-center justify-center hover:opacity-80" style={{ background: 'var(--accent-red-dark)', color: 'var(--text-secondary)' }}>✕</button>
           </div>
         </div>
 
@@ -246,7 +246,7 @@ function RecheckConfigModal({ open, signalName, enabled, barDelay, mode, onSave,
               <div className="w-4 h-4 rounded-full shadow transition-transform"
                 style={{ background: 'var(--text-secondary)', transform: isEnabled ? 'translateX(20px)' : 'translateX(0)' }} />
             </div>
-            <span className="text-sm font-semibold" style={{ color: isEnabled ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+            <span className="text-sm font-semibold" style={{ color: isEnabled ? 'var(--text-secondary)' : 'var(--text-secondary)' }}>
               {isEnabled ? 'RECHECK Enabled' : 'RECHECK Disabled — click to enable'}
             </span>
           </div>
@@ -279,7 +279,7 @@ function RecheckConfigModal({ open, signalName, enabled, barDelay, mode, onSave,
                       <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0" style={{ borderColor: selected ? 'var(--accent-green)' : 'var(--text-muted)' }}>
                         {selected && <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--accent-green)' }} />}
                       </div>
-                      <span className="text-sm font-semibold whitespace-nowrap" style={{ color: selected ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{opt.label}</span>
+                      <span className="text-sm font-semibold whitespace-nowrap" style={{ color: selected ? 'var(--text-secondary)' : 'var(--text-secondary)' }}>{opt.label}</span>
                     </div>
                   );
                 })}
@@ -320,7 +320,7 @@ function ExitPill({ block, globalIndex, onEdit, onRemove, onDuplicate, onHighlig
   return (
     <div className="flex items-center gap-2 ml-3 mt-1 text-xs pl-2 py-1 rounded border border-red-900/50" style={{ background: 'rgba(220,38,38,0.07)' }}>
       <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--accent-red)' }}>↳ <ExitDot /></span>
-      <span className="flex-1 min-w-0 truncate" style={{ color: 'var(--text-primary)' }}>
+      <span className="flex-1 min-w-0 truncate" style={{ color: 'var(--text-secondary)' }}>
         <span
           className={`font-semibold${canHighlight ? ' hover:text-sky-300 transition-colors' : ''}`}
           style={{ cursor: canHighlight ? 'pointer' : 'default' }}
@@ -461,7 +461,7 @@ function BlockCard({
   const definitionId = block.data.definitionId as string | undefined;
 
   const badgeStyle: React.CSSProperties = isExit
-    ? { background: 'rgba(153,27,27,0.6)', color: 'var(--text-primary)', border: '1px solid var(--accent-red-deeper)' }
+    ? { background: 'rgba(153,27,27,0.6)', color: 'var(--text-secondary)', border: '1px solid var(--accent-red-deeper)' }
     : logic === 'OR'
     ? { background: 'var(--accent-green-mid)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-green-dark)' }
     : { background: 'var(--accent-blue-mid)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-blue-dark)' };
@@ -496,12 +496,12 @@ function BlockCard({
         <div className="flex items-center gap-0.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
           <RichTooltip content={TT_MOVE_UP}>
             <button onClick={() => onMoveUp(index)} disabled={mainIndex === 0}
-              className="p-1 rounded hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] disabled:opacity-25 disabled:cursor-not-allowed text-xs transition-colors"
+              className="p-1 rounded hover:text-[var(--text-secondary)] hover:bg-[var(--bg-card)] disabled:opacity-25 disabled:cursor-not-allowed text-xs transition-colors"
               style={{ color: 'var(--text-secondary)' }}>▲</button>
           </RichTooltip>
           <RichTooltip content={TT_MOVE_DOWN}>
             <button onClick={() => onMoveDown(index)} disabled={mainIndex === mainTotal - 1}
-              className="p-1 rounded hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] disabled:opacity-25 disabled:cursor-not-allowed text-xs transition-colors"
+              className="p-1 rounded hover:text-[var(--text-secondary)] hover:bg-[var(--bg-card)] disabled:opacity-25 disabled:cursor-not-allowed text-xs transition-colors"
               style={{ color: 'var(--text-secondary)' }}>▼</button>
           </RichTooltip>
         </div>
@@ -525,7 +525,7 @@ function BlockCard({
             <button
               onClick={() => onRemove(index)}
               className="hover:opacity-80 transition-opacity"
-              style={{ ...BTN, background: 'rgba(153,27,27,0.7)', color: 'var(--text-primary)', border: '1px solid var(--accent-red)', gap: 5 }}
+              style={{ ...BTN, background: 'rgba(153,27,27,0.7)', color: 'var(--text-secondary)', border: '1px solid var(--accent-red)', gap: 5 }}
             ><XIcon size={9} /> Remove</button>
           </RichTooltip>
         </div>
@@ -550,7 +550,7 @@ function BlockCard({
                     <span className="flex-1 min-w-0">
                       <span
                         className="hover:text-sky-300 transition-colors"
-                        style={{ color: 'var(--text-primary)', cursor: definitionId ? 'pointer' : 'default' }}
+                        style={{ color: 'var(--text-secondary)', cursor: definitionId ? 'pointer' : 'default' }}
                         onClick={() => { if (definitionId) onHighlightInLibrary(definitionId); }}
                       >
                         {si + 1}. {formatSignalName(sig.name)}
@@ -701,7 +701,7 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate, o
                   </div>
                   <div className="flex items-center gap-3 mt-1 flex-wrap text-xs" style={{ color: 'var(--text-secondary)' }}>
                     <span><span style={{ color: 'var(--text-muted)' }}>Exit:</span> <span className="font-semibold" style={{ color: 'var(--accent-green)' }}>{pct}</span></span>
-                    <span><span style={{ color: 'var(--text-muted)' }}>Mode:</span> <span className="font-semibold" style={{ color: mode === 'FLEXIBLE' ? 'var(--accent-blue)' : 'var(--text-primary)' }}>{mode}</span></span>
+                    <span><span style={{ color: 'var(--text-muted)' }}>Mode:</span> <span className="font-semibold" style={{ color: mode === 'FLEXIBLE' ? 'var(--accent-blue)' : 'var(--text-secondary)' }}>{mode}</span></span>
                     {cfg?.recheckEnabled && <span style={{ color: 'var(--accent-teal)' }}>RECHECK: {cfg.recheckBarDelay ?? 3} bars</span>}
                     {signals.length > 0 && <span style={{ color: 'var(--text-muted)' }}>({signals.length} signal{signals.length !== 1 ? 's' : ''})</span>}
                   </div>
@@ -734,7 +734,7 @@ function ReorderConfirmModal({ fromName, toName, direction, onConfirm, onCancel 
           <span className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Reorder Building Blocks</span>
         </div>
         <div className="px-4 py-4 space-y-2.5">
-          <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
             Move <span className="font-semibold" style={{ color: 'var(--accent-sky)' }}>{fromName}</span>{' '}
             {direction === 'up' ? 'before' : 'after'}{' '}
             <span className="font-semibold" style={{ color: 'var(--accent-sky)' }}>{toName}</span>?

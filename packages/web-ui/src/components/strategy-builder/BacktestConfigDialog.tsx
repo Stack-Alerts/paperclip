@@ -107,7 +107,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                   <button
                     onClick={() => applyPreset(d)}
                     className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
                   >
@@ -129,7 +129,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                   value={config.startDate}
                   onChange={(e) => patch('startDate', e.target.value)}
                   className="w-full px-3 py-2 rounded text-sm focus:outline-none"
-                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                 />
               </InfoTooltip>
             </div>
@@ -142,7 +142,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                   value={config.endDate}
                   onChange={(e) => patch('endDate', e.target.value)}
                   className="w-full px-3 py-2 rounded text-sm focus:outline-none"
-                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                 />
               </InfoTooltip>
             </div>
@@ -161,7 +161,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                   value={config.initialCapital}
                   onChange={(e) => patch('initialCapital', parseFloat(e.target.value))}
                   className="w-full px-3 py-2 rounded text-sm focus:outline-none"
-                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                 />
               </InfoTooltip>
             </div>
@@ -177,7 +177,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                   value={config.commissionPercentage}
                   onChange={(e) => patch('commissionPercentage', parseFloat(e.target.value))}
                   className="w-full px-3 py-2 rounded text-sm focus:outline-none"
-                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                 />
               </InfoTooltip>
               <p className="text-xs" style={{ color: 'var(--text-faintest)' }}>e.g. 0.001 = 0.1%</p>
@@ -209,7 +209,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
             <button
               onClick={onClose}
               className="px-4 py-2 rounded text-sm font-medium transition-colors"
-              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
             >

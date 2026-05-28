@@ -83,7 +83,7 @@ function TimeframeRow({ tf }: { tf: TimeframeProgress }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
-        <span className="font-mono w-8" style={{ color: 'var(--text-primary)' }}>{tf.timeframe}</span>
+        <span className="font-mono w-8" style={{ color: 'var(--text-secondary)' }}>{tf.timeframe}</span>
         <span className="flex-1 mx-3 truncate" style={{ color: 'var(--text-secondary)' }}>{tf.message}</span>
         {tf.lastCandleTs && (
           <span className="font-mono text-[10px] whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
@@ -415,7 +415,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
         <div className="flex items-center gap-3 border-b px-6 py-4" style={{ borderColor: 'var(--border)' }}>
           <span className="text-xl">📥</span>
           <div>
-            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Data Update</h2>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>Data Update</h2>
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Strategy Builder Startup Check</p>
           </div>
         </div>
@@ -437,7 +437,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                 <>
                   {/* Data Status Group - shows per-type gaps */}
                   <div className="rounded-lg p-4 space-y-3 border" style={{ borderColor: 'var(--border)' }}>
-                    <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>📊 Data Status</h3>
+                    <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>📊 Data Status</h3>
 
                     <div className="space-y-2 text-sm">
                       {Object.entries(gapCheckResult.all_status).map(([dataType, info]) => (
@@ -452,7 +452,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                                   : '⚠️'}
                           </span>
                           <div className="flex-1">
-                            <p className="font-mono" style={{ color: 'var(--text-primary)' }}>
+                            <p className="font-mono" style={{ color: 'var(--text-secondary)' }}>
                               {dataType.toUpperCase()}:{' '}
                               {info.status === 'complete'
                                 ? 'Complete'
@@ -493,7 +493,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                   {gapCheckResult.any_gaps && (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Start Date</label>
+                        <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Start Date</label>
                         <input
                           type="date"
                           value={startDate}
@@ -503,7 +503,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>End Date</label>
+                        <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>End Date</label>
                         <input
                           type="date"
                           value={endDate}
@@ -524,7 +524,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                   </p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Start Date</label>
+                      <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Start Date</label>
                       <input
                         type="date"
                         value={startDate}
@@ -534,7 +534,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>End Date</label>
+                      <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>End Date</label>
                       <input
                         type="date"
                         value={endDate}
@@ -577,7 +577,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
               {/* Overall progress bar */}
               {!progress.alreadyCurrent && (
                 <>
-                  <p className="text-sm" style={{ color: 'var(--text-primary)' }}>Downloading data from Binance…</p>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Downloading data from Binance…</p>
                   <div className="w-full rounded-full h-2" style={{ background: 'var(--bg-card)' }}>
                     <div
                       className="h-2 rounded-full transition-all duration-300"
@@ -647,7 +647,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                   <button
                     onClick={onSkip}
                     className="px-4 py-2 rounded text-sm font-medium transition-colors"
-                    style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+                    style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                   >
@@ -688,7 +688,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
               <button
                 onClick={onSkip}
                 className="px-4 py-2 rounded text-sm font-medium transition-colors"
-                style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+                style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
               >
@@ -713,7 +713,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
             <button
               onClick={onSkip}
               className="px-4 py-2 rounded text-sm font-medium transition-colors"
-              style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
             >
@@ -744,7 +744,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                   <button
                     onClick={onSkip}
                     className="px-4 py-2 rounded text-sm font-medium transition-colors"
-                    style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}
+                    style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                   >
