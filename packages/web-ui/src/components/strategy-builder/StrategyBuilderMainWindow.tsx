@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { NewStrategyDialog } from './NewStrategyDialog';
 import { StrategyBrowserDialog } from './StrategyBrowserDialog';
 import { SaveStrategyModeDialog } from './SaveStrategyModeDialog';
 import { BacktestConfigDialog } from './BacktestConfigDialog';
@@ -12,13 +11,13 @@ import { SettingsDialog } from './SettingsDialog';
 import { AlertDialog, QuestionDialog } from './AlertDialog';
 import { AdminPinDialog } from './AdminPinDialog';
 import { StepperRibbon } from './StepperRibbon';
-import { StrategyInfoPanel } from './StrategyInfoPanel';
+import { StrategyInfoPanel, STRATEGY_NAME_INPUT_ID } from './StrategyInfoPanel';
 import { StrategyBlocksPanel } from './StrategyBlocksPanel';
 import { BlockSearchPanel } from './BlockSearchPanel';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import * as api from '@/lib/strategy-builder/api';
 import type { BacktestResult, BacktestConfig, Strategy, Block } from '@/lib/strategy-builder/types';
-import { BlockType } from '@/lib/strategy-builder/types';
+import { BlockType, StrategyStatus } from '@/lib/strategy-builder/types';
 import { RichTooltip, TooltipContent } from './RichTooltip';
 import { useTooltipSettings } from './TooltipSettingsContext';
 import { ThemeSelector } from './ThemeSelector';
@@ -27,7 +26,6 @@ import { useSidebar } from '@/contexts/SidebarContext';
 import { AppBrand } from '@/components/shared/AppBrand';
 
 type DialogKey =
-  | 'newStrategy'
   | 'strategyBrowser'
   | 'backtestConfig'
   | 'validation'
@@ -290,15 +288,12 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // Keyboard shortcuts
   // -------------------------------------------------------------------------
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'S') {
-      e.preventDefault();
-      handleSaveAs();
-    } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault();
       handleSave();
     } else if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
       e.preventDefault();
-      open('newStrategy');
+      handleNewStrategy();
     } else if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
       e.preventDefault();
       open('strategyBrowser');
@@ -389,18 +384,43 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     setPendingSaveMode(null);
   }, [saveModeBusy]);
 
-  const handleSaveAs = useCallback(async () => {
-    if (!currentStrategy) return;
-    const newName = window.prompt('Save strategy as:', `${currentStrategy.name} (copy)`);
-    if (!newName?.trim()) return;
-    const saved = await api.post<Strategy>('/strategies', {
-      ...currentStrategy,
-      id: undefined,
-      name: newName.trim(),
+  // BTCAAAAA-30520: File > New Strategy (and Ctrl+N / the toolbar New button)
+  // clear the builder form silently — no modal, no confirm. The rename-then-Save
+  // path still surfaces SaveStrategyModeDialog if the user edited a backend
+  // strategy before clicking New, because pendingSaveMode is gated by the
+  // existing handleSave flow (line ~333), not by this reset.
+  const handleNewStrategy = useCallback(() => {
+    const now = new Date().toISOString();
+    const fresh: Strategy = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      name: '',
+      description: '',
+      status: StrategyStatus.DRAFT,
+      strategyType: 'Bullish',
+      blocks: [],
+      settings: {
+        timeframe: '1h',
+        targetMarket: 'BTC/USDT',
+        riskParameters: null,
+        strategyExits: [],
+      },
+      validationStatus: null,
+      createdAt: now,
+      updatedAt: now,
+    } as unknown as Strategy;
+    setCurrentStrategy(fresh);
+    setCleanSnapshot(JSON.stringify({ id: fresh.id, blocks: fresh.blocks, name: fresh.name }));
+    setCurrentStep(0);
+    setCompletedSteps(new Set());
+    setErrorSteps(new Set());
+    // Focus the Name input on the next paint after StrategyInfoPanel remounts
+    // its uncontrolled input on the new strategy id.
+    requestAnimationFrame(() => {
+      const el = document.getElementById(STRATEGY_NAME_INPUT_ID) as HTMLInputElement | null;
+      el?.focus();
+      el?.select();
     });
-    setCurrentStrategy(saved);
-    setCleanSnapshot(JSON.stringify({ id: saved.id, blocks: saved.blocks, name: saved.name }));
-  }, [currentStrategy, setCurrentStrategy]);
+  }, [setCurrentStrategy]);
 
   const handleExit = useCallback(() => {
     if (isModified && !window.confirm('You have unsaved changes. Exit without saving?')) return;
@@ -703,11 +723,10 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         <MenuDropdown
           label="File"
           items={[
-            { label: 'New Strategy',     onClick: () => open('newStrategy'),      shortcut: 'Ctrl+N' },
+            { label: 'New Strategy',     onClick: handleNewStrategy,              shortcut: 'Ctrl+N' },
             { label: 'Open Strategy…',   onClick: () => open('strategyBrowser'),  shortcut: 'Ctrl+O' },
             { label: '—', onClick: () => {} },
             { label: 'Save',             onClick: handleSave,                     shortcut: 'Ctrl+S' },
-            { label: 'Save As…',         onClick: handleSaveAs,                   shortcut: 'Ctrl+Shift+S' },
             { label: '—', onClick: () => {} },
             { label: 'Exit',             onClick: handleExit },
           ]}
@@ -757,7 +776,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       <div className="flex items-center border-b px-3 py-1.5 flex-shrink-0" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border)' }}>
         {/* Left: toolbar buttons */}
         <div className="flex items-center gap-1">
-          <ToolbarButton label="New"  icon={<Plus size={13} strokeWidth={1.5} />} tooltip={TT_NEW}  onClick={() => open('newStrategy')} />
+          <ToolbarButton label="New"  icon={<Plus size={13} strokeWidth={1.5} />} tooltip={TT_NEW}  onClick={handleNewStrategy} />
           <ToolbarButton label="Open" icon={<FolderOpen size={13} strokeWidth={1.5} />} tooltip={TT_OPEN} onClick={() => open('strategyBrowser')} />
           <ToolbarButton
             label="Save"
@@ -860,8 +879,6 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────────────── */}
-      <NewStrategyDialog open={activeDialog === 'newStrategy'} onClose={close} />
-
       <StrategyBrowserDialog
         key={`strategyBrowser-${popInRev}`}
         open={activeDialog === 'strategyBrowser'}
@@ -967,7 +984,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 // ---------------------------------------------------------------------------
 const TT_NEW: TooltipContent = {
   title: 'New Strategy (Ctrl+N)',
-  body: 'Create a blank strategy from scratch. The current strategy will remain saved.',
+  body: 'Start a new strategy — clears the form (name, description, blocks) and focuses the Name field.',
   sections: [
     { header: 'Shortcut:', items: ['Ctrl+N'] },
     { header: 'Note:', items: ['Any unsaved changes will be lost — save first if needed'] },

@@ -6,6 +6,10 @@ import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { Block, BlockType } from '@/lib/strategy-builder/types';
 import { RichTooltip, TooltipContent } from './RichTooltip';
 
+// Stable id so File > New Strategy (BTCAAAAA-30520) can focus the Name input
+// after clearing the form, regardless of compact vs full panel rendering.
+export const STRATEGY_NAME_INPUT_ID = 'strategy-name-input';
+
 const TT_STRATEGY_NAME: TooltipContent = {
   title: 'Strategy Name',
   body: 'The unique identifier for this strategy used in backtest results, reports, and version history.',
@@ -303,6 +307,7 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
           <RichTooltip content={TT_STRATEGY_NAME}>
             <input
               type="text"
+              id={STRATEGY_NAME_INPUT_ID}
               key={currentStrategy.id}
               defaultValue={currentStrategy.name}
               onBlur={e => handleNameChange(e.target.value)}
@@ -373,6 +378,7 @@ export function StrategyInfoPanel({ compact = false }: StrategyInfoPanelProps) {
         <RichTooltip content={TT_STRATEGY_NAME}>
           <input
             type="text"
+            id={STRATEGY_NAME_INPUT_ID}
             key={currentStrategy.id}
             defaultValue={currentStrategy.name}
             onBlur={e => handleNameChange(e.target.value)}
