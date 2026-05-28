@@ -1218,7 +1218,7 @@ export function StrategyBrowserDialog({
       style={{ left: 'var(--sidebar-width, 0px)' }}
       onKeyDown={handleKeyDown}
     >
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/70 cursor-pointer" onClick={onClose} />
       {contentBox}
       {modals}
     </div>

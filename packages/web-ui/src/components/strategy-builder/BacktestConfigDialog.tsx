@@ -83,7 +83,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
       className="fixed inset-0 z-50 flex items-center justify-center"
       onKeyDown={handleKeyDown}
     >
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60 cursor-pointer" onClick={onClose} />
 
       <div className="relative w-full max-w-xl rounded-lg shadow-2xl mx-4" style={{ border: '1px solid var(--border)', background: 'var(--bg-panel)' }}>
         {/* Header */}

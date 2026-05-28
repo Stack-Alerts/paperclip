@@ -369,7 +369,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
       className="fixed inset-0 z-50 flex items-center justify-center"
       onKeyDown={handleKeyDown}
     >
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/70 cursor-pointer" onClick={onClose} />
 
       <div className="relative w-full max-w-5xl mx-4 rounded-lg shadow-2xl flex flex-col max-h-[90vh]" style={{ border: '1px solid var(--border)', background: 'var(--bg-panel)' }}>
         {/* Header */}

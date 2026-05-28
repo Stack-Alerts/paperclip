@@ -261,6 +261,56 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* ─── Interactive element cursor standard ────────────────────────────────── */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+a[href] {
+  cursor: pointer;
+}
+
+summary {
+  cursor: pointer;
+}
+
+label[for] {
+  cursor: pointer;
+}
+
+input[type="checkbox"],
+input[type="radio"],
+input[type="submit"],
+input[type="reset"],
+input[type="button"] {
+  cursor: pointer;
+}
+
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled,
+input[type="submit"]:disabled,
+input[type="reset"]:disabled,
+input[type="button"]:disabled {
+  cursor: not-allowed;
+}
+
+select:not(:disabled) {
+  cursor: pointer;
+}
+
+select:disabled {
+  cursor: not-allowed;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 /* ─── Scrollbars ─────────────────────────────────────────────────────────── */
 * {
   scrollbar-width: thin;
