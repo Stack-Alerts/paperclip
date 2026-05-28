@@ -37,5 +37,4 @@ export const status = {
   },
 };
 
-export { statusBus };
 export type { StatusEntry, StatusVariant, StatusEmitOptions, StatusBarSettings } from './types';
