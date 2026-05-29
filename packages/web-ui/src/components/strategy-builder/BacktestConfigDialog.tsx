@@ -187,10 +187,10 @@ function ConfigTab({
   }, [onChange]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-[1600px] mx-auto pb-4">
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 max-w-[1700px] mx-auto pb-4">
       {/* ============================= LEFT COLUMN — CONFIGURATION ============================= */}
       <div className="space-y-3">
-        <SectionHeader title="Configuration" subtitle="Date range, mode, and stop-loss tuning" />
+        <SectionHeader title="Configuration" subtitle="Basic settings, mode, TP/SL config" />
 
         {/* ── Basic Settings ── */}
         <SectionCard>
@@ -305,6 +305,11 @@ function ConfigTab({
             </div>
           </div>
         </SectionCard>
+      </div>
+
+      {/* ============================= MIDDLE COLUMN — ADAPTIVE v2.0 ============================= */}
+      <div className="space-y-3">
+        <SectionHeader title="Adaptive v2.0" subtitle="Volatility-aware stop-loss and take-profit tuning" />
 
         {/* ── Adaptive v2.0 panel ── */}
         <SectionCard>
@@ -398,139 +403,6 @@ function ConfigTab({
             />
           </div>
         </SectionCard>
-
-        {/* ── Execution & Fees (date range, capital, commission, slippage, timeframe, positions) ── */}
-        <SectionCard>
-          <h4 className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-            EXECUTION & FEES
-          </h4>
-
-          {/* Date range */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label htmlFor="bt-start" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Start Date</label>
-              <InfoTooltip id="bt-start">
-                <input
-                  id="bt-start"
-                  type="date"
-                  disabled={disabled}
-                  value={config.startDate}
-                  onChange={(e) => onChange({ startDate: e.target.value })}
-                  className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                />
-              </InfoTooltip>
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor="bt-end" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>End Date</label>
-              <InfoTooltip id="bt-end">
-                <input
-                  id="bt-end"
-                  type="date"
-                  disabled={disabled}
-                  value={config.endDate}
-                  onChange={(e) => onChange({ endDate: e.target.value })}
-                  className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                />
-              </InfoTooltip>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label htmlFor="bt-capital" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Initial Capital (USD)</label>
-              <InfoTooltip id="bt-capital">
-                <input
-                  id="bt-capital"
-                  type="number"
-                  disabled={disabled}
-                  min={100}
-                  step={1000}
-                  value={config.initialCapital}
-                  onChange={(e) => onChange({ initialCapital: parseFloat(e.target.value) || 10000 })}
-                  className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                />
-              </InfoTooltip>
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor="bt-commission" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Commission (fraction)</label>
-              <InfoTooltip id="bt-commission">
-                <input
-                  id="bt-commission"
-                  type="number"
-                  disabled={disabled}
-                  min={0}
-                  max={0.05}
-                  step={0.0001}
-                  value={config.commissionPercentage ?? 0.001}
-                  onChange={(e) => onChange({ commissionPercentage: parseFloat(e.target.value) })}
-                  className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                />
-              </InfoTooltip>
-              <p className="text-xs" style={{ color: 'var(--text-faint)' }}>e.g. 0.001 = 0.1%</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label htmlFor="bt-max-pos" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Max Concurrent Positions</label>
-              <InfoTooltip id="bt-max-pos">
-                <input
-                  id="bt-max-pos"
-                  type="number"
-                  disabled={disabled}
-                  min={1}
-                  max={20}
-                  step={1}
-                  value={config.maxConcurrentPositions ?? 1}
-                  onChange={(e) => onChange({ maxConcurrentPositions: parseInt(e.target.value) || 1 })}
-                  className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                />
-              </InfoTooltip>
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor="bt-slippage" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Slippage (fraction)</label>
-              <InfoTooltip id="bt-slippage">
-                <input
-                  id="bt-slippage"
-                  type="number"
-                  disabled={disabled}
-                  min={0}
-                  max={0.02}
-                  step={0.0001}
-                  value={config.slippagePercentage ?? 0}
-                  onChange={(e) => onChange({ slippagePercentage: parseFloat(e.target.value) })}
-                  className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                />
-              </InfoTooltip>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label htmlFor="bt-timeframe" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Timeframe</label>
-              <InfoTooltip id="bt-timeframe">
-                <select
-                  id="bt-timeframe"
-                  disabled={disabled}
-                  value={config.timeframe ?? '1h'}
-                  onChange={(e) => onChange({ timeframe: e.target.value })}
-                  className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                >
-                  {['1m', '5m', '15m', '30m', '1h', '4h', '1d'].map((tf) => (
-                    <option key={tf} value={tf}>{tf}</option>
-                  ))}
-                </select>
-              </InfoTooltip>
-            </div>
-          </div>
-        </SectionCard>
       </div>
 
       {/* ============================= RIGHT COLUMN — RISK/REWARD ============================= */}
@@ -621,26 +493,6 @@ function ConfigTab({
             disabled={disabled}
             format={(v) => `${v}`}
           />
-        </SectionCard>
-
-        <SectionCard>
-          <h4 className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-            SUMMARY
-          </h4>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-            <dt style={{ color: 'var(--text-muted)' }}>Lookback</dt>
-            <dd style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{lookbackDays}d ({config.startDate} → {config.endDate})</dd>
-            <dt style={{ color: 'var(--text-muted)' }}>Mode</dt>
-            <dd style={{ color: 'var(--text-secondary)' }}>{mode === 'walk-forward' ? 'Walk-Forward' : mode === 'walk' ? 'Walk' : 'Live Replay'}</dd>
-            <dt style={{ color: 'var(--text-muted)' }}>Adaptive Preset</dt>
-            <dd style={{ color: 'var(--text-secondary)' }}>{adaptivePreset}</dd>
-            <dt style={{ color: 'var(--text-muted)' }}>Stop-Loss Range</dt>
-            <dd style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{minStopLoss}% – {maxStopLoss}%</dd>
-            <dt style={{ color: 'var(--text-muted)' }}>Risk / Leverage</dt>
-            <dd style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{maxRisk}% · {leverage}x</dd>
-            <dt style={{ color: 'var(--text-muted)' }}>Min/Max Bars</dt>
-            <dd style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{minBarsHeld} – {maxBarsHeld}</dd>
-          </dl>
         </SectionCard>
 
         {/* Optimize hook — deferred to BTCAAAAA-31247 */}
