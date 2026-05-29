@@ -257,8 +257,17 @@
       "src/ai_consultant/cost_tracker.py",
       "src/ai_consultant/provider.py"
     ],
+    "src/ai_consultant/audit_writer.py": [
+      "src/optimizer_v3/database/settings.py"
+    ],
     "src/ai_consultant/consultant_service.py": [
       "src/ai_consultant/provider.py"
+    ],
+    "src/ai_consultant/cost_tracker.py": [
+      "src/optimizer_v3/database/settings.py"
+    ],
+    "src/ai_consultant/db/query_engine.py": [
+      "src/optimizer_v3/database/settings.py"
     ],
     "src/ai_consultant/signal_catalog.py": [
       "src/detectors/building_blocks/registry.py"
@@ -913,6 +922,9 @@
       "src/optimizer_v3/core/results/risk_metrics.py",
       "src/optimizer_v3/core/results/trade_analyzer.py"
     ],
+    "src/optimizer_v3/core/results/session_history.py": [
+      "src/optimizer_v3/database/settings.py"
+    ],
     "src/optimizer_v3/core/strategy_analyzer.py": [
       "src/optimizer_v3/core/logger.py",
       "src/optimizer_v3/core/validator.py",
@@ -943,13 +955,17 @@
     "src/optimizer_v3/database/backup.py": [
       "src/optimizer_v3/database/config.py"
     ],
+    "src/optimizer_v3/database/config.py": [
+      "src/optimizer_v3/database/settings.py"
+    ],
     "src/optimizer_v3/database/connection_pool.py": [
       "src/optimizer_v3/database/config.py"
     ],
     "src/optimizer_v3/database/database_manager.py": [
       "src/optimizer_v3/database/strategy_manager.py",
       "src/optimizer_v3/database/ai_recommendations_manager.py",
-      "src/optimizer_v3/database/test_results_manager.py"
+      "src/optimizer_v3/database/test_results_manager.py",
+      "src/optimizer_v3/database/settings.py"
     ],
     "src/optimizer_v3/database/init_db.py": [
       "src/optimizer_v3/database/config.py",
@@ -1404,6 +1420,9 @@
       "src/touch_index/git_extractor.py",
       "src/touch_index/paperclip_client.py"
     ],
+    "src/touch_index/db.py": [
+      "src/optimizer_v3/database/settings.py"
+    ],
     "src/touch_index/fr_worker.py": [
       "src/touch_index/comment_extractor.py",
       "src/touch_index/git_extractor.py",
@@ -1504,6 +1523,11 @@
     ],
     "tests/api/test_p2_strategy_control.py": [
       "src/itm/orchestrator/registry.py",
+      "src/api/app.py"
+    ],
+    "tests/api/test_websockets.py": [
+      "src/api/__init__.py",
+      "src/api/auth.py",
       "src/api/app.py"
     ],
     "tests/audit/test_btcaaaaa_25474_differential_pnl_audit.py": [
@@ -5055,8 +5079,18 @@
       "tests/ai_consultant/test_consultant_service.py",
       "tests/ai_consultant/test_provider.py"
     ],
+    "src/optimizer_v3/database/settings.py": [
+      "src/ai_consultant/audit_writer.py",
+      "src/ai_consultant/cost_tracker.py",
+      "src/ai_consultant/db/query_engine.py",
+      "src/optimizer_v3/core/results/session_history.py",
+      "src/optimizer_v3/database/config.py",
+      "src/optimizer_v3/database/database_manager.py",
+      "src/touch_index/db.py"
+    ],
     "src/api/auth.py": [
-      "src/api/app.py"
+      "src/api/app.py",
+      "tests/api/test_websockets.py"
     ],
     "src/api/models.py": [
       "src/api/app.py"
@@ -6285,10 +6319,14 @@
     ],
     "src/api/app.py": [
       "tests/api/conftest.py",
-      "tests/api/test_p2_strategy_control.py"
+      "tests/api/test_p2_strategy_control.py",
+      "tests/api/test_websockets.py"
     ],
     "src/api/event_publisher.py": [
       "tests/api/test_event_publisher.py"
+    ],
+    "src/api/__init__.py": [
+      "tests/api/test_websockets.py"
     ],
     "tests/strategy_builder/ui/test_backtest_config_panel_calibration_gate.py": [
       "tests/bug_regression/test_btcaaaaa_1018_regression.py"
@@ -8035,6 +8073,7 @@
     "src/optimizer_v3/database/manager.py",
     "src/optimizer_v3/database/models.py",
     "src/optimizer_v3/database/nautilus_types.py",
+    "src/optimizer_v3/database/settings.py",
     "src/optimizer_v3/database/strategy_manager.py",
     "src/optimizer_v3/database/test_results_manager.py",
     "src/optimizer_v3/database/validators.py",
@@ -9042,10 +9081,10 @@
     "src/detectors/building_blocks/patterns/triple_top.py"
   ],
   "stats": {
-    "total_files": 1418,
-    "parsed_files": 1402,
+    "total_files": 1419,
+    "parsed_files": 1403,
     "error_files": 16,
     "parse_rate_pct": 98.87,
-    "edge_count": 2461
+    "edge_count": 2471
   }
 }
