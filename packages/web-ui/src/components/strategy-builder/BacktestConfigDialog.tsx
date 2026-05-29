@@ -18,12 +18,13 @@ export interface BacktestConfigDialogProps {
 
 type TabKey = 'config' | 'output' | 'trades' | 'metrics' | 'ai' | 'compare';
 
+// Tab order mirrors thickclient: Config / Live Output / Trades / AI Recommendations / Metrics / Compare
 const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
   { key: 'config', label: 'Config', icon: <Settings size={14} /> },
   { key: 'output', label: 'Live Output', icon: <Terminal size={14} /> },
   { key: 'trades', label: 'Trades', icon: <TrendingUp size={14} /> },
-  { key: 'metrics', label: 'Metrics', icon: <BarChart3 size={14} /> },
   { key: 'ai', label: 'AI Recommendations', icon: <Sparkles size={14} /> },
+  { key: 'metrics', label: 'Metrics', icon: <BarChart3 size={14} /> },
   { key: 'compare', label: 'Compare', icon: <GitCompare size={14} /> },
 ];
 
@@ -365,23 +366,23 @@ function ConfigTab({
 
             <ChipRow
               label="Stop-Loss Delay"
-              values={[0.5, 1.0, 1.5, 2.0, 2.5]}
+              values={[0, 1, 2, 3, 4, 5, 6, 7]}
               current={stopLossDelay}
               onSelect={setStopLossDelay}
               disabled={disabled}
-              format={(v) => `${v}%`}
+              format={(v) => `${v} bars`}
             />
             <ChipRow
               label="Emergency"
-              values={[1.0, 1.5, 2.0, 3.0]}
+              values={[1.0, 1.5, 2.0, 2.5, 3.0]}
               current={emergency}
               onSelect={setEmergency}
               disabled={disabled}
-              format={(v) => `${v}%`}
+              format={(v) => `${Number(v).toFixed(2)}%`}
             />
             <ChipRow
               label="Volatility Lookback"
-              values={[10, 20, 30, 50]}
+              values={[10, 15, 20, 25, 30, 50]}
               current={volatilityLookback}
               onSelect={setVolatilityLookback}
               disabled={disabled}
@@ -389,7 +390,7 @@ function ConfigTab({
             />
             <ChipRow
               label="Volatility Multiplier"
-              values={[1.0, 1.5, 2.0, 2.5]}
+              values={[1, 2, 3, 4, 5]}
               current={volatilityMultiplier}
               onSelect={setVolatilityMultiplier}
               disabled={disabled}
@@ -401,7 +402,7 @@ function ConfigTab({
               current={minStopLoss}
               onSelect={setMinStopLoss}
               disabled={disabled}
-              format={(v) => `${v}%`}
+              format={(v) => `${Number(v).toFixed(1)}%`}
             />
             <ChipRow
               label="Max Stop-Loss"
@@ -409,7 +410,7 @@ function ConfigTab({
               current={maxStopLoss}
               onSelect={setMaxStopLoss}
               disabled={disabled}
-              format={(v) => `${v}%`}
+              format={(v) => `${Number(v).toFixed(1)}%`}
             />
           </div>
         </SectionCard>
@@ -449,7 +450,7 @@ function ConfigTab({
           />
           <ChipRow
             label="Leverage"
-            values={[1, 3, 5, 10, 25, 50, 100]}
+            values={[1, 2, 3, 5, 10, 25, 50, 100]}
             current={leverage}
             onSelect={setLeverage}
             disabled={disabled}
@@ -772,23 +773,31 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
           {/* Status log panel — drawer footer mirrors thickclient bottom status box */}
           <StatusLogPanel logs={outputLogs} isRunning={backTestInProgress} />
 
-          {/* Progress bar with Candles / Trades counters (placeholders until backend wires) */}
+          {/* Progress bar — thickclient parity: Candles N/M, Trades K, TPSL Adjustments K */}
           {(backTestInProgress || backTestProgress > 0) && (
             <div className="mb-4 space-y-1">
               <div
-                className="flex justify-between text-xs"
+                className="text-[11px]"
                 style={{ color: 'var(--text-secondary)' }}
               >
-                <span>
-                  {backTestInProgress ? 'Running…' : 'Last run'}
-                  <span className="ml-3" style={{ color: 'var(--text-muted)' }}>
-                    Candles: <span style={{ fontVariantNumeric: 'tabular-nums' }}>—</span>
-                  </span>
-                  <span className="ml-3" style={{ color: 'var(--text-muted)' }}>
-                    Trades: <span style={{ fontVariantNumeric: 'tabular-nums' }}>{backTestResult?.trades?.length ?? '—'}</span>
+                <span className="font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Progress</span>
+                <span className="ml-3" style={{ color: 'var(--text-muted)' }}>
+                  Candles:{' '}
+                  <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>
+                    {(backTestResult?.trades && (backTestResult as unknown as { totalBars?: number }).totalBars) ?? '—'}
                   </span>
                 </span>
-                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{backTestProgress}%</span>
+                <span className="ml-3" style={{ color: 'var(--text-muted)' }}>
+                  Trades:{' '}
+                  <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>
+                    {backTestResult?.trades?.length ?? '—'}
+                  </span>
+                </span>
+                <span className="ml-3" style={{ color: 'var(--text-muted)' }}>
+                  TPSL Adjustments:{' '}
+                  <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-faint)' }}>—</span>
+                </span>
+                <span className="ml-3 float-right" style={{ fontVariantNumeric: 'tabular-nums' }}>{backTestProgress}%</span>
               </div>
               <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-card)' }}>
                 <div
@@ -803,43 +812,39 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
             <p className="text-xs mb-3" style={{ color: 'var(--accent-red)' }}>{error}</p>
           )}
 
-          {/* Action bar — thickclient parity: Run Test / Config Discovery / View Live Results / Cancel + Start */}
+          {/* Action bar — thickclient layout: Run Test / Pause / Stop on left, Config Discovery / saved-at / View Live Results on right */}
           <div className="flex items-center justify-between gap-2">
-            {/* Left cluster: ancillary actions — ghost styling so they read as auxiliary */}
-            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-faint)' }}>
-              <InfoTooltip id="bt-config-discovery-btn">
-                <button
-                  disabled
-                  title="Config Discovery — auto-tune TP/SL across recent windows (deferred to BTCAAAAA-31247)"
-                  className="flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors disabled:cursor-not-allowed"
-                  style={{ background: 'transparent', border: '1px dashed var(--border)', color: 'var(--text-faint)' }}
-                >
-                  <Settings size={12} />
-                  Config Discovery
-                </button>
-              </InfoTooltip>
-              <InfoTooltip id="bt-view-live-btn">
-                <button
-                  disabled={!backTestResult}
-                  onClick={() => setActiveTab('trades')}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors disabled:cursor-not-allowed"
-                  style={{ background: 'transparent', border: '1px dashed var(--border)', color: backTestResult ? 'var(--text-secondary)' : 'var(--text-faint)' }}
-                >
-                  <TrendingUp size={12} />
-                  View Live Results
-                </button>
-              </InfoTooltip>
-              <span className="ml-1 text-[10px]" style={{ color: 'var(--text-faint)' }}>(awaiting backend BTCAAAAA-31184)</span>
-            </div>
-
-            {/* Right cluster: primary controls */}
+            {/* Left cluster — primary run controls (thickclient leading edge) */}
             <div className="flex items-center gap-2">
-            {/* Pause/Resume (disabled until backend contract ships) */}
-            {backTestInProgress && (
+              <InfoTooltip id="bt-run-btn">
+                {!backTestInProgress ? (
+                  <button
+                    onClick={handleStart}
+                    disabled={!canRun}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ background: '#32557c', color: 'var(--btn-primary-text, white)' }}
+                    onMouseEnter={e => { if (canRun) (e.currentTarget as HTMLButtonElement).style.opacity = '0.85'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
+                  >
+                    <Play size={14} />
+                    {backTestResult ? 'Re-run' : 'Run Test'}
+                  </button>
+                ) : (
+                  <button
+                    className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium"
+                    style={{ background: '#32557c', color: 'var(--btn-primary-text, white)', opacity: 0.6, cursor: 'not-allowed' }}
+                    disabled
+                    title="Stop not yet available — awaiting backend contract"
+                  >
+                    <Square size={14} />
+                    Running…
+                  </button>
+                )}
+              </InfoTooltip>
               <InfoTooltip id="bt-pause-btn">
                 <button
                   disabled
-                  title="Pause/Resume coming in BTCAAAAA-31183"
+                  title="Pause/Resume — deferred (control endpoint coming in follow-up)"
                   className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
                 >
@@ -847,48 +852,68 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                   Pause
                 </button>
               </InfoTooltip>
-            )}
-
-            {/* Cancel / Reset */}
-            <InfoTooltip id="bt-cancel-btn">
-              <button
-                onClick={onClose}
-                disabled={backTestInProgress}
-                className="px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: '#314255', color: 'var(--btn-primary-text, white)' }}
-                onMouseEnter={e => { if (!backTestInProgress) (e.currentTarget as HTMLButtonElement).style.opacity = '0.85'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
-              >
-                {backTestResult ? 'Close' : 'Cancel'}
-              </button>
-            </InfoTooltip>
-
-            {/* Start / Stop */}
-            <InfoTooltip id="bt-run-btn">
-              {!backTestInProgress ? (
+              <InfoTooltip id="bt-stop-btn">
                 <button
-                  onClick={handleStart}
-                  disabled={!canRun}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ background: '#32557c', color: 'var(--btn-primary-text, white)' }}
-                  onMouseEnter={e => { if (canRun) (e.currentTarget as HTMLButtonElement).style.opacity = '0.85'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
-                >
-                  <Play size={14} />
-                  {backTestResult ? 'Re-run' : 'Start Backtest'}
-                </button>
-              ) : (
-                <button
-                  className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium"
-                  style={{ background: '#32557c', color: 'var(--btn-primary-text, white)', opacity: 0.6, cursor: 'not-allowed' }}
                   disabled
-                  title="Stop not yet available — awaiting backend contract"
+                  title="Stop — deferred (control endpoint coming in follow-up)"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
                 >
                   <Square size={14} />
-                  Running…
+                  Stop
                 </button>
+              </InfoTooltip>
+              {/* "Config saved at HH:MM:SS (after test run)" — italic, only after a run completes */}
+              {backTestResult?.completedAt && (
+                <span
+                  className="ml-2 italic text-xs"
+                  style={{ color: 'var(--text-faint)' }}
+                >
+                  Config saved at {new Date(backTestResult.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (after test run)
+                </span>
               )}
-            </InfoTooltip>
+            </div>
+
+            {/* Right cluster — ancillary actions + close */}
+            <div className="flex items-center gap-2">
+              <InfoTooltip id="bt-config-discovery-btn">
+                <button
+                  disabled
+                  title="Config Discovery — auto-tune TP/SL across recent windows (deferred to BTCAAAAA-31247)"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium disabled:cursor-not-allowed"
+                  style={{
+                    background: 'rgba(46, 140, 255, 0.10)',
+                    border: '1px solid rgba(46, 140, 255, 0.30)',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  <Settings size={14} />
+                  Config Discovery
+                </button>
+              </InfoTooltip>
+              <InfoTooltip id="bt-view-live-btn">
+                <button
+                  disabled={!backTestResult}
+                  onClick={() => setActiveTab('trades')}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: backTestResult ? 'var(--text-secondary)' : 'var(--text-muted)' }}
+                >
+                  <TrendingUp size={14} />
+                  View Live Results
+                </button>
+              </InfoTooltip>
+              <InfoTooltip id="bt-cancel-btn">
+                <button
+                  onClick={onClose}
+                  disabled={backTestInProgress}
+                  className="px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: '#314255', color: 'var(--btn-primary-text, white)' }}
+                  onMouseEnter={e => { if (!backTestInProgress) (e.currentTarget as HTMLButtonElement).style.opacity = '0.85'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
+                >
+                  {backTestResult ? 'Close' : 'Cancel'}
+                </button>
+              </InfoTooltip>
             </div>
           </div>
         </div>
