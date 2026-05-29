@@ -31,7 +31,7 @@
  */
 
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, BarChart3, AlertTriangle, TrendingUp } from 'lucide-react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { ValidationReport, ValidationIssue, ValidationSeverity } from '@/lib/strategy-builder/types';
 import { AutoFixConfirmDialog } from './AutoFixConfirmDialog';
@@ -835,25 +835,25 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
       </div>
 
       {/* Status banner */}
-      <div className="flex-shrink-0 px-6 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
-        <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+      <div className="flex-shrink-0 px-6 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
+        <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>
           Strategy: {displayReport.strategy_summary.name}
-            {displayReport.strategy_summary.version && ` (v${displayReport.strategy_summary.version})`} • Validated:{' '}
-            {new Date(displayReport.timestamp).toLocaleString()}
-          </p>
-          <div className="rounded border p-3" style={statusBgStyle}>
-            <div className="flex items-center gap-3">
-              <span className="text-lg font-bold" style={statusTextStyle}>
-                {displayReport.is_valid ? '✅ VALIDATION PASSED' : '❌ VALIDATION FAILED'}
-              </span>
-              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                {displayReport.is_valid
-                  ? 'Your strategy meets all institutional-grade requirements.'
-                  : `${issueCounts.critical + issueCounts.errors} blocking issue(s) must be fixed.`}
-              </span>
-            </div>
+          {displayReport.strategy_summary.version && ` (v${displayReport.strategy_summary.version})`} • Validated:{' '}
+          {new Date(displayReport.timestamp).toLocaleString()}
+        </p>
+        <div className="rounded border px-3 py-2" style={statusBgStyle}>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold" style={statusTextStyle}>
+              {displayReport.is_valid ? '✓ VALIDATION PASSED' : '✕ VALIDATION FAILED'}
+            </span>
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              {displayReport.is_valid
+                ? 'Your strategy meets all institutional-grade requirements.'
+                : `${issueCounts.critical + issueCounts.errors} blocking issue(s) must be fixed.`}
+            </span>
           </div>
         </div>
+      </div>
 
         {/* Summary bar */}
         <div
@@ -872,84 +872,80 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
           className="flex-shrink-0 px-6 border-b flex gap-8"
           style={{ borderColor: 'var(--border)', background: 'var(--bg-panel)' }}
         >
-          {(['summary', 'issues', 'metrics'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setCurrentTab(tab)}
-              className="px-4 py-3 font-medium text-sm border-b-2 transition-colors"
-              style={
-                currentTab === tab
-                  ? { borderColor: 'var(--accent-blue)', color: 'var(--accent-blue)' }
-                  : { borderColor: 'transparent', color: 'var(--text-secondary)' }
-              }
-              onMouseEnter={(e) => {
-                if (currentTab !== tab) {
-                  e.currentTarget.style.color = 'var(--text-secondary)';
+          {(['summary', 'issues', 'metrics'] as const).map((tab) => {
+            const isActive = currentTab === tab;
+            const Icon = tab === 'summary' ? BarChart3 : tab === 'issues' ? AlertTriangle : TrendingUp;
+            const iconColor = tab === 'issues' && (issueCounts.errors + issueCounts.warnings + issueCounts.critical) > 0
+              ? 'var(--accent-orange)'
+              : undefined;
+            return (
+              <button
+                key={tab}
+                onClick={() => setCurrentTab(tab)}
+                className="px-4 py-2.5 font-medium text-sm border-b-2 transition-colors flex items-center gap-2"
+                style={
+                  isActive
+                    ? { borderColor: 'var(--accent-blue)', color: 'var(--accent-blue)' }
+                    : { borderColor: 'transparent', color: 'var(--text-secondary)' }
                 }
-              }}
-              onMouseLeave={(e) => {
-                if (currentTab !== tab) {
-                  e.currentTarget.style.color = 'var(--text-secondary)';
-                }
-              }}
-            >
-              {tab === 'summary' && '📊 Summary'}
-              {tab === 'issues' && '⚠️ Issues'}
-              {tab === 'metrics' && '📈 Metrics'}
-            </button>
-          ))}
+              >
+                <Icon size={14} strokeWidth={1.75} style={{ color: iconColor }} />
+                <span className="capitalize">{tab}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {currentTab === 'summary' && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Validation Summary */}
               <div
-                className="rounded border p-4"
+                className="rounded border p-3"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
               >
-                <h3 className="font-bold mb-3 text-sm" style={{ color: 'var(--accent-blue)' }}>
+                <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                   Validation Summary
                 </h3>
-                <div className="grid grid-cols-5 gap-3 text-xs">
-                  <div className="rounded p-2" style={{ background: 'var(--bg-panel)' }}>
-                    <div className="font-bold" style={{ color: 'var(--accent-red)' }}>
+                <div className="grid grid-cols-5 gap-2 text-xs">
+                  <div className="rounded px-3 py-2" style={{ background: 'var(--bg-panel)' }}>
+                    <div className="text-[11px] font-medium" style={{ color: issueCounts.critical > 0 ? 'var(--accent-red)' : 'var(--text-muted)' }}>
                       Critical
                     </div>
-                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-secondary)' }}>
+                    <div className="text-base font-semibold mt-0.5" style={{ color: issueCounts.critical > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
                       {issueCounts.critical}
                     </div>
                   </div>
-                  <div className="rounded p-2" style={{ background: 'var(--bg-panel)' }}>
-                    <div className="font-bold" style={{ color: 'var(--accent-orange)' }}>
+                  <div className="rounded px-3 py-2" style={{ background: 'var(--bg-panel)' }}>
+                    <div className="text-[11px] font-medium" style={{ color: issueCounts.errors > 0 ? 'var(--accent-orange)' : 'var(--text-muted)' }}>
                       Errors
                     </div>
-                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-secondary)' }}>
+                    <div className="text-base font-semibold mt-0.5" style={{ color: issueCounts.errors > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
                       {issueCounts.errors}
                     </div>
                   </div>
-                  <div className="rounded p-2" style={{ background: 'var(--bg-panel)' }}>
-                    <div className="font-bold" style={{ color: 'var(--accent-orange)' }}>
+                  <div className="rounded px-3 py-2" style={{ background: 'var(--bg-panel)' }}>
+                    <div className="text-[11px] font-medium" style={{ color: issueCounts.warnings > 0 ? 'var(--accent-orange)' : 'var(--text-muted)' }}>
                       Warnings
                     </div>
-                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-secondary)' }}>
+                    <div className="text-base font-semibold mt-0.5" style={{ color: issueCounts.warnings > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
                       {issueCounts.warnings}
                     </div>
                   </div>
-                  <div className="rounded p-2" style={{ background: 'var(--bg-panel)' }}>
-                    <div className="font-bold" style={{ color: 'var(--accent-blue)' }}>
+                  <div className="rounded px-3 py-2" style={{ background: 'var(--bg-panel)' }}>
+                    <div className="text-[11px] font-medium" style={{ color: issueCounts.notices > 0 ? 'var(--accent-blue)' : 'var(--text-muted)' }}>
                       Notices
                     </div>
-                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-secondary)' }}>
+                    <div className="text-base font-semibold mt-0.5" style={{ color: issueCounts.notices > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
                       {issueCounts.notices}
                     </div>
                   </div>
-                  <div className="rounded p-2" style={{ background: 'var(--bg-panel)' }}>
-                    <div className="font-bold" style={{ color: 'var(--text-muted)' }}>
+                  <div className="rounded px-3 py-2" style={{ background: 'var(--bg-panel)' }}>
+                    <div className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
                       Info
                     </div>
-                    <div className="text-xl font-bold mt-1" style={{ color: 'var(--text-secondary)' }}>
+                    <div className="text-base font-semibold mt-0.5" style={{ color: issueCounts.info > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
                       {issueCounts.info}
                     </div>
                   </div>
@@ -958,23 +954,23 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
 
               {/* Strategy Composition */}
               <div
-                className="rounded border p-4"
+                className="rounded border p-3"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
               >
-                <h3 className="font-bold mb-3 text-sm" style={{ color: 'var(--accent-blue)' }}>
+                <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                   Strategy Composition
                 </h3>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {getCompositionBreakdown(currentStrategy).map((item, idx) => (
-                    <div key={idx} className="rounded p-3" style={{ background: 'var(--bg-panel)' }}>
+                    <div key={idx} className="rounded px-3 py-2" style={{ background: 'var(--bg-panel)' }}>
                       <div className="flex justify-between items-center">
-                        <span style={{ color: 'var(--text-secondary)' }}>{item.label}:</span>
-                        <div className="font-bold text-lg" style={{ color: 'var(--text-secondary)' }}>
+                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{item.label}</span>
+                        <span className="font-semibold text-sm" style={{ color: 'var(--text-secondary)' }}>
                           {item.count}
-                        </div>
+                        </span>
                       </div>
                       {item.details && (
-                        <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                        <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                           {item.details}
                         </div>
                       )}
@@ -985,17 +981,17 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
 
               {/* Complexity */}
               <div
-                className="rounded border p-4"
+                className="rounded border p-3"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
               >
-                <h3 className="font-bold mb-3 text-sm" style={{ color: 'var(--accent-blue)' }}>
+                <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                   Strategy Complexity
                 </h3>
-                <div className="space-y-3">
-                  <div className="rounded p-3" style={{ background: 'var(--bg-panel)' }}>
+                <div className="space-y-2">
+                  <div className="rounded px-3 py-2" style={{ background: 'var(--bg-panel)' }}>
                     <div className="flex justify-between items-center mb-2">
-                      <span style={{ color: 'var(--text-secondary)' }}>Complexity Score:</span>
-                      <span className="font-bold text-lg" style={{ color: 'var(--accent-green)' }}>
+                      <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Complexity Score</span>
+                      <span className="font-semibold text-sm" style={{ color: 'var(--accent-green)' }}>
                         {displayReport.complexity_metrics.complexity_score}/100
                       </span>
                     </div>
