@@ -30,15 +30,18 @@
  * Note: CSV export and Undo are P3 scope (already partially implemented)
  */
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import { ShieldCheck } from 'lucide-react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { ValidationReport, ValidationIssue, ValidationSeverity } from '@/lib/strategy-builder/types';
 import { AutoFixConfirmDialog } from './AutoFixConfirmDialog';
+import { AppBrand } from '@/components/shared/AppBrand';
 
 export interface ValidationReportWindowProps {
   open: boolean;
   onClose: () => void;
   report?: ValidationReport;
+  standalone?: boolean;
 }
 
 // Severity styles matching PyQt5 implementation — using CSS variables
@@ -525,8 +528,30 @@ function getComplexityLevel(score: number): string {
   }
 }
 
-export function ValidationReportWindow({ open, onClose, report }: ValidationReportWindowProps) {
+export function ValidationReportWindow({ open, onClose, report, standalone = false }: ValidationReportWindowProps) {
   const { validationMessages, isValidating, validateStrategy, clearValidation, currentStrategy } = useStrategyStore();
+
+  const handlePopOut = useCallback(() => {
+    const win = window.open(
+      '/validation',
+      '_blank',
+      'width=1280,height=800,menubar=no,toolbar=no,location=no,status=no',
+    );
+    if (win) onClose();
+  }, [onClose]);
+
+  const handlePopIn = useCallback(() => {
+    if (typeof window === 'undefined' || !window.opener) return;
+    window.opener.postMessage({ type: 'validation-report:popin' }, window.location.origin);
+    window.close();
+  }, []);
+
+  const [canPopIn, setCanPopIn] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && standalone && window.opener) {
+      setCanPopIn(true);
+    }
+  }, [standalone]);
   const [currentTab, setCurrentTab] = useState<'summary' | 'issues' | 'metrics'>('summary');
   const [undoStack, setUndoStack] = useState<UndoState[]>([]);
   const [showAutoFix, setShowAutoFix] = useState(false);
@@ -744,34 +769,75 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
     ? { background: 'var(--accent-green-dark)', color: 'var(--btn-primary-text)' }
     : { background: 'var(--accent-red-dark)', color: 'var(--btn-primary-text)' };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+  const contentBox = (
+    <div
+      className="relative w-full flex flex-col"
+      style={{
+        maxWidth: standalone ? '100%' : '2560px',
+        width: '100%',
+        height: '100%',
+        borderRadius: 0,
+        border: '1px solid var(--border)',
+        background: 'var(--bg-panel)',
+        boxShadow: standalone ? 'none' : '0 25px 50px -12px rgba(0,0,0,0.5)',
+      }}
+    >
+      {/* Header — matches StrategyBrowserDialog structure */}
       <div
-        className="relative w-full max-w-6xl h-[90vh] rounded-lg border shadow-2xl mx-4 flex flex-col"
-        style={{ borderColor: 'var(--border)', background: 'var(--bg-panel)' }}
+        className="flex items-center justify-between px-6 py-3 flex-shrink-0"
+        style={{ borderBottom: '1px solid var(--border)' }}
       >
-        {/* Header */}
-        <div
-          className="flex-shrink-0 px-6 py-4 border-b"
-          style={{ borderColor: 'var(--border)' }}
+        <h2
+          id="validation-report-title"
+          className="text-sm font-semibold flex items-center gap-3"
+          style={{ color: 'var(--text-secondary)' }}
         >
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xl font-bold" style={{ color: 'var(--accent-blue)' }}>
-              💼 Validation Report
-            </h2>
+          <AppBrand size={24} />
+          <span className="flex items-center gap-2">
+            <ShieldCheck style={{ width: 16, height: 16, flexShrink: 0 }} />
+            <span>Validation Report</span>
+          </span>
+        </h2>
+        <div className="flex items-center gap-2">
+          {!standalone && (
             <button
-              onClick={onClose}
-              className="transition-colors text-2xl"
-              style={{ color: 'var(--text-secondary)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
-              aria-label="Close"
+              onClick={handlePopOut}
+              title="Open this report in a separate window that can be moved to another monitor"
+              className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
+              style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
             >
-              ✕
+              ↗ Pop Out
             </button>
-          </div>
-          <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-            Strategy: {displayReport.strategy_summary.name}
+          )}
+          {canPopIn && (
+            <button
+              onClick={handlePopIn}
+              title="Return this report to the main app window"
+              className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
+              style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
+            >
+              ↙ Pop In
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="text-lg transition-colors"
+            aria-label="Close dialog"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
+          >✕</button>
+        </div>
+      </div>
+
+      {/* Status banner */}
+      <div className="flex-shrink-0 px-6 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+        <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+          Strategy: {displayReport.strategy_summary.name}
             {displayReport.strategy_summary.version && ` (v${displayReport.strategy_summary.version})`} • Validated:{' '}
             {new Date(displayReport.timestamp).toLocaleString()}
           </p>
@@ -1035,8 +1101,10 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
           </button>
         </div>
       </div>
+  );
 
-      {/* Auto-fix confirmation dialog */}
+  const modals = (
+    <>
       {selectedIssue && (
         <AutoFixConfirmDialog
           open={showAutoFix}
@@ -1052,6 +1120,24 @@ export function ValidationReportWindow({ open, onClose, report }: ValidationRepo
           }}
         />
       )}
+    </>
+  );
+
+  if (standalone) {
+    return <>{contentBox}{modals}</>;
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="validation-report-title"
+      className="fixed inset-y-0 right-0 z-50 flex items-stretch"
+      style={{ left: 'var(--sidebar-width, 0px)' }}
+    >
+      <div className="absolute inset-0 bg-black/70 cursor-pointer" onClick={onClose} />
+      {contentBox}
+      {modals}
     </div>
   );
 }

@@ -670,6 +670,17 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     return () => window.removeEventListener('message', handler);
   }, []);
 
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as { type?: string } | null;
+      if (!data || data.type !== 'validation-report:popin') return;
+      setActiveDialog('validation');
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
   // -------------------------------------------------------------------------
   // Debug Logger helpers
   // -------------------------------------------------------------------------
