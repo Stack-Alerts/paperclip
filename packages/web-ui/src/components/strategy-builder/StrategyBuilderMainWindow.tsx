@@ -460,11 +460,12 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   }, []);
 
   const handleValidate = useCallback(async () => {
+    setCurrentStep(1);
+    setActiveDialog('validation');
     try {
       await validateStrategy();
       setCompletedSteps(prev => new Set([...prev, 1]));
       setErrorSteps(prev => { const s = new Set(prev); s.delete(1); return s; });
-      setCurrentStep(1);
     } catch {
       setErrorSteps(prev => new Set([...prev, 1]));
     }
@@ -823,7 +824,14 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             currentStep={currentStep}
             completedSteps={completedSteps}
             errorSteps={errorSteps}
-            onStepClick={setCurrentStep}
+            onStepClick={(id) => {
+              setCurrentStep(id);
+              if (id === 1) {
+                handleValidate();
+              } else if (id === 2) {
+                open('backtestConfig');
+              }
+            }}
             inline
           />
         </div>
