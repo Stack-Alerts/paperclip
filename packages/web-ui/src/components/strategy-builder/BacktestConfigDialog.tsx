@@ -58,14 +58,14 @@ function ChipRow({
 }) {
   const fmt = format ?? ((v: ChipValue) => String(v));
   return (
-    <div className="flex items-center gap-3">
+    <div className="grid grid-cols-[110px_1fr] items-center gap-x-3 gap-y-0">
       <span
-        className="text-xs font-medium uppercase tracking-wide flex-shrink-0"
-        style={{ color: 'var(--text-muted)', minWidth: 140 }}
+        className="text-[10px] font-medium uppercase tracking-wider truncate"
+        style={{ color: 'var(--text-muted)' }}
       >
         {label}
       </span>
-      <div className="flex gap-1.5 flex-wrap">
+      <div className="flex gap-1 flex-wrap items-center">
         {values.map((v) => {
           const isActive = current === v;
           return (
@@ -73,18 +73,19 @@ function ChipRow({
               key={String(v)}
               disabled={disabled}
               onClick={() => onSelect(v)}
-              className="px-2.5 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight"
               style={{
-                background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-card)',
+                background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                 border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
                 color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
                 fontVariantNumeric: 'tabular-nums',
+                minWidth: 38,
               }}
               onMouseEnter={(e) => {
                 if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
               }}
               onMouseLeave={(e) => {
-                if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)';
+                if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
               }}
             >
               {fmt(v)}
@@ -117,7 +118,7 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
 function SectionCard({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="rounded-md p-4 space-y-3"
+      className="rounded-md p-3 space-y-2"
       style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border)',
@@ -186,9 +187,9 @@ function ConfigTab({
   }, [onChange]);
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 max-w-[1600px] mx-auto pb-4">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-[1600px] mx-auto pb-4">
       {/* ============================= LEFT COLUMN — CONFIGURATION ============================= */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         <SectionHeader title="Configuration" subtitle="Date range, mode, and stop-loss tuning" />
 
         {/* ── Basic Settings ── */}
@@ -533,7 +534,7 @@ function ConfigTab({
       </div>
 
       {/* ============================= RIGHT COLUMN — RISK/REWARD ============================= */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         <SectionHeader title="Risk / Reward" subtitle="Sizing, exposure, and trade-duration bounds" />
 
         <SectionCard>
@@ -942,16 +943,16 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
 
           {/* Action bar — thickclient parity: Run Test / Config Discovery / View Live Results / Cancel + Start */}
           <div className="flex items-center justify-between gap-2">
-            {/* Left cluster: ancillary actions */}
-            <div className="flex items-center gap-2">
+            {/* Left cluster: ancillary actions — ghost styling so they read as auxiliary */}
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-faint)' }}>
               <InfoTooltip id="bt-config-discovery-btn">
                 <button
                   disabled
                   title="Config Discovery — auto-tune TP/SL across recent windows (deferred to BTCAAAAA-31247)"
-                  className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors disabled:cursor-not-allowed"
+                  style={{ background: 'transparent', border: '1px dashed var(--border)', color: 'var(--text-faint)' }}
                 >
-                  <Settings size={14} />
+                  <Settings size={12} />
                   Config Discovery
                 </button>
               </InfoTooltip>
@@ -959,13 +960,14 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                 <button
                   disabled={!backTestResult}
                   onClick={() => setActiveTab('trades')}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: backTestResult ? 'var(--text-secondary)' : 'var(--text-muted)' }}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors disabled:cursor-not-allowed"
+                  style={{ background: 'transparent', border: '1px dashed var(--border)', color: backTestResult ? 'var(--text-secondary)' : 'var(--text-faint)' }}
                 >
-                  <TrendingUp size={14} />
+                  <TrendingUp size={12} />
                   View Live Results
                 </button>
               </InfoTooltip>
+              <span className="ml-1 text-[10px]" style={{ color: 'var(--text-faint)' }}>(awaiting backend BTCAAAAA-31184)</span>
             </div>
 
             {/* Right cluster: primary controls */}
