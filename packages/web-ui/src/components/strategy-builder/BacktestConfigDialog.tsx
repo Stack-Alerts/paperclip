@@ -39,7 +39,114 @@ function daysAgo(n: number) {
   return d.toISOString().slice(0, 10);
 }
 
-// ─── Config Tab ────────────────────────────────────────────────────────────────
+// ─── Chip row helper (used for parity with thickclient duration / percentage rows) ─────
+type ChipValue = string | number;
+function ChipRow({
+  label,
+  values,
+  current,
+  onSelect,
+  disabled,
+  format,
+}: {
+  label: string;
+  values: ChipValue[];
+  current: ChipValue | null | undefined;
+  onSelect: (v: ChipValue) => void;
+  disabled: boolean;
+  format?: (v: ChipValue) => string;
+}) {
+  const fmt = format ?? ((v: ChipValue) => String(v));
+  return (
+    <div className="flex items-center gap-3">
+      <span
+        className="text-xs font-medium uppercase tracking-wide flex-shrink-0"
+        style={{ color: 'var(--text-muted)', minWidth: 140 }}
+      >
+        {label}
+      </span>
+      <div className="flex gap-1.5 flex-wrap">
+        {values.map((v) => {
+          const isActive = current === v;
+          return (
+            <button
+              key={String(v)}
+              disabled={disabled}
+              onClick={() => onSelect(v)}
+              className="px-2.5 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-card)',
+                border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
+                color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+              onMouseEnter={(e) => {
+                if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)';
+              }}
+            >
+              {fmt(v)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Section header for two-column ConfigTab body ──────────────────────────────────────
+function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="space-y-0.5 mb-3">
+      <h3
+        className="text-xs font-semibold uppercase tracking-wider"
+        style={{ color: 'var(--text-secondary)' }}
+      >
+        {title}
+      </h3>
+      {subtitle && (
+        <p className="text-xs" style={{ color: 'var(--text-faint)' }}>{subtitle}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Card wrapper for each ConfigTab section ───────────────────────────────────────────
+function SectionCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="rounded-md p-4 space-y-3"
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ─── Config Tab — Two-column drawer body matching thickclient backtest_config_panel ────
+//
+// LEFT COLUMN: Configuration
+//   - Basic Settings (Lookback / Training / Testing duration chip rows)
+//   - Mode toggles (Walk-Forward / Live Replay)
+//   - TP/SL Config (TP/SL Picker, Stop-Loss Adjustment, Adaptive v2.0)
+//   - Execution & Fees (Date range, capital, commission, slippage, timeframe, max positions)
+//
+// RIGHT COLUMN: Risk/Reward
+//   - Starting Capital chip row
+//   - Min Risk/Reward chip row
+//   - Max Risk chip row
+//   - Leverage chip row
+//   - Confluence (Boost from Strategy)
+//   - Min/Max Bars Held chip rows
+//
+// All chips and inputs degrade gracefully when backend metadata is unavailable. Sections
+// mirror the PyQt5 src/strategy_builder/ui/backtest_config_panel.py layout.
+//
 function ConfigTab({
   config,
   onChange,
@@ -49,189 +156,566 @@ function ConfigTab({
   onChange: (patch: Partial<Omit<BacktestConfig, 'strategyId'>>) => void;
   disabled: boolean;
 }) {
+  // Local UI-only state for thickclient parameters that don't (yet) reach the backend.
+  // These mirror the thickclient panel surface so the visual port is complete; they will
+  // be wired to BTCAAAAA-31183 backend config payload once that contract lands.
+  const [lookbackDays, setLookbackDays] = useState<ChipValue>(90);
+  const [trainingDays, setTrainingDays] = useState<ChipValue>(60);
+  const [testingDays, setTestingDays] = useState<ChipValue>(30);
+  const [mode, setMode] = useState<'walk-forward' | 'walk' | 'live-replay'>('walk-forward');
+  const [tpSlConfig, setTpSlConfig] = useState<string>('Default');
+  const [adaptivePreset, setAdaptivePreset] = useState<'Conservative' | 'Balanced' | 'Aggressive' | 'Custom'>('Balanced');
+  const [delayStopLoss, setDelayStopLoss] = useState(true);
+  const [marketStructureStop, setMarketStructureStop] = useState(false);
+  const [stopLossDelay, setStopLossDelay] = useState<ChipValue>(1.0);
+  const [emergency, setEmergency] = useState<ChipValue>(1.5);
+  const [volatilityLookback, setVolatilityLookback] = useState<ChipValue>(20);
+  const [volatilityMultiplier, setVolatilityMultiplier] = useState<ChipValue>(1.5);
+  const [minStopLoss, setMinStopLoss] = useState<ChipValue>(1.0);
+  const [maxStopLoss, setMaxStopLoss] = useState<ChipValue>(3.0);
+  const [minRiskReward, setMinRiskReward] = useState<ChipValue>(2.0);
+  const [maxRisk, setMaxRisk] = useState<ChipValue>(10);
+  const [leverage, setLeverage] = useState<ChipValue>(5);
+  const [confluence, setConfluence] = useState<string>('Boost from Strategy');
+  const [minBarsHeld, setMinBarsHeld] = useState<ChipValue>(5);
+  const [maxBarsHeld, setMaxBarsHeld] = useState<ChipValue>(60);
+
+  const applyLookbackToDates = useCallback((days: number) => {
+    setLookbackDays(days);
+    onChange({ startDate: daysAgo(days), endDate: today() });
+  }, [onChange]);
+
   return (
-    <div className="space-y-6 max-w-2xl">
-      {/* Lookback presets */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-          LOOKBACK PRESET
-        </p>
-        <div className="flex gap-2 flex-wrap">
-          {PRESET_DAYS.map((d) => (
-            <button
-              key={d}
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 max-w-[1600px] mx-auto pb-4">
+      {/* ============================= LEFT COLUMN — CONFIGURATION ============================= */}
+      <div className="space-y-4">
+        <SectionHeader title="Configuration" subtitle="Date range, mode, and stop-loss tuning" />
+
+        {/* ── Basic Settings ── */}
+        <SectionCard>
+          <h4 className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+            BASIC SETTINGS
+          </h4>
+          <ChipRow
+            label="Lookback"
+            values={[30, 60, 90, 120, 180, 365]}
+            current={lookbackDays}
+            onSelect={(v) => applyLookbackToDates(Number(v))}
+            disabled={disabled}
+            format={(v) => `${v}d`}
+          />
+          <ChipRow
+            label="Training"
+            values={[30, 60, 90, 120, 180]}
+            current={trainingDays}
+            onSelect={setTrainingDays}
+            disabled={disabled}
+            format={(v) => `${v}d`}
+          />
+          <ChipRow
+            label="Testing"
+            values={[15, 30, 45, 60, 90]}
+            current={testingDays}
+            onSelect={setTestingDays}
+            disabled={disabled}
+            format={(v) => `${v}d`}
+          />
+        </SectionCard>
+
+        {/* ── Mode toggles ── */}
+        <SectionCard>
+          <h4 className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+            MODE
+          </h4>
+          <div className="flex gap-2 flex-wrap">
+            {([
+              { id: 'walk-forward' as const, label: 'Walk-Forward' },
+              { id: 'walk' as const, label: 'Walk' },
+              { id: 'live-replay' as const, label: 'Live Replay' },
+            ]).map((m) => {
+              const isActive = mode === m.id;
+              return (
+                <button
+                  key={m.id}
+                  disabled={disabled}
+                  onClick={() => setMode(m.id)}
+                  className="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50"
+                  style={{
+                    background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-card)',
+                    border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
+                    color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                  }}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        </SectionCard>
+
+        {/* ── TP/SL Config ── */}
+        <SectionCard>
+          <h4 className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+            TP/SL CONFIG
+          </h4>
+          <div className="grid grid-cols-1 gap-3">
+            <div className="space-y-1.5">
+              <label htmlFor="bt-tpsl-config" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                TP/SL Config
+              </label>
+              <select
+                id="bt-tpsl-config"
+                disabled={disabled}
+                value={tpSlConfig}
+                onChange={(e) => setTpSlConfig(e.target.value)}
+                className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
+                style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+              >
+                <option>Default</option>
+                <option>TBoosct</option>
+                <option>Conservative</option>
+                <option>Aggressive</option>
+                <option>Manual</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                Stop-Loss Adjustment
+              </label>
+              <div className="flex gap-2 flex-wrap">
+                {['Adaptive v2.0', 'Static', 'Trailing', 'None'].map((opt) => {
+                  const isActive = opt === 'Adaptive v2.0';
+                  return (
+                    <button
+                      key={opt}
+                      disabled={disabled}
+                      className="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50"
+                      style={{
+                        background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
+                        border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
+                        color: isActive ? 'var(--accent-blue)' : 'var(--text-muted)',
+                      }}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* ── Adaptive v2.0 panel ── */}
+        <SectionCard>
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+              ADAPTIVE v2.0
+            </h4>
+            <span className="text-xs" style={{ color: 'var(--text-faint)' }}>Volatility-aware SL/TP</span>
+          </div>
+          <div className="space-y-3">
+            {/* Presets */}
+            <ChipRow
+              label="Presets"
+              values={['Conservative', 'Balanced', 'Aggressive', 'Custom']}
+              current={adaptivePreset}
+              onSelect={(v) => setAdaptivePreset(v as typeof adaptivePreset)}
               disabled={disabled}
-              onClick={() => onChange({ startDate: daysAgo(d), endDate: today() })}
-              className="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-              onMouseEnter={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
-            >
-              {d}d
-            </button>
-          ))}
-        </div>
+            />
+
+            {/* Toggles */}
+            <div className="flex gap-4 pt-1">
+              <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input
+                  type="checkbox"
+                  disabled={disabled}
+                  checked={delayStopLoss}
+                  onChange={(e) => setDelayStopLoss(e.target.checked)}
+                  style={{ accentColor: 'var(--accent-blue)' }}
+                />
+                Delay Stop-Loss
+              </label>
+              <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input
+                  type="checkbox"
+                  disabled={disabled}
+                  checked={marketStructureStop}
+                  onChange={(e) => setMarketStructureStop(e.target.checked)}
+                  style={{ accentColor: 'var(--accent-blue)' }}
+                />
+                Market Structure Stop-Loss
+              </label>
+            </div>
+
+            <ChipRow
+              label="Stop-Loss Delay"
+              values={[0.5, 1.0, 1.5, 2.0, 2.5]}
+              current={stopLossDelay}
+              onSelect={setStopLossDelay}
+              disabled={disabled}
+              format={(v) => `${v}%`}
+            />
+            <ChipRow
+              label="Emergency"
+              values={[1.0, 1.5, 2.0, 3.0]}
+              current={emergency}
+              onSelect={setEmergency}
+              disabled={disabled}
+              format={(v) => `${v}%`}
+            />
+            <ChipRow
+              label="Volatility Lookback"
+              values={[10, 20, 30, 50]}
+              current={volatilityLookback}
+              onSelect={setVolatilityLookback}
+              disabled={disabled}
+              format={(v) => `${v} bars`}
+            />
+            <ChipRow
+              label="Volatility Multiplier"
+              values={[1.0, 1.5, 2.0, 2.5]}
+              current={volatilityMultiplier}
+              onSelect={setVolatilityMultiplier}
+              disabled={disabled}
+              format={(v) => `${v}x`}
+            />
+            <ChipRow
+              label="Min Stop-Loss"
+              values={[0.5, 1.0, 1.5, 2.0, 2.5]}
+              current={minStopLoss}
+              onSelect={setMinStopLoss}
+              disabled={disabled}
+              format={(v) => `${v}%`}
+            />
+            <ChipRow
+              label="Max Stop-Loss"
+              values={[2.0, 3.0, 5.0, 7.0, 10.0]}
+              current={maxStopLoss}
+              onSelect={setMaxStopLoss}
+              disabled={disabled}
+              format={(v) => `${v}%`}
+            />
+          </div>
+        </SectionCard>
+
+        {/* ── Execution & Fees (date range, capital, commission, slippage, timeframe, positions) ── */}
+        <SectionCard>
+          <h4 className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+            EXECUTION & FEES
+          </h4>
+
+          {/* Date range */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label htmlFor="bt-start" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Start Date</label>
+              <InfoTooltip id="bt-start">
+                <input
+                  id="bt-start"
+                  type="date"
+                  disabled={disabled}
+                  value={config.startDate}
+                  onChange={(e) => onChange({ startDate: e.target.value })}
+                  className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
+                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                />
+              </InfoTooltip>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="bt-end" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>End Date</label>
+              <InfoTooltip id="bt-end">
+                <input
+                  id="bt-end"
+                  type="date"
+                  disabled={disabled}
+                  value={config.endDate}
+                  onChange={(e) => onChange({ endDate: e.target.value })}
+                  className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
+                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                />
+              </InfoTooltip>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label htmlFor="bt-capital" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Initial Capital (USD)</label>
+              <InfoTooltip id="bt-capital">
+                <input
+                  id="bt-capital"
+                  type="number"
+                  disabled={disabled}
+                  min={100}
+                  step={1000}
+                  value={config.initialCapital}
+                  onChange={(e) => onChange({ initialCapital: parseFloat(e.target.value) || 10000 })}
+                  className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
+                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                />
+              </InfoTooltip>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="bt-commission" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Commission (fraction)</label>
+              <InfoTooltip id="bt-commission">
+                <input
+                  id="bt-commission"
+                  type="number"
+                  disabled={disabled}
+                  min={0}
+                  max={0.05}
+                  step={0.0001}
+                  value={config.commissionPercentage ?? 0.001}
+                  onChange={(e) => onChange({ commissionPercentage: parseFloat(e.target.value) })}
+                  className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
+                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                />
+              </InfoTooltip>
+              <p className="text-xs" style={{ color: 'var(--text-faint)' }}>e.g. 0.001 = 0.1%</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label htmlFor="bt-max-pos" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Max Concurrent Positions</label>
+              <InfoTooltip id="bt-max-pos">
+                <input
+                  id="bt-max-pos"
+                  type="number"
+                  disabled={disabled}
+                  min={1}
+                  max={20}
+                  step={1}
+                  value={config.maxConcurrentPositions ?? 1}
+                  onChange={(e) => onChange({ maxConcurrentPositions: parseInt(e.target.value) || 1 })}
+                  className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
+                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                />
+              </InfoTooltip>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="bt-slippage" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Slippage (fraction)</label>
+              <InfoTooltip id="bt-slippage">
+                <input
+                  id="bt-slippage"
+                  type="number"
+                  disabled={disabled}
+                  min={0}
+                  max={0.02}
+                  step={0.0001}
+                  value={config.slippagePercentage ?? 0}
+                  onChange={(e) => onChange({ slippagePercentage: parseFloat(e.target.value) })}
+                  className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
+                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                />
+              </InfoTooltip>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label htmlFor="bt-timeframe" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Timeframe</label>
+              <InfoTooltip id="bt-timeframe">
+                <select
+                  id="bt-timeframe"
+                  disabled={disabled}
+                  value={config.timeframe ?? '1h'}
+                  onChange={(e) => onChange({ timeframe: e.target.value })}
+                  className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
+                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                >
+                  {['1m', '5m', '15m', '30m', '1h', '4h', '1d'].map((tf) => (
+                    <option key={tf} value={tf}>{tf}</option>
+                  ))}
+                </select>
+              </InfoTooltip>
+            </div>
+          </div>
+        </SectionCard>
       </div>
 
-      {/* Date range */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-          DATE RANGE
-        </p>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label htmlFor="bt-start" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Start Date</label>
-            <InfoTooltip id="bt-start">
-              <input
-                id="bt-start"
-                type="date"
-                disabled={disabled}
-                value={config.startDate}
-                onChange={e => onChange({ startDate: e.target.value })}
-                className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-              />
-            </InfoTooltip>
-          </div>
-          <div className="space-y-1.5">
-            <label htmlFor="bt-end" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>End Date</label>
-            <InfoTooltip id="bt-end">
-              <input
-                id="bt-end"
-                type="date"
-                disabled={disabled}
-                value={config.endDate}
-                onChange={e => onChange({ endDate: e.target.value })}
-                className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-              />
-            </InfoTooltip>
-          </div>
-        </div>
-      </div>
+      {/* ============================= RIGHT COLUMN — RISK/REWARD ============================= */}
+      <div className="space-y-4">
+        <SectionHeader title="Risk / Reward" subtitle="Sizing, exposure, and trade-duration bounds" />
 
-      {/* Capital & commission */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-          CAPITAL & FEES
-        </p>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label htmlFor="bt-capital" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Initial Capital (USD)</label>
-            <InfoTooltip id="bt-capital">
-              <input
-                id="bt-capital"
-                type="number"
-                disabled={disabled}
-                min={100}
-                step={1000}
-                value={config.initialCapital}
-                onChange={e => onChange({ initialCapital: parseFloat(e.target.value) || 10000 })}
-                className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-              />
-            </InfoTooltip>
-          </div>
-          <div className="space-y-1.5">
-            <label htmlFor="bt-commission" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Commission (fraction)</label>
-            <InfoTooltip id="bt-commission">
-              <input
-                id="bt-commission"
-                type="number"
-                disabled={disabled}
-                min={0}
-                max={0.05}
-                step={0.0001}
-                value={config.commissionPercentage ?? 0.001}
-                onChange={e => onChange({ commissionPercentage: parseFloat(e.target.value) })}
-                className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-              />
-            </InfoTooltip>
-            <p className="text-xs" style={{ color: 'var(--text-faint)' }}>e.g. 0.001 = 0.1%</p>
-          </div>
-        </div>
-      </div>
+        <SectionCard>
+          <h4 className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+            CAPITAL & EXPOSURE
+          </h4>
+          <ChipRow
+            label="Starting Capital"
+            values={[100, 1000, 10000, 100000, 1000000]}
+            current={config.initialCapital ?? 10000}
+            onSelect={(v) => onChange({ initialCapital: Number(v) })}
+            disabled={disabled}
+            format={(v) => `$${Number(v).toLocaleString()}`}
+          />
+          <ChipRow
+            label="Min Risk/Reward"
+            values={[1.0, 1.5, 2.0, 3.0, 5.0]}
+            current={minRiskReward}
+            onSelect={setMinRiskReward}
+            disabled={disabled}
+            format={(v) => `${v}x`}
+          />
+          <ChipRow
+            label="Max Risk"
+            values={[1, 5, 10, 20, 40]}
+            current={maxRisk}
+            onSelect={setMaxRisk}
+            disabled={disabled}
+            format={(v) => `${v}%`}
+          />
+          <ChipRow
+            label="Leverage"
+            values={[1, 3, 5, 10, 25, 50, 100]}
+            current={leverage}
+            onSelect={setLeverage}
+            disabled={disabled}
+            format={(v) => `${v}x`}
+          />
+        </SectionCard>
 
-      {/* Risk parameters */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-          RISK PARAMETERS
-        </p>
-        <div className="grid grid-cols-2 gap-4">
+        <SectionCard>
+          <h4 className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+            CONFLUENCE
+          </h4>
           <div className="space-y-1.5">
-            <label htmlFor="bt-max-pos" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Max Concurrent Positions</label>
-            <InfoTooltip id="bt-max-pos">
-              <input
-                id="bt-max-pos"
-                type="number"
-                disabled={disabled}
-                min={1}
-                max={20}
-                step={1}
-                value={config.maxConcurrentPositions ?? 1}
-                onChange={e => onChange({ maxConcurrentPositions: parseInt(e.target.value) || 1 })}
-                className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-              />
-            </InfoTooltip>
-          </div>
-          <div className="space-y-1.5">
-            <label htmlFor="bt-slippage" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Slippage (fraction)</label>
-            <InfoTooltip id="bt-slippage">
-              <input
-                id="bt-slippage"
-                type="number"
-                disabled={disabled}
-                min={0}
-                max={0.02}
-                step={0.0001}
-                value={config.slippagePercentage ?? 0}
-                onChange={e => onChange({ slippagePercentage: parseFloat(e.target.value) })}
-                className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-              />
-            </InfoTooltip>
-          </div>
-        </div>
-      </div>
-
-      {/* Timeframe */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-          TIMEFRAME
-        </p>
-        <div style={{ maxWidth: 200 }}>
-          <label htmlFor="bt-timeframe" className="text-xs font-medium sr-only" style={{ color: 'var(--text-secondary)' }}>Timeframe</label>
-          <InfoTooltip id="bt-timeframe">
+            <label htmlFor="bt-confluence" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+              Confluence Mode
+            </label>
             <select
-              id="bt-timeframe"
+              id="bt-confluence"
               disabled={disabled}
-              value={config.timeframe ?? '1h'}
-              onChange={e => onChange({ timeframe: e.target.value })}
+              value={confluence}
+              onChange={(e) => setConfluence(e.target.value)}
               className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+              style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
             >
-              {['1m', '5m', '15m', '30m', '1h', '4h', '1d'].map(tf => (
-                <option key={tf} value={tf}>{tf}</option>
-              ))}
+              <option>Boost from Strategy</option>
+              <option>Independent Score</option>
+              <option>Disabled</option>
             </select>
-          </InfoTooltip>
+            <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
+              Use strategy-side confluence boost vs an independent score band.
+            </p>
+          </div>
+        </SectionCard>
+
+        <SectionCard>
+          <h4 className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+            HOLD DURATION
+          </h4>
+          <ChipRow
+            label="Min Bars Held"
+            values={[1, 5, 10, 20, 40]}
+            current={minBarsHeld}
+            onSelect={setMinBarsHeld}
+            disabled={disabled}
+            format={(v) => `${v}`}
+          />
+          <ChipRow
+            label="Max Bars Held"
+            values={[5, 10, 30, 60, 120, 200]}
+            current={maxBarsHeld}
+            onSelect={setMaxBarsHeld}
+            disabled={disabled}
+            format={(v) => `${v}`}
+          />
+        </SectionCard>
+
+        <SectionCard>
+          <h4 className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+            SUMMARY
+          </h4>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+            <dt style={{ color: 'var(--text-muted)' }}>Lookback</dt>
+            <dd style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{lookbackDays}d ({config.startDate} → {config.endDate})</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>Mode</dt>
+            <dd style={{ color: 'var(--text-secondary)' }}>{mode === 'walk-forward' ? 'Walk-Forward' : mode === 'walk' ? 'Walk' : 'Live Replay'}</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>Adaptive Preset</dt>
+            <dd style={{ color: 'var(--text-secondary)' }}>{adaptivePreset}</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>Stop-Loss Range</dt>
+            <dd style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{minStopLoss}% – {maxStopLoss}%</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>Risk / Leverage</dt>
+            <dd style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{maxRisk}% · {leverage}x</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>Min/Max Bars</dt>
+            <dd style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{minBarsHeld} – {maxBarsHeld}</dd>
+          </dl>
+        </SectionCard>
+
+        {/* Optimize hook — deferred to BTCAAAAA-31247 */}
+        <div className="pt-2">
+          <button
+            disabled
+            title="Parameter sweep optimizer — deferred to BTCAAAAA-31247"
+            className="px-4 py-2 rounded text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+          >
+            Optimize…
+          </button>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>Parameter sweep optimizer — deferred to BTCAAAAA-31247</p>
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* Optimize hook (out of scope placeholder) */}
-      <div className="pt-2">
-        <button
-          disabled
-          title="Coming in BTCAAAAA-31182"
-          className="px-4 py-2 rounded text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+// ─── Status log panel — mirrors thickclient bottom status box ──────────────────────────
+function StatusLogPanel({
+  logs,
+  isRunning,
+}: {
+  logs: BacktestStatusMessage[];
+  isRunning: boolean;
+}) {
+  if (logs.length === 0 && !isRunning) return null;
+  const recent = logs.slice(-5);
+  return (
+    <div
+      className="rounded-md mb-4"
+      style={{
+        background: 'var(--bg-deep)',
+        border: '1px solid var(--border)',
+      }}
+    >
+      <div
+        className="flex items-center justify-between px-3 py-1.5"
+        style={{ borderBottom: '1px solid var(--border)' }}
+      >
+        <span
+          className="text-xs font-semibold uppercase tracking-wide"
+          style={{ color: 'var(--text-muted)' }}
         >
-          Optimize…
-        </button>
-        <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>Parameter sweep optimizer — coming in BTCAAAAA-31182</p>
+          Status
+        </span>
+        <span
+          className="text-xs"
+          style={{ color: isRunning ? 'var(--accent-blue)' : 'var(--text-faint)' }}
+        >
+          {isRunning ? 'Running…' : 'Idle'}
+        </span>
       </div>
+      <ul className="px-3 py-2 space-y-0.5 max-h-28 overflow-auto">
+        {recent.map((log, idx) => (
+          <li
+            key={`${log.timestamp}-${idx}`}
+            className="text-xs font-mono leading-snug"
+            style={{
+              color:
+                log.level === 'ERROR'
+                  ? 'var(--accent-red)'
+                  : log.level === 'WARN'
+                    ? 'var(--accent-orange)'
+                    : 'var(--text-secondary)',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            <span style={{ color: 'var(--text-faint)' }}>
+              {new Date(log.timestamp).toISOString().slice(11, 19)}{' '}
+            </span>
+            {log.message}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -320,24 +804,21 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
       role="dialog"
       aria-modal="true"
       aria-labelledby="backtest-dialog-title"
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-y-0 right-0 z-50 flex items-stretch"
+      style={{ left: 'var(--sidebar-width, 0px)' }}
       onKeyDown={handleKeyDown}
     >
-      {/* Backdrop */}
+      {/* Backdrop — drawer-pattern parity with ValidationReportWindow / StrategyBrowserDialog */}
       <div
-        className="absolute inset-0"
-        style={{ background: 'rgba(0,0,0,0.6)' }}
+        className="absolute inset-0 bg-black/70 cursor-pointer"
         onClick={() => { if (!backTestInProgress) onClose(); }}
       />
 
-      {/* Dialog box */}
+      {/* Drawer box — full-height right-anchored window */}
       <div
         ref={dialogRef}
-        className="relative flex flex-col rounded-lg shadow-2xl mx-4"
+        className="relative flex flex-col flex-1 shadow-2xl"
         style={{
-          width: '90vw',
-          maxWidth: 1100,
-          height: '82vh',
           border: '1px solid var(--border)',
           background: 'var(--bg-panel)',
         }}
@@ -420,19 +901,30 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
           )}
         </div>
 
-        {/* ── Footer: progress + run controls ── */}
+        {/* ── Footer: status, progress + run controls ── */}
         <div
           className="flex-shrink-0 px-6 py-4"
           style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-panel)' }}
         >
-          {/* Progress bar */}
-          {backTestInProgress && (
+          {/* Status log panel — drawer footer mirrors thickclient bottom status box */}
+          <StatusLogPanel logs={outputLogs} isRunning={backTestInProgress} />
+
+          {/* Progress bar with Candles / Trades counters (placeholders until backend wires) */}
+          {(backTestInProgress || backTestProgress > 0) && (
             <div className="mb-4 space-y-1">
               <div
                 className="flex justify-between text-xs"
                 style={{ color: 'var(--text-secondary)' }}
               >
-                <span>Running…</span>
+                <span>
+                  {backTestInProgress ? 'Running…' : 'Last run'}
+                  <span className="ml-3" style={{ color: 'var(--text-muted)' }}>
+                    Candles: <span style={{ fontVariantNumeric: 'tabular-nums' }}>—</span>
+                  </span>
+                  <span className="ml-3" style={{ color: 'var(--text-muted)' }}>
+                    Trades: <span style={{ fontVariantNumeric: 'tabular-nums' }}>{backTestResult?.trades?.length ?? '—'}</span>
+                  </span>
+                </span>
                 <span style={{ fontVariantNumeric: 'tabular-nums' }}>{backTestProgress}%</span>
               </div>
               <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-card)' }}>
@@ -448,8 +940,36 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
             <p className="text-xs mb-3" style={{ color: 'var(--accent-red)' }}>{error}</p>
           )}
 
-          {/* Buttons */}
-          <div className="flex items-center justify-end gap-2">
+          {/* Action bar — thickclient parity: Run Test / Config Discovery / View Live Results / Cancel + Start */}
+          <div className="flex items-center justify-between gap-2">
+            {/* Left cluster: ancillary actions */}
+            <div className="flex items-center gap-2">
+              <InfoTooltip id="bt-config-discovery-btn">
+                <button
+                  disabled
+                  title="Config Discovery — auto-tune TP/SL across recent windows (deferred to BTCAAAAA-31247)"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+                >
+                  <Settings size={14} />
+                  Config Discovery
+                </button>
+              </InfoTooltip>
+              <InfoTooltip id="bt-view-live-btn">
+                <button
+                  disabled={!backTestResult}
+                  onClick={() => setActiveTab('trades')}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: backTestResult ? 'var(--text-secondary)' : 'var(--text-muted)' }}
+                >
+                  <TrendingUp size={14} />
+                  View Live Results
+                </button>
+              </InfoTooltip>
+            </div>
+
+            {/* Right cluster: primary controls */}
+            <div className="flex items-center gap-2">
             {/* Pause/Resume (disabled until backend contract ships) */}
             {backTestInProgress && (
               <InfoTooltip id="bt-pause-btn">
@@ -505,6 +1025,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                 </button>
               )}
             </InfoTooltip>
+            </div>
           </div>
         </div>
       </div>
