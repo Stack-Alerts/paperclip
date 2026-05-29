@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "bash scripts/gate-main-branch.sh",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "gate-main-branch": "bash scripts/gate-main-branch.sh"
   },
   "dependencies": {
     "@tremor/react": "^3.18.7",

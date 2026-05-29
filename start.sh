@@ -161,6 +161,14 @@ fi
 export BTE_RUNNING_SHA="$RUNNING_SHA"
 export BTE_RUNNING_BRANCH="$RUNNING_BRANCH"
 
+# Signal to the packages/web-ui `predev` hook ([[BTCAAAAA-31217]]) that the
+# main-branch gate has already been processed by start.sh. The hook would
+# otherwise refuse to launch `next dev` on a non-main HEAD — duplicating work
+# and breaking the legitimate `./start.sh --branch <name>` /
+# `--skip-branch-gate` paths. The hook still enforces the gate when invoked
+# directly (`cd packages/web-ui && npm run dev`).
+export BTE_BRANCH_GATE_OK=1
+
 # Export only the launcher/server-bind env vars start.sh and uvicorn need
 # from .env. We deliberately do NOT `source .env`: it contains values like
 # `TP_FIBONACCI_LEVELS=[1.618, 2.618, 3.618]` whose unquoted whitespace bash
