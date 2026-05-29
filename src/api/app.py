@@ -45,7 +45,9 @@ import json
 import logging
 import os
 import subprocess
+import threading
 import time
+import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1262,6 +1264,272 @@ async def sb_duplicate_strategy(
             detail=f"Strategy '{strategy_id}' not found",
         )
     return result
+
+
+# ---------------------------------------------------------------------------
+# REST: Backtest execution (BTCAAAAA-31183 / parent BTCAAAAA-31180)
+# ---------------------------------------------------------------------------
+#
+# Wraps MulticoreBacktestEngine + BacktestDataProvider behind a REST contract
+# that the WebUI BackTesting drawer can drive:
+#
+#   POST /strategies/{strategy_id}/backtest               -> {runId, status}
+#   GET  /strategies/{strategy_id}/backtest/{run_id}      -> live status + result
+#
+# Runs are stored in-process (best-effort; lost on restart). For persistent
+# job history see follow-up BTCAAAAA-31247.
+#
+# The engine call is synchronous and CPU-heavy; we spawn a worker thread per
+# run so the event loop stays responsive. Concurrency is bounded by the OS
+# default ProcessPoolExecutor inside the engine itself.
+#
+# WebSocket /ws/backtest/{run_id} is deferred to a follow-up — polling the
+# GET endpoint is sufficient for the V1 unblock per board direction.
+
+_backtest_runs: dict[str, dict[str, Any]] = {}
+_backtest_lock = threading.Lock()
+
+
+def _new_backtest_run(strategy_id: str, config: dict) -> str:
+    run_id = uuid.uuid4().hex
+    now = datetime.now(timezone.utc).isoformat()
+    with _backtest_lock:
+        _backtest_runs[run_id] = {
+            "runId": run_id,
+            "strategyId": strategy_id,
+            "status": "running",
+            "progress": 0,
+            "trades": [],
+            "metrics": {},
+            "logs": [],
+            "error": None,
+            "config": config,
+            "startedAt": now,
+            "completedAt": None,
+        }
+    return run_id
+
+
+def _patch_backtest_run(run_id: str, **patch: Any) -> None:
+    with _backtest_lock:
+        run = _backtest_runs.get(run_id)
+        if run is not None:
+            run.update(patch)
+
+
+def _append_backtest_log(run_id: str, message: str, level: str = "INFO") -> None:
+    entry = {
+        "message": str(message),
+        "level": level,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    with _backtest_lock:
+        run = _backtest_runs.get(run_id)
+        if run is not None:
+            logs = run.setdefault("logs", [])
+            logs.append(entry)
+            # Bound the log buffer so a long run doesn't balloon memory.
+            if len(logs) > 500:
+                del logs[: len(logs) - 500]
+
+
+def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
+    """Background worker: load bars, run engine, persist result into the runs dict."""
+    try:
+        _append_backtest_log(
+            run_id,
+            f"Starting backtest for '{strategy.get('name', '?')}' "
+            f"({config.get('startDate', '?')} → {config.get('endDate', '?')})",
+        )
+
+        from src.optimizer_v3.core.backtest_data_provider import get_backtest_provider
+        from src.optimizer_v3.core.multicore_backtest_engine import MulticoreBacktestEngine
+
+        timeframe = str(config.get("timeframe") or strategy.get("settings", {}).get("timeframe") or "15m")
+        start = datetime.fromisoformat(str(config["startDate"]))
+        end = datetime.fromisoformat(str(config["endDate"]))
+
+        _append_backtest_log(run_id, f"Loading bars {timeframe} {config['startDate']} → {config['endDate']}")
+
+        def _load_progress(current: int, total: int, msg: str) -> None:
+            pct = int((current / total) * 25) if total else 0
+            _patch_backtest_run(run_id, progress=pct)
+            if msg:
+                _append_backtest_log(run_id, msg)
+
+        provider = get_backtest_provider()
+        bars = provider.load_bars_for_backtest(timeframe, start, end, _load_progress)
+        _append_backtest_log(run_id, f"Loaded {len(bars)} bars")
+        _patch_backtest_run(run_id, progress=30)
+
+        def _engine_progress(current: int, total: int, msg: str) -> None:
+            pct = 30 + int((current / total) * 70) if total else 30
+            _patch_backtest_run(run_id, progress=min(99, pct))
+            if msg:
+                _append_backtest_log(run_id, msg)
+
+        engine = MulticoreBacktestEngine()
+        result = engine.run_backtest(
+            bars=bars,
+            strategy_config=strategy,
+            backtest_config=config,
+            progress_callback=_engine_progress,
+        )
+
+        trades = list(result.get("trades", []))
+        errors = list(result.get("errors", []))
+        # Normalize trade fields the WebUI Trades tab expects so the front-end
+        # doesn't have to bridge two shapes.
+        normalized_trades = []
+        for t in trades:
+            normalized_trades.append({
+                "entryTimestamp": t.get("entry_time") or t.get("entryTimestamp"),
+                "exitTimestamp": t.get("exit_time") or t.get("exitTimestamp"),
+                "side": t.get("side") or t.get("direction"),
+                "entryPrice": t.get("entry_price") or t.get("entryPrice"),
+                "exitPrice": t.get("exit_price") or t.get("exitPrice"),
+                "pnl": t.get("pnl"),
+                "pnlPercent": t.get("pnl_percent") or t.get("pnlPercent"),
+                "exitReason": t.get("exit_reason") or t.get("exitReason"),
+                "barsHeld": t.get("bars_held") or t.get("barsHeld"),
+            })
+
+        wins = [t for t in trades if (t.get("pnl") or 0) > 0]
+        win_rate = (len(wins) / len(trades)) if trades else 0.0
+        total_return = sum(float(t.get("pnl_percent") or t.get("pnlPercent") or 0.0) for t in trades)
+
+        metrics = {
+            "totalTrades": len(trades),
+            "winningTrades": len(wins),
+            "losingTrades": len(trades) - len(wins),
+            "winRate": win_rate,
+            "returnPercentage": total_return,
+            "totalBars": int(result.get("total_bars", len(bars))),
+            "totalSignals": int(result.get("total_signals", 0)),
+        }
+
+        _patch_backtest_run(
+            run_id,
+            status="error" if errors and not trades else "done",
+            progress=100,
+            trades=normalized_trades,
+            metrics=metrics,
+            error="; ".join(errors) if errors else None,
+            completedAt=datetime.now(timezone.utc).isoformat(),
+        )
+        _append_backtest_log(
+            run_id,
+            f"Backtest completed: {len(trades)} trades, win rate {win_rate:.1%}, total return {total_return:.2f}%",
+            level="SYSTEM",
+        )
+    except Exception as exc:  # noqa: BLE001 — surface to webui caller
+        logger.exception("Backtest run %s failed", run_id)
+        _patch_backtest_run(
+            run_id,
+            status="error",
+            error=str(exc),
+            completedAt=datetime.now(timezone.utc).isoformat(),
+        )
+        _append_backtest_log(run_id, f"ERROR: {exc}", level="ERROR")
+
+
+class BacktestStartResponse(BaseModel):
+    runId: str
+    status: str
+    streamUrl: Optional[str] = None
+
+
+class BacktestRunStatus(BaseModel):
+    runId: str
+    strategyId: str
+    status: str
+    progress: int
+    trades: list
+    metrics: dict
+    logs: list
+    error: Optional[str] = None
+    startedAt: str
+    completedAt: Optional[str] = None
+
+
+@app.post(
+    "/strategies/{strategy_id}/backtest",
+    response_model=BacktestStartResponse,
+    tags=["Backtest"],
+    summary="Start a backtest run for a strategy",
+)
+async def start_backtest(
+    strategy_id: str,
+    payload: dict,
+    _: dict = Depends(require_jwt),
+) -> BacktestStartResponse:
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    def _load_strategy() -> Optional[dict]:
+        with db.scoped_managers() as scoped:
+            return scoped.strategy.get_latest_version(strategy_id)
+
+    try:
+        strategy = await asyncio.to_thread(_load_strategy)
+    except Exception as exc:
+        logger.exception("Failed to load strategy %s for backtest", strategy_id)
+        raise HTTPException(status_code=500, detail=f"Failed to load strategy: {exc}") from exc
+
+    if strategy is None:
+        raise _strategy_not_found(strategy_id)
+
+    config = dict(payload or {})
+    # Webui sends camelCase; the engine accepts both — keep payload intact and
+    # let the worker normalize via .get() lookups.
+
+    run_id = _new_backtest_run(strategy_id, config)
+
+    worker = threading.Thread(
+        target=_run_backtest_in_thread,
+        args=(run_id, strategy, config),
+        name=f"backtest-{run_id[:8]}",
+        daemon=True,
+    )
+    worker.start()
+
+    return BacktestStartResponse(
+        runId=run_id,
+        status="running",
+        streamUrl=f"/ws/backtest/{run_id}",
+    )
+
+
+@app.get(
+    "/strategies/{strategy_id}/backtest/{run_id}",
+    response_model=BacktestRunStatus,
+    tags=["Backtest"],
+    summary="Get current status / final result of a backtest run",
+)
+async def get_backtest_status(
+    strategy_id: str,
+    run_id: str,
+    _: dict = Depends(require_jwt),
+) -> BacktestRunStatus:
+    with _backtest_lock:
+        run = _backtest_runs.get(run_id)
+        snapshot = dict(run) if run is not None else None
+
+    if snapshot is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Backtest run '{run_id}' not found (may have expired or never started)",
+        )
+
+    if snapshot.get("strategyId") != strategy_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Run does not belong to this strategy",
+        )
+
+    snapshot.pop("config", None)
+    return BacktestRunStatus(**snapshot)
 
 
 # ---------------------------------------------------------------------------

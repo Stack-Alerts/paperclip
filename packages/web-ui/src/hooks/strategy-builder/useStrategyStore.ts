@@ -15,7 +15,7 @@ import {
   BacktestResult,
   StrategySettings,
 } from '@/lib/strategy-builder/types';
-import { put as apiPut, post as apiPost } from '@/lib/strategy-builder/api';
+import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults } from '@/lib/strategy-builder/api';
 
 // Strategies loaded from the strategy-builder API have IDs of the form
 // "strategy_<hex>" (see StrategyDatabaseManager.create_strategy); locally
@@ -422,17 +422,92 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     });
   },
 
-  // Run backtest (stub — backend not available)
-  runBacktest: async (_config: BacktestConfig | BacktestConfigFull) => {
-    set({ backTestInProgress: true, backTestProgress: 0 });
-    await new Promise((r) => setTimeout(r, 500));
-    set({ backTestInProgress: false });
-    throw new Error('Backtest backend not connected');
+  // Run backtest via backend API (BTCAAAAA-31183 / parent BTCAAAAA-31180):
+  //   POST /strategies/{id}/backtest -> { runId }
+  //   poll GET /strategies/{id}/backtest/{runId} until status in ('done','error')
+  runBacktest: async (config: BacktestConfig | BacktestConfigFull) => {
+    const strategyId = (config as { strategyId?: string }).strategyId;
+    if (!strategyId) throw new Error('Backtest: missing strategyId in config');
+    set({ backTestInProgress: true, backTestProgress: 0, backTestResult: undefined });
+    try {
+      const startResp = (await apiRunBacktest(strategyId, config)) as { runId: string; status: string };
+      const runId = startResp.runId;
+      if (!runId) throw new Error('Backtest: backend did not return a runId');
+
+      // Poll loop: 1s cadence, 30 min ceiling.
+      const deadline = Date.now() + 30 * 60_000;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        if (Date.now() > deadline) throw new Error('Backtest timed out after 30 minutes');
+        await new Promise((r) => setTimeout(r, 1000));
+        const status = (await apiGetBacktestResults(strategyId, runId)) as {
+          runId: string;
+          status: string;
+          progress: number;
+          trades?: unknown[];
+          metrics?: Record<string, unknown>;
+          error?: string | null;
+          startedAt?: string;
+          completedAt?: string | null;
+        };
+        if (typeof status.progress === 'number') set({ backTestProgress: status.progress });
+        if (status.status === 'error') {
+          throw new Error(status.error || 'Backtest failed');
+        }
+        if (status.status === 'done') {
+          const m = status.metrics ?? {};
+          const result: BacktestResult = {
+            id: runId,
+            strategyId,
+            runId,
+            status: 'completed',
+            startDate: (config as BacktestConfig).startDate ?? '',
+            endDate: (config as BacktestConfig).endDate ?? '',
+            initialCapital: (config as BacktestConfig).initialCapital ?? 10000,
+            finalCapital: ((config as BacktestConfig).initialCapital ?? 10000) *
+              (1 + Number(m.returnPercentage ?? 0) / 100),
+            totalTrades: Number(m.totalTrades ?? 0),
+            winningTrades: Number(m.winningTrades ?? 0),
+            losingTrades: Number(m.losingTrades ?? 0),
+            winRate: Number(m.winRate ?? 0),
+            totalReturn: Number(m.returnPercentage ?? 0),
+            returnPercentage: Number(m.returnPercentage ?? 0),
+            maxDrawdown: Number(m.maxDrawdown ?? 0),
+            sharpeRatio: Number(m.sharpeRatio ?? 0),
+            sortino_ratio: Number(m.sortinoRatio ?? 0),
+            profitFactor: Number(m.profitFactor ?? 0),
+            averageWin: Number(m.averageWin ?? 0),
+            averageLoss: Number(m.averageLoss ?? 0),
+            trades: (status.trades as BacktestResult['trades']) ?? [],
+            createdAt: status.startedAt ?? new Date().toISOString(),
+            completedAt: status.completedAt ?? new Date().toISOString(),
+          };
+          set({ backTestResult: result, backTestInProgress: false, backTestProgress: 100 });
+          return result;
+        }
+      }
+    } catch (e) {
+      set({ backTestInProgress: false });
+      throw e;
+    }
   },
 
-  // Poll for backtest results (stub)
-  pollBacktestResult: async (_runId: string) => {
-    return undefined;
+  // Poll for backtest results (one-shot wrapper around GET)
+  pollBacktestResult: async (runId: string) => {
+    const strategyId = get().currentStrategy?.id;
+    if (!strategyId) return undefined;
+    try {
+      const status = (await apiGetBacktestResults(strategyId, runId)) as {
+        status: string;
+        metrics?: Record<string, unknown>;
+        trades?: unknown[];
+      };
+      if (status.status !== 'done') return undefined;
+      // Return a minimal projection — callers that need the full shape go via runBacktest.
+      return { runId, status: 'completed', trades: status.trades, metrics: status.metrics } as unknown as BacktestResult;
+    } catch {
+      return undefined;
+    }
   },
 
   // Load block library from static file
