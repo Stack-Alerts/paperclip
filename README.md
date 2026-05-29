@@ -6,8 +6,9 @@
 
 ## Quick Start
 
+### Environment Setup
+
 ```bash
-# Setup
 cd /home/sirrus/projects/BTC-Trade-Engine-PaperClip
 python3 -m venv venv
 source venv/bin/activate
@@ -16,6 +17,22 @@ pip install -r requirements.txt
 # Verify
 python -c "import nautilus_trader as nt; print(f'✅ v{nt.__version__}')"
 ```
+
+### Development Server
+
+**Supervised (recommended for the board & QA):**
+```bash
+./start-dev.sh          # Start supervised server on :3010
+./start-dev.sh --watch  # ... and tail logs
+```
+
+**Ephemeral testing (for branch-specific iteration):**
+```bash
+./start-test.sh                   # Test on :3000
+./start-test.sh --branch feature  # ... on a non-main branch
+```
+
+See `AGENTS.md` for details on when to use each.
 
 ## Documentation
 

@@ -141,3 +141,54 @@ The `Fix-SHA:` line must be on its own, must match `^Fix-SHA: [0-9a-f]{40}$`, an
 - Merge dispatch from `in_review` → `done` → Phase 4a ([BTCAAAAA-30041](/BTCAAAAA/issues/BTCAAAAA-30041)).
 - GitHub branch protection rules → Phase 4b ([BTCAAAAA-30042](/BTCAAAAA/issues/BTCAAAAA-30042)).
 <!-- END:merge-governance -->
+
+## Dev Server Entry Points (BTCAAAAA-31132)
+
+To eliminate operator confusion between the supervised and ephemeral dev servers, the
+legacy `./start.sh` has been split into two distinct, clearly named entry points:
+
+### `./start-dev.sh` — Supervised, canonical launcher (port `:3010`)
+
+**Use this for:** The board, QA, production-like testing, integration with systemd health checks.
+
+```bash
+./start-dev.sh          # Start/verify server, then exit
+./start-dev.sh --watch  # Start/verify, then tail journalctl logs
+```
+
+**Behavior:**
+- Runs on port `:3010` (same as `btc-dev-server.service`)
+- Ensures the systemd unit is `active`; restarts if `inactive` or `failed`
+- Waits for HTTP 200 on `http://localhost:3010/`
+- Inherits all branch gating from the systemd unit
+  ([BTCAAAAA-30590](/BTCAAAAA/issues/BTCAAAAA-30590),
+   [BTCAAAAA-31114](/BTCAAAAA/issues/BTCAAAAA-31114))
+- Returns 0 on success, non-zero on failure
+
+### `./start-test.sh [--branch <name>]` — Ephemeral test instance (port `:3000`)
+
+**Use this for:** Quick iteration, branch-specific testing (non-`main`), sandboxed development.
+
+```bash
+./start-test.sh                   # Test on :3000, default branch
+./start-test.sh --branch feature  # Test on :3000, switch to feature branch first
+```
+
+**Behavior:**
+- Spawns a standalone `next dev -p 3000` (not under systemd)
+- Does NOT register with systemd; pure ephemeral process
+- Prints a warning: "THIS IS A TEST INSTANCE"
+- Optional `--branch <name>` to test non-`main` code without affecting `:3010`
+- Runs indefinitely until you press Ctrl+C
+
+**Note:** Next.js prevents multiple dev servers in the same directory (BTCAAAAA-30626).
+If `btc-dev-server.service` is already running on `:3010`, you must stop it first:
+```bash
+systemctl --user stop btc-dev-server.service
+./start-test.sh --branch feature-branch
+```
+
+### `./start.sh` (deprecated)
+
+The original `./start.sh` is deprecated and now prints a deprecation notice. Use one of
+the above instead.
