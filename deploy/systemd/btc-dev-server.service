@@ -1,0 +1,20 @@
+[Unit]
+Description=BTC Trading Engine Dev Server (Next.js UI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/sirrus/projects/BTC-Trade-Engine-PaperClip/packages/web-ui
+Environment=PATH=/home/sirrus/.nvm/versions/node/v20.20.2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Main-branch gate: refuse startup if not on main/master branch (blocks stale-branch incidents)
+# See BTCAAAAA-29995 (root cause), BTCAAAAA-30590 (start.sh gate), BTCAAAAA-31076 (systemd gate)
+ExecStartPre=/bin/bash -c 'cd /home/sirrus/projects/BTC-Trade-Engine-PaperClip; branch=$(git rev-parse --abbrev-ref HEAD); [[ "$branch" == "main" || "$branch" == "master" ]] || { echo "REFUSE: branch=$branch" >&2; exit 1; }; git fetch --quiet origin main || { echo "REFUSE: fetch origin/main failed" >&2; exit 1; }; head_sha=$(git rev-parse HEAD); main_sha=$(git rev-parse origin/main); if [[ "$head_sha" != "$main_sha" ]]; then git merge --ff-only origin/main 2>&1 || { echo "REFUSE: HEAD ($head_sha) != origin/main ($main_sha) and not ff-able" >&2; exit 1; }; echo "[branch-gate] fast-forwarded to origin/main ($main_sha)"; fi'
+ExecStart=/home/sirrus/.config/systemd/user/btc-dev-server-wrapper.sh
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

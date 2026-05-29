@@ -33,7 +33,8 @@ for arg in "$@"; do
 done
 
 # Check if btc-dev-server.service exists
-if ! systemctl --user list-unit-files 2>/dev/null | grep -q btc-dev-server.service; then
+UNIT_CHECK=$(systemctl --user list-unit-files 2>/dev/null || true)
+if ! echo "$UNIT_CHECK" | grep -q btc-dev-server.service; then
   echo "ERROR: btc-dev-server.service not found in systemd user units" >&2
   echo "       Run 'deploy/systemd/install-dev-server.sh' to register the unit" >&2
   exit 1
