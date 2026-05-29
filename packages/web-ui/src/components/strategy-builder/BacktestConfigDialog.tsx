@@ -58,7 +58,7 @@ function ChipRow({
 }) {
   const fmt = format ?? ((v: ChipValue) => String(v));
   return (
-    <div className="grid grid-cols-[110px_1fr] items-center gap-x-3 gap-y-0">
+    <div className="grid grid-cols-[110px_1fr_56px] items-center gap-x-3 gap-y-0">
       <span
         className="text-[10px] font-medium uppercase tracking-wider truncate"
         style={{ color: 'var(--text-muted)' }}
@@ -93,6 +93,16 @@ function ChipRow({
           );
         })}
       </div>
+      {/* Selected-value readout — mirrors thickclient row-end suffix ("90 days", "1.5x", "20 bars") */}
+      <span
+        className="text-[10px] text-right truncate"
+        style={{
+          color: current !== null && current !== undefined ? 'var(--accent-blue)' : 'var(--text-faint)',
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {current !== null && current !== undefined ? fmt(current) : '—'}
+      </span>
     </div>
   );
 }
@@ -687,10 +697,10 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
               className="text-sm font-semibold uppercase tracking-wide"
               style={{ color: 'var(--text-secondary)' }}
             >
-              BACKTEST
+              Backtest Configuration
             </h2>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {currentStrategy?.name ?? 'No strategy loaded'}
+              {currentStrategy?.name ? `${currentStrategy.name} Strategy` : 'No strategy loaded'}
             </p>
           </div>
           <button
