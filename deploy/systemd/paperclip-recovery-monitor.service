@@ -11,7 +11,17 @@ StandardError=journal
 Environment=HOME=/home/sirrus
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:/snap/bin:/home/sirrus/.local/bin
 WorkingDirectory=/home/sirrus/projects/BTC-Trade-Engine-PaperClip
-EnvironmentFile=/home/sirrus/projects/BTC-Trade-Engine-PaperClip/.env
+# Do NOT use EnvironmentFile=.env here: systemd's EnvironmentFile= overrides Environment=
+# (empirically verified — opposite of older docs), and .env ships placeholder values
+# (api.paperclip.example.com / dev_key / dev-company) that break local API access.
+# The Python script calls load_dotenv(REPO_ROOT/".env") with override=False, so non-conflicting
+# vars (POSTGRES_*, GH_TOKEN, …) still load while the systemd Environment= below wins.
+# _base() in src/touch_index/paperclip_client.py prefers PAPERCLIP_LISTEN_HOST/PORT.
+# Local server is local_trusted on 127.0.0.1:3100, so PAPERCLIP_API_KEY can be any string.
+Environment=PAPERCLIP_LISTEN_HOST=127.0.0.1
+Environment=PAPERCLIP_LISTEN_PORT=3100
+Environment=PAPERCLIP_API_KEY=local_trusted
+Environment=PAPERCLIP_COMPANY_ID=73419cf3-bd37-4a7c-8782-311ccb47fced
 
 [Install]
 WantedBy=default.target
