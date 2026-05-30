@@ -276,6 +276,8 @@
       "src/api/auth.py",
       "src/api/models.py",
       "src/api/redis_client.py",
+      "src/optimizer_v3/core/backtest_data_provider.py",
+      "src/optimizer_v3/core/multicore_backtest_engine.py",
       "src/itm/domain/events.py",
       "src/optimizer_v3/database/__init__.py"
     ],
@@ -4881,6 +4883,7 @@
       "scripts/p1_2_compare_data_sources.py",
       "scripts/qa_btcaaaaa_1089_cache_key_fix.py",
       "scripts/verify_trade_prices.py",
+      "src/api/app.py",
       "src/optimizer_v3/core/nautilus_training_system.py",
       "src/strategy_builder/ui/backtest_config_panel.py",
       "tests/bug_regression/test_btcaaaaa_163_regression.py",
@@ -5097,6 +5100,19 @@
     ],
     "src/api/redis_client.py": [
       "src/api/app.py"
+    ],
+    "src/optimizer_v3/core/multicore_backtest_engine.py": [
+      "src/api/app.py",
+      "src/strategy_builder/ui/backtest_config_panel.py",
+      "src/strategy_builder/ui/config_permutation_engine.py",
+      "test_backtest_engine_validation.py",
+      "test_multi_strategy_full.py",
+      "test_multi_strategy_validation.py",
+      "tests/integration/refresh_ci_regression_hashes.py",
+      "tests/integration/test_btcaaaaa_693_registry_clear_regression.py",
+      "tests/integration/test_btcaaaaa_745_multicore_real_data_regression.py",
+      "tests/integration/test_ci_regression_btcaaaaa987.py",
+      "tests/optimizer_v3/test_multicore_backtest_engine.py"
     ],
     "src/blast_radius/query.py": [
       "src/blast_radius/__main__.py",
@@ -6154,18 +6170,6 @@
       "src/strategy_builder/ui/config_discovery_results_dialog.py",
       "tests/strategy_builder/integration/test_config_discovery_engine.py",
       "tests/strategy_builder/integration/test_discovery_flow_integration.py"
-    ],
-    "src/optimizer_v3/core/multicore_backtest_engine.py": [
-      "src/strategy_builder/ui/backtest_config_panel.py",
-      "src/strategy_builder/ui/config_permutation_engine.py",
-      "test_backtest_engine_validation.py",
-      "test_multi_strategy_full.py",
-      "test_multi_strategy_validation.py",
-      "tests/integration/refresh_ci_regression_hashes.py",
-      "tests/integration/test_btcaaaaa_693_registry_clear_regression.py",
-      "tests/integration/test_btcaaaaa_745_multicore_real_data_regression.py",
-      "tests/integration/test_ci_regression_btcaaaaa987.py",
-      "tests/optimizer_v3/test_multicore_backtest_engine.py"
     ],
     "src/strategy_builder/integration/strategy_builder_orchestrator.py": [
       "src/strategy_builder/ui/block_search_panel.py",
@@ -9085,6 +9089,6 @@
     "parsed_files": 1403,
     "error_files": 16,
     "parse_rate_pct": 98.87,
-    "edge_count": 2471
+    "edge_count": 2473
   }
 }
