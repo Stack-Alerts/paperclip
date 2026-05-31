@@ -22,6 +22,9 @@ cd "$REPO_ROOT"
 
 BRANCH_OVERRIDE=""
 FORCE_MODE=0
+KILL_EXISTING=0
+REUSE_EXISTING=0
+CANCEL_ON_CONFLICT=0
 prev_arg=""
 for arg in "$@"; do
   if [[ "$prev_arg" == "--branch" ]]; then
@@ -39,9 +42,18 @@ for arg in "$@"; do
     --force)
       FORCE_MODE=1
       ;;
+    --kill-existing)
+      KILL_EXISTING=1
+      ;;
+    --reuse-existing)
+      REUSE_EXISTING=1
+      ;;
+    --cancel-on-conflict)
+      CANCEL_ON_CONFLICT=1
+      ;;
     *)
       echo "ERROR: unknown flag: $arg" >&2
-      echo "Usage: ./start-test.sh [--branch <name>] [--force]" >&2
+      echo "Usage: ./start-test.sh [--branch <name>] [--force] [--kill-existing] [--reuse-existing] [--cancel-on-conflict]" >&2
       exit 1
       ;;
   esac
@@ -65,6 +77,103 @@ if ! command -v npm >/dev/null 2>&1; then
   exit 1
 fi
 NPM="$(command -v npm)"
+
+# Port conflict detection and handling
+check_port_in_use() {
+  local port=$1
+  # Use ss to check for listening process (more reliable than lsof)
+  if command -v ss >/dev/null 2>&1; then
+    ss -tlnp 2>/dev/null | grep ":$port " | grep -o 'pid=[0-9]*' | grep -o '[0-9]*' | head -1
+  else
+    # Fallback to lsof if ss is not available
+    lsof -t -i :"$port" 2>/dev/null | grep -v '^$' | head -1
+  fi
+}
+
+handle_port_conflict() {
+  local port=$1
+  local pid=$2
+
+  local cmd_line
+  cmd_line=$(ps -o args= -p "$pid" 2>/dev/null || echo "unknown")
+  local etime
+  etime=$(ps -o etime= -p "$pid" 2>/dev/null || echo "unknown")
+
+  echo
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "⚠️  Port :$port is already in use"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "PID:     $pid"
+  echo "Command: $cmd_line"
+  echo "Time:    $etime"
+  echo
+
+  if [[ $KILL_EXISTING -eq 1 ]]; then
+    echo "[port-conflict] --kill-existing: terminating PID $pid..."
+    kill -TERM "$pid" 2>/dev/null || true
+
+    local wait_count=0
+    while [[ $(check_port_in_use "$port") != "" ]] && [[ $wait_count -lt 50 ]]; do
+      sleep 0.1
+      wait_count=$((wait_count + 1))
+    done
+
+    if [[ $(check_port_in_use "$port") == "" ]]; then
+      echo "[port-conflict] port :$port is now free"
+      return 0
+    else
+      echo "ERROR: port :$port still in use after killing PID $pid" >&2
+      exit 1
+    fi
+  elif [[ $REUSE_EXISTING -eq 1 ]]; then
+    echo "[port-conflict] --reuse-existing: exiting without starting new server"
+    exit 0
+  elif [[ $CANCEL_ON_CONFLICT -eq 1 ]]; then
+    echo "[port-conflict] --cancel-on-conflict: canceling startup"
+    exit 1
+  else
+    echo "Choose action:"
+    echo "  [k] kill PID $pid and start fresh"
+    echo "  [r] reuse existing server on :$port"
+    echo "  [c] cancel startup"
+    echo
+    read -p "Action? [k/r/c]: " -r action
+
+    case "$action" in
+      k|K)
+        echo "[port-conflict] killing PID $pid..."
+        kill -TERM "$pid" 2>/dev/null || true
+
+        local wait_count=0
+        while [[ $(check_port_in_use "$port") != "" ]] && [[ $wait_count -lt 50 ]]; do
+          sleep 0.1
+          wait_count=$((wait_count + 1))
+        done
+
+        if [[ $(check_port_in_use "$port") == "" ]]; then
+          echo "[port-conflict] port :$port is now free"
+          return 0
+        else
+          echo "ERROR: port :$port still in use after killing PID $pid" >&2
+          exit 1
+        fi
+        ;;
+      r|R)
+        echo "[port-conflict] reusing existing server on :$port"
+        echo "[port-conflict] browse http://localhost:$port"
+        exit 0
+        ;;
+      c|C)
+        echo "[port-conflict] canceling"
+        exit 1
+        ;;
+      *)
+        echo "ERROR: invalid action '$action'" >&2
+        exit 1
+        ;;
+    esac
+  fi
+}
 
 # Detect if supervised dev server is already running on :3010
 SUPERVISED_STATUS=$(systemctl --user is-active btc-dev-server.service 2>/dev/null || echo "inactive")
@@ -92,6 +201,13 @@ if [[ "$SUPERVISED_STATUS" == "active" ]]; then
       exit 1
     fi
   fi
+fi
+
+# Check if port :3000 is already in use by a foreign process
+TARGET_PORT=3000
+PID_ON_PORT=$(check_port_in_use "$TARGET_PORT")
+if [[ -n "$PID_ON_PORT" ]]; then
+  handle_port_conflict "$TARGET_PORT" "$PID_ON_PORT"
 fi
 
 # Print the test instance notice
