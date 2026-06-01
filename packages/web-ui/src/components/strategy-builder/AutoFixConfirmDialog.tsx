@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
+import Structural005FixDialog from './Structural005FixDialog';
 
 export interface AutoFixOption {
   key: string;
@@ -8,6 +9,13 @@ export interface AutoFixOption {
   /** Whether the option is checked by default */
   defaultChecked?: boolean;
   tooltip?: string;
+}
+
+export interface Structural005Data {
+  blockName: string;
+  signalName: string;
+  duplicateIndices: number[];
+  signalDetails: Array<{ index: number; name: string; weight: number; exitCount: number }>;
 }
 
 export interface AutoFixConfirmDialogProps {
@@ -18,7 +26,9 @@ export interface AutoFixConfirmDialogProps {
   afterState: Record<string, unknown>;
   impactAnalysis: string;
   options?: AutoFixOption[];
-  onConfirm: (userOptions: Record<string, boolean>) => void;
+  ruleId?: string;
+  structural005Data?: Structural005Data;
+  onConfirm: (userOptions: Record<string, boolean> | { mode: string; targetIndex: number; newName?: string }) => void;
   onCancel: () => void;
 }
 
@@ -57,6 +67,8 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
   beforeState,
   afterState,
   impactAnalysis,
+  ruleId,
+  structural005Data,
   options = [],
   onConfirm,
   onCancel,
@@ -64,6 +76,7 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
   const [userOptions, setUserOptions] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(options.map((o) => [o.key, o.defaultChecked ?? false]))
   );
+  const isStructural005 = ruleId === 'STRUCTURAL_005' && structural005Data;
 
   // Reset state when the dialog opens. The previous form of this effect
   // depended on `options` directly; callers pass it as an inline array (or
@@ -154,8 +167,23 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
             <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>{impactAnalysis}</p>
           </div>
 
+          {/* ── Rule-specific Controls ── */}
+          {isStructural005 && structural005Data && (
+            <Structural005FixDialog
+              strategyId=""
+              blockName={structural005Data.blockName}
+              signalName={structural005Data.signalName}
+              duplicateIndices={structural005Data.duplicateIndices}
+              signalDetails={structural005Data.signalDetails}
+              onConfirm={(mode, targetIndex, newName) => {
+                onConfirm({ mode, targetIndex, newName });
+              }}
+              onCancel={onCancel}
+            />
+          )}
+
           {/* ── Checkbox Options ── */}
-          {options.length > 0 && (
+          {!isStructural005 && options.length > 0 && (
             <div className="rounded-lg px-5 py-4 space-y-3 border" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-card) 30%, transparent)' }}>
               <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
                 ⚙️ Options
@@ -182,25 +210,27 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
           )}
         </div>
 
-        {/* ── Sticky footer ── */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-t sticky bottom-0 z-10" style={{ borderColor: 'var(--border)', background: 'var(--bg-panel)' }}>
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
-          >
-            ✅ Apply Fix
-          </button>
-        </div>
+        {/* ── Sticky footer (hidden for STRUCTURAL_005 which has its own buttons) ── */}
+        {!isStructural005 && (
+          <div className="flex justify-end gap-2 px-6 py-4 border-t sticky bottom-0 z-10" style={{ borderColor: 'var(--border)', background: 'var(--bg-panel)' }}>
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 rounded text-sm font-medium transition-colors"
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              className="px-4 py-2 rounded text-sm font-medium transition-colors"
+              style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
+            >
+              ✅ Apply Fix
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -916,7 +916,49 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
     setShowAutoFix(true);
   }, []);
 
-  const handleAutoFixConfirm = useCallback(async () => {
+  const getStructural005Data = useCallback(() => {
+    if (!selectedIssue || selectedIssue.rule_id !== 'STRUCTURAL_005' || !currentStrategy) {
+      return undefined;
+    }
+
+    // Extract auto_fix_data from the issue
+    const autoFixData = selectedIssue.auto_fix_data as any;
+    if (!autoFixData?.block_name || !autoFixData?.signal_name) {
+      return undefined;
+    }
+
+    // Find the block and its signals
+    const block = currentStrategy.blocks?.find((b: any) => b.data?.name === autoFixData.block_name);
+    if (!block) return undefined;
+
+    // Find all indices of the duplicate signal name
+    const duplicateIndices: number[] = [];
+    const signalDetails: Array<{ index: number; name: string; weight: number; exitCount: number }> = [];
+
+    const signals = block.data?.signals as any[];
+    signals?.forEach((signal: any, idx: number) => {
+      if (signal.name === autoFixData.signal_name) {
+        duplicateIndices.push(idx);
+        signalDetails.push({
+          index: idx,
+          name: signal.name,
+          weight: signal.weight || 0,
+          exitCount: signal.exit_conditions?.length || 0,
+        });
+      }
+    });
+
+    if (duplicateIndices.length < 2) return undefined;
+
+    return {
+      blockName: autoFixData.block_name,
+      signalName: autoFixData.signal_name,
+      duplicateIndices,
+      signalDetails,
+    };
+  }, [selectedIssue, currentStrategy]);
+
+  const handleAutoFixConfirm = useCallback(async (userInput?: Record<string, any>) => {
     if (!selectedIssue || !currentStrategy) return;
 
     // Snapshot for undo before the store swaps currentStrategy with the
@@ -931,10 +973,19 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
     ]);
 
     try {
-      const applied = await applyAutoFix(
-        selectedIssue.rule_id,
-        selectedIssue.auto_fix_data as Record<string, unknown> | undefined,
-      );
+      let fixData = selectedIssue.auto_fix_data as Record<string, unknown> | undefined;
+
+      // For STRUCTURAL_005, merge the user input with auto_fix_data
+      if (selectedIssue.rule_id === 'STRUCTURAL_005' && userInput && userInput.mode) {
+        fixData = {
+          ...(selectedIssue.auto_fix_data as Record<string, unknown>),
+          mode: userInput.mode,
+          target_index: userInput.targetIndex,
+          ...(userInput.newName && { new_name: userInput.newName }),
+        };
+      }
+
+      const applied = await applyAutoFix(selectedIssue.rule_id, fixData);
       setShowAutoFix(false);
       setSelectedIssue(null);
       if (!applied) {
@@ -1375,6 +1426,8 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
           beforeState={{ issue: selectedIssue.message }}
           afterState={{ issue: 'Fixed' }}
           impactAnalysis="The selected issue will be automatically fixed. Validation will re-run to confirm."
+          ruleId={selectedIssue.rule_id}
+          structural005Data={getStructural005Data()}
           onConfirm={handleAutoFixConfirm}
           onCancel={() => {
             setShowAutoFix(false);
