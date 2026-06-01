@@ -291,7 +291,7 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
   return (
     <div className="grid grid-cols-3 gap-4 p-4 min-h-full" style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-deep)' }}>
       {/* Column 1: Strategy Info */}
-      <div className="space-y-4">
+      <div className="space-y-4 p-4 rounded border" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
           <Info size={12} strokeWidth={1.5} />
           Strategy Info
@@ -381,7 +381,7 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
       </div>
 
       {/* Column 2: Configuration Hierarchy */}
-      <div className="space-y-2 overflow-y-auto">
+      <div className="space-y-2 overflow-y-auto p-4 rounded border" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
           <Settings size={12} strokeWidth={1.5} />
           Configuration
@@ -396,7 +396,7 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
       </div>
 
       {/* Column 3: Performance */}
-      <div className="space-y-3">
+      <div className="space-y-3 p-4 rounded border" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
           <TrendingUp size={12} strokeWidth={1.5} />
           Performance
