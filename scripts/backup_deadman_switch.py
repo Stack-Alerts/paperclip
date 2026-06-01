@@ -38,6 +38,14 @@ BACKUP_STATE_FILE = (
     / "backup-state"
     / "last-success.json"
 )
+BACKUP_RESULT_FILE = (
+    Path.home()
+    / ".paperclip"
+    / "instances"
+    / "default"
+    / "backup-state"
+    / "last-result.json"
+)
 BACKUP_INTERVAL_HOURS = 4
 DEFAULT_GRACE_HOURS = 4
 DEADMAN_LOG = Path.home() / ".paperclip" / "backup_deadman_switch.log"
@@ -73,6 +81,22 @@ def _read_last_success() -> dict | None:
         return json.loads(BACKUP_STATE_FILE.read_text())
     except (json.JSONDecodeError, OSError) as exc:
         logger.error("Failed to read last-success.json: %s", exc)
+        return None
+
+
+def _read_last_result() -> dict | None:
+    """Read the latest run's result file (ok | skipped_no_change | failed).
+
+    Optional; absence is treated as "no info" — alarm logic falls back to the
+    last-success timestamp. Added for BTCAAAAA-33092 so deadman runs surface
+    whether the most recent run was a real upload or a healthy no-op skip.
+    """
+    if not BACKUP_RESULT_FILE.exists():
+        return None
+    try:
+        return json.loads(BACKUP_RESULT_FILE.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Failed to read last-result.json: %s", exc)
         return None
 
 
@@ -278,6 +302,9 @@ def run(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = False) -> dict:
     age_hours = _get_backup_age_hours(state) if state else None
     threshold = BACKUP_INTERVAL_HOURS + grace_hours
 
+    last_result = _read_last_result()
+    last_result_kind = (last_result or {}).get("result") if last_result else None
+
     alert_fired = False
     alert_skipped = False
     alert_reason = ""
@@ -286,11 +313,18 @@ def run(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = False) -> dict:
         logger.warning("No successful backup recorded — alert will fire")
         alert_reason = "no_success_ever"
     elif age_hours <= threshold:
-        logger.info(
-            "Backup current: %.1fh old (threshold %.1fh)",
-            age_hours,
-            threshold,
-        )
+        if last_result_kind == "skipped_no_change":
+            logger.info(
+                "Backup current: %.1fh old (threshold %.1fh) — last run was skipped_no_change (signature unchanged)",
+                age_hours,
+                threshold,
+            )
+        else:
+            logger.info(
+                "Backup current: %.1fh old (threshold %.1fh)",
+                age_hours,
+                threshold,
+            )
     else:
         logger.warning(
             "Backup overdue: %.1fh old (threshold %.1fh) — alert will fire",
@@ -345,6 +379,8 @@ def run(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = False) -> dict:
         "self_last_run_utc": now_utc,
         "self_prev_run_utc": prev_last,
         "self_total_runs": prev_runs + 1,
+        "last_run_result": last_result_kind or "unknown",
+        "last_run_reason": (last_result or {}).get("reason") if last_result else None,
     }
     return summary
 

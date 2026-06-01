@@ -683,3 +683,165 @@ class TestRun:
         _create_alert(age_hours=15.0, grace_hours=8, dry_run=False)
         payload = mock_sess.post.call_args[1]["json"]
         assert "unknown" in payload["description"]
+
+
+class TestNoOpRecognition:
+    """Regression for BTCAAAAA-33092: deadman must NOT alarm on skipped runs
+    and must surface the result kind in the summary."""
+
+    deadman_bug = pytest.mark.bug("BTCAAAAA-33092")
+
+    @deadman_bug
+    def test_read_last_result_returns_state_when_present(self, tmp_path, monkeypatch):
+        from scripts.backup_deadman_switch import _read_last_result
+
+        result = {
+            "timestamp": "2026-06-01T12:00:00Z",
+            "result": "skipped_no_change",
+            "reason": "signature unchanged",
+            "signature": "abc123",
+        }
+        rf = tmp_path / "last-result.json"
+        rf.write_text(json.dumps(result))
+        monkeypatch.setattr("scripts.backup_deadman_switch.BACKUP_RESULT_FILE", rf)
+        assert _read_last_result() == result
+
+    @deadman_bug
+    def test_read_last_result_returns_none_when_missing(self, monkeypatch):
+        from scripts.backup_deadman_switch import _read_last_result
+
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch.BACKUP_RESULT_FILE",
+            Path("/nonexistent/last-result.json"),
+        )
+        assert _read_last_result() is None
+
+    @deadman_bug
+    def test_read_last_result_returns_none_on_invalid_json(self, tmp_path, monkeypatch):
+        from scripts.backup_deadman_switch import _read_last_result
+
+        rf = tmp_path / "bad.json"
+        rf.write_text("{not valid")
+        monkeypatch.setattr("scripts.backup_deadman_switch.BACKUP_RESULT_FILE", rf)
+        assert _read_last_result() is None
+
+    @deadman_bug
+    def test_skipped_no_change_does_not_fire_alert(self, tmp_path, monkeypatch):
+        """When last-success is fresh AND last-result says skipped_no_change,
+        the run must stay healthy and surface the skip in the summary."""
+        from scripts.backup_deadman_switch import run
+
+        monkeypatch.setenv("PAPERCLIP_API_URL", "https://api.test")
+        monkeypatch.setenv("PAPERCLIP_API_KEY", "test-key")
+        monkeypatch.setenv("PAPERCLIP_COMPANY_ID", "test-co")
+
+        # Wire stubs
+        sf = MagicMock()
+        sf.exists.return_value = False
+        monkeypatch.setattr("scripts.backup_deadman_switch.DEADMAN_STATE", sf)
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._rotate_log_if_needed", MagicMock()
+        )
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._save_self_state", MagicMock()
+        )
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._load_self_state", lambda: {}
+        )
+
+        # Fresh success state + skip result
+        success_state = _make_fresh_state(0.5)
+        ssf = tmp_path / "last-success.json"
+        ssf.write_text(json.dumps(success_state))
+        monkeypatch.setattr("scripts.backup_deadman_switch.BACKUP_STATE_FILE", ssf)
+
+        result_state = {
+            "timestamp": success_state["lastSuccess"],
+            "result": "skipped_no_change",
+            "reason": "signature unchanged",
+            "signature": "deadbeef",
+        }
+        rrf = tmp_path / "last-result.json"
+        rrf.write_text(json.dumps(result_state))
+        monkeypatch.setattr("scripts.backup_deadman_switch.BACKUP_RESULT_FILE", rrf)
+
+        # Ensure no alert path is invoked
+        mock_create = MagicMock(return_value=True)
+        mock_comment = MagicMock(return_value=True)
+        mock_find = MagicMock(return_value=None)
+        monkeypatch.setattr("scripts.backup_deadman_switch._create_alert", mock_create)
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._comment_on_existing_alert", mock_comment
+        )
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._find_existing_alert", mock_find
+        )
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._session", lambda: MagicMock()
+        )
+
+        summary = run(grace_hours=4, dry_run=False)
+
+        assert summary["status"] == "healthy"
+        assert summary["alert_fired"] is False
+        assert summary["alert_skipped"] is False
+        assert summary["alert_reason"] == "none"
+        assert summary["last_run_result"] == "skipped_no_change"
+        assert summary["last_run_reason"] == "signature unchanged"
+        mock_create.assert_not_called()
+        mock_comment.assert_not_called()
+
+    @deadman_bug
+    def test_overdue_still_alerts_even_when_last_result_says_skipped(
+        self, tmp_path, monkeypatch
+    ):
+        """Defensive: a stale lastSuccess MUST still alarm, even if a skip
+        result is present. The skip flag is informational, not an alarm
+        suppressor for genuine staleness."""
+        from scripts.backup_deadman_switch import run
+
+        monkeypatch.setenv("PAPERCLIP_API_URL", "https://api.test")
+        monkeypatch.setenv("PAPERCLIP_API_KEY", "test-key")
+        monkeypatch.setenv("PAPERCLIP_COMPANY_ID", "test-co")
+
+        sf = MagicMock()
+        sf.exists.return_value = False
+        monkeypatch.setattr("scripts.backup_deadman_switch.DEADMAN_STATE", sf)
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._rotate_log_if_needed", MagicMock()
+        )
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._save_self_state", MagicMock()
+        )
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._load_self_state", lambda: {}
+        )
+
+        # Stale success (20h old) + a stale skip result
+        stale = _make_fresh_state(20.0)
+        ssf = tmp_path / "last-success.json"
+        ssf.write_text(json.dumps(stale))
+        monkeypatch.setattr("scripts.backup_deadman_switch.BACKUP_STATE_FILE", ssf)
+
+        rrf = tmp_path / "last-result.json"
+        rrf.write_text(
+            json.dumps(
+                {"result": "skipped_no_change", "reason": "signature unchanged"}
+            )
+        )
+        monkeypatch.setattr("scripts.backup_deadman_switch.BACKUP_RESULT_FILE", rrf)
+
+        mock_create = MagicMock(return_value=True)
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._find_existing_alert", lambda: None
+        )
+        monkeypatch.setattr("scripts.backup_deadman_switch._create_alert", mock_create)
+        monkeypatch.setattr(
+            "scripts.backup_deadman_switch._session", lambda: MagicMock()
+        )
+
+        summary = run(grace_hours=4, dry_run=False)
+        assert summary["alert_fired"] is True
+        assert summary["alert_reason"] == "overdue"
+        assert summary["last_run_result"] == "skipped_no_change"
+        mock_create.assert_called_once()

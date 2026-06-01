@@ -1,0 +1,13 @@
+[Unit]
+Description=Paperclip Local DB-Dump Retention Pruner Timer (hourly, after the dumper)
+Requires=paperclip-backup-prune.service
+
+[Timer]
+# Local DB dumper runs at HH:28; prune at HH:45 so it slots between the
+# dumper and the next offsite trigger.
+OnCalendar=*-*-* *:45:00
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

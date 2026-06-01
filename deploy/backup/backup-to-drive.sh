@@ -293,6 +293,132 @@ echo "  Version:    ${PAPERCLIP_VERSION}"
 echo "  Hostname:   $(hostname)"
 echo ""
 
+# ============================================================================
+# Change-detection gate (BTCAAAAA-33092)
+# ----------------------------------------------------------------------------
+# Computes a signature over (code HEAD, DB write counters, instance-dir mtime
+# walk). If unchanged from the last uploaded signature, exit 0 with
+# result=skipped_no_change and update last-success.json so the deadman switch
+# treats the no-op as a healthy run (see backup_deadman_switch.py).
+# ============================================================================
+
+BACKUP_STATE_DIR="${INSTANCE_DIR}/backup-state"
+mkdir -p "$BACKUP_STATE_DIR"
+LAST_SIG_FILE="$BACKUP_STATE_DIR/last-signature.txt"
+LAST_RESULT_FILE="$BACKUP_STATE_DIR/last-result.json"
+LAST_SUCCESS_FILE="$BACKUP_STATE_DIR/last-success.json"
+
+LAST_SIG_PREV=""
+if [ -f "$LAST_SIG_FILE" ]; then
+    LAST_SIG_PREV=$(tr -d '[:space:]' < "$LAST_SIG_FILE")
+fi
+
+# Code signal: git HEAD of the company's primary repo, if present.
+BTE_REPO="${BTE_REPO_PATH:-$HOME/projects/BTC-Trade-Engine-PaperClip}"
+if [ -d "$BTE_REPO/.git" ]; then
+    CODE_SIG=$(git -C "$BTE_REPO" rev-parse HEAD 2>/dev/null || echo "unknown")
+else
+    CODE_SIG="no-repo"
+fi
+
+# Files signal: size+mtime+path walk over the instance dirs that the offsite
+# tarball includes. No content read — purely metadata.
+FILES_SIG=$(
+    cd "$INSTANCE_DIR" 2>/dev/null && \
+    find companies projects skills data/storage -type f -printf '%T@ %s %p\n' 2>/dev/null \
+        | LC_ALL=C sort | sha256sum | cut -d' ' -f1
+)
+FILES_SIG="${FILES_SIG:-empty}"
+
+# DB signal: SHA-256 of the freshest dump's content with the two known
+# non-deterministic markers stripped (per-dump timestamp comment + per-run
+# breakpoint UUID). Equal SQL data -> equal hash. Deterministic across
+# environments — no dependency on psycopg2 / pip / venv / miniconda paths,
+# which prevents the systemd-vs-interactive-env signature mismatch problem.
+#
+# Cost: one gunzip + grep + sha256 over the freshest dump (~5-10s for 500MB).
+# Run once per 4h backup, this is comfortably cheap.
+
+DB_SIG=""
+DB_SIG_SOURCE=""
+FRESHEST_FOR_SIG=$(ls -1t "$BACKUPS_DIR"/paperclip-*.sql.gz 2>/dev/null | head -1)
+if [ -n "$FRESHEST_FOR_SIG" ] && [ -f "$FRESHEST_FOR_SIG" ]; then
+    DB_SIG=$(gunzip -c "$FRESHEST_FOR_SIG" 2>/dev/null \
+        | grep -vE '^-- (Created:|paperclip statement breakpoint)' \
+        | sha256sum | cut -d' ' -f1)
+    DB_SIG_SOURCE="dump-content-hash($(basename "$FRESHEST_FOR_SIG"))"
+fi
+DB_SIG="${DB_SIG:-unavailable}"
+DB_SIG_SOURCE="${DB_SIG_SOURCE:-unavailable}"
+
+SIGNATURE=$(printf "code=%s\ndb=%s\nfiles=%s\n" "$CODE_SIG" "$DB_SIG" "$FILES_SIG" \
+    | sha256sum | cut -d' ' -f1)
+
+echo "--- Change-detection ---"
+echo "  code:      ${CODE_SIG:0:16}..."
+echo "  db:        ${DB_SIG:0:16}...  (source: ${DB_SIG_SOURCE})"
+echo "  files:     ${FILES_SIG:0:16}..."
+echo "  signature: ${SIGNATURE:0:16}..."
+echo "  previous:  ${LAST_SIG_PREV:0:16}..."
+
+if [ -n "$LAST_SIG_PREV" ] && [ "$SIGNATURE" = "$LAST_SIG_PREV" ]; then
+    SHORT_PREV="${LAST_SIG_PREV:0:12}"
+    echo ""
+    echo "no-op: no changes since ${SHORT_PREV}"
+    echo "Skipping backup creation and upload."
+
+    # Skip is a healthy run; refresh last-success.json timestamp so the
+    # deadman switch does not alarm on legitimate no-op runs.
+    NOW_UTC="$NOW_UTC" SIGNATURE="$SIGNATURE" \
+    CODE_SIG="$CODE_SIG" DB_SIG="$DB_SIG" FILES_SIG="$FILES_SIG" \
+    HOSTNAME_VAL="$(hostname)" \
+    LAST_SUCCESS_FILE="$LAST_SUCCESS_FILE" \
+    LAST_RESULT_FILE="$LAST_RESULT_FILE" \
+    python3 <<'PYEOF'
+import json, os
+now_utc = os.environ["NOW_UTC"]
+sig = os.environ["SIGNATURE"]
+last_success_file = os.environ["LAST_SUCCESS_FILE"]
+last_result_file = os.environ["LAST_RESULT_FILE"]
+
+state = {}
+if os.path.exists(last_success_file):
+    try:
+        state = json.load(open(last_success_file))
+    except Exception:
+        state = {}
+state["lastSuccess"] = now_utc
+state["lastRunResult"] = "skipped_no_change"
+state["signature"] = sig
+state["hostname"] = os.environ.get("HOSTNAME_VAL", "")
+json.dump(state, open(last_success_file, "w"), indent=2)
+
+result = {
+    "timestamp": now_utc,
+    "result": "skipped_no_change",
+    "reason": "signature unchanged",
+    "signature": sig,
+    "codeSig": os.environ["CODE_SIG"],
+    "dbSig": os.environ["DB_SIG"],
+    "filesSig": os.environ["FILES_SIG"],
+}
+json.dump(result, open(last_result_file, "w"), indent=2)
+PYEOF
+    echo "  last-success.json + last-result.json updated."
+    echo ""
+    echo "=========================================="
+    echo "  Result: skipped_no_change"
+    echo "=========================================="
+    exit 0
+fi
+
+if [ -n "$LAST_SIG_PREV" ]; then
+    echo "  Signature CHANGED — proceeding with backup."
+else
+    echo "  No prior signature — first backup; proceeding."
+fi
+echo ""
+
 # --- Pick freshest database dump ------------------------------------------
 FRESHEST=$(ls -1t "$BACKUPS_DIR"/paperclip-*.sql.gz 2>/dev/null | head -1)
 if [ -z "$FRESHEST" ]; then
@@ -455,24 +581,105 @@ echo "  Manifest:    MANIFEST.json"
 echo "  DB dump:     ${DUMP_FILENAME:-none}"
 echo "=========================================="
 
-# Write success state
-BACKUP_STATE_DIR="${INSTANCE_DIR}/backup-state"
-mkdir -p "$BACKUP_STATE_DIR"
-python3 -c "
+# Write success state (BACKUP_STATE_DIR was created above by the change-detection gate)
+NOW_UTC="$NOW_UTC" DEST="$DEST" SIGNATURE="$SIGNATURE" \
+CODE_SIG="$CODE_SIG" DB_SIG="$DB_SIG" FILES_SIG="$FILES_SIG" \
+HOSTNAME_VAL="$(hostname)" \
+TMPDIR="$TMPDIR" \
+LAST_SUCCESS_FILE="$LAST_SUCCESS_FILE" \
+LAST_RESULT_FILE="$LAST_RESULT_FILE" \
+LAST_SIG_FILE="$LAST_SIG_FILE" \
+python3 <<'PYEOF'
 import json, os
+now_utc = os.environ["NOW_UTC"]
+dest = os.environ["DEST"]
+sig = os.environ["SIGNATURE"]
+tmpdir = os.environ["TMPDIR"]
+last_success_file = os.environ["LAST_SUCCESS_FILE"]
+last_result_file = os.environ["LAST_RESULT_FILE"]
+last_sig_file = os.environ["LAST_SIG_FILE"]
+
+manifest_path = os.path.join(tmpdir, "MANIFEST.json")
+payload_sha = ""
+payload_size = 0
+if os.path.exists(manifest_path):
+    try:
+        m = json.load(open(manifest_path))
+        payload_sha = m.get("payloadSha256", "")
+        payload_size = m.get("payloadSizeBytes", 0)
+    except Exception:
+        pass
+
 state = {
-    'lastSuccess': '$NOW_UTC',
-    'destination': '$DEST',
-    'payloadSha256': open('${TMPDIR}/MANIFEST.json' if os.path.exists('${TMPDIR}/MANIFEST.json') else '/dev/null'),
+    "lastSuccess": now_utc,
+    "lastRunResult": "ok",
+    "destination": dest,
+    "payloadSha256": payload_sha,
+    "payloadSizeBytes": payload_size,
+    "signature": sig,
+    "hostname": os.environ.get("HOSTNAME_VAL", ""),
 }
-with open('${TMPDIR}/MANIFEST.json') as f:
-    m = json.load(f)
-state['payloadSha256'] = m.get('payloadSha256', '')
-state['payloadSizeBytes'] = m.get('payloadSizeBytes', 0)
-state['hostname'] = '$(hostname)'
-with open('${BACKUP_STATE_DIR}/last-success.json', 'w') as f:
-    json.dump(state, f, indent=2)
-print(f'State written: ${BACKUP_STATE_DIR}/last-success.json')
-"
+json.dump(state, open(last_success_file, "w"), indent=2)
+print(f"State written: {last_success_file}")
+
+result = {
+    "timestamp": now_utc,
+    "result": "ok",
+    "destination": dest,
+    "signature": sig,
+    "codeSig": os.environ["CODE_SIG"],
+    "dbSig": os.environ["DB_SIG"],
+    "filesSig": os.environ["FILES_SIG"],
+    "payloadSha256": payload_sha,
+    "payloadSizeBytes": payload_size,
+}
+json.dump(result, open(last_result_file, "w"), indent=2)
+print(f"Result written: {last_result_file}")
+
+with open(last_sig_file, "w") as f:
+    f.write(sig + "\n")
+print(f"Signature recorded: {last_sig_file}")
+PYEOF
+
+# ============================================================================
+# Offsite retention: keep newest 10 (BTCAAAAA-33092)
+# ----------------------------------------------------------------------------
+# Lists leaf YYYY/MM/DD/HHMM dirs under the company root and purges all but
+# the 10 most-recent. Reverse-sort works because the path components are
+# zero-padded and sort lexicographically.
+# ============================================================================
+echo ""
+echo "--- Offsite retention (keep newest 10) ---"
+RETENTION_KEEP="${BACKUP_RETENTION_KEEP:-10}"
+
+OFFSITE_DIRS=$(rclone lsf "${REMOTE_ROOT}/${COMPANY_ID}" \
+    --config "$RCLONE_CONFIG" --recursive --dirs-only --format p 2>/dev/null \
+    | grep -E '^[0-9]{4}/[0-9]{2}/[0-9]{2}/[0-9]{4}/?$' \
+    | sed 's:/*$::' \
+    | LC_ALL=C sort -r) || true
+
+if [ -z "$OFFSITE_DIRS" ]; then
+    echo "  (no offsite directories matched leaf pattern)"
+else
+    TOTAL=$(echo "$OFFSITE_DIRS" | wc -l)
+    KEEP_LIST=$(echo "$OFFSITE_DIRS" | head -n "$RETENTION_KEEP")
+    PURGE_LIST=$(echo "$OFFSITE_DIRS" | tail -n +$((RETENTION_KEEP + 1)))
+    PURGE_COUNT=0
+    if [ -n "$PURGE_LIST" ]; then
+        PURGE_COUNT=$(echo "$PURGE_LIST" | grep -c .)
+    fi
+    echo "  Found: ${TOTAL} backup dirs"
+    echo "  Keep:  ${RETENTION_KEEP} newest"
+    echo "  Purge: ${PURGE_COUNT}"
+    if [ "$PURGE_COUNT" -gt 0 ]; then
+        echo "$PURGE_LIST" | while IFS= read -r d; do
+            [ -z "$d" ] && continue
+            echo "    purging: $d"
+            rclone purge "${REMOTE_ROOT}/${COMPANY_ID}/$d" --config "$RCLONE_CONFIG" 2>&1 \
+                | grep -v "^$" | tail -3 || true
+        done
+    fi
+fi
+echo ""
 
 # Clean up manifest SHA reference before trap
