@@ -16,7 +16,8 @@ import {
   BacktestResult,
   StrategySettings,
 } from '@/lib/strategy-builder/types';
-import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults, validateStrategy as validateStrategyAPI } from '@/lib/strategy-builder/api';
+import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults } from '@/lib/strategy-builder/api';
+import { validateStrategyLocal } from '@/lib/strategy-builder/validation';
 
 // Strategies loaded from the strategy-builder API have IDs of the form
 // "strategy_<hex>" (see StrategyDatabaseManager.create_strategy); locally
@@ -387,18 +388,17 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     });
   },
 
-  // Validate strategy via backend API
+  // Validate strategy using local validation
+  // Note: For full institutional validation (logic flow, timing conflicts, exit strategy analysis),
+  // a backend endpoint wrapping the Python InstitutionalValidator would be needed.
+  // For now, we use local structural checks and degrade gracefully.
   validateStrategy: async () => {
     const { currentStrategy } = get();
     if (!currentStrategy) return;
 
     set({ isValidating: true, validationReport: null });
     try {
-      const report = await validateStrategyAPI(currentStrategy.id, {
-        name: currentStrategy.name,
-        blocks: currentStrategy.blocks,
-        settings: currentStrategy.settings,
-      }) as ValidationReport;
+      const report = validateStrategyLocal(currentStrategy);
 
       set({
         validationReport: report,
