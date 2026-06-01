@@ -927,28 +927,41 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
       return undefined;
     }
 
-    // Find the block and its signals
-    const block = currentStrategy.blocks?.find((b: any) => b.data?.name === autoFixData.block_name);
+    // Find the block and its signals (try multiple patterns)
+    let block = currentStrategy.blocks?.find((b: any) => b.data?.name === autoFixData.block_name);
+    if (!block) {
+      block = currentStrategy.blocks?.find((b: any) => b.name === autoFixData.block_name);
+    }
     if (!block) return undefined;
 
     // Find all indices of the duplicate signal name
     const duplicateIndices: number[] = [];
     const signalDetails: Array<{ index: number; name: string; weight: number; exitCount: number }> = [];
 
-    const signals = block.data?.signals as any[];
-    signals?.forEach((signal: any, idx: number) => {
-      if (signal.name === autoFixData.signal_name) {
+    // Try to get signals from different possible locations
+    let signals = block.data?.signals as any[];
+    if (!signals) {
+      signals = block.signals as any[];
+    }
+    if (!Array.isArray(signals)) {
+      signals = [];
+    }
+
+    signals.forEach((signal: any, idx: number) => {
+      const signalName = signal.name || signal.data?.name;
+      if (signalName === autoFixData.signal_name) {
         duplicateIndices.push(idx);
         signalDetails.push({
           index: idx,
-          name: signal.name,
-          weight: signal.weight || 0,
-          exitCount: signal.exit_conditions?.length || 0,
+          name: signalName,
+          weight: signal.weight || signal.data?.weight || 0,
+          exitCount: (signal.exit_conditions?.length || signal.data?.exit_conditions?.length || 0),
         });
       }
     });
 
-    if (duplicateIndices.length < 2) return undefined;
+    // Return data even if only 1 or more matches found (not just 2+)
+    if (duplicateIndices.length < 1) return undefined;
 
     return {
       blockName: autoFixData.block_name,
