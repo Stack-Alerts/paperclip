@@ -80,14 +80,17 @@ NPM="$(command -v npm)"
 
 # Port conflict detection and handling
 check_port_in_use() {
+  # Must return 0 even when no listener is found: under `set -euo pipefail`,
+  # the inner grep returns non-zero on no match, which would silently abort
+  # any caller using `$(check_port_in_use ...)`. BTCAAAAA-32422 forensics.
   local port=$1
-  # Use ss to check for listening process (more reliable than lsof)
+  local pid=""
   if command -v ss >/dev/null 2>&1; then
-    ss -tlnp 2>/dev/null | grep ":$port " | grep -o 'pid=[0-9]*' | grep -o '[0-9]*' | head -1
+    pid=$(ss -tlnp 2>/dev/null | grep ":$port " | grep -o 'pid=[0-9]*' | grep -o '[0-9]*' | head -1 || true)
   else
-    # Fallback to lsof if ss is not available
-    lsof -t -i :"$port" 2>/dev/null | grep -v '^$' | head -1
+    pid=$(lsof -t -i :"$port" 2>/dev/null | grep -v '^$' | head -1 || true)
   fi
+  echo "$pid"
 }
 
 handle_port_conflict() {
