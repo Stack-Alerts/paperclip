@@ -1175,7 +1175,9 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
 
           {currentTab === 'summary' && (
             <div className="space-y-3">
-              {/* Validation Summary — compact grid layout */}
+              {/* Issue Summary — same label-value row layout as Composition
+                  so the tab reads as one consistent structure (BTCAAAAA-32954
+                  board comment 9cebfe95). */}
               <div
                 className="rounded border p-3"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
@@ -1183,31 +1185,31 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
                 <h3 className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}>
                   Issue Summary
                 </h3>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="space-y-1.5" style={{ fontSize: '13px' }}>
                   {[
-                    { label: 'Critical', count: issueCounts.critical, color: issueCounts.critical > 0 ? 'var(--accent-red)' : 'var(--text-muted)' },
-                    { label: 'Errors', count: issueCounts.errors, color: issueCounts.errors > 0 ? 'var(--accent-orange)' : 'var(--text-muted)' },
-                    { label: 'Warnings', count: issueCounts.warnings, color: issueCounts.warnings > 0 ? 'var(--accent-orange)' : 'var(--text-muted)' },
-                    { label: 'Notices', count: issueCounts.notices, color: issueCounts.notices > 0 ? 'var(--accent-blue)' : 'var(--text-muted)' },
-                    { label: 'Info', count: issueCounts.info, color: 'var(--text-muted)' },
-                  ].map((item) => (
+                    { label: 'Critical', count: issueCounts.critical, color: issueCounts.critical > 0 ? 'var(--accent-red)' : undefined },
+                    { label: 'Errors', count: issueCounts.errors, color: issueCounts.errors > 0 ? 'var(--accent-red)' : undefined },
+                    { label: 'Warnings', count: issueCounts.warnings, color: issueCounts.warnings > 0 ? 'var(--accent-orange)' : undefined },
+                    { label: 'Notices', count: issueCounts.notices, color: issueCounts.notices > 0 ? 'var(--accent-blue)' : undefined },
+                    { label: 'Info', count: issueCounts.info, color: undefined },
+                  ].map((item, idx) => (
                     <div
                       key={item.label}
-                      className="text-center py-2"
-                      style={{ background: 'var(--bg-panel)', borderRadius: '4px', border: '1px solid var(--border)' }}
+                      className="flex justify-between items-baseline px-2 py-1.5"
+                      style={{ background: idx % 2 === 0 ? 'transparent' : 'var(--bg-panel)', borderRadius: '3px' }}
                     >
-                      <div className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-muted)', marginBottom: '4px', letterSpacing: '0.05em' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
                         {item.label}
-                      </div>
-                      <div className="text-lg font-bold" style={{ color: item.color }}>
+                      </span>
+                      <span style={{ color: item.color ?? 'var(--text-secondary)', fontWeight: '600', minWidth: '2rem', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                         {item.count}
-                      </div>
+                      </span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Strategy Composition — label-value pairs with right-aligned numbers */}
+              {/* Composition — label-value rows matching Issue Summary above. */}
               <div
                 className="rounded border p-3"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
@@ -1231,17 +1233,6 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
                     </div>
                   ))}
                 </div>
-                {getCompositionBreakdown(currentStrategy).some(item => item.details) && (
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
-                    {getCompositionBreakdown(currentStrategy)
-                      .filter(item => item.details)
-                      .map((item, idx) => (
-                        <div key={idx} style={{ marginTop: idx > 0 ? '3px' : '0' }}>
-                          • {item.details}
-                        </div>
-                      ))}
-                  </div>
-                )}
               </div>
 
               {/* Complexity — compact with progress bar */}
