@@ -332,15 +332,15 @@ export function validateStrategyLocal(strategy: Strategy): ValidationReport {
     });
   }
 
-  // Backend validation unavailable notice
+  // We're in the local-fallback path — useStrategyStore only invokes this
+  // when the backend InstitutionalValidator is unreachable. Surface that.
   issues.info.push({
     rule_id: 'backend_validation_unavailable',
     rule_name: 'Limited Validation',
     severity: ValidationSeverity.INFO,
     category: 'system',
     message:
-      'Backend validation service is temporarily unavailable. Showing local structural checks only. ' +
-      'Full institutional validation including logic flow, timing conflicts, and exit strategy analysis requires backend support.',
+      'Backend validation service is unreachable — showing local structural checks only.',
     location: 'System::validation',
   });
 

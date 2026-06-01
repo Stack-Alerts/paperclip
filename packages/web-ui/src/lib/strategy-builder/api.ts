@@ -165,8 +165,11 @@ export async function getBlockSchema(blockType: string) {
   return get(`/blocks/${blockType}`);
 }
 
-export async function validateStrategy(id: string, strategyData: unknown) {
-  return post(`/strategies/${id}/validate`, strategyData);
+export async function validateStrategy(id: string) {
+  // Runs the backend InstitutionalValidator against the strategy's latest
+  // stored version. The body is empty by design — validation always reads
+  // from the DB, not from in-flight UI edits (BTCAAAAA-32954).
+  return post(`/strategy-builder/strategies/${id}/validate`, {});
 }
 
 export async function runBacktest(id: string, config: unknown) {

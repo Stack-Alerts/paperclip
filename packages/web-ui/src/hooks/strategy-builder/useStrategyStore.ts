@@ -16,7 +16,7 @@ import {
   BacktestResult,
   StrategySettings,
 } from '@/lib/strategy-builder/types';
-import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults } from '@/lib/strategy-builder/api';
+import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults, validateStrategy as validateStrategyAPI } from '@/lib/strategy-builder/api';
 import { validateStrategyLocal } from '@/lib/strategy-builder/validation';
 
 // Strategies loaded from the strategy-builder API have IDs of the form
@@ -388,18 +388,38 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     });
   },
 
-  // Validate strategy using local validation
-  // Note: For full institutional validation (logic flow, timing conflicts, exit strategy analysis),
-  // a backend endpoint wrapping the Python InstitutionalValidator would be needed.
-  // For now, we use local structural checks and degrade gracefully.
+  // Validate strategy via the backend InstitutionalValidator
+  // (POST /strategy-builder/strategies/{id}/validate). The endpoint runs the
+  // same Python validator the thick client uses; the web UI then layers its
+  // own executionFlow/confluenceScoring/scenarios narrative on top of the
+  // report. Falls back to the TypeScript structural checker only when the
+  // backend is unreachable (e.g. dev with no API server). BTCAAAAA-32954.
   validateStrategy: async () => {
     const { currentStrategy } = get();
     if (!currentStrategy) return;
 
     set({ isValidating: true, validationReport: null });
+
+    if (isBackendStrategyId(currentStrategy.id)) {
+      try {
+        const apiReport = await validateStrategyAPI(currentStrategy.id) as ValidationReport;
+        set({
+          validationReport: apiReport,
+          isValidating: false,
+          currentStrategy: {
+            ...currentStrategy,
+            status: apiReport.is_valid ? StrategyStatus.VALID : StrategyStatus.INVALID,
+          },
+        });
+        return;
+      } catch {
+        // Fall through to local validation below — the structural checks are
+        // still useful when the backend is down (e.g. local dev w/o API).
+      }
+    }
+
     try {
       const report = validateStrategyLocal(currentStrategy);
-
       set({
         validationReport: report,
         isValidating: false,

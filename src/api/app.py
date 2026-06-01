@@ -1060,6 +1060,153 @@ async def sb_get_strategy(
     return result
 
 
+_VALIDATION_SEVERITY_BUCKET = {
+    "CRITICAL": "critical_issues",
+    "ERROR": "errors",
+    "WARNING": "warnings",
+    "NOTICE": "notices",
+    "INFO": "info",
+}
+
+
+def _serialize_validation_issue(issue: Any) -> dict:
+    """Map an InstitutionalValidator ValidationIssue → web-UI shape."""
+    severity_name = issue.severity.name if hasattr(issue.severity, "name") else str(issue.severity)
+    return {
+        "rule_id": getattr(issue, "rule_id", "") or "",
+        "rule_name": getattr(issue, "rule_name", "") or "",
+        "severity": severity_name,
+        "category": getattr(issue, "category", "") or "",
+        "message": getattr(issue, "message", "") or "",
+        "location": getattr(issue, "location", "") or "",
+        "suggestion": getattr(issue, "suggestion", None) or None,
+        "auto_fix_available": bool(getattr(issue, "auto_fix_available", False)),
+        "auto_fix_data": getattr(issue, "auto_fix_data", None) or None,
+    }
+
+
+def _serialize_validation_report(
+    report: Any,
+    strategy_name: str,
+    version_number: Optional[int],
+) -> dict:
+    """Map InstitutionalValidator ValidationReport → web-UI ValidationReport shape.
+
+    The web UI populates executionFlow / confluenceScoring / scenarios from the
+    strategy structure on the client side, so we only return the issues,
+    complexity, and timing-conflict fields here.
+    """
+    metrics = getattr(report, "complexity_metrics", None) or {}
+    if isinstance(metrics, dict):
+        complexity_score = int(metrics.get("complexity_score") or 0)
+    else:
+        complexity_score = 0
+
+    timing_conflicts_raw = getattr(report, "timing_conflicts", None) or []
+    timing_conflicts: list[dict] = []
+    if isinstance(timing_conflicts_raw, list):
+        for tc in timing_conflicts_raw:
+            if not isinstance(tc, dict):
+                continue
+            timing_conflicts.append({
+                "signal": str(tc.get("signal") or tc.get("signal_name") or ""),
+                "timing_window": int(tc.get("timing_window") or tc.get("max_candles") or 0),
+                "recheck_delay": int(tc.get("recheck_delay") or tc.get("bar_delay") or 0),
+            })
+
+    return {
+        "is_valid": bool(getattr(report, "is_valid", False)),
+        "timestamp": getattr(report, "timestamp", None)
+        or datetime.now(timezone.utc).isoformat(),
+        "strategy_summary": {
+            "name": strategy_name or "(unnamed)",
+            "version": str(version_number) if version_number is not None else None,
+        },
+        "critical_issues": [
+            _serialize_validation_issue(i) for i in getattr(report, "critical_issues", []) or []
+        ],
+        "errors": [
+            _serialize_validation_issue(i) for i in getattr(report, "errors", []) or []
+        ],
+        "warnings": [
+            _serialize_validation_issue(i) for i in getattr(report, "warnings", []) or []
+        ],
+        "notices": [
+            _serialize_validation_issue(i) for i in getattr(report, "notices", []) or []
+        ],
+        "info": [
+            _serialize_validation_issue(i) for i in getattr(report, "info", []) or []
+        ],
+        "complexity_metrics": {"complexity_score": complexity_score},
+        "timing_conflicts": timing_conflicts,
+    }
+
+
+@app.post(
+    "/strategy-builder/strategies/{strategy_id}/validate",
+    tags=["Strategy Builder"],
+    summary="Run institutional validation against the stored strategy",
+)
+async def sb_validate_strategy(
+    strategy_id: str,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Run the full InstitutionalValidator against the strategy's latest version.
+
+    The web UI used to fall back to a TypeScript structural checker because no
+    backend endpoint existed — now it can call this route to get the same
+    institutional report the thick client produces (BTCAAAAA-32954).
+    """
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    def _run() -> Optional[dict]:
+        with db.scoped_managers() as scoped:
+            version = scoped.strategy.get_latest_version(strategy_id)
+        if version is None:
+            return None
+
+        from src.strategy_builder.persistence.strategy_persistence import (
+            StrategyPersistence,
+        )
+        from src.optimizer_v3.validation.institutional_validator import (
+            InstitutionalValidator,
+        )
+
+        version_payload = {
+            "name": version.get("name", ""),
+            "description": version.get("description") or "",
+            "strategy_type": version.get("strategy_type") or "Bullish",
+            "blocks": version.get("blocks") or [],
+            "exit_conditions": version.get("exit_conditions") or [],
+        }
+        config = StrategyPersistence()._dict_to_config(version_payload)
+
+        report = InstitutionalValidator().validate(config)
+        return _serialize_validation_report(
+            report,
+            strategy_name=version.get("name", ""),
+            version_number=version.get("version_number"),
+        )
+
+    try:
+        result = await asyncio.to_thread(_run)
+    except Exception as exc:
+        logger.exception("Validation failed for strategy %s", strategy_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Validation failed: {exc}",
+        ) from exc
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy '{strategy_id}' not found",
+        )
+    return result
+
+
 @app.put(
     "/strategy-builder/strategies/{strategy_id}",
     tags=["Strategy Builder"],
