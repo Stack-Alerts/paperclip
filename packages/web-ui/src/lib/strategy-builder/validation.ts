@@ -10,6 +10,170 @@ import {
   BlockType,
 } from './types';
 
+interface BlockDataWithSignals {
+  signals?: Array<{ id?: string; name?: string; signalName?: string }>;
+  name?: string;
+  blockName?: string;
+  category?: string;
+  logic?: string;
+  exitMode?: string;
+  exitSignal?: string;
+  exitPercentage?: number;
+  timingWindow?: number;
+  recheckDelay?: number;
+}
+
+interface ExitBlockData {
+  name?: string;
+  exitName?: string;
+  exitMode?: string;
+  exitPercentage?: number;
+}
+
+interface StrategySettingsExtended {
+  confluenceThreshold?: number;
+  [key: string]: unknown;
+}
+
+function generateExecutionFlow(strategy: Strategy) {
+  const blocks = strategy.blocks ?? [];
+  const entryBlocks = blocks.filter((b) => b.type === BlockType.ENTRY_CONDITION);
+  const exitBlocks = blocks.filter((b) => b.type === BlockType.EXIT_CONDITION);
+
+  const blockFlows = entryBlocks.map((block) => {
+    const data = block.data as BlockDataWithSignals;
+    const signals = [];
+
+    if (data?.signals && Array.isArray(data.signals)) {
+      signals.push(
+        ...data.signals.map((sig: { id?: string; name?: string; signalName?: string }) => ({
+          kind: 'entry' as const,
+          name: sig.name || sig.signalName || `Signal_${sig.id}`,
+          linkedExit: data.exitMode
+            ? {
+                name: data.exitSignal || `Exit_${block.id}`,
+                closePct: data.exitPercentage || 100,
+                mode: (data.exitMode === 'percentage' ? 'ABSOLUTE' : 'FLEXIBLE') as 'ABSOLUTE' | 'FLEXIBLE',
+              }
+            : undefined,
+          timingConstraint: data.timingWindow
+            ? { withinCandles: data.timingWindow, ofSignal: sig.name || 'entry' }
+            : undefined,
+          recheck: data.recheckDelay
+            ? { signal: sig.name || 'entry', afterBars: data.recheckDelay }
+            : undefined,
+        }))
+      );
+    }
+
+    return {
+      index: block.index,
+      name: data?.name || data?.blockName || `Block_${block.id}`,
+      logic: (data?.category === 'required' || data?.logic === 'AND' ? 'REQUIRED' : 'OPTIONAL') as 'REQUIRED' | 'OPTIONAL',
+      signals,
+    };
+  });
+
+  const strategyLevelExits = exitBlocks.map((block, idx) => {
+    const data = block.data as ExitBlockData;
+    return {
+      index: block.index,
+      name: data?.name || data?.exitName || `Exit_${idx + 1}`,
+      closePct: data?.exitPercentage || 100,
+      mode: (data?.exitMode === 'percentage' ? 'ABSOLUTE' : 'FLEXIBLE') as 'ABSOLUTE' | 'FLEXIBLE',
+    };
+  });
+
+  return {
+    blocks: blockFlows,
+    strategyLevelExits,
+  };
+}
+
+function generateConfluenceScoring(strategy: Strategy) {
+  const blocks = strategy.blocks ?? [];
+  const entryBlocks = blocks.filter((b) => b.type === BlockType.ENTRY_CONDITION);
+
+  const perBlock = entryBlocks.map((block) => {
+    const data = block.data as BlockDataWithSignals;
+    const signalCount = data?.signals?.length ?? 1;
+    const isRequired = data?.category === 'required' || data?.logic === 'AND';
+    const points = isRequired ? signalCount * 10 : signalCount * 5;
+
+    return {
+      index: block.index,
+      name: data?.name || data?.blockName || `Block_${block.id}`,
+      logic: (isRequired ? 'REQUIRED' : 'OPTIONAL') as 'REQUIRED' | 'OPTIONAL',
+      points,
+      signalCount,
+    };
+  });
+
+  const requiredPoints = perBlock.filter((b) => b.logic === 'REQUIRED').reduce((sum, b) => sum + b.points, 0);
+  const optionalPoints = perBlock.filter((b) => b.logic === 'OPTIONAL').reduce((sum, b) => sum + b.points, 0);
+  const totalPossible = requiredPoints + optionalPoints;
+  const settings = strategy.settings as unknown as StrategySettingsExtended;
+  const threshold = settings?.confluenceThreshold ?? 40;
+
+  return {
+    requiredPoints,
+    optionalPoints,
+    totalPossible,
+    threshold,
+    perBlock,
+  };
+}
+
+function generateScenarios(strategy: Strategy) {
+  const blocks = strategy.blocks ?? [];
+  const entryBlocks = blocks.filter((b) => b.type === BlockType.ENTRY_CONDITION);
+  const scoring = generateConfluenceScoring(strategy);
+
+  const scenarios = [];
+
+  if (entryBlocks.length > 0) {
+    const requiredBlocks = scoring.perBlock.filter((b) => b.logic === 'REQUIRED');
+    const optionalBlocks = scoring.perBlock.filter((b) => b.logic === 'OPTIONAL');
+
+    const allRequiredFirePerBlock = requiredBlocks.map((b) => ({
+      index: b.index,
+      name: b.name,
+      result: 'FIRE',
+      points: b.points,
+    }));
+    const allRequiredPoints = allRequiredFirePerBlock.reduce((sum, b) => sum + b.points, 0);
+    const allOptionalPoints = optionalBlocks.reduce((sum, b) => sum + b.points, 0);
+
+    scenarios.push({
+      label: 'Scenario A: All REQUIRED blocks fire',
+      outcome: allRequiredPoints >= scoring.threshold ? ('opens' as const) : ('no_position' as const),
+      totalPoints: allRequiredPoints + allOptionalPoints,
+      perBlock: [
+        ...allRequiredFirePerBlock,
+        ...optionalBlocks.map((b) => ({ index: b.index, name: b.name, result: 'FIRE', points: b.points })),
+      ],
+    });
+
+    if (requiredBlocks.length > 0) {
+      const oneRequiredShortPerBlock = requiredBlocks.map((b, idx) =>
+        idx === 0
+          ? { index: b.index, name: b.name, result: 'MISS', points: 0 }
+          : { index: b.index, name: b.name, result: 'FIRE', points: b.points }
+      );
+      const oneRequiredShortPoints = oneRequiredShortPerBlock.reduce((sum, b) => sum + b.points, 0);
+
+      scenarios.push({
+        label: `Scenario C: One REQUIRED block misses`,
+        outcome: oneRequiredShortPoints >= scoring.threshold ? ('opens' as const) : ('no_position' as const),
+        totalPoints: oneRequiredShortPoints,
+        perBlock: oneRequiredShortPerBlock,
+      });
+    }
+  }
+
+  return scenarios;
+}
+
 export function validateStrategyLocal(strategy: Strategy): ValidationReport {
   const issues: {
     critical: ValidationIssue[];
@@ -117,20 +281,46 @@ export function validateStrategyLocal(strategy: Strategy): ValidationReport {
     issues.critical.length === 0 &&
     issues.errors.length === 0;
 
-  return {
-    is_valid,
-    timestamp: new Date().toISOString(),
-    strategy_summary: {
-      name: strategy.name || '(unnamed)',
-      version: (strategy as { versionNumber?: number }).versionNumber?.toString(),
-    },
-    critical_issues: issues.critical,
-    errors: issues.errors,
-    warnings: issues.warnings,
-    notices: issues.notices,
-    info: issues.info,
-    complexity_metrics: {
-      complexity_score: Math.min(100, blocks.length * 10),
-    },
-  };
+  try {
+    const executionFlow = generateExecutionFlow(strategy);
+    const confluenceScoring = generateConfluenceScoring(strategy);
+    const scenarios = generateScenarios(strategy);
+
+    return {
+      is_valid,
+      timestamp: new Date().toISOString(),
+      strategy_summary: {
+        name: strategy.name || '(unnamed)',
+        version: (strategy as { versionNumber?: number }).versionNumber?.toString(),
+      },
+      critical_issues: issues.critical,
+      errors: issues.errors,
+      warnings: issues.warnings,
+      notices: issues.notices,
+      info: issues.info,
+      complexity_metrics: {
+        complexity_score: Math.min(100, blocks.length * 10),
+      },
+      executionFlow: executionFlow.blocks.length > 0 ? executionFlow : undefined,
+      confluenceScoring: confluenceScoring.perBlock.length > 0 ? confluenceScoring : undefined,
+      scenarios: scenarios.length > 0 ? scenarios : undefined,
+    };
+  } catch {
+    return {
+      is_valid,
+      timestamp: new Date().toISOString(),
+      strategy_summary: {
+        name: strategy.name || '(unnamed)',
+        version: (strategy as { versionNumber?: number }).versionNumber?.toString(),
+      },
+      critical_issues: issues.critical,
+      errors: issues.errors,
+      warnings: issues.warnings,
+      notices: issues.notices,
+      info: issues.info,
+      complexity_metrics: {
+        complexity_score: Math.min(100, blocks.length * 10),
+      },
+    };
+  }
 }

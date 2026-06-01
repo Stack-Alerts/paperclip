@@ -377,6 +377,353 @@ function getTimingConflictAnalysis(timingConflicts: any[]): string {
   return lines.join('\n');
 }
 
+interface ExecutionBlock {
+  index: number;
+  name: string;
+  logic: 'REQUIRED' | 'OPTIONAL';
+  signals: Array<{
+    kind: 'entry';
+    name: string;
+    linkedExit?: { name: string; closePct: number; mode: 'ABSOLUTE' | 'FLEXIBLE' };
+    timingConstraint?: { withinCandles: number; ofSignal: string };
+    recheck?: { signal: string; afterBars: number };
+  }>;
+}
+
+interface ExecutionFlowData {
+  blocks: ExecutionBlock[];
+  strategyLevelExits: Array<{ index: number; name: string; closePct: number; mode: 'ABSOLUTE' | 'FLEXIBLE' }>;
+}
+
+interface ConfluenceScoringData {
+  requiredPoints: number;
+  optionalPoints: number;
+  totalPossible: number;
+  threshold: number;
+  perBlock: Array<{ index: number; name: string; logic: 'REQUIRED' | 'OPTIONAL'; points: number; signalCount: number }>;
+}
+
+interface Scenario {
+  label: string;
+  outcome: 'opens' | 'no_position';
+  totalPoints: number;
+  perBlock: Array<{ index: number; name: string; result: string; points: number }>;
+}
+
+function ExecutionFlowSection({
+  executionFlow,
+  confluenceScoring,
+  scenarios,
+}: {
+  executionFlow?: ExecutionFlowData;
+  confluenceScoring?: ConfluenceScoringData;
+  scenarios?: Scenario[];
+}) {
+  if (!executionFlow && !confluenceScoring && !scenarios) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+        No execution flow information available for this strategy.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Execution Flow Blocks */}
+      {executionFlow && executionFlow.blocks && executionFlow.blocks.length > 0 && (
+        <div
+          className="rounded border p-3"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        >
+          <h3
+            className="text-[10px] font-semibold uppercase tracking-widest mb-3"
+            style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}
+          >
+            Strategy Execution Flow
+          </h3>
+          <div className="space-y-3">
+            {executionFlow.blocks.map((block: ExecutionBlock, idx: number) => (
+              <div
+                key={idx}
+                className="rounded border p-3"
+                style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}
+              >
+                <div
+                  className="flex items-center gap-2 mb-2"
+                  style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}
+                >
+                  <span
+                    style={{
+                      display: 'flex',
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      background:
+                        block.logic === 'REQUIRED'
+                          ? 'var(--accent-orange)'
+                          : 'var(--accent-blue)',
+                      color: 'var(--btn-primary-text)',
+                      fontSize: '10px',
+                      fontWeight: '700',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {block.index + 1}
+                  </span>
+                  <span>{block.name}</span>
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: '700',
+                      padding: '2px 6px',
+                      borderRadius: '2px',
+                      background:
+                        block.logic === 'REQUIRED'
+                          ? 'var(--accent-orange)'
+                          : 'var(--accent-blue)',
+                      color: 'var(--btn-primary-text)',
+                    }}
+                  >
+                    {block.logic}
+                  </span>
+                </div>
+
+                {block.signals && block.signals.length > 0 && (
+                  <div className="ml-6 space-y-2">
+                    {block.signals.map((signal, sigIdx: number) => (
+                      <div
+                        key={sigIdx}
+                        style={{
+                          fontSize: '11px',
+                          color: 'var(--text-secondary)',
+                          padding: '6px',
+                          background: 'rgba(0,0,0,0.2)',
+                          borderRadius: '2px',
+                          borderLeft: '2px solid var(--accent-green)',
+                        }}
+                      >
+                        <div style={{ fontWeight: '600', marginBottom: '2px' }}>
+                          Entry Signal: {signal.name}
+                        </div>
+                        {signal.linkedExit && (
+                          <div style={{ marginBottom: '2px' }}>
+                            ➜ Exit: {signal.linkedExit.name} ({signal.linkedExit.closePct}% {signal.linkedExit.mode})
+                          </div>
+                        )}
+                        {signal.timingConstraint && (
+                          <div style={{ marginBottom: '2px' }}>
+                            ⏱ Must trigger within {signal.timingConstraint.withinCandles} bars
+                          </div>
+                        )}
+                        {signal.recheck && (
+                          <div>
+                            🔄 Validate &apos;{signal.recheck.signal}&apos; after {signal.recheck.afterBars} bars
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Strategy-level Exits */}
+      {executionFlow && executionFlow.strategyLevelExits && executionFlow.strategyLevelExits.length > 0 && (
+        <div
+          className="rounded border p-3"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        >
+          <h3
+            className="text-[10px] font-semibold uppercase tracking-widest mb-2"
+            style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}
+          >
+            Strategy-Level Exit Conditions
+          </h3>
+          <div className="space-y-1.5">
+            {executionFlow.strategyLevelExits.map((exit, idx: number) => (
+              <div
+                key={idx}
+                style={{
+                  fontSize: '12px',
+                  padding: '8px',
+                  background: 'var(--bg-panel)',
+                  borderRadius: '3px',
+                  borderLeft: '2px solid var(--accent-red)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                <strong>{exit.name}</strong> — Close {exit.closePct}% ({exit.mode})
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Confluence Scoring */}
+      {confluenceScoring && (
+        <div
+          className="rounded border p-3"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        >
+          <h3
+            className="text-[10px] font-semibold uppercase tracking-widest mb-3"
+            style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}
+          >
+            Confluence Scoring System
+          </h3>
+
+          <div
+            className="rounded border p-3 mb-3"
+            style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '12px', fontSize: '12px' }}>
+              <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Required Points:</span>
+              <span style={{ color: 'var(--text-secondary)' }}>{confluenceScoring.requiredPoints} pts</span>
+
+              <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Optional Points:</span>
+              <span style={{ color: 'var(--text-secondary)' }}>{confluenceScoring.optionalPoints} pts</span>
+
+              <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Total Possible:</span>
+              <span style={{ color: 'var(--accent-green)', fontWeight: '600' }}>
+                {confluenceScoring.totalPossible} pts
+              </span>
+
+              <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Threshold:</span>
+              <span style={{ color: 'var(--accent-blue)', fontWeight: '600' }}>
+                {confluenceScoring.threshold} pts
+              </span>
+            </div>
+          </div>
+
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '3px', fontWeight: '600' }}>
+            Per-Block Breakdown:
+          </div>
+          <div className="space-y-1.5">
+            {confluenceScoring.perBlock.map((block, idx: number) => (
+              <div
+                key={idx}
+                style={{
+                  fontSize: '11px',
+                  padding: '6px',
+                  background: 'var(--bg-panel)',
+                  borderRadius: '2px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span>
+                  <strong>{block.name}</strong>{' '}
+                  <span
+                    style={{
+                      fontSize: '9px',
+                      padding: '1px 4px',
+                      background:
+                        block.logic === 'REQUIRED'
+                          ? 'var(--accent-orange)'
+                          : 'var(--accent-blue)',
+                      color: 'var(--btn-primary-text)',
+                      borderRadius: '2px',
+                      marginLeft: '4px',
+                    }}
+                  >
+                    {block.logic}
+                  </span>
+                </span>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>
+                  {block.points} pts ({block.signalCount} signal{block.signalCount > 1 ? 's' : ''})
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Scenarios */}
+      {scenarios && scenarios.length > 0 && (
+        <div
+          className="rounded border p-3"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        >
+          <h3
+            className="text-[10px] font-semibold uppercase tracking-widest mb-3"
+            style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}
+          >
+            Real-World Scenarios
+          </h3>
+          <div className="grid grid-cols-1 gap-3">
+            {scenarios.map((scenario, idx: number) => (
+              <div
+                key={idx}
+                className="rounded border p-3"
+                style={{
+                  background:
+                    scenario.outcome === 'opens'
+                      ? 'color-mix(in srgb, var(--accent-green) 12%, transparent)'
+                      : 'color-mix(in srgb, var(--accent-orange) 12%, transparent)',
+                  borderColor: scenario.outcome === 'opens' ? 'var(--accent-green)' : 'var(--accent-orange)',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color:
+                      scenario.outcome === 'opens'
+                        ? 'var(--accent-green)'
+                        : 'var(--accent-orange)',
+                    marginBottom: '8px',
+                  }}
+                >
+                  {scenario.label}
+                </div>
+                <div className="space-y-1.5 mb-2">
+                  {scenario.perBlock.map((block, blockIdx: number) => (
+                    <div
+                      key={blockIdx}
+                      style={{
+                        fontSize: '11px',
+                        padding: '4px 6px',
+                        background: 'rgba(0,0,0,0.2)',
+                        borderRadius: '2px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      <span>{block.name}: {block.result}</span>
+                      <span style={{ fontWeight: '600' }}>{block.points} pts</span>
+                    </div>
+                  ))}
+                </div>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    padding: '6px',
+                    background: 'rgba(0,0,0,0.3)',
+                    borderRadius: '2px',
+                    textAlign: 'center',
+                    color:
+                      scenario.outcome === 'opens'
+                        ? 'var(--accent-green)'
+                        : 'var(--accent-orange)',
+                  }}
+                >
+                  Total: {scenario.totalPoints} pts → {scenario.outcome === 'opens' ? '✅ POSITION OPENS' : '❌ NO POSITION'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function getSignalDirectionAnalysis(strategy: any): string {
   if (!strategy || !strategy.blocks) {
     return 'No strategy data available for direction analysis.';
@@ -531,7 +878,7 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
       setCanPopIn(true);
     }
   }, [standalone]);
-  const [currentTab, setCurrentTab] = useState<'summary' | 'issues' | 'metrics'>('summary');
+  const [currentTab, setCurrentTab] = useState<'summary' | 'execution-flow' | 'issues' | 'metrics'>('summary');
   const [undoStack, setUndoStack] = useState<UndoState[]>([]);
   const [showAutoFix, setShowAutoFix] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<ValidationIssue | null>(null);
@@ -848,12 +1195,23 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
 
         {/* Tabs */}
         <div
-          className="flex-shrink-0 px-6 border-b flex gap-8"
+          className="flex-shrink-0 px-6 border-b flex gap-8 overflow-x-auto"
           style={{ borderColor: 'var(--border)', background: 'var(--bg-panel)' }}
         >
-          {(['summary', 'issues', 'metrics'] as const).map((tab) => {
+          {(['summary', 'execution-flow', 'issues', 'metrics'] as const).map((tab) => {
             const isActive = currentTab === tab;
-            const Icon = tab === 'summary' ? BarChart3 : tab === 'issues' ? AlertTriangle : TrendingUp;
+            let Icon = BarChart3;
+            let label = 'Summary';
+            if (tab === 'execution-flow') {
+              Icon = TrendingUp;
+              label = 'Execution Flow';
+            } else if (tab === 'issues') {
+              Icon = AlertTriangle;
+              label = 'Issues';
+            } else if (tab === 'metrics') {
+              Icon = TrendingUp;
+              label = 'Metrics';
+            }
             const iconColor = tab === 'issues' && (issueCounts.errors + issueCounts.warnings + issueCounts.critical) > 0
               ? 'var(--accent-orange)'
               : undefined;
@@ -861,7 +1219,7 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
               <button
                 key={tab}
                 onClick={() => setCurrentTab(tab)}
-                className="px-4 py-2.5 font-medium text-sm border-b-2 transition-colors flex items-center gap-2"
+                className="px-4 py-2.5 font-medium text-sm border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap"
                 style={
                   isActive
                     ? { borderColor: 'var(--accent-blue)', color: 'var(--accent-blue)' }
@@ -869,7 +1227,7 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
                 }
               >
                 <Icon size={14} strokeWidth={1.75} style={{ color: iconColor }} />
-                <span className="capitalize">{tab}</span>
+                <span>{label}</span>
               </button>
             );
           })}
@@ -877,6 +1235,14 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
+          {currentTab === 'execution-flow' && (
+            <ExecutionFlowSection
+              executionFlow={displayReport.executionFlow}
+              confluenceScoring={displayReport.confluenceScoring}
+              scenarios={displayReport.scenarios}
+            />
+          )}
+
           {currentTab === 'summary' && (
             <div className="space-y-3">
               {/* Validation Summary — compact grid layout */}

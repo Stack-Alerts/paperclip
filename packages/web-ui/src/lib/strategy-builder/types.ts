@@ -388,6 +388,34 @@ export interface ValidationReport {
     timing_window: number;
     recheck_delay: number;
   }>;
+  executionFlow?: {
+    blocks: Array<{
+      index: number;
+      name: string;
+      logic: 'REQUIRED' | 'OPTIONAL';
+      signals: Array<{
+        kind: 'entry';
+        name: string;
+        linkedExit?: { name: string; closePct: number; mode: 'ABSOLUTE' | 'FLEXIBLE' };
+        timingConstraint?: { withinCandles: number; ofSignal: string };
+        recheck?: { signal: string; afterBars: number };
+      }>;
+    }>;
+    strategyLevelExits: Array<{ index: number; name: string; closePct: number; mode: 'ABSOLUTE' | 'FLEXIBLE' }>;
+  };
+  confluenceScoring?: {
+    requiredPoints: number;
+    optionalPoints: number;
+    totalPossible: number;
+    threshold: number;
+    perBlock: Array<{ index: number; name: string; logic: 'REQUIRED' | 'OPTIONAL'; points: number; signalCount: number }>;
+  };
+  scenarios?: Array<{
+    label: string;
+    outcome: 'opens' | 'no_position';
+    totalPoints: number;
+    perBlock: Array<{ index: number; name: string; result: string; points: number }>;
+  }>;
 }
 
 export interface WalkforwardResult {
