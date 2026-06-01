@@ -17,7 +17,7 @@ import {
   StrategySettings,
 } from '@/lib/strategy-builder/types';
 import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults, validateStrategy as validateStrategyAPI } from '@/lib/strategy-builder/api';
-import { validateStrategyLocal } from '@/lib/strategy-builder/validation';
+import { validateStrategyLocal, enrichReportWithNarrative } from '@/lib/strategy-builder/validation';
 
 // Strategies loaded from the strategy-builder API have IDs of the form
 // "strategy_<hex>" (see StrategyDatabaseManager.create_strategy); locally
@@ -403,12 +403,17 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     if (isBackendStrategyId(currentStrategy.id)) {
       try {
         const apiReport = await validateStrategyAPI(currentStrategy.id) as ValidationReport;
+        // The backend owns issues/complexity/timing; the executionFlow,
+        // confluenceScoring, and scenarios narrative is a web-UI presentation
+        // layer derived from the block tree. Merge it on so the
+        // Execution Flow tab has content for API-sourced reports.
+        const enriched = enrichReportWithNarrative(apiReport, currentStrategy);
         set({
-          validationReport: apiReport,
+          validationReport: enriched,
           isValidating: false,
           currentStrategy: {
             ...currentStrategy,
-            status: apiReport.is_valid ? StrategyStatus.VALID : StrategyStatus.INVALID,
+            status: enriched.is_valid ? StrategyStatus.VALID : StrategyStatus.INVALID,
           },
         });
         return;
