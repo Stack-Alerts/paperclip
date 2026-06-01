@@ -567,8 +567,8 @@ function StatusLogPanel({
               color:
                 log.level === 'ERROR'
                   ? 'var(--accent-red)'
-                  : log.level === 'WARN'
-                    ? 'var(--accent-orange)'
+                  : log.level === 'SYSTEM'
+                    ? 'var(--accent-blue)'
                     : 'var(--text-secondary)',
               fontVariantNumeric: 'tabular-nums',
             }}
