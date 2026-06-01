@@ -321,7 +321,7 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
 
         {/* Blocks — numbered list, signals as sub-text */}
         {descriptionBlocks.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-2" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
             <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
               Blocks ({descriptionBlocks.length})
             </p>
@@ -349,7 +349,7 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
         )}
 
         {/* Metadata — icon + label rows, no emoji */}
-        <div className="space-y-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <div className="space-y-1 text-xs" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', color: 'var(--text-muted)' }}>
           <div className="flex items-center gap-1.5">
             <Calendar size={11} strokeWidth={1.5} style={{ flexShrink: 0 }} />
             <span>Created {new Date(strategy.createdAt).toLocaleDateString()}</span>
@@ -368,7 +368,7 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
 
         {/* Tags */}
         {strategy.tags && strategy.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
             {strategy.tags.map((tag) => (
               <span key={tag} className="px-2 py-0.5 rounded text-xs" style={{
                 background: 'var(--bg-card)',
@@ -382,12 +382,12 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
 
       {/* Column 2: Configuration Hierarchy */}
       <div className="space-y-2 overflow-y-auto p-4 rounded border" style={{ borderColor: 'var(--border)' }}>
-        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
           <Settings size={12} strokeWidth={1.5} />
           Configuration
         </div>
         <BlockHierarchyTree blocks={strategy.blocks as AnyBlock[]} />
-        <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-xs mt-2" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', color: 'var(--text-muted)' }}>
           {strategy.blocks.length} block{strategy.blocks.length !== 1 ? 's' : ''}
           {entryBlocks.length > 0 || exitBlocks.length > 0
             ? ` · ${entryBlocks.length} entry · ${exitBlocks.length} exit`
@@ -397,7 +397,7 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
 
       {/* Column 3: Performance */}
       <div className="space-y-3 p-4 rounded border" style={{ borderColor: 'var(--border)' }}>
-        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
           <TrendingUp size={12} strokeWidth={1.5} />
           Performance
         </div>
@@ -411,7 +411,7 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
           <div className="space-y-1.5 text-xs">
             {/* Quality Score Badge */}
             {quality && (
-              <div className="px-2.5 py-1.5 rounded border flex items-center gap-2" style={{
+              <div className="px-2.5 py-1.5 rounded border flex items-center gap-2" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem',
                 background: quality.color === 'var(--accent-green)' ? 'rgba(124, 194, 122, 0.15)' :
                            quality.color === 'var(--accent-blue)' ? 'rgba(96, 165, 250, 0.15)' :
                            quality.color === 'var(--accent-orange)' ? 'rgba(249, 115, 22, 0.15)' :
@@ -429,7 +429,7 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
             )}
 
             {/* Trade Stats Section */}
-            <div className="px-2.5 py-1.5 rounded border" style={{ borderColor: 'var(--border)', background: 'rgba(0,0,0,0.1)' }}>
+            <div className="px-2.5 py-1.5 rounded border" style={{ borderTop: '1px solid var(--border)', borderColor: 'var(--border)', background: 'rgba(0,0,0,0.1)', paddingTop: '1rem', marginTop: '1rem' }}>
               <p className="uppercase tracking-wide font-semibold mb-1 text-xs" style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>Trade Stats</p>
               <div className="space-y-0.5">
                 <div className="flex items-center justify-between">
@@ -446,7 +446,7 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
             </div>
 
             {/* Returns Section */}
-            <div className="px-2.5 py-1.5 rounded border" style={{ borderColor: 'var(--border)', background: 'rgba(0,0,0,0.1)' }}>
+            <div className="px-2.5 py-1.5 rounded border" style={{ borderTop: '1px solid var(--border)', borderColor: 'var(--border)', background: 'rgba(0,0,0,0.1)', paddingTop: '1rem', marginTop: '1rem' }}>
               <p className="uppercase tracking-wide font-semibold mb-1 text-xs" style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>Returns</p>
               <div className="space-y-0.5">
                 <div className="flex items-center justify-between">
@@ -471,7 +471,7 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
             </div>
 
             {/* Risk Metrics Section */}
-            <div className="px-2.5 py-1.5 rounded border" style={{ borderColor: 'var(--border)', background: 'rgba(0,0,0,0.1)' }}>
+            <div className="px-2.5 py-1.5 rounded border" style={{ borderTop: '1px solid var(--border)', borderColor: 'var(--border)', background: 'rgba(0,0,0,0.1)', paddingTop: '1rem', marginTop: '1rem' }}>
               <p className="uppercase tracking-wide font-semibold mb-1 text-xs" style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>Risk Metrics</p>
               <div className="space-y-0.5">
                 <div className="flex items-center justify-between">
