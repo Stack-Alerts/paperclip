@@ -410,134 +410,146 @@ interface Scenario {
   perBlock: Array<{ index: number; name: string; result: string; points: number }>;
 }
 
-// Render the execution flow as a single monospace terminal-style narrative,
-// matching the thick client's preformatted layout. The board reads this report
-// top-to-bottom and the previous card-based layout broke that flow. See the
-// thick-client reference attached to BTCAAAAA-32954 (comment cc8d5eec).
-function formatExecutionFlowAsText(
+interface FlowSection {
+  title: string;
+  subtitle?: string;
+  body: string;
+}
+
+// Build the execution-flow report as discrete sections so each title can be a
+// styled banner instead of a raw === bar. Section bodies keep the thick-client
+// tree/emoji formatting and render inside a <pre> (BTCAAAAA-32954 cc8d5eec).
+function buildExecutionFlowSections(
   executionFlow: ExecutionFlowData | undefined,
   confluenceScoring: ConfluenceScoringData | undefined,
   scenarios: Scenario[] | undefined,
-): string {
-  const HR = '='.repeat(80);
-  const lines: string[] = [];
-
-  const push = (s: string = '') => lines.push(s);
+): FlowSection[] {
+  const sections: FlowSection[] = [];
 
   if (executionFlow && executionFlow.blocks && executionFlow.blocks.length > 0) {
-    push(HR);
-    push('STRATEGY EXECUTION FLOW - HOW YOUR STRATEGY WORKS');
-    push(HR);
-    push();
+    const lines: string[] = [];
     executionFlow.blocks.forEach((block, bIdx) => {
       const num = block.index + 1 || bIdx + 1;
       const logicNote = block.logic === 'REQUIRED' ? 'ALL signals required' : 'ANY signal triggers';
-      push(`📦 BLOCK ${num}: ${block.name.toUpperCase()} (${logicNote})`);
-      push();
+      lines.push(`📦 BLOCK ${num}: ${block.name.toUpperCase()} (${logicNote})`);
+      lines.push('');
       (block.signals || []).forEach((sig) => {
-        push(`   🎯 ENTRY SIGNAL: ${sig.name}`);
+        lines.push(`   🎯 ENTRY SIGNAL: ${sig.name}`);
         if (sig.timingConstraint) {
           const ref = sig.timingConstraint.ofSignal
             ? ` of '${sig.timingConstraint.ofSignal}'`
             : '';
-          push(`      └── ⏱  Timing: Must trigger within ${sig.timingConstraint.withinCandles} candles${ref}`);
+          lines.push(`      └── ⏱  Timing: Must trigger within ${sig.timingConstraint.withinCandles} candles${ref}`);
         }
         if (sig.recheck) {
-          push(`      └── 🔄 RECHECK: Validate '${sig.recheck.signal}' after ${sig.recheck.afterBars} bars`);
-          push(`          ├── If found: Signal VALID ✓`);
-          push(`          └── If not found: Signal RESET ✗`);
+          lines.push(`      └── 🔄 RECHECK: Validate '${sig.recheck.signal}' after ${sig.recheck.afterBars} bars`);
+          lines.push(`          ├── If found: Signal VALID ✓`);
+          lines.push(`          └── If not found: Signal RESET ✗`);
         }
         if (sig.linkedExit) {
-          push(`      └── 🚪 EXIT: ${sig.linkedExit.name} → Close ${sig.linkedExit.closePct}% (${sig.linkedExit.mode})`);
+          lines.push(`      └── 🚪 EXIT: ${sig.linkedExit.name} → Close ${sig.linkedExit.closePct}% (${sig.linkedExit.mode})`);
         }
-        push();
+        lines.push('');
       });
+    });
+    sections.push({
+      title: 'Strategy Execution Flow',
+      subtitle: 'How your strategy works',
+      body: lines.join('\n').trimEnd(),
     });
   }
 
   if (executionFlow && executionFlow.strategyLevelExits && executionFlow.strategyLevelExits.length > 0) {
-    push(HR);
-    push('EXIT CONDITIONS (Strategy-Level)');
-    push(HR);
-    push();
+    const lines: string[] = [];
     executionFlow.strategyLevelExits.forEach((ex, i) => {
-      push(`   🚪 EXIT #${i + 1}: ${ex.name} triggers`);
-      push(`      └── Action: Close ${ex.closePct}% of position (${ex.mode} mode)`);
-      push();
+      lines.push(`🚪 EXIT #${i + 1}: ${ex.name} triggers`);
+      lines.push(`   └── Action: Close ${ex.closePct}% of position (${ex.mode} mode)`);
+      lines.push('');
+    });
+    sections.push({
+      title: 'Exit Conditions',
+      subtitle: 'Strategy-level',
+      body: lines.join('\n').trimEnd(),
     });
   }
 
   if (confluenceScoring && confluenceScoring.perBlock.length > 0) {
-    push(HR);
-    push('POSITION OPENING LOGIC - INSTITUTIONAL-GRADE CONFLUENCE SYSTEM');
-    push(HR);
-    push();
-    push('BLOCK TYPES IN YOUR STRATEGY:');
-    push();
+    const lines: string[] = [];
+    lines.push('BLOCK TYPES IN YOUR STRATEGY');
+    lines.push('');
     confluenceScoring.perBlock.forEach((b) => {
       const num = b.index + 1;
       const logicLabel = b.logic === 'REQUIRED' ? 'REQUIRED (AND logic)' : 'OPTIONAL (OR logic)';
       const allOrAny = b.logic === 'REQUIRED' ? 'ALL' : 'ANY';
       const contribNote = b.logic === 'REQUIRED' ? 'required' : 'optional bonus';
-      push(`Block ${num} (${b.name.toUpperCase()}) - ${logicLabel}`);
-      push(`   • Type: ${b.logic} - ${allOrAny} ${b.signalCount} signal${b.signalCount === 1 ? '' : 's'} must trigger`);
-      push(`   • Contributes: ~${b.points} pts (${contribNote})`);
+      lines.push(`Block ${num} (${b.name.toUpperCase()}) - ${logicLabel}`);
+      lines.push(`   • Type: ${b.logic} - ${allOrAny} ${b.signalCount} signal${b.signalCount === 1 ? '' : 's'} must trigger`);
+      lines.push(`   • Contributes: ~${b.points} pts (${contribNote})`);
       if (b.logic === 'REQUIRED') {
-        push(`   • If ANY signal missing → 0 points from this block`);
+        lines.push(`   • If ANY signal missing → 0 points from this block`);
       }
-      push();
+      lines.push('');
+    });
+    sections.push({
+      title: 'Position Opening Logic',
+      subtitle: 'Institutional-grade confluence system',
+      body: lines.join('\n').trimEnd(),
     });
 
-    push(HR);
-    push('CONFLUENCE SCORING SYSTEM - HOW POSITION ACTUALLY OPENS');
-    push(HR);
-    push();
-    push('Your Strategy Point Breakdown:');
-    push(`   • Required Points: ${confluenceScoring.requiredPoints} pts (${confluenceScoring.perBlock.filter((b) => b.logic === 'REQUIRED').length} REQUIRED blocks)`);
-    push(`   • Optional Points: ${confluenceScoring.optionalPoints} pts (${confluenceScoring.perBlock.filter((b) => b.logic === 'OPTIONAL').length} OPTIONAL blocks)`);
-    push(`   • Total Possible: ${confluenceScoring.totalPossible} pts`);
-    push();
-    push('POSITION OPENS WHEN:');
-    push(`   ⇨ Confluence Score >= Threshold (e.g., ${confluenceScoring.threshold} pts)`);
-    push(`   ⇨ ONLY ONE POSITION opens when threshold met`);
-    push(`   ⇨ Once open, strategy manages THIS POSITION with exits/TP/SL`);
-    push();
+    const scoreLines: string[] = [];
+    scoreLines.push('YOUR STRATEGY POINT BREAKDOWN');
+    scoreLines.push(`   • Required Points: ${confluenceScoring.requiredPoints} pts (${confluenceScoring.perBlock.filter((b) => b.logic === 'REQUIRED').length} REQUIRED blocks)`);
+    scoreLines.push(`   • Optional Points: ${confluenceScoring.optionalPoints} pts (${confluenceScoring.perBlock.filter((b) => b.logic === 'OPTIONAL').length} OPTIONAL blocks)`);
+    scoreLines.push(`   • Total Possible: ${confluenceScoring.totalPossible} pts`);
+    scoreLines.push('');
+    scoreLines.push('POSITION OPENS WHEN');
+    scoreLines.push(`   ⇨ Confluence Score >= Threshold (e.g., ${confluenceScoring.threshold} pts)`);
+    scoreLines.push(`   ⇨ ONLY ONE POSITION opens when threshold met`);
+    scoreLines.push(`   ⇨ Once open, strategy manages THIS POSITION with exits/TP/SL`);
+    sections.push({
+      title: 'Confluence Scoring System',
+      subtitle: 'How position actually opens',
+      body: scoreLines.join('\n'),
+    });
   }
 
   if (scenarios && scenarios.length > 0) {
-    push('Real-World Scenarios:');
-    push();
+    const lines: string[] = [];
     scenarios.forEach((sc) => {
-      push(sc.label);
+      lines.push(sc.label);
       sc.perBlock.forEach((b) => {
         const marker = b.result === 'FIRE' ? '✓' : b.result === 'MISS' ? '✗' : '·';
         const pointsTxt = b.result === 'FIRE' ? `+${b.points} pts` : `${b.points} pts`;
         const desc = b.result === 'FIRE' ? 'ALL signals' : b.result === 'MISS' ? 'Missing signal' : b.result;
-        push(`   • Block ${b.index + 1} (${b.name.toUpperCase()}): ${desc} ${marker} → ${pointsTxt}`);
+        lines.push(`   • Block ${b.index + 1} (${b.name.toUpperCase()}): ${desc} ${marker} → ${pointsTxt}`);
       });
       const verdict = sc.outcome === 'opens' ? 'POSITION OPENS ✓' : 'Below threshold, NO POSITION';
-      push(`   Total: ${sc.totalPoints} pts → ${verdict}`);
-      push();
+      lines.push(`   Total: ${sc.totalPoints} pts → ${verdict}`);
+      lines.push('');
+    });
+    sections.push({
+      title: 'Real-World Scenarios',
+      subtitle: 'Walking through how points add up',
+      body: lines.join('\n').trimEnd(),
     });
   }
 
   if (confluenceScoring) {
-    push(HR);
-    push('KEY TAKEAWAYS:');
-    push(HR);
-    push();
-    push('✓ REQUIRED blocks (AND): Must have ALL signals to contribute points');
-    push('✓ OPTIONAL blocks (OR): Contribute bonus points if ANY signal fires');
-    push('✓ Position opens when: Total points >= Confluence Threshold');
-    push('✓ ONE POSITION only: Not multiple trades');
-    push(`✓ Threshold configurable: In backtest config (default ~${confluenceScoring.threshold} pts)`);
-    push();
-    push(HR);
-    push('EXECUTION: Signals evaluated bar-by-bar in real-time');
-    push(HR);
+    const lines: string[] = [];
+    lines.push('✓ REQUIRED blocks (AND): Must have ALL signals to contribute points');
+    lines.push('✓ OPTIONAL blocks (OR): Contribute bonus points if ANY signal fires');
+    lines.push('✓ Position opens when: Total points >= Confluence Threshold');
+    lines.push('✓ ONE POSITION only: Not multiple trades');
+    lines.push(`✓ Threshold configurable: In backtest config (default ~${confluenceScoring.threshold} pts)`);
+    lines.push('');
+    lines.push('EXECUTION: Signals evaluated bar-by-bar in real-time');
+    sections.push({
+      title: 'Key Takeaways',
+      body: lines.join('\n'),
+    });
   }
 
-  return lines.join('\n');
+  return sections;
 }
 
 function ExecutionFlowSection({
@@ -557,28 +569,79 @@ function ExecutionFlowSection({
     );
   }
 
-  const text = formatExecutionFlowAsText(executionFlow, confluenceScoring, scenarios);
+  const sections = buildExecutionFlowSections(executionFlow, confluenceScoring, scenarios);
 
   return (
-    <pre
-      style={{
-        margin: 0,
-        padding: '14px 16px',
-        background: 'var(--bg-panel)',
-        border: '1px solid var(--border)',
-        borderRadius: '4px',
-        color: 'var(--text-secondary)',
-        fontFamily:
-          'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
-        fontSize: '12px',
-        lineHeight: 1.55,
-        whiteSpace: 'pre',
-        overflowX: 'auto',
-        tabSize: 2,
-      }}
-    >
-      {text}
-    </pre>
+    <div className="flex flex-col gap-4">
+      {sections.map((section, i) => (
+        <section
+          key={i}
+          className="rounded overflow-hidden border"
+          style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}
+        >
+          <header
+            className="flex items-baseline gap-2 px-4 py-2.5"
+            style={{
+              background:
+                'linear-gradient(90deg, color-mix(in srgb, var(--accent-blue) 18%, transparent), transparent)',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <span
+              style={{
+                color: 'var(--accent-blue)',
+                fontSize: '10px',
+                fontWeight: 700,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {`0${i + 1}`.slice(-2)}
+            </span>
+            <h3
+              style={{
+                color: 'var(--text-primary)',
+                fontSize: '13px',
+                fontWeight: 600,
+                letterSpacing: '0.02em',
+                margin: 0,
+              }}
+            >
+              {section.title}
+            </h3>
+            {section.subtitle && (
+              <span
+                style={{
+                  color: 'var(--text-muted)',
+                  fontSize: '11px',
+                  fontWeight: 400,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                · {section.subtitle}
+              </span>
+            )}
+          </header>
+          <pre
+            style={{
+              margin: 0,
+              padding: '12px 16px',
+              background: 'var(--bg-panel)',
+              color: 'var(--text-secondary)',
+              fontFamily:
+                'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+              fontSize: '12px',
+              lineHeight: 1.55,
+              whiteSpace: 'pre',
+              overflowX: 'auto',
+              tabSize: 2,
+            }}
+          >
+            {section.body}
+          </pre>
+        </section>
+      ))}
+    </div>
   );
 }
 
