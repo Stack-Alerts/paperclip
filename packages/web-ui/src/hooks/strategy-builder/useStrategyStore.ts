@@ -16,7 +16,7 @@ import {
   BacktestResult,
   StrategySettings,
 } from '@/lib/strategy-builder/types';
-import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults, validateStrategy as validateStrategyAPI } from '@/lib/strategy-builder/api';
+import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults, validateStrategy as validateStrategyAPI, autoFixStrategy as autoFixStrategyAPI } from '@/lib/strategy-builder/api';
 import { validateStrategyLocal, enrichReportWithNarrative } from '@/lib/strategy-builder/validation';
 
 // Strategies loaded from the strategy-builder API have IDs of the form
@@ -119,6 +119,7 @@ interface StrategyStoreState {
   updateBlock: (index: number, data: BlockData) => void;
   reorderBlocks: (fromIdx: number, toIdx: number) => void;
   validateStrategy: () => Promise<void>;
+  applyAutoFix: (ruleId: string, autoFixData: Record<string, unknown> | undefined) => Promise<boolean>;
   runBacktest: (config: BacktestConfig | BacktestConfigFull) => Promise<BacktestResult>;
   loadBlockLibrary: () => Promise<void>;
   clearValidation: () => void;
@@ -449,6 +450,29 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
         isValidating: false,
         currentStrategy: { ...currentStrategy, status: StrategyStatus.INVALID },
       });
+    }
+  },
+
+  // Apply a validator auto-fix (TIMING_004, EXIT_009, LOGIC_003, DIRECTION_001)
+  // via the backend. The endpoint creates a new strategy version with the
+  // fix applied. We don't splice the raw API response into currentStrategy
+  // — those blocks are in the {name, logic, signals} shape and the rest of
+  // the builder expects the normalized {id, type, data} Block contract; the
+  // un-normalized swap crashed StrategyInfoPanel::computeStats. Instead we
+  // re-run validateStrategy, which re-reads from the DB and reflects the
+  // fix in the validation panel directly. BTCAAAAA-32954.
+  applyAutoFix: async (ruleId, autoFixData) => {
+    const { currentStrategy } = get();
+    if (!currentStrategy || !isBackendStrategyId(currentStrategy.id)) {
+      return false;
+    }
+    try {
+      await autoFixStrategyAPI(currentStrategy.id, ruleId, autoFixData);
+      await (get().validateStrategy as () => Promise<void>)();
+      return true;
+    } catch (error) {
+      console.error('Auto-fix failed:', error);
+      return false;
     }
   },
 

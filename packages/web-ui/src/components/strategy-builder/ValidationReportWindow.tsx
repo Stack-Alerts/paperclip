@@ -225,12 +225,14 @@ function IssuesTable({
                   ) : (
                     <span
                       className="text-xs font-bold whitespace-nowrap"
+                      title="No auto-fix is available for this rule — see the How to Fix hint below the message."
                       style={{
                         color:
                           issue.severity === ValidationSeverity.CRITICAL ||
                           issue.severity === ValidationSeverity.ERROR
-                            ? 'var(--accent-red)'
+                            ? 'color-mix(in srgb, var(--accent-red) 70%, var(--text-secondary))'
                             : 'var(--text-muted)',
+                        cursor: 'help',
                       }}
                     >
                       {getActionText(issue.severity)}
@@ -782,7 +784,7 @@ function getComplexityLevel(score: number): string {
 }
 
 export function ValidationReportWindow({ open, onClose, report, standalone = false }: ValidationReportWindowProps) {
-  const { validationMessages, isValidating, validateStrategy, clearValidation, currentStrategy } = useStrategyStore();
+  const { validationMessages, isValidating, validateStrategy, clearValidation, currentStrategy, applyAutoFix } = useStrategyStore();
 
   const handlePopOut = useCallback(() => {
     const win = window.open(
@@ -915,92 +917,37 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
   }, []);
 
   const handleAutoFixConfirm = useCallback(async () => {
-    if (selectedIssue && currentStrategy) {
-      // Capture pre-fix snapshot
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          snapshot: currentStrategy,
-          fixType: selectedIssue.rule_name,
-          fixDescription: selectedIssue.message,
-        },
-      ]);
+    if (!selectedIssue || !currentStrategy) return;
 
-      let fixApplied = false;
+    // Snapshot for undo before the store swaps currentStrategy with the
+    // post-fix version returned by the backend.
+    setUndoStack((prev) => [
+      ...prev,
+      {
+        snapshot: currentStrategy,
+        fixType: selectedIssue.rule_name,
+        fixDescription: selectedIssue.message,
+      },
+    ]);
 
-      try {
-        // Route to specific fix handler based on rule_id
-        switch (selectedIssue.rule_id) {
-          case 'DIRECTION_001': {
-            // TODO(P2-backend): Implement auto_fix_strategy_type API action
-            // This should extract suggested_type from auto_fix_data and switch strategy direction
-            // Expected: PATCH /strategies/{id} with { strategy_type: suggested_type }
-            console.log('Applying DIRECTION_001 fix - switch strategy direction');
-            if (selectedIssue.auto_fix_data?.suggested_type) {
-              // TODO(P2-backend): Call store action to update strategy type
-              // await updateStrategyType(selectedIssue.auto_fix_data.suggested_type);
-              fixApplied = true;
-            }
-            break;
-          }
-
-          case 'TIMING_004': {
-            // TODO(P2-backend): Implement auto_fix_recheck_delay API action
-            // This should reduce RECHECK delay to fit within timing window
-            // Expected: PATCH /strategies/{id}/blocks/{blockId} with updated timing config
-            console.log('Applying TIMING_004 fix - reduce RECHECK delay');
-            if (selectedIssue.auto_fix_data?.timing_window) {
-              // TODO(P2-backend): Call store action to update RECHECK delay
-              // await updateRecheckDelay(signalName, timing_window);
-              fixApplied = true;
-            }
-            break;
-          }
-
-          case 'EXIT_009': {
-            // TODO(P2-backend): Implement auto_fix_duplicate_exits API action
-            // This should merge duplicate exit conditions
-            // Expected: PATCH /strategies/{id}/blocks/{blockId} with consolidated exits
-            console.log('Applying EXIT_009 fix - consolidate exits');
-            if (selectedIssue.auto_fix_data?.signal_name) {
-              // TODO(P2-backend): Call store action to consolidate exits
-              // await consolidateExits(signal_name, level);
-              fixApplied = true;
-            }
-            break;
-          }
-
-          case 'LOGIC_003': {
-            // TODO(P2-backend): Implement auto_fix_dead_code API action
-            // This should disable or remove unreachable signals
-            // Expected: PATCH /strategies/{id}/blocks/{blockId} with { enabled: false } or delete
-            console.log('Applying LOGIC_003 fix - disable dead code');
-            if (selectedIssue.auto_fix_data?.signal_name) {
-              // TODO(P2-backend): Call store action to disable/remove dead code
-              // await disableDeadCode(signal_name, block_name, preserve_history);
-              fixApplied = true;
-            }
-            break;
-          }
-
-          default:
-            console.log(`No handler for rule ${selectedIssue.rule_id}`);
-        }
-
-        setShowAutoFix(false);
-        setSelectedIssue(null);
-
-        if (fixApplied) {
-          // Re-validate
-          await validateStrategy().catch(console.error);
-        }
-      } catch (error) {
-        console.error('Error applying fix:', error);
-        setShowAutoFix(false);
-        setSelectedIssue(null);
+    try {
+      const applied = await applyAutoFix(
+        selectedIssue.rule_id,
+        selectedIssue.auto_fix_data as Record<string, unknown> | undefined,
+      );
+      setShowAutoFix(false);
+      setSelectedIssue(null);
+      if (!applied) {
+        // Roll the undo snapshot back so it doesn't accumulate no-op entries.
+        setUndoStack((prev) => prev.slice(0, -1));
       }
+    } catch (error) {
+      console.error('Error applying fix:', error);
+      setShowAutoFix(false);
+      setSelectedIssue(null);
+      setUndoStack((prev) => prev.slice(0, -1));
     }
-  }, [selectedIssue, currentStrategy, validateStrategy]);
+  }, [selectedIssue, currentStrategy, applyAutoFix]);
 
   const handleUndo = useCallback(() => {
     if (undoStack.length > 0) {
@@ -1017,10 +964,13 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
         background: 'color-mix(in srgb, var(--accent-green) 7%, transparent)',
         borderColor: 'color-mix(in srgb, var(--accent-green) 40%, var(--border))',
       }
-    : { background: 'var(--accent-red-deeper)', borderColor: 'var(--accent-red-dark)' };
+    : {
+        background: 'color-mix(in srgb, var(--accent-red) 7%, transparent)',
+        borderColor: 'color-mix(in srgb, var(--accent-red) 40%, var(--border))',
+      };
   const statusTextStyle: React.CSSProperties = displayReport.is_valid
     ? { color: 'color-mix(in srgb, var(--accent-green) 70%, var(--text-secondary))' }
-    : { color: 'var(--accent-red)' };
+    : { color: 'color-mix(in srgb, var(--accent-red) 70%, var(--text-secondary))' };
   const closeButtonStyle: React.CSSProperties = displayReport.is_valid
     ? { background: 'var(--accent-green-dark)', color: 'var(--btn-primary-text)' }
     : { background: 'var(--accent-red-dark)', color: 'var(--btn-primary-text)' };
@@ -1277,15 +1227,38 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
               {displayReport.timing_conflicts && displayReport.timing_conflicts.length > 0 && (
                 <div
                   className="rounded border p-3"
-                  style={{ background: 'var(--accent-red-deeper)', borderColor: 'var(--accent-red)' }}
+                  style={{
+                    background: 'color-mix(in srgb, var(--accent-red) 7%, transparent)',
+                    borderColor: 'color-mix(in srgb, var(--accent-red) 40%, var(--border))',
+                  }}
                 >
-                  <h3 className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--accent-red)', letterSpacing: '0.12em' }}>
+                  <h3
+                    className="text-[10px] font-semibold uppercase tracking-widest mb-2"
+                    style={{
+                      color: 'color-mix(in srgb, var(--accent-red) 70%, var(--text-secondary))',
+                      letterSpacing: '0.12em',
+                    }}
+                  >
                     ⚠ Timing Conflicts
                   </h3>
                   <div className="space-y-2" style={{ fontSize: '12px' }}>
                     {displayReport.timing_conflicts.map((conflict, idx) => (
-                      <div key={idx} style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '3px', borderLeft: '2px solid var(--accent-red)' }}>
-                        <div style={{ color: 'var(--accent-red)', fontWeight: '600', marginBottom: '4px' }}>
+                      <div
+                        key={idx}
+                        style={{
+                          background: 'var(--bg-panel)',
+                          padding: '8px',
+                          borderRadius: '3px',
+                          borderLeft: '2px solid color-mix(in srgb, var(--accent-red) 60%, var(--border))',
+                        }}
+                      >
+                        <div
+                          style={{
+                            color: 'color-mix(in srgb, var(--accent-red) 70%, var(--text-secondary))',
+                            fontWeight: '600',
+                            marginBottom: '4px',
+                          }}
+                        >
                           {conflict.signal}
                         </div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: '11px', display: 'grid', gap: '2px' }}>

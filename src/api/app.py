@@ -1207,6 +1207,179 @@ async def sb_validate_strategy(
     return result
 
 
+class _AutoFixRequest(BaseModel):
+    """Body for POST /strategy-builder/strategies/{id}/auto-fix.
+
+    Matches ValidationIssue.auto_fix_data from the InstitutionalValidator
+    response — pass the rule_id alongside the data dict that the validator
+    attached when it flagged the issue.
+    """
+
+    rule_id: str
+    auto_fix_data: Optional[dict] = None
+
+
+def _apply_auto_fix(blocks: list[dict], rule_id: str, data: dict) -> tuple[list[dict], bool]:
+    """Mutate `blocks` in place per the requested auto-fix rule.
+
+    Returns ``(blocks, changed)``. Operates on the raw API dict shape
+    (name/logic/signals/exit_conditions) so the desktop AutoFix module's
+    dataclass-based helpers are not needed.
+    """
+    changed = False
+    if rule_id == "TIMING_004":
+        # Reduce RECHECK delay to 75% of the timing window so the signal
+        # actually has room to validate (mirrors auto_fix_recheck_delay).
+        timing_window = int((data or {}).get("timing_window") or 0)
+        suggested = int((data or {}).get("suggested_delay") or 0)
+        if suggested <= 0 and timing_window > 0:
+            suggested = max(1, int(timing_window * 0.75))
+        if suggested <= 0:
+            return blocks, False
+        for block in blocks:
+            for sig in block.get("signals") or []:
+                rc = sig.get("recheck_config")
+                if isinstance(rc, dict) and rc.get("enabled"):
+                    rc["bar_delay"] = suggested
+                    changed = True
+        return blocks, changed
+
+    if rule_id == "EXIT_009":
+        # The validator flags EXIT_009 when the SAME target exit signal_name
+        # (e.g. STOP_LOSS) appears anywhere in the strategy with conflicting
+        # modes (one signal binds it ABSOLUTE, another FLEXIBLE). Harmonize
+        # by forcing every occurrence to the highest-confidence mode
+        # (ABSOLUTE > FLEXIBLE).
+        target = (data or {}).get("signal_name")
+        if not target:
+            return blocks, False
+        all_matches: list[dict] = []
+        for block in blocks:
+            for sig in block.get("signals") or []:
+                for ec in sig.get("exit_conditions") or []:
+                    if ec.get("signal_name") == target:
+                        all_matches.append(ec)
+        if len(all_matches) <= 1:
+            return blocks, False
+        modes = {e.get("exit_mode") for e in all_matches}
+        if len(modes) <= 1:
+            return blocks, False
+        merged_mode = "ABSOLUTE" if "ABSOLUTE" in modes else next(iter(modes))
+        for ec in all_matches:
+            if ec.get("exit_mode") != merged_mode:
+                ec["exit_mode"] = merged_mode
+                changed = True
+        return blocks, changed
+
+    if rule_id == "LOGIC_003":
+        # Drop the signal entirely from its block (parity with disable+remove).
+        target = (data or {}).get("signal_name")
+        if not target:
+            return blocks, False
+        for block in blocks:
+            sigs = block.get("signals") or []
+            new_sigs = [s for s in sigs if s.get("name") != target]
+            if len(new_sigs) != len(sigs):
+                block["signals"] = new_sigs
+                changed = True
+        return blocks, changed
+
+    if rule_id == "DIRECTION_001":
+        # Direction switches happen on the strategy, not the blocks — caller
+        # handles strategy_type. Nothing to do here.
+        return blocks, False
+
+    return blocks, False
+
+
+@app.post(
+    "/strategy-builder/strategies/{strategy_id}/auto-fix",
+    tags=["Strategy Builder"],
+    summary="Apply an auto-fix to a stored strategy and return the new version",
+)
+async def sb_auto_fix_strategy(
+    strategy_id: str,
+    body: _AutoFixRequest,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Apply the named auto-fix to the latest version and persist a new one.
+
+    Mirrors the desktop AutoFix module (see src/strategy_builder/validation/
+    auto_fix.py) but works directly on the raw API dict shape so we don't have
+    to round-trip through StrategyConfig dataclasses. Returns the updated
+    strategy in the same shape the GET route uses, so the web UI can swap
+    `currentStrategy` from the response without an extra fetch. BTCAAAAA-32954.
+    """
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    rule_id = body.rule_id
+    data = body.auto_fix_data or {}
+
+    def _run() -> Optional[dict]:
+        with db.scoped_managers() as scoped:
+            latest = scoped.strategy.get_latest_version(strategy_id)
+            if latest is None:
+                return None
+
+            existing_blocks = latest.get("blocks") or []
+            # Deep copy so a no-op fix doesn't mutate the cached version row.
+            import copy
+            blocks = copy.deepcopy(existing_blocks)
+            blocks, changed = _apply_auto_fix(blocks, rule_id, data)
+
+            new_strategy_type = latest.get("strategy_type") or "Bullish"
+            if rule_id == "DIRECTION_001":
+                suggested = (data or {}).get("suggested_type")
+                if isinstance(suggested, str) and suggested:
+                    new_strategy_type = suggested
+                    changed = True
+
+            if not changed:
+                # Nothing to apply — return the strategy unchanged so the
+                # client can refresh without a stale-version write.
+                tests = []
+                return _build_sb_strategy(strategy_id, latest, tests)
+
+            _strip = {
+                "version_id", "version_number", "timestamp", "created_at",
+                "config_hash", "validation_timestamp",
+            }
+            version_data: dict = {
+                k: v for k, v in latest.items() if k not in _strip
+            }
+            version_data["strategy_id"] = strategy_id
+            version_data["blocks"] = blocks
+            version_data["strategy_type"] = new_strategy_type
+
+            version_id = scoped.strategy.create_strategy_version(version_data)
+            new_version = scoped.strategy.get_strategy_version(version_id)
+            try:
+                tests = scoped.test_results.get_version_test_results(
+                    str(version_id)
+                )
+            except Exception:
+                tests = []
+            return _build_sb_strategy(strategy_id, new_version, tests)
+
+    try:
+        result = await asyncio.to_thread(_run)
+    except Exception as exc:
+        logger.exception("Auto-fix failed for strategy %s rule %s", strategy_id, rule_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Auto-fix failed: {exc}",
+        ) from exc
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy '{strategy_id}' not found",
+        )
+    return result
+
+
 @app.put(
     "/strategy-builder/strategies/{strategy_id}",
     tags=["Strategy Builder"],
