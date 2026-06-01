@@ -10,18 +10,44 @@ import {
   BlockType,
 } from './types';
 
+interface NormalizedSignal {
+  id?: string;
+  name?: string;
+  signalName?: string;
+  weight?: number;
+  logic?: string;
+  exit_conditions?: Array<{
+    signal_name?: string;
+    signalName?: string;
+    exit_mode?: string;
+    exitMode?: string;
+    percentage?: number;
+  }>;
+  timing_constraint?: { reference?: string; max_candles?: number };
+  recheck_config?: { enabled?: boolean; bar_delay?: number };
+  recheckEnabled?: boolean;
+  recheckBarDelay?: number;
+}
+
 interface BlockDataWithSignals {
-  signals?: Array<{ id?: string; name?: string; signalName?: string }>;
+  signals?: NormalizedSignal[];
   name?: string;
   blockName?: string;
   category?: string;
   logic?: string;
-  exitMode?: string;
-  exitSignal?: string;
-  exitPercentage?: number;
-  timingWindow?: number;
-  recheckDelay?: number;
 }
+
+const titleCase = (s: string) =>
+  s.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+
+// Main strategy blocks are normalized to BlockType.INDICATOR with the raw
+// API payload (name, logic, signals, exit_conditions on each signal) preserved
+// inside `data` (see StrategyBuilderMainWindow.tsx::normalizeSignal). Synthetic
+// per-signal exit pills get type === BlockType.EXIT_CONDITION. So an "entry
+// block" here is any block that isn't an exit-pill — filtering by
+// === ENTRY_CONDITION misses everything.
+const isEntryBlock = (b: Strategy['blocks'][number]) =>
+  b.type !== BlockType.EXIT_CONDITION;
 
 interface ExitBlockData {
   name?: string;
@@ -35,52 +61,84 @@ interface StrategySettingsExtended {
   [key: string]: unknown;
 }
 
+function signalName(sig: NormalizedSignal): string {
+  return sig.name || sig.signalName || (sig.id ? `Signal_${sig.id}` : 'Signal');
+}
+
 function generateExecutionFlow(strategy: Strategy) {
   const blocks = strategy.blocks ?? [];
-  const entryBlocks = blocks.filter((b) => b.type === BlockType.ENTRY_CONDITION);
+  const entryBlocks = blocks.filter(isEntryBlock);
   const exitBlocks = blocks.filter((b) => b.type === BlockType.EXIT_CONDITION);
 
   const blockFlows = entryBlocks.map((block) => {
     const data = block.data as BlockDataWithSignals;
-    const signals = [];
+    const rawSignals = Array.isArray(data?.signals) ? data.signals : [];
 
-    if (data?.signals && Array.isArray(data.signals)) {
-      signals.push(
-        ...data.signals.map((sig: { id?: string; name?: string; signalName?: string }) => ({
-          kind: 'entry' as const,
-          name: sig.name || sig.signalName || `Signal_${sig.id}`,
-          linkedExit: data.exitMode
-            ? {
-                name: data.exitSignal || `Exit_${block.id}`,
-                closePct: data.exitPercentage || 100,
-                mode: (data.exitMode === 'percentage' ? 'ABSOLUTE' : 'FLEXIBLE') as 'ABSOLUTE' | 'FLEXIBLE',
-              }
-            : undefined,
-          timingConstraint: data.timingWindow
-            ? { withinCandles: data.timingWindow, ofSignal: sig.name || 'entry' }
-            : undefined,
-          recheck: data.recheckDelay
-            ? { signal: sig.name || 'entry', afterBars: data.recheckDelay }
-            : undefined,
-        }))
-      );
-    }
+    const signals = rawSignals.map((sig) => {
+      const ec = Array.isArray(sig.exit_conditions) ? sig.exit_conditions[0] : undefined;
+      const linkedExit = ec
+        ? {
+            name: ec.signal_name || ec.signalName || 'Exit',
+            closePct: typeof ec.percentage === 'number' ? Math.round(ec.percentage * 100) : 100,
+            mode: ((ec.exit_mode || ec.exitMode || 'ABSOLUTE').toString().toUpperCase() === 'ABSOLUTE'
+              ? 'ABSOLUTE'
+              : 'FLEXIBLE') as 'ABSOLUTE' | 'FLEXIBLE',
+          }
+        : undefined;
 
+      const tc = sig.timing_constraint;
+      const timingConstraint =
+        tc && typeof tc.max_candles === 'number'
+          ? { withinCandles: tc.max_candles, ofSignal: tc.reference || '' }
+          : undefined;
+
+      const recheckBars =
+        sig.recheck_config?.enabled && typeof sig.recheck_config.bar_delay === 'number'
+          ? sig.recheck_config.bar_delay
+          : sig.recheckEnabled && typeof sig.recheckBarDelay === 'number'
+            ? sig.recheckBarDelay
+            : undefined;
+      const recheck =
+        typeof recheckBars === 'number'
+          ? { signal: signalName(sig), afterBars: recheckBars }
+          : undefined;
+
+      return {
+        kind: 'entry' as const,
+        name: signalName(sig),
+        linkedExit,
+        timingConstraint,
+        recheck,
+      };
+    });
+
+    const blockName = data?.name || data?.blockName || `Block_${block.id}`;
+    const blockLogic = (data?.logic || '').toString().toUpperCase();
     return {
       index: block.index,
-      name: data?.name || data?.blockName || `Block_${block.id}`,
-      logic: (data?.category === 'required' || data?.logic === 'AND' ? 'REQUIRED' : 'OPTIONAL') as 'REQUIRED' | 'OPTIONAL',
+      name: blockName,
+      logic: (data?.category === 'required' || blockLogic === 'AND' ? 'REQUIRED' : 'OPTIONAL') as 'REQUIRED' | 'OPTIONAL',
       signals,
     };
   });
 
   const strategyLevelExits = exitBlocks.map((block, idx) => {
-    const data = block.data as ExitBlockData;
+    const data = block.data as ExitBlockData & {
+      signalName?: string;
+      exitMode?: string;
+      percentage?: number;
+      blockName?: string;
+      parentSignalName?: string;
+    };
+    const rawName = (data?.signalName || data?.name || data?.exitName || `Exit_${idx + 1}`).toString();
+    const display = /[a-z]/.test(rawName) ? rawName : titleCase(rawName);
     return {
       index: block.index,
-      name: data?.name || data?.exitName || `Exit_${idx + 1}`,
-      closePct: data?.exitPercentage || 100,
-      mode: (data?.exitMode === 'percentage' ? 'ABSOLUTE' : 'FLEXIBLE') as 'ABSOLUTE' | 'FLEXIBLE',
+      name: display,
+      closePct: typeof data?.percentage === 'number' ? Math.round(data.percentage * 100) : 100,
+      mode: ((data?.exitMode || 'ABSOLUTE').toString().toUpperCase() === 'ABSOLUTE'
+        ? 'ABSOLUTE'
+        : 'FLEXIBLE') as 'ABSOLUTE' | 'FLEXIBLE',
     };
   });
 
@@ -92,12 +150,13 @@ function generateExecutionFlow(strategy: Strategy) {
 
 function generateConfluenceScoring(strategy: Strategy) {
   const blocks = strategy.blocks ?? [];
-  const entryBlocks = blocks.filter((b) => b.type === BlockType.ENTRY_CONDITION);
+  const entryBlocks = blocks.filter(isEntryBlock);
 
   const perBlock = entryBlocks.map((block) => {
     const data = block.data as BlockDataWithSignals;
     const signalCount = data?.signals?.length ?? 1;
-    const isRequired = data?.category === 'required' || data?.logic === 'AND';
+    const blockLogic = (data?.logic || '').toString().toUpperCase();
+    const isRequired = data?.category === 'required' || blockLogic === 'AND';
     const points = isRequired ? signalCount * 10 : signalCount * 5;
 
     return {
@@ -126,7 +185,7 @@ function generateConfluenceScoring(strategy: Strategy) {
 
 function generateScenarios(strategy: Strategy) {
   const blocks = strategy.blocks ?? [];
-  const entryBlocks = blocks.filter((b) => b.type === BlockType.ENTRY_CONDITION);
+  const entryBlocks = blocks.filter(isEntryBlock);
   const scoring = generateConfluenceScoring(strategy);
 
   const scenarios = [];
@@ -192,8 +251,16 @@ export function validateStrategyLocal(strategy: Strategy): ValidationReport {
   const blocks = strategy.blocks ?? [];
   const settings = strategy.settings ?? ({} as Partial<Strategy['settings']>);
 
-  // Check for required blocks
-  const hasEntry = blocks.some((b) => b.type === BlockType.ENTRY_CONDITION);
+  // Check for required blocks. Main strategy blocks are normalized to
+  // BlockType.INDICATOR with their entry signals embedded in data.signals;
+  // strategy-level exit pills get BlockType.EXIT_CONDITION. So "has entry"
+  // means "has any non-exit block with at least one signal."
+  const hasEntry = blocks.some(
+    (b) =>
+      b.type !== BlockType.EXIT_CONDITION &&
+      Array.isArray((b.data as BlockDataWithSignals | undefined)?.signals) &&
+      ((b.data as BlockDataWithSignals).signals?.length ?? 0) > 0,
+  );
   const hasExit = blocks.some((b) => b.type === BlockType.EXIT_CONDITION);
 
   if (!hasEntry) {
