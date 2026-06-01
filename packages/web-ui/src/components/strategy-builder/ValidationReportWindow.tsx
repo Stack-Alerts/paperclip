@@ -55,14 +55,20 @@ const SEVERITY_STYLES: Record<
     badge: { background: 'var(--accent-red)', color: 'var(--btn-primary-text)' },
   },
   [ValidationSeverity.ERROR]: {
-    text: { color: 'var(--accent-orange)' },
-    bg: { background: 'color-mix(in srgb, var(--accent-orange) 12%, transparent)' },
-    badge: { background: 'var(--accent-orange)', color: 'var(--btn-primary-text)' },
+    text: { color: 'var(--accent-red)' },
+    bg: { background: 'color-mix(in srgb, var(--accent-red) 10%, transparent)' },
+    badge: {
+      background: 'color-mix(in srgb, var(--accent-red) 28%, var(--bg-panel))',
+      color: 'var(--accent-red)',
+    },
   },
   [ValidationSeverity.WARNING]: {
     text: { color: 'var(--accent-orange)' },
-    bg: { background: 'color-mix(in srgb, var(--accent-orange) 10%, transparent)' },
-    badge: { background: 'var(--accent-orange)', color: 'var(--btn-primary-text)' },
+    bg: { background: 'color-mix(in srgb, var(--accent-orange) 8%, transparent)' },
+    badge: {
+      background: 'color-mix(in srgb, var(--accent-orange) 26%, var(--bg-panel))',
+      color: 'var(--accent-orange)',
+    },
   },
   [ValidationSeverity.NOTICE]: {
     text: { color: 'var(--accent-blue)' },
@@ -600,7 +606,7 @@ function ExecutionFlowSection({
             </span>
             <h3
               style={{
-                color: 'var(--text-primary)',
+                color: 'var(--text-secondary)',
                 fontSize: '13px',
                 fontWeight: 600,
                 letterSpacing: '0.02em',
@@ -1007,10 +1013,13 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
   if (!open) return null;
 
   const statusBgStyle: React.CSSProperties = displayReport.is_valid
-    ? { background: 'color-mix(in srgb, var(--accent-green) 12%, transparent)', borderColor: 'var(--accent-green-mid)' }
+    ? {
+        background: 'color-mix(in srgb, var(--accent-green) 7%, transparent)',
+        borderColor: 'color-mix(in srgb, var(--accent-green) 40%, var(--border))',
+      }
     : { background: 'var(--accent-red-deeper)', borderColor: 'var(--accent-red-dark)' };
   const statusTextStyle: React.CSSProperties = displayReport.is_valid
-    ? { color: 'var(--accent-green)' }
+    ? { color: 'color-mix(in srgb, var(--accent-green) 70%, var(--text-secondary))' }
     : { color: 'var(--accent-red)' };
   const closeButtonStyle: React.CSSProperties = displayReport.is_valid
     ? { background: 'var(--accent-green-dark)', color: 'var(--btn-primary-text)' }
