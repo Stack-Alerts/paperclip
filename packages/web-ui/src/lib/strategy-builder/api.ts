@@ -172,6 +172,20 @@ export async function validateStrategy(id: string) {
   return post(`/strategy-builder/strategies/${id}/validate`, {});
 }
 
+export async function autoFixStrategy(
+  id: string,
+  ruleId: string,
+  autoFixData: Record<string, unknown> | undefined,
+) {
+  // Apply the named validator auto-fix to the latest stored version. Returns
+  // the updated strategy (new version) so the caller can swap currentStrategy
+  // directly. BTCAAAAA-32954 board comment 9b5949ca.
+  return post(`/strategy-builder/strategies/${id}/auto-fix`, {
+    rule_id: ruleId,
+    auto_fix_data: autoFixData ?? null,
+  });
+}
+
 export async function runBacktest(id: string, config: unknown) {
   return post(`/strategies/${id}/backtest`, config);
 }

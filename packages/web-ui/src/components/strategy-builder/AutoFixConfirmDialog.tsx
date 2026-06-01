@@ -65,14 +65,25 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
     Object.fromEntries(options.map((o) => [o.key, o.defaultChecked ?? false]))
   );
 
-  // Reset state when options change or dialog opens (matches PyQt5 behavior of re-instantiation)
+  // Reset state when the dialog opens. The previous form of this effect
+  // depended on `options` directly; callers pass it as an inline array (or
+  // omit it so it defaults to a new `[]` on every render) which made the
+  // dependency change identity on every render and triggered an infinite
+  // setState loop the moment the dialog opened (BTCAAAAA-32954 board comment
+  // 9b5949ca: "applied the 2 fixes ... nothing changed"). Key off a stable
+  // serialization so re-init only fires when the option keys/defaults
+  // actually change.
+  const optionsKey = options
+    .map((o) => `${o.key}:${o.defaultChecked ? 1 : 0}`)
+    .join('|');
   useEffect(() => {
     if (open) {
       setUserOptions(
         Object.fromEntries(options.map((o) => [o.key, o.defaultChecked ?? false]))
       );
     }
-  }, [open, options]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, optionsKey]);
 
   const handleOptionChange = useCallback((key: string, checked: boolean) => {
     setUserOptions((prev) => ({ ...prev, [key]: checked }));
