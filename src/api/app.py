@@ -1289,6 +1289,28 @@ def _apply_auto_fix(blocks: list[dict], rule_id: str, data: dict) -> tuple[list[
         # handles strategy_type. Nothing to do here.
         return blocks, False
 
+    if rule_id == "STRUCTURAL_005":
+        block_name = (data or {}).get("block_name")
+        signal_name = (data or {}).get("signal_name")
+        fix_mode = (data or {}).get("fix_mode") or (data or {}).get("mode", "remove")
+        target_index = (data or {}).get("target_index")
+        new_name = (data or {}).get("new_name")
+        if not block_name or not signal_name:
+            return blocks, False
+        for block in blocks:
+            if block.get("name") != block_name:
+                continue
+            sigs = block.get("signals") or []
+            if fix_mode == "remove" and target_index is not None:
+                if 0 <= target_index < len(sigs):
+                    block["signals"] = [s for i, s in enumerate(sigs) if i != target_index]
+                    changed = True
+            elif fix_mode == "rename" and target_index is not None and new_name:
+                if 0 <= target_index < len(sigs):
+                    sigs[target_index]["name"] = new_name
+                    changed = True
+        return blocks, changed
+
     return blocks, False
 
 

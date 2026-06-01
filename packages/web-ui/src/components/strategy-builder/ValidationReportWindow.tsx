@@ -927,9 +927,19 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
       return undefined;
     }
 
-    // Find the block and its signals (try multiple patterns)
-    let block = currentStrategy.blocks?.find((b: any) => b.data?.name === autoFixData.block_name);
+    // Find the block and its signals.
+    // API blocks are normalized into {id, type, index, data: {name (title-cased), definitionId (raw), signals}}
+    // by handleStrategySelect. Use definitionId (the original snake_case name) to find the block.
+    let block = currentStrategy.blocks?.find((b: any) => b.data?.definitionId === autoFixData.block_name);
     if (!block) {
+      // Fallback: case-insensitive name comparison
+      const blockNameLower = autoFixData.block_name.toLowerCase().replace(/_/g, ' ');
+      block = currentStrategy.blocks?.find((b: any) =>
+        (b.data?.name || '').toLowerCase() === blockNameLower
+      );
+    }
+    if (!block) {
+      // Fallback: raw name field on block
       block = currentStrategy.blocks?.find((b: any) => b.name === autoFixData.block_name);
     }
     if (!block) return undefined;

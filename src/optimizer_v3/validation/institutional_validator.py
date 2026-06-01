@@ -360,6 +360,7 @@ class InstitutionalValidator:
                 signal_names = [sig.name for sig in block.signals]
                 duplicates = set([name for name in signal_names if signal_names.count(name) > 1])
                 if duplicates:
+                    first_dup = next(iter(duplicates))
                     self._add_issue(
                         severity=ValidationSeverity.ERROR,
                         category="STRUCTURAL",
@@ -368,7 +369,9 @@ class InstitutionalValidator:
                         message=f"Duplicate signal names in block '{block.name}': {', '.join(duplicates)}",
                         location=f"Block::{block.name}",
                         affected_components=list(duplicates),
-                        suggestion="Remove or rename duplicate signals"
+                        suggestion="Remove or rename duplicate signals",
+                        auto_fix_available=True,
+                        auto_fix_data={"block_name": block.name, "signal_name": first_dup}
                     )
         
         # Rule 6: Valid logic values (AND/OR)
