@@ -1175,9 +1175,9 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
 
           {currentTab === 'summary' && (
             <div className="space-y-3">
-              {/* Issue Summary — same label-value row layout as Composition
-                  so the tab reads as one consistent structure (BTCAAAAA-32954
-                  board comment 9cebfe95). */}
+              {/* Issue Summary + Composition as compact tile grids so the tab
+                  fits the whole strategy at a glance instead of stacking
+                  9-row tables (BTCAAAAA-32954 board comment 8c8259e3). */}
               <div
                 className="rounded border p-3"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
@@ -1185,31 +1185,35 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
                 <h3 className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}>
                   Issue Summary
                 </h3>
-                <div className="space-y-1.5" style={{ fontSize: '13px' }}>
+                <div className="grid grid-cols-5 gap-2">
                   {[
                     { label: 'Critical', count: issueCounts.critical, color: issueCounts.critical > 0 ? 'var(--accent-red)' : undefined },
                     { label: 'Errors', count: issueCounts.errors, color: issueCounts.errors > 0 ? 'var(--accent-red)' : undefined },
                     { label: 'Warnings', count: issueCounts.warnings, color: issueCounts.warnings > 0 ? 'var(--accent-orange)' : undefined },
                     { label: 'Notices', count: issueCounts.notices, color: issueCounts.notices > 0 ? 'var(--accent-blue)' : undefined },
                     { label: 'Info', count: issueCounts.info, color: undefined },
-                  ].map((item, idx) => (
+                  ].map((item) => (
                     <div
                       key={item.label}
-                      className="flex justify-between items-baseline px-2 py-1.5"
-                      style={{ background: idx % 2 === 0 ? 'transparent' : 'var(--bg-panel)', borderRadius: '3px' }}
+                      className="text-center"
+                      style={{
+                        background: 'var(--bg-panel)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '4px',
+                        padding: '8px 4px',
+                      }}
                     >
-                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                      <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px' }}>
                         {item.label}
-                      </span>
-                      <span style={{ color: item.color ?? 'var(--text-secondary)', fontWeight: '600', minWidth: '2rem', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                      </div>
+                      <div style={{ fontSize: '18px', fontWeight: 700, color: item.color ?? 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
                         {item.count}
-                      </span>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Composition — label-value rows matching Issue Summary above. */}
               <div
                 className="rounded border p-3"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
@@ -1217,19 +1221,24 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
                 <h3 className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}>
                   Composition
                 </h3>
-                <div className="space-y-1.5" style={{ fontSize: '13px' }}>
+                <div className="grid grid-cols-4 gap-2">
                   {getCompositionBreakdown(currentStrategy).map((item, idx) => (
                     <div
                       key={idx}
-                      className="flex justify-between items-baseline px-2 py-1.5"
-                      style={{ background: idx % 2 === 0 ? 'transparent' : 'var(--bg-panel)', borderRadius: '3px' }}
+                      className="text-center"
+                      style={{
+                        background: 'var(--bg-panel)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '4px',
+                        padding: '8px 4px',
+                      }}
                     >
-                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                      <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px' }}>
                         {item.label}
-                      </span>
-                      <span style={{ color: 'var(--text-secondary)', fontWeight: '600', minWidth: '2rem', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                      </div>
+                      <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
                         {item.count}
-                      </span>
+                      </div>
                     </div>
                   ))}
                 </div>
