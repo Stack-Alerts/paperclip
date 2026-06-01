@@ -410,6 +410,136 @@ interface Scenario {
   perBlock: Array<{ index: number; name: string; result: string; points: number }>;
 }
 
+// Render the execution flow as a single monospace terminal-style narrative,
+// matching the thick client's preformatted layout. The board reads this report
+// top-to-bottom and the previous card-based layout broke that flow. See the
+// thick-client reference attached to BTCAAAAA-32954 (comment cc8d5eec).
+function formatExecutionFlowAsText(
+  executionFlow: ExecutionFlowData | undefined,
+  confluenceScoring: ConfluenceScoringData | undefined,
+  scenarios: Scenario[] | undefined,
+): string {
+  const HR = '='.repeat(80);
+  const lines: string[] = [];
+
+  const push = (s: string = '') => lines.push(s);
+
+  if (executionFlow && executionFlow.blocks && executionFlow.blocks.length > 0) {
+    push(HR);
+    push('STRATEGY EXECUTION FLOW - HOW YOUR STRATEGY WORKS');
+    push(HR);
+    push();
+    executionFlow.blocks.forEach((block, bIdx) => {
+      const num = block.index + 1 || bIdx + 1;
+      const logicNote = block.logic === 'REQUIRED' ? 'ALL signals required' : 'ANY signal triggers';
+      push(`📦 BLOCK ${num}: ${block.name.toUpperCase()} (${logicNote})`);
+      push();
+      (block.signals || []).forEach((sig) => {
+        push(`   🎯 ENTRY SIGNAL: ${sig.name}`);
+        if (sig.timingConstraint) {
+          const ref = sig.timingConstraint.ofSignal
+            ? ` of '${sig.timingConstraint.ofSignal}'`
+            : '';
+          push(`      └── ⏱  Timing: Must trigger within ${sig.timingConstraint.withinCandles} candles${ref}`);
+        }
+        if (sig.recheck) {
+          push(`      └── 🔄 RECHECK: Validate '${sig.recheck.signal}' after ${sig.recheck.afterBars} bars`);
+          push(`          ├── If found: Signal VALID ✓`);
+          push(`          └── If not found: Signal RESET ✗`);
+        }
+        if (sig.linkedExit) {
+          push(`      └── 🚪 EXIT: ${sig.linkedExit.name} → Close ${sig.linkedExit.closePct}% (${sig.linkedExit.mode})`);
+        }
+        push();
+      });
+    });
+  }
+
+  if (executionFlow && executionFlow.strategyLevelExits && executionFlow.strategyLevelExits.length > 0) {
+    push(HR);
+    push('EXIT CONDITIONS (Strategy-Level)');
+    push(HR);
+    push();
+    executionFlow.strategyLevelExits.forEach((ex, i) => {
+      push(`   🚪 EXIT #${i + 1}: ${ex.name} triggers`);
+      push(`      └── Action: Close ${ex.closePct}% of position (${ex.mode} mode)`);
+      push();
+    });
+  }
+
+  if (confluenceScoring && confluenceScoring.perBlock.length > 0) {
+    push(HR);
+    push('POSITION OPENING LOGIC - INSTITUTIONAL-GRADE CONFLUENCE SYSTEM');
+    push(HR);
+    push();
+    push('BLOCK TYPES IN YOUR STRATEGY:');
+    push();
+    confluenceScoring.perBlock.forEach((b) => {
+      const num = b.index + 1;
+      const logicLabel = b.logic === 'REQUIRED' ? 'REQUIRED (AND logic)' : 'OPTIONAL (OR logic)';
+      const allOrAny = b.logic === 'REQUIRED' ? 'ALL' : 'ANY';
+      const contribNote = b.logic === 'REQUIRED' ? 'required' : 'optional bonus';
+      push(`Block ${num} (${b.name.toUpperCase()}) - ${logicLabel}`);
+      push(`   • Type: ${b.logic} - ${allOrAny} ${b.signalCount} signal${b.signalCount === 1 ? '' : 's'} must trigger`);
+      push(`   • Contributes: ~${b.points} pts (${contribNote})`);
+      if (b.logic === 'REQUIRED') {
+        push(`   • If ANY signal missing → 0 points from this block`);
+      }
+      push();
+    });
+
+    push(HR);
+    push('CONFLUENCE SCORING SYSTEM - HOW POSITION ACTUALLY OPENS');
+    push(HR);
+    push();
+    push('Your Strategy Point Breakdown:');
+    push(`   • Required Points: ${confluenceScoring.requiredPoints} pts (${confluenceScoring.perBlock.filter((b) => b.logic === 'REQUIRED').length} REQUIRED blocks)`);
+    push(`   • Optional Points: ${confluenceScoring.optionalPoints} pts (${confluenceScoring.perBlock.filter((b) => b.logic === 'OPTIONAL').length} OPTIONAL blocks)`);
+    push(`   • Total Possible: ${confluenceScoring.totalPossible} pts`);
+    push();
+    push('POSITION OPENS WHEN:');
+    push(`   ⇨ Confluence Score >= Threshold (e.g., ${confluenceScoring.threshold} pts)`);
+    push(`   ⇨ ONLY ONE POSITION opens when threshold met`);
+    push(`   ⇨ Once open, strategy manages THIS POSITION with exits/TP/SL`);
+    push();
+  }
+
+  if (scenarios && scenarios.length > 0) {
+    push('Real-World Scenarios:');
+    push();
+    scenarios.forEach((sc) => {
+      push(sc.label);
+      sc.perBlock.forEach((b) => {
+        const marker = b.result === 'FIRE' ? '✓' : b.result === 'MISS' ? '✗' : '·';
+        const pointsTxt = b.result === 'FIRE' ? `+${b.points} pts` : `${b.points} pts`;
+        const desc = b.result === 'FIRE' ? 'ALL signals' : b.result === 'MISS' ? 'Missing signal' : b.result;
+        push(`   • Block ${b.index + 1} (${b.name.toUpperCase()}): ${desc} ${marker} → ${pointsTxt}`);
+      });
+      const verdict = sc.outcome === 'opens' ? 'POSITION OPENS ✓' : 'Below threshold, NO POSITION';
+      push(`   Total: ${sc.totalPoints} pts → ${verdict}`);
+      push();
+    });
+  }
+
+  if (confluenceScoring) {
+    push(HR);
+    push('KEY TAKEAWAYS:');
+    push(HR);
+    push();
+    push('✓ REQUIRED blocks (AND): Must have ALL signals to contribute points');
+    push('✓ OPTIONAL blocks (OR): Contribute bonus points if ANY signal fires');
+    push('✓ Position opens when: Total points >= Confluence Threshold');
+    push('✓ ONE POSITION only: Not multiple trades');
+    push(`✓ Threshold configurable: In backtest config (default ~${confluenceScoring.threshold} pts)`);
+    push();
+    push(HR);
+    push('EXECUTION: Signals evaluated bar-by-bar in real-time');
+    push(HR);
+  }
+
+  return lines.join('\n');
+}
+
 function ExecutionFlowSection({
   executionFlow,
   confluenceScoring,
@@ -427,300 +557,28 @@ function ExecutionFlowSection({
     );
   }
 
+  const text = formatExecutionFlowAsText(executionFlow, confluenceScoring, scenarios);
+
   return (
-    <div className="space-y-4">
-      {/* Execution Flow Blocks */}
-      {executionFlow && executionFlow.blocks && executionFlow.blocks.length > 0 && (
-        <div
-          className="rounded border p-3"
-          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
-        >
-          <h3
-            className="text-[10px] font-semibold uppercase tracking-widest mb-3"
-            style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}
-          >
-            Strategy Execution Flow
-          </h3>
-          <div className="space-y-3">
-            {executionFlow.blocks.map((block: ExecutionBlock, idx: number) => (
-              <div
-                key={idx}
-                className="rounded border p-3"
-                style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}
-              >
-                <div
-                  className="flex items-center gap-2 mb-2"
-                  style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}
-                >
-                  <span
-                    style={{
-                      display: 'flex',
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      background:
-                        block.logic === 'REQUIRED'
-                          ? 'var(--accent-orange)'
-                          : 'var(--accent-blue)',
-                      color: 'var(--btn-primary-text)',
-                      fontSize: '10px',
-                      fontWeight: '700',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {block.index + 1}
-                  </span>
-                  <span>{block.name}</span>
-                  <span
-                    style={{
-                      fontSize: '10px',
-                      fontWeight: '700',
-                      padding: '2px 6px',
-                      borderRadius: '2px',
-                      background:
-                        block.logic === 'REQUIRED'
-                          ? 'var(--accent-orange)'
-                          : 'var(--accent-blue)',
-                      color: 'var(--btn-primary-text)',
-                    }}
-                  >
-                    {block.logic}
-                  </span>
-                </div>
-
-                {block.signals && block.signals.length > 0 && (
-                  <div className="ml-6 space-y-2">
-                    {block.signals.map((signal, sigIdx: number) => (
-                      <div
-                        key={sigIdx}
-                        style={{
-                          fontSize: '11px',
-                          color: 'var(--text-secondary)',
-                          padding: '6px',
-                          background: 'rgba(0,0,0,0.2)',
-                          borderRadius: '2px',
-                          borderLeft: '2px solid var(--accent-green)',
-                        }}
-                      >
-                        <div style={{ fontWeight: '600', marginBottom: '2px' }}>
-                          Entry Signal: {signal.name}
-                        </div>
-                        {signal.linkedExit && (
-                          <div style={{ marginBottom: '2px' }}>
-                            ➜ Exit: {signal.linkedExit.name} ({signal.linkedExit.closePct}% {signal.linkedExit.mode})
-                          </div>
-                        )}
-                        {signal.timingConstraint && (
-                          <div style={{ marginBottom: '2px' }}>
-                            ⏱ Must trigger within {signal.timingConstraint.withinCandles} bars
-                          </div>
-                        )}
-                        {signal.recheck && (
-                          <div>
-                            🔄 Validate &apos;{signal.recheck.signal}&apos; after {signal.recheck.afterBars} bars
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Strategy-level Exits */}
-      {executionFlow && executionFlow.strategyLevelExits && executionFlow.strategyLevelExits.length > 0 && (
-        <div
-          className="rounded border p-3"
-          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
-        >
-          <h3
-            className="text-[10px] font-semibold uppercase tracking-widest mb-2"
-            style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}
-          >
-            Strategy-Level Exit Conditions
-          </h3>
-          <div className="space-y-1.5">
-            {executionFlow.strategyLevelExits.map((exit, idx: number) => (
-              <div
-                key={idx}
-                style={{
-                  fontSize: '12px',
-                  padding: '8px',
-                  background: 'var(--bg-panel)',
-                  borderRadius: '3px',
-                  borderLeft: '2px solid var(--accent-red)',
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                <strong>{exit.name}</strong> — Close {exit.closePct}% ({exit.mode})
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Confluence Scoring */}
-      {confluenceScoring && (
-        <div
-          className="rounded border p-3"
-          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
-        >
-          <h3
-            className="text-[10px] font-semibold uppercase tracking-widest mb-3"
-            style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}
-          >
-            Confluence Scoring System
-          </h3>
-
-          <div
-            className="rounded border p-3 mb-3"
-            style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}
-          >
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '12px', fontSize: '12px' }}>
-              <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Required Points:</span>
-              <span style={{ color: 'var(--text-secondary)' }}>{confluenceScoring.requiredPoints} pts</span>
-
-              <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Optional Points:</span>
-              <span style={{ color: 'var(--text-secondary)' }}>{confluenceScoring.optionalPoints} pts</span>
-
-              <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Total Possible:</span>
-              <span style={{ color: 'var(--accent-green)', fontWeight: '600' }}>
-                {confluenceScoring.totalPossible} pts
-              </span>
-
-              <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Threshold:</span>
-              <span style={{ color: 'var(--accent-blue)', fontWeight: '600' }}>
-                {confluenceScoring.threshold} pts
-              </span>
-            </div>
-          </div>
-
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '3px', fontWeight: '600' }}>
-            Per-Block Breakdown:
-          </div>
-          <div className="space-y-1.5">
-            {confluenceScoring.perBlock.map((block, idx: number) => (
-              <div
-                key={idx}
-                style={{
-                  fontSize: '11px',
-                  padding: '6px',
-                  background: 'var(--bg-panel)',
-                  borderRadius: '2px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <span>
-                  <strong>{block.name}</strong>{' '}
-                  <span
-                    style={{
-                      fontSize: '9px',
-                      padding: '1px 4px',
-                      background:
-                        block.logic === 'REQUIRED'
-                          ? 'var(--accent-orange)'
-                          : 'var(--accent-blue)',
-                      color: 'var(--btn-primary-text)',
-                      borderRadius: '2px',
-                      marginLeft: '4px',
-                    }}
-                  >
-                    {block.logic}
-                  </span>
-                </span>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>
-                  {block.points} pts ({block.signalCount} signal{block.signalCount > 1 ? 's' : ''})
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Scenarios */}
-      {scenarios && scenarios.length > 0 && (
-        <div
-          className="rounded border p-3"
-          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
-        >
-          <h3
-            className="text-[10px] font-semibold uppercase tracking-widest mb-3"
-            style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}
-          >
-            Real-World Scenarios
-          </h3>
-          <div className="grid grid-cols-1 gap-3">
-            {scenarios.map((scenario, idx: number) => (
-              <div
-                key={idx}
-                className="rounded border p-3"
-                style={{
-                  background:
-                    scenario.outcome === 'opens'
-                      ? 'color-mix(in srgb, var(--accent-green) 12%, transparent)'
-                      : 'color-mix(in srgb, var(--accent-orange) 12%, transparent)',
-                  borderColor: scenario.outcome === 'opens' ? 'var(--accent-green)' : 'var(--accent-orange)',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    color:
-                      scenario.outcome === 'opens'
-                        ? 'var(--accent-green)'
-                        : 'var(--accent-orange)',
-                    marginBottom: '8px',
-                  }}
-                >
-                  {scenario.label}
-                </div>
-                <div className="space-y-1.5 mb-2">
-                  {scenario.perBlock.map((block, blockIdx: number) => (
-                    <div
-                      key={blockIdx}
-                      style={{
-                        fontSize: '11px',
-                        padding: '4px 6px',
-                        background: 'rgba(0,0,0,0.2)',
-                        borderRadius: '2px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      <span>{block.name}: {block.result}</span>
-                      <span style={{ fontWeight: '600' }}>{block.points} pts</span>
-                    </div>
-                  ))}
-                </div>
-                <div
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: '700',
-                    padding: '6px',
-                    background: 'rgba(0,0,0,0.3)',
-                    borderRadius: '2px',
-                    textAlign: 'center',
-                    color:
-                      scenario.outcome === 'opens'
-                        ? 'var(--accent-green)'
-                        : 'var(--accent-orange)',
-                  }}
-                >
-                  Total: {scenario.totalPoints} pts → {scenario.outcome === 'opens' ? '✅ POSITION OPENS' : '❌ NO POSITION'}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    <pre
+      style={{
+        margin: 0,
+        padding: '14px 16px',
+        background: 'var(--bg-panel)',
+        border: '1px solid var(--border)',
+        borderRadius: '4px',
+        color: 'var(--text-secondary)',
+        fontFamily:
+          'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+        fontSize: '12px',
+        lineHeight: 1.55,
+        whiteSpace: 'pre',
+        overflowX: 'auto',
+        tabSize: 2,
+      }}
+    >
+      {text}
+    </pre>
   );
 }
 
