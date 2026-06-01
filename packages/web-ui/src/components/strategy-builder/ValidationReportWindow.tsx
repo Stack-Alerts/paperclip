@@ -99,42 +99,43 @@ function CollapsibleSection({
 
   return (
     <div
-      className="border rounded-lg overflow-hidden"
+      className="rounded border overflow-hidden"
       style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}
     >
-      <div
-        className="flex items-center justify-between px-4 py-3"
-        style={{ background: 'var(--bg-panel)' }}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between px-3 py-2 text-left hover:opacity-80 transition-opacity"
+        style={{ background: 'var(--bg-panel)', cursor: 'pointer', border: 'none' }}
       >
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-2 flex-1 text-left hover:opacity-80 transition-opacity"
-        >
-          <span className="text-lg" style={{ color: 'var(--text-secondary)' }}>
+        <div className="flex items-center gap-2 flex-1">
+          <span style={{ color: 'var(--text-secondary)', width: '16px', textAlign: 'center', fontSize: '12px', lineHeight: '1' }}>
             {isExpanded ? '▼' : '▶'}
           </span>
-          <h3 className="font-bold text-sm" style={{ color: titleColor }}>
+          <h3 style={{ color: titleColor, fontSize: '12px', fontWeight: '600', margin: '0' }}>
             {title}
           </h3>
-        </button>
+        </div>
         {onMaximize && (
           <button
-            onClick={onMaximize}
-            className="px-3 py-1 rounded text-xs font-medium transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMaximize();
+            }}
+            className="px-2 py-1 rounded text-xs font-medium transition-colors flex-shrink-0 ml-2"
+            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)', border: 'none', cursor: 'pointer' }}
           >
-            🗖 Maximize
+            🗖
           </button>
         )}
-      </div>
+      </button>
       {isExpanded && (
         <div
-          className="px-4 py-3 border-t"
-          style={{ background: 'var(--bg-deep)', borderColor: 'var(--border)' }}
+          className="px-3 py-2 border-t overflow-x-auto"
+          style={{ background: 'var(--bg-deep)', borderColor: 'var(--border)', fontSize: '11px' }}
         >
           <pre
-            className="text-xs font-mono overflow-x-auto whitespace-pre-wrap break-words"
-            style={{ color: 'var(--text-secondary)' }}
+            className="font-mono whitespace-pre-wrap break-words m-0"
+            style={{ color: 'var(--text-secondary)', lineHeight: '1.4' }}
           >
             {content}
           </pre>
@@ -151,110 +152,65 @@ function IssuesTable({
   issues: ValidationIssue[];
   onFixClick: (issue: ValidationIssue) => void;
 }) {
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-
   const getFixButtonLabel = (ruleId: string): string => {
     const labels: Record<string, string> = {
-      DIRECTION_001: '🔄 Switch Direction',
-      TIMING_004: '⏱️ Fix Timing',
-      EXIT_009: '🔗 Consolidate Exits',
-      LOGIC_003: '🗑️ Remove Dead Code',
+      DIRECTION_001: '🔄 Switch',
+      TIMING_004: '⏱️ Fix',
+      EXIT_009: '🔗 Consolidate',
+      LOGIC_003: '🗑️ Remove',
     };
-    return labels[ruleId] || '🔧 Fix Now';
+    return labels[ruleId] || '🔧 Fix';
   };
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr
-            className="border-b"
-            style={{ borderColor: 'var(--border)', background: 'var(--bg-panel)' }}
-          >
-            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-secondary)' }}>
-              Severity
-            </th>
-            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-secondary)' }}>
-              Category
-            </th>
-            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-secondary)' }}>
-              Issue
-            </th>
-            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-secondary)' }}>
-              Location
-            </th>
-            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-secondary)' }}>
-              Description &amp; Guidance
-            </th>
-            <th className="px-4 py-3 text-left font-bold" style={{ color: 'var(--text-secondary)' }}>
-              Action
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {issues.map((issue, idx) => {
-            const styles = SEVERITY_STYLES[issue.severity];
-            const isHovered = hoveredIdx === idx;
-            return (
-              <tr
-                key={`${issue.rule_id}-${idx}`}
-                className="border-b transition-colors"
-                style={{
-                  borderColor: 'var(--border)',
-                  ...styles.bg,
-                  ...(isHovered ? { background: 'var(--bg-hover)' } : {}),
-                }}
-                onMouseEnter={() => setHoveredIdx(idx)}
-                onMouseLeave={() => setHoveredIdx(null)}
-              >
-                <td className="px-4 py-3 font-bold">
+    <div className="space-y-2">
+      {issues.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
+          No issues found.
+        </div>
+      ) : (
+        issues.map((issue, idx) => {
+          const styles = SEVERITY_STYLES[issue.severity];
+          return (
+            <div
+              key={`${issue.rule_id}-${idx}`}
+              className="rounded border transition-colors"
+              style={{
+                borderColor: 'var(--border)',
+                ...styles.bg,
+                padding: '10px',
+              }}
+            >
+              {/* Issue Header Row */}
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
                   <span
-                    className="inline-block px-2 py-1 rounded text-xs font-bold"
-                    style={styles.badge}
+                    className="inline-block px-2 py-0.5 rounded text-[10px] font-bold flex-shrink-0 uppercase"
+                    style={{ ...styles.badge, letterSpacing: '0.05em' }}
                   >
                     {issue.severity}
                   </span>
-                </td>
-                <td className="px-4 py-3" style={{ color: 'var(--text-secondary)' }}>
-                  {issue.category}
-                </td>
-                <td className="px-4 py-3 font-bold" style={{ color: 'var(--text-secondary)' }}>
-                  {issue.rule_name}
-                </td>
-                <td
-                  className="px-4 py-3 text-xs font-mono whitespace-pre-wrap"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  {formatLocation(issue.location)}
-                </td>
-                <td className="px-4 py-3 max-w-md" style={{ color: 'var(--text-secondary)' }}>
-                  <div className="whitespace-normal break-words">
-                    {issue.message}
-                    {issue.suggestion && (
-                      <div
-                        className="mt-2 pt-2 border-t text-xs"
-                        style={{
-                          borderColor: 'var(--border)',
-                          color: 'var(--accent-blue)',
-                        }}
-                      >
-                        💡 How to Fix: {issue.suggestion}
-                      </div>
-                    )}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-sm" style={{ color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                      {issue.rule_name}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      {issue.category}
+                    </div>
                   </div>
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap">
+                </div>
+                <div className="flex-shrink-0">
                   {issue.severity === ValidationSeverity.INFO ? (
                     <span
-                      className="font-bold text-xs"
+                      className="text-xs font-bold"
                       style={{ color: 'var(--accent-green)' }}
                     >
-                      ✓ Passed
+                      ✓
                     </span>
                   ) : issue.auto_fix_available ? (
                     <button
                       onClick={() => onFixClick(issue)}
-                      className="px-3 py-1 rounded text-xs font-bold transition-colors"
+                      className="px-2 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap"
                       style={{ background: 'var(--accent-orange)', color: 'var(--btn-primary-text)' }}
                       title={getFixButtonTooltip(issue.rule_id)}
                     >
@@ -262,7 +218,7 @@ function IssuesTable({
                     </button>
                   ) : (
                     <span
-                      className="text-xs font-bold"
+                      className="text-xs font-bold whitespace-nowrap"
                       style={{
                         color:
                           issue.severity === ValidationSeverity.CRITICAL ||
@@ -274,12 +230,35 @@ function IssuesTable({
                       {getActionText(issue.severity)}
                     </span>
                   )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                </div>
+              </div>
+
+              {/* Message */}
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '6px' }}>
+                {issue.message}
+              </div>
+
+              {/* Location & Suggestion */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 12px', fontSize: '11px' }}>
+                {issue.location && (
+                  <>
+                    <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Location:</span>
+                    <code style={{ color: 'var(--text-secondary)', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+                      {formatLocation(issue.location)}
+                    </code>
+                  </>
+                )}
+                {issue.suggestion && (
+                  <>
+                    <span style={{ color: 'var(--accent-blue)', fontWeight: '600' }}>💡 How to Fix:</span>
+                    <span style={{ color: 'var(--accent-blue)' }}>{issue.suggestion}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }
@@ -899,117 +878,135 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {currentTab === 'summary' && (
-            <div className="space-y-4">
-              {/* Validation Summary */}
+            <div className="space-y-3">
+              {/* Validation Summary — compact grid layout */}
               <div
                 className="rounded border p-3"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
               >
-                <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                  Validation Summary
+                <h3 className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}>
+                  Issue Summary
                 </h3>
-                <div className="grid grid-cols-5 gap-2 text-xs">
-                  <div className="rounded px-3 py-2" style={{ background: 'var(--bg-panel)' }}>
-                    <div className="text-[11px] font-medium" style={{ color: issueCounts.critical > 0 ? 'var(--accent-red)' : 'var(--text-muted)' }}>
-                      Critical
-                    </div>
-                    <div className="text-base font-semibold mt-0.5" style={{ color: issueCounts.critical > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
-                      {issueCounts.critical}
-                    </div>
-                  </div>
-                  <div className="rounded px-3 py-2" style={{ background: 'var(--bg-panel)' }}>
-                    <div className="text-[11px] font-medium" style={{ color: issueCounts.errors > 0 ? 'var(--accent-orange)' : 'var(--text-muted)' }}>
-                      Errors
-                    </div>
-                    <div className="text-base font-semibold mt-0.5" style={{ color: issueCounts.errors > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
-                      {issueCounts.errors}
-                    </div>
-                  </div>
-                  <div className="rounded px-3 py-2" style={{ background: 'var(--bg-panel)' }}>
-                    <div className="text-[11px] font-medium" style={{ color: issueCounts.warnings > 0 ? 'var(--accent-orange)' : 'var(--text-muted)' }}>
-                      Warnings
-                    </div>
-                    <div className="text-base font-semibold mt-0.5" style={{ color: issueCounts.warnings > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
-                      {issueCounts.warnings}
-                    </div>
-                  </div>
-                  <div className="rounded px-3 py-2" style={{ background: 'var(--bg-panel)' }}>
-                    <div className="text-[11px] font-medium" style={{ color: issueCounts.notices > 0 ? 'var(--accent-blue)' : 'var(--text-muted)' }}>
-                      Notices
-                    </div>
-                    <div className="text-base font-semibold mt-0.5" style={{ color: issueCounts.notices > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
-                      {issueCounts.notices}
-                    </div>
-                  </div>
-                  <div className="rounded px-3 py-2" style={{ background: 'var(--bg-panel)' }}>
-                    <div className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                      Info
-                    </div>
-                    <div className="text-base font-semibold mt-0.5" style={{ color: issueCounts.info > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
-                      {issueCounts.info}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Strategy Composition */}
-              <div
-                className="rounded border p-3"
-                style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
-              >
-                <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                  Strategy Composition
-                </h3>
-                <div className="space-y-2">
-                  {getCompositionBreakdown(currentStrategy).map((item, idx) => (
-                    <div key={idx} className="rounded px-3 py-2" style={{ background: 'var(--bg-panel)' }}>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{item.label}</span>
-                        <span className="font-semibold text-sm" style={{ color: 'var(--text-secondary)' }}>
-                          {item.count}
-                        </span>
+                <div className="grid grid-cols-5 gap-2">
+                  {[
+                    { label: 'Critical', count: issueCounts.critical, color: issueCounts.critical > 0 ? 'var(--accent-red)' : 'var(--text-muted)' },
+                    { label: 'Errors', count: issueCounts.errors, color: issueCounts.errors > 0 ? 'var(--accent-orange)' : 'var(--text-muted)' },
+                    { label: 'Warnings', count: issueCounts.warnings, color: issueCounts.warnings > 0 ? 'var(--accent-orange)' : 'var(--text-muted)' },
+                    { label: 'Notices', count: issueCounts.notices, color: issueCounts.notices > 0 ? 'var(--accent-blue)' : 'var(--text-muted)' },
+                    { label: 'Info', count: issueCounts.info, color: 'var(--text-muted)' },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="text-center py-2"
+                      style={{ background: 'var(--bg-panel)', borderRadius: '4px', border: '1px solid var(--border)' }}
+                    >
+                      <div className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-muted)', marginBottom: '4px', letterSpacing: '0.05em' }}>
+                        {item.label}
                       </div>
-                      {item.details && (
-                        <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                          {item.details}
-                        </div>
-                      )}
+                      <div className="text-lg font-bold" style={{ color: item.color }}>
+                        {item.count}
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Complexity */}
+              {/* Strategy Composition — label-value pairs with right-aligned numbers */}
               <div
                 className="rounded border p-3"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
               >
-                <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                  Strategy Complexity
+                <h3 className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}>
+                  Composition
                 </h3>
-                <div className="space-y-2">
-                  <div className="rounded px-3 py-2" style={{ background: 'var(--bg-panel)' }}>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Complexity Score</span>
-                      <span className="font-semibold text-sm" style={{ color: 'var(--accent-green)' }}>
-                        {displayReport.complexity_metrics.complexity_score}/100
+                <div className="space-y-1.5" style={{ fontSize: '13px' }}>
+                  {getCompositionBreakdown(currentStrategy).map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="flex justify-between items-baseline px-2 py-1.5"
+                      style={{ background: idx % 2 === 0 ? 'transparent' : 'var(--bg-panel)', borderRadius: '3px' }}
+                    >
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                        {item.label}
+                      </span>
+                      <span style={{ color: 'var(--text-secondary)', fontWeight: '600', minWidth: '2rem', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        {item.count}
                       </span>
                     </div>
-                    <div className="w-full rounded-full h-2" style={{ background: 'var(--bg-hover)' }}>
-                      <div
-                        className="h-2 rounded-full transition-all"
-                        style={{
-                          background: 'var(--accent-green)',
-                          width: `${Math.min(displayReport.complexity_metrics.complexity_score, 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
-                      {getComplexityLevel(displayReport.complexity_metrics.complexity_score)}
-                    </div>
+                  ))}
+                </div>
+                {getCompositionBreakdown(currentStrategy).some(item => item.details) && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
+                    {getCompositionBreakdown(currentStrategy)
+                      .filter(item => item.details)
+                      .map((item, idx) => (
+                        <div key={idx} style={{ marginTop: idx > 0 ? '3px' : '0' }}>
+                          • {item.details}
+                        </div>
+                      ))}
                   </div>
+                )}
+              </div>
+
+              {/* Complexity — compact with progress bar */}
+              <div
+                className="rounded border p-3"
+                style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}>
+                    Complexity
+                  </h3>
+                  <span className="text-sm font-bold" style={{ color: 'var(--accent-green)', fontVariantNumeric: 'tabular-nums' }}>
+                    {displayReport.complexity_metrics.complexity_score}
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '2px' }}>/100</span>
+                  </span>
+                </div>
+                <div style={{ height: '4px', background: 'var(--bg-panel)', borderRadius: '2px', marginBottom: '6px', overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      background: 'var(--accent-green)',
+                      width: `${Math.min(displayReport.complexity_metrics.complexity_score, 100)}%`,
+                      transition: 'width 0.3s ease',
+                    }}
+                  />
+                </div>
+                <div className="text-xs" style={{ color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                  {getComplexityLevel(displayReport.complexity_metrics.complexity_score)}
                 </div>
               </div>
+
+              {/* Timing Conflicts if present */}
+              {displayReport.timing_conflicts && displayReport.timing_conflicts.length > 0 && (
+                <div
+                  className="rounded border p-3"
+                  style={{ background: 'var(--accent-red-deeper)', borderColor: 'var(--accent-red)' }}
+                >
+                  <h3 className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--accent-red)', letterSpacing: '0.12em' }}>
+                    ⚠ Timing Conflicts
+                  </h3>
+                  <div className="space-y-2" style={{ fontSize: '12px' }}>
+                    {displayReport.timing_conflicts.map((conflict, idx) => (
+                      <div key={idx} style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '3px', borderLeft: '2px solid var(--accent-red)' }}>
+                        <div style={{ color: 'var(--accent-red)', fontWeight: '600', marginBottom: '4px' }}>
+                          {conflict.signal}
+                        </div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '11px', display: 'grid', gap: '2px' }}>
+                          <div className="flex justify-between">
+                            <span>Timing Window:</span>
+                            <span style={{ fontWeight: '600', fontVariantNumeric: 'tabular-nums' }}>{conflict.timing_window} bars</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>RECHECK Delay:</span>
+                            <span style={{ fontWeight: '600', fontVariantNumeric: 'tabular-nums' }}>{conflict.recheck_delay} bars</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
