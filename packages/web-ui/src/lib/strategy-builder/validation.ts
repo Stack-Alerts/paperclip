@@ -25,9 +25,12 @@ export function validateStrategyLocal(strategy: Strategy): ValidationReport {
     info: [],
   };
 
+  const blocks = strategy.blocks ?? [];
+  const settings = strategy.settings ?? ({} as Partial<Strategy['settings']>);
+
   // Check for required blocks
-  const hasEntry = strategy.blocks.some((b) => b.type === BlockType.ENTRY_CONDITION);
-  const hasExit = strategy.blocks.some((b) => b.type === BlockType.EXIT_CONDITION);
+  const hasEntry = blocks.some((b) => b.type === BlockType.ENTRY_CONDITION);
+  const hasExit = blocks.some((b) => b.type === BlockType.EXIT_CONDITION);
 
   if (!hasEntry) {
     issues.critical.push({
@@ -52,7 +55,7 @@ export function validateStrategyLocal(strategy: Strategy): ValidationReport {
   }
 
   // Check for empty strategy
-  if (strategy.blocks.length === 0) {
+  if (blocks.length === 0) {
     issues.errors.push({
       rule_id: 'empty_strategy',
       rule_name: 'Empty Strategy',
@@ -76,7 +79,7 @@ export function validateStrategyLocal(strategy: Strategy): ValidationReport {
   }
 
   // Check settings
-  if (!strategy.settings.timeframe) {
+  if (!settings.timeframe) {
     issues.warnings.push({
       rule_id: 'missing_timeframe',
       rule_name: 'Missing Timeframe',
@@ -87,7 +90,7 @@ export function validateStrategyLocal(strategy: Strategy): ValidationReport {
     });
   }
 
-  if (!strategy.settings.targetMarket) {
+  if (!settings.targetMarket) {
     issues.warnings.push({
       rule_id: 'missing_target_market',
       rule_name: 'Missing Target Market',
@@ -127,7 +130,7 @@ export function validateStrategyLocal(strategy: Strategy): ValidationReport {
     notices: issues.notices,
     info: issues.info,
     complexity_metrics: {
-      complexity_score: Math.min(100, strategy.blocks.length * 10),
+      complexity_score: Math.min(100, blocks.length * 10),
     },
   };
 }
