@@ -391,3 +391,25 @@ export function validateStrategyLocal(strategy: Strategy): ValidationReport {
     };
   }
 }
+
+// Merge the client-derived narrative fields (executionFlow / confluenceScoring
+// / scenarios) onto a ValidationReport returned by the backend. The Python
+// InstitutionalValidator owns issues/complexity/timing-conflicts but it does
+// not produce the narrative — that's a web-UI-only presentation layer that
+// walks the strategy block tree. Without this, the Execution Flow tab is
+// empty for API-sourced reports (BTCAAAAA-32954 board comment 7696e717).
+export function enrichReportWithNarrative(
+  report: ValidationReport,
+  strategy: Strategy,
+): ValidationReport {
+  try {
+    return {
+      ...report,
+      executionFlow: generateExecutionFlow(strategy),
+      confluenceScoring: generateConfluenceScoring(strategy),
+      scenarios: generateScenarios(strategy),
+    };
+  } catch {
+    return report;
+  }
+}
