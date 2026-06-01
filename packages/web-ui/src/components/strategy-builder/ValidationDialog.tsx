@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ValidationReportWindow } from './ValidationReportWindow';
+import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 
 export interface ValidationDialogProps {
   open: boolean;
@@ -9,7 +10,9 @@ export interface ValidationDialogProps {
 }
 
 export const ValidationDialog: React.FC<ValidationDialogProps> = ({ open, onClose }) => {
-  return <ValidationReportWindow open={open} onClose={onClose} />;
+  const validationReport = useStrategyStore((state) => state.validationReport);
+
+  return <ValidationReportWindow open={open} onClose={onClose} report={validationReport ?? undefined} />;
 };
 
 export default ValidationDialog;

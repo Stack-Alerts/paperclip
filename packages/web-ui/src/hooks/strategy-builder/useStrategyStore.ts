@@ -10,12 +10,13 @@ import {
   BlockCategory,
   ValidationMessage,
   ValidationLevel,
+  ValidationReport,
   BacktestConfig,
   BacktestConfigFull,
   BacktestResult,
   StrategySettings,
 } from '@/lib/strategy-builder/types';
-import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults } from '@/lib/strategy-builder/api';
+import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults, validateStrategy as validateStrategyAPI } from '@/lib/strategy-builder/api';
 
 // Strategies loaded from the strategy-builder API have IDs of the form
 // "strategy_<hex>" (see StrategyDatabaseManager.create_strategy); locally
@@ -100,6 +101,7 @@ interface StrategyStoreState {
   // UI state
   selectedBlockIndex: number | null;
   validationMessages: ValidationMessage[];
+  validationReport: ValidationReport | null;
   isValidating: boolean;
   backTestInProgress: boolean;
   backTestProgress: number;
@@ -140,6 +142,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   isLoadingLibrary: true,
   selectedBlockIndex: null,
   validationMessages: [],
+  validationReport: null,
   isValidating: false,
   backTestInProgress: false,
   backTestProgress: 0,
@@ -384,42 +387,44 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     });
   },
 
-  // Validate strategy client-side
+  // Validate strategy via backend API
   validateStrategy: async () => {
     const { currentStrategy } = get();
     if (!currentStrategy) return;
 
-    set({ isValidating: true });
-    const messages: ValidationMessage[] = [];
+    set({ isValidating: true, validationReport: null });
+    try {
+      const report = await validateStrategyAPI(currentStrategy.id, {
+        name: currentStrategy.name,
+        blocks: currentStrategy.blocks,
+        settings: currentStrategy.settings,
+      }) as ValidationReport;
 
-    if (!currentStrategy.name || currentStrategy.name.trim() === '') {
-      messages.push({
-        id: 'validation-name',
-        level: ValidationLevel.ERROR,
-        text: 'Strategy name is required',
-        code: 'MISSING_NAME',
-        timestamp: new Date().toISOString(),
+      set({
+        validationReport: report,
+        isValidating: false,
+        currentStrategy: {
+          ...currentStrategy,
+          status: report.is_valid ? StrategyStatus.VALID : StrategyStatus.INVALID,
+        },
+      });
+    } catch (error) {
+      const messages: ValidationMessage[] = [
+        {
+          id: 'validation-error',
+          level: ValidationLevel.ERROR,
+          text: `Validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          code: 'VALIDATION_ERROR',
+          timestamp: new Date().toISOString(),
+        },
+      ];
+
+      set({
+        validationMessages: messages,
+        isValidating: false,
+        currentStrategy: { ...currentStrategy, status: StrategyStatus.INVALID },
       });
     }
-
-    if (currentStrategy.blocks.length === 0) {
-      messages.push({
-        id: 'validation-blocks',
-        level: ValidationLevel.WARNING,
-        text: 'Strategy has no building blocks',
-        code: 'NO_BLOCKS',
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    const hasErrors = messages.some((m) => m.level === ValidationLevel.ERROR);
-    const newStatus = hasErrors ? StrategyStatus.INVALID : StrategyStatus.VALID;
-
-    set({
-      validationMessages: messages,
-      isValidating: false,
-      currentStrategy: { ...currentStrategy, status: newStatus },
-    });
   },
 
   // Run backtest via backend API (BTCAAAAA-31183 / parent BTCAAAAA-31180):
