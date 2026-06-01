@@ -282,6 +282,36 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* ─── Interactive element cursor standard ────────────────────────────────── */
+/* Wrapped in @layer base so Tailwind v4 preserves these rules. Bare element
+   selectors at the top level are dropped by @tailwindcss/postcss v4. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  summary,
+  label[for],
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="submit"],
+  input[type="reset"],
+  input[type="button"],
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  input[type="checkbox"]:disabled,
+  input[type="radio"]:disabled,
+  input[type="submit"]:disabled,
+  input[type="reset"]:disabled,
+  input[type="button"]:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
+}
+
 /* ─── Scrollbars ─────────────────────────────────────────────────────────── */
 * {
   scrollbar-width: thin;
