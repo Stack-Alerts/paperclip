@@ -108,46 +108,13 @@ function ChipRow({
   );
 }
 
-// ─── Section header for two-column ConfigTab body ──────────────────────────────────────
-function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
-  return (
-    <div className="space-y-0.5 mb-3">
-      <h3
-        className="text-xs font-semibold uppercase tracking-wider"
-        style={{ color: 'var(--text-secondary)' }}
-      >
-        {title}
-      </h3>
-      {subtitle && (
-        <p className="text-xs" style={{ color: 'var(--text-faint)' }}>{subtitle}</p>
-      )}
-    </div>
-  );
-}
-
-// ─── Card wrapper for each ConfigTab section ───────────────────────────────────────────
-function SectionCard({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className="rounded-md p-3 space-y-2"
-      style={{
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border)',
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-// ─── Config Tab — single-column vertical layout for scannability ──────────────────────
+// ─── Config Tab — 3-column grid layout matching thick-client exactly ─────────────────
 //
-// All sections stacked top-to-bottom in a scrollable panel:
-//   Basic Settings → Mode → TP/SL Config → Adaptive v2.0 → Capital & Exposure
-//   → Confluence → Hold Duration
+// Layout: [Configuration (35%)] [Adaptive SL v2.0 (35%)] [Risk/Reward (30%)]
 //
-// Replaces the previous 3-column grid that was dense and hard to scan.
-// All state bindings and functional inventory are preserved.
+// Each column contains vertically-stacked field groups, all using ChipRow pattern.
+// Density: Fits 1280×800 without scrolling, matching thick client.
+// All state bindings and functional inventory preserved.
 //
 function ConfigTab({
   config,
@@ -163,21 +130,22 @@ function ConfigTab({
   const [testingDays, setTestingDays] = useState<ChipValue>(30);
   const [mode, setMode] = useState<'walk-forward' | 'walk' | 'live-replay'>('walk-forward');
   const [tpSlConfig, setTpSlConfig] = useState<string>('Default');
+  const [slAdjustment, setSlAdjustment] = useState<'Adaptive v2.0' | 'Static'>('Adaptive v2.0');
   const [adaptivePreset, setAdaptivePreset] = useState<'Conservative' | 'Balanced' | 'Aggressive' | 'Custom'>('Balanced');
   const [delayStopLoss, setDelayStopLoss] = useState(true);
-  const [marketStructureStop, setMarketStructureStop] = useState(false);
-  const [stopLossDelay, setStopLossDelay] = useState<ChipValue>(1.0);
-  const [emergency, setEmergency] = useState<ChipValue>(1.5);
+  const [marketStructureStop, setMarketStructureStop] = useState(true);
+  const [stopLossDelay, setStopLossDelay] = useState<ChipValue>(2);
+  const [emergency, setEmergency] = useState<ChipValue>(2.0);
   const [volatilityLookback, setVolatilityLookback] = useState<ChipValue>(20);
-  const [volatilityMultiplier, setVolatilityMultiplier] = useState<ChipValue>(1.5);
-  const [minStopLoss, setMinStopLoss] = useState<ChipValue>(1.0);
-  const [maxStopLoss, setMaxStopLoss] = useState<ChipValue>(3.0);
-  const [minRiskReward, setMinRiskReward] = useState<ChipValue>(2.0);
+  const [volatilityMultiplier, setVolatilityMultiplier] = useState<ChipValue>(1.2);
+  const [minStopLoss, setMinStopLoss] = useState<ChipValue>(0.7);
+  const [maxStopLoss, setMaxStopLoss] = useState<ChipValue>(2.0);
+  const [minRiskReward, setMinRiskReward] = useState<ChipValue>(1.2);
   const [maxRisk, setMaxRisk] = useState<ChipValue>(10);
-  const [leverage, setLeverage] = useState<ChipValue>(5);
+  const [leverage, setLeverage] = useState<ChipValue>(10);
   const [confluence, setConfluence] = useState<string>('Boost from Strategy');
   const [minBarsHeld, setMinBarsHeld] = useState<ChipValue>(5);
-  const [maxBarsHeld, setMaxBarsHeld] = useState<ChipValue>(60);
+  const [maxBarsHeld, setMaxBarsHeld] = useState<ChipValue>(200);
 
   const applyLookbackToDates = useCallback((days: number) => {
     setLookbackDays(days);
@@ -185,107 +153,128 @@ function ConfigTab({
   }, [onChange]);
 
   return (
-    <div className="max-w-2xl mx-auto pb-6 space-y-4">
+    <div className="h-full overflow-auto pb-6">
+      {/* 3-Column Grid: Configuration | Adaptive SL v2.0 | Risk/Reward */}
+      <div className="grid grid-cols-[35%_35%_30%] gap-4 px-4 py-4">
 
-      {/* ── Basic Settings ── */}
-      <SectionCard>
-        <SectionHeader title="Basic Settings" subtitle="Lookback, training, and testing window lengths" />
-        <div className="space-y-3">
-          <ChipRow
-            label="Lookback"
-            values={[30, 60, 90, 120, 180, 365]}
-            current={lookbackDays}
-            onSelect={(v) => applyLookbackToDates(Number(v))}
-            disabled={disabled}
-            format={(v) => `${v}d`}
-          />
-          <ChipRow
-            label="Training"
-            values={[30, 60, 90, 120, 180]}
-            current={trainingDays}
-            onSelect={setTrainingDays}
-            disabled={disabled}
-            format={(v) => `${v}d`}
-          />
-          <ChipRow
-            label="Testing"
-            values={[15, 30, 45, 60, 90]}
-            current={testingDays}
-            onSelect={setTestingDays}
-            disabled={disabled}
-            format={(v) => `${v}d`}
-          />
-        </div>
-      </SectionCard>
+        {/* ═════════════════════════════════════════════════════════════════════
+            COLUMN 1: CONFIGURATION (35%)
+            ════════════════════════════════════════════════════════════════════ */}
+        <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-400px)]">
+          {/* Column header */}
+          <div className="mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+              Configuration
+            </h3>
+          </div>
 
-      {/* ── Mode ── */}
-      <SectionCard>
-        <SectionHeader title="Mode" />
-        <div className="flex gap-2 flex-wrap">
-          {([
-            { id: 'walk-forward' as const, label: 'Walk-Forward' },
-            { id: 'walk' as const, label: 'Walk' },
-            { id: 'live-replay' as const, label: 'Live Replay' },
-          ]).map((m) => {
-            const isActive = mode === m.id;
-            return (
-              <button
-                key={m.id}
+          {/* Basic Settings section */}
+          <div>
+            <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+              Basic Settings
+            </div>
+            <div className="space-y-2">
+              <ChipRow
+                label="Lookback"
+                values={[30, 60, 90, 120, 180, 240, 360]}
+                current={lookbackDays}
+                onSelect={(v) => applyLookbackToDates(Number(v))}
                 disabled={disabled}
-                onClick={() => setMode(m.id)}
-                className="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50"
-                style={{
-                  background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
-                  border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
-                  color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                }}
-              >
-                {m.label}
-              </button>
-            );
-          })}
-        </div>
-      </SectionCard>
+                format={(v) => `${v}d`}
+              />
+              <ChipRow
+                label="Training"
+                values={[30, 60, 90, 120, 180, 240, 360]}
+                current={trainingDays}
+                onSelect={setTrainingDays}
+                disabled={disabled}
+                format={(v) => `${v}d`}
+              />
+              <ChipRow
+                label="Testing"
+                values={[30, 60, 90, 120, 180, 240, 360]}
+                current={testingDays}
+                onSelect={setTestingDays}
+                disabled={disabled}
+                format={(v) => `${v}d`}
+              />
+            </div>
+          </div>
 
-      {/* ── TP/SL Config ── */}
-      <SectionCard>
-        <SectionHeader title="TP/SL Config" subtitle="Take-profit / stop-loss configuration and adjustment mode" />
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <label htmlFor="bt-tpsl-config" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+          {/* Divider */}
+          <div style={{ height: '1px', background: 'var(--border)' }} />
+
+          {/* Mode section */}
+          <div>
+            <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+              Mode
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {(['walk-forward', 'walk', 'live-replay'] as const).map((m) => {
+                const labels = {
+                  'walk-forward': 'Mode 1: Historical',
+                  'walk': 'Mode 2: Walk',
+                  'live-replay': 'Mode 2: Live Replay',
+                };
+                const isActive = mode === m;
+                return (
+                  <button
+                    key={m}
+                    disabled={disabled}
+                    onClick={() => setMode(m)}
+                    className="px-2 py-1 rounded text-[11px] font-medium text-left transition-colors disabled:opacity-50"
+                    style={{
+                      background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
+                      border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
+                      color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                    }}
+                  >
+                    {labels[m]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: '1px', background: 'var(--border)' }} />
+
+          {/* TP/SL Config section */}
+          <div>
+            <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
               TP/SL Config
-            </label>
+            </div>
             <select
-              id="bt-tpsl-config"
               disabled={disabled}
               value={tpSlConfig}
               onChange={(e) => setTpSlConfig(e.target.value)}
-              className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
+              className="w-full px-2 py-1 rounded text-[11px] focus:outline-none disabled:opacity-50"
               style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
             >
-              <option>Default</option>
-              <option>TBoosct</option>
-              <option>Conservative</option>
-              <option>Aggressive</option>
-              <option>Manual</option>
+              <option>Fibonacci</option>
+              <option>Hybrid</option>
+              <option>Fixed</option>
             </select>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-              Stop-Loss Adjustment
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              {['Adaptive v2.0', 'Static', 'Trailing', 'None'].map((opt) => {
-                const isActive = opt === 'Adaptive v2.0';
+
+          {/* Stop Loss Adjustment section */}
+          <div>
+            <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+              Stop Loss Adjustment
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {(['Adaptive v2.0', 'Static'] as const).map((opt) => {
+                const isActive = slAdjustment === opt;
                 return (
                   <button
                     key={opt}
                     disabled={disabled}
-                    className="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50"
+                    onClick={() => setSlAdjustment(opt)}
+                    className="px-2 py-1 rounded text-[11px] font-medium text-left transition-colors disabled:opacity-50"
                     style={{
                       background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                       border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
-                      color: isActive ? 'var(--accent-blue)' : 'var(--text-muted)',
+                      color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
                     }}
                   >
                     {opt}
@@ -295,21 +284,48 @@ function ConfigTab({
             </div>
           </div>
         </div>
-      </SectionCard>
 
-      {/* ── Adaptive v2.0 ── */}
-      <SectionCard>
-        <SectionHeader title="Adaptive v2.0" subtitle="Volatility-aware stop-loss and take-profit tuning" />
-        <div className="space-y-3">
-          <ChipRow
-            label="Presets"
-            values={['Conservative', 'Balanced', 'Aggressive', 'Custom']}
-            current={adaptivePreset}
-            onSelect={(v) => setAdaptivePreset(v as typeof adaptivePreset)}
-            disabled={disabled}
-          />
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+        {/* ═════════════════════════════════════════════════════════════════════
+            COLUMN 2: ADAPTIVE SL v2.0 (35%)
+            ════════════════════════════════════════════════════════════════════ */}
+        <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-400px)]">
+          {/* Column header */}
+          <div className="mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+              Adaptive SL v2.0
+            </h3>
+          </div>
+
+          {/* Presets section */}
+          <div>
+            <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+              Presets
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {(['Conservative', 'Balanced', 'Aggressive', 'Custom'] as const).map((preset) => {
+                const isActive = adaptivePreset === preset;
+                return (
+                  <button
+                    key={preset}
+                    disabled={disabled}
+                    onClick={() => setAdaptivePreset(preset)}
+                    className="px-2 py-1 rounded text-[11px] font-medium text-left transition-colors disabled:opacity-50"
+                    style={{
+                      background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
+                      border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
+                      color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                    }}
+                  >
+                    {preset}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Checkboxes */}
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-2 text-[11px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
               <input
                 type="checkbox"
                 disabled={disabled}
@@ -319,7 +335,7 @@ function ConfigTab({
               />
               Delay Stop-Loss
             </label>
-            <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+            <label className="flex items-center gap-2 text-[11px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
               <input
                 type="checkbox"
                 disabled={disabled}
@@ -330,141 +346,161 @@ function ConfigTab({
               Market Structure Stop-Loss
             </label>
           </div>
-          <ChipRow
-            label="Stop-Loss Delay"
-            values={[0, 1, 2, 3, 4, 5, 6, 7]}
-            current={stopLossDelay}
-            onSelect={setStopLossDelay}
-            disabled={disabled}
-            format={(v) => `${v} bars`}
-          />
-          <ChipRow
-            label="Emergency"
-            values={[1.0, 1.5, 2.0, 2.5, 3.0]}
-            current={emergency}
-            onSelect={setEmergency}
-            disabled={disabled}
-            format={(v) => `${Number(v).toFixed(2)}%`}
-          />
-          <ChipRow
-            label="Volatility Lookback"
-            values={[10, 15, 20, 25, 30, 50]}
-            current={volatilityLookback}
-            onSelect={setVolatilityLookback}
-            disabled={disabled}
-            format={(v) => `${v} bars`}
-          />
-          <ChipRow
-            label="Volatility Multiplier"
-            values={[1, 2, 3, 4, 5]}
-            current={volatilityMultiplier}
-            onSelect={setVolatilityMultiplier}
-            disabled={disabled}
-            format={(v) => `${v}x`}
-          />
-          <ChipRow
-            label="Min Stop-Loss"
-            values={[0.5, 1.0, 1.5, 2.0, 2.5]}
-            current={minStopLoss}
-            onSelect={setMinStopLoss}
-            disabled={disabled}
-            format={(v) => `${Number(v).toFixed(1)}%`}
-          />
-          <ChipRow
-            label="Max Stop-Loss"
-            values={[2.0, 3.0, 5.0, 7.0, 10.0]}
-            current={maxStopLoss}
-            onSelect={setMaxStopLoss}
-            disabled={disabled}
-            format={(v) => `${Number(v).toFixed(1)}%`}
-          />
-        </div>
-      </SectionCard>
 
-      {/* ── Capital & Exposure ── */}
-      <SectionCard>
-        <SectionHeader title="Capital & Exposure" subtitle="Position sizing, risk limits, and leverage" />
-        <div className="space-y-3">
-          <ChipRow
-            label="Starting Capital"
-            values={[100, 1000, 10000, 100000, 1000000]}
-            current={config.initialCapital ?? 10000}
-            onSelect={(v) => onChange({ initialCapital: Number(v) })}
-            disabled={disabled}
-            format={(v) => `$${Number(v).toLocaleString()}`}
-          />
-          <ChipRow
-            label="Min Risk/Reward"
-            values={[1.0, 1.5, 2.0, 3.0, 5.0]}
-            current={minRiskReward}
-            onSelect={setMinRiskReward}
-            disabled={disabled}
-            format={(v) => `${v}x`}
-          />
-          <ChipRow
-            label="Max Risk"
-            values={[1, 5, 10, 20, 40]}
-            current={maxRisk}
-            onSelect={setMaxRisk}
-            disabled={disabled}
-            format={(v) => `${v}%`}
-          />
-          <ChipRow
-            label="Leverage"
-            values={[1, 2, 3, 5, 10, 25, 50, 100]}
-            current={leverage}
-            onSelect={setLeverage}
-            disabled={disabled}
-            format={(v) => `${v}x`}
-          />
-        </div>
-      </SectionCard>
+          {/* Divider */}
+          <div style={{ height: '1px', background: 'var(--border)' }} />
 
-      {/* ── Confluence ── */}
-      <SectionCard>
-        <SectionHeader title="Confluence" subtitle="Use strategy-side confluence boost vs an independent score band" />
-        <div className="space-y-1.5">
-          <label htmlFor="bt-confluence" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-            Confluence Mode
-          </label>
-          <select
-            id="bt-confluence"
-            disabled={disabled}
-            value={confluence}
-            onChange={(e) => setConfluence(e.target.value)}
-            className="w-full px-3 py-2 rounded text-sm focus:outline-none disabled:opacity-50"
-            style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-          >
-            <option>Boost from Strategy</option>
-            <option>Independent Score</option>
-            <option>Disabled</option>
-          </select>
+          {/* Volatility/SL Controls */}
+          <div className="space-y-2">
+            <ChipRow
+              label="Stop Loss Delay"
+              values={[1, 2, 3, 4, 5, 6, 7]}
+              current={stopLossDelay}
+              onSelect={setStopLossDelay}
+              disabled={disabled}
+              format={(v) => `${v}`}
+            />
+            <ChipRow
+              label="Emergency"
+              values={[1.0, 1.25, 1.5, 1.75, 2.0, 2.15, 2.25]}
+              current={emergency}
+              onSelect={setEmergency}
+              disabled={disabled}
+              format={(v) => `${Number(v).toFixed(2)}`}
+            />
+            <ChipRow
+              label="Vol Lookback"
+              values={[10, 15, 20, 25, 30, 50]}
+              current={volatilityLookback}
+              onSelect={setVolatilityLookback}
+              disabled={disabled}
+              format={(v) => `${v}`}
+            />
+            <ChipRow
+              label="Vol Multiplier"
+              values={[1, 2, 3, 4, 5]}
+              current={volatilityMultiplier}
+              onSelect={setVolatilityMultiplier}
+              disabled={disabled}
+              format={(v) => `${v}x`}
+            />
+            <ChipRow
+              label="Min Stop-Loss"
+              values={[0.5, 1.0, 1.5, 2.0, 2.5]}
+              current={minStopLoss}
+              onSelect={setMinStopLoss}
+              disabled={disabled}
+              format={(v) => `${Number(v).toFixed(1)}`}
+            />
+            <ChipRow
+              label="Max Stop-Loss"
+              values={[2.0, 3.0, 5.0, 7.0, 10.0]}
+              current={maxStopLoss}
+              onSelect={setMaxStopLoss}
+              disabled={disabled}
+              format={(v) => `${Number(v).toFixed(1)}`}
+            />
+          </div>
         </div>
-      </SectionCard>
 
-      {/* ── Hold Duration ── */}
-      <SectionCard>
-        <SectionHeader title="Hold Duration" subtitle="Minimum and maximum bars a position may be held" />
-        <div className="space-y-3">
-          <ChipRow
-            label="Min Bars Held"
-            values={[1, 5, 10, 20, 40]}
-            current={minBarsHeld}
-            onSelect={setMinBarsHeld}
-            disabled={disabled}
-            format={(v) => `${v}`}
-          />
-          <ChipRow
-            label="Max Bars Held"
-            values={[5, 10, 30, 60, 120, 200]}
-            current={maxBarsHeld}
-            onSelect={setMaxBarsHeld}
-            disabled={disabled}
-            format={(v) => `${v}`}
-          />
+        {/* ═════════════════════════════════════════════════════════════════════
+            COLUMN 3: RISK / REWARD (30%)
+            ════════════════════════════════════════════════════════════════════ */}
+        <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-400px)]">
+          {/* Column header */}
+          <div className="mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+              Risk / Reward
+            </h3>
+          </div>
+
+          {/* Capital & Exposure */}
+          <div className="space-y-2">
+            <ChipRow
+              label="Starting Capital"
+              values={[500, 1000, 2000, 5000, 10000, 25000, 50000]}
+              current={config.initialCapital ?? 10000}
+              onSelect={(v) => onChange({ initialCapital: Number(v) })}
+              disabled={disabled}
+              format={(v) => {
+                const n = Number(v);
+                if (n >= 1000) return `$${(n / 1000).toFixed(0)}k`;
+                return `$${n}`;
+              }}
+            />
+            <ChipRow
+              label="Min Risk:Reward"
+              values={[12, 15, 20, 22, 25, 27, 30]}
+              current={minRiskReward}
+              onSelect={setMinRiskReward}
+              disabled={disabled}
+              format={(v) => `${v}x`}
+            />
+            <ChipRow
+              label="Risk %"
+              values={[1, 2, 5, 7, 10, 12, 15]}
+              current={maxRisk}
+              onSelect={setMaxRisk}
+              disabled={disabled}
+              format={(v) => `${v}%`}
+            />
+            <ChipRow
+              label="Leverage"
+              values={[3, 5, 10, 15, 20, 25, 30]}
+              current={leverage}
+              onSelect={setLeverage}
+              disabled={disabled}
+              format={(v) => `${v}x`}
+            />
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: '1px', background: 'var(--border)' }} />
+
+          {/* Confluence */}
+          <div>
+            <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+              Confluence
+            </div>
+            <select
+              disabled={disabled}
+              value={confluence}
+              onChange={(e) => setConfluence(e.target.value)}
+              className="w-full px-2 py-1 rounded text-[11px] focus:outline-none disabled:opacity-50"
+              style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+            >
+              <option>Boost from Strategy</option>
+              <option>Independent Score</option>
+              <option>Disabled</option>
+            </select>
+          </div>
+
+          {/* Hold Duration */}
+          <div>
+            <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+              Hold Duration
+            </div>
+            <div className="space-y-2">
+              <ChipRow
+                label="Min Bars Held"
+                values={[1, 5, 10, 20, 40]}
+                current={minBarsHeld}
+                onSelect={setMinBarsHeld}
+                disabled={disabled}
+                format={(v) => `${v}`}
+              />
+              <ChipRow
+                label="Max Bars Held"
+                values={[15, 20, 25, 30, 40, 50, 75]}
+                current={maxBarsHeld}
+                onSelect={setMaxBarsHeld}
+                disabled={disabled}
+                format={(v) => `${v}`}
+              />
+            </div>
+          </div>
         </div>
-      </SectionCard>
-
+      </div>
     </div>
   );
 }

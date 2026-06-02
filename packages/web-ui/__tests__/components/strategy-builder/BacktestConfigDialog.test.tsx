@@ -5,11 +5,11 @@ import { BacktestConfigDialog } from '@/components/strategy-builder/BacktestConf
 import { Providers } from '@/components/strategy-builder/Providers';
 import { StrategyStatus } from '@/lib/strategy-builder/types';
 
-jest.mock('@/hooks/useStrategyStore', () => ({
+jest.mock('@/hooks/strategy-builder/useStrategyStore', () => ({
   useStrategyStore: jest.fn(),
 }));
 
-import { useStrategyStore } from '@/hooks/useStrategyStore';
+import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 
 const mockStore = useStrategyStore as jest.MockedFunction<typeof useStrategyStore>;
 
@@ -28,6 +28,7 @@ const defaultStore = {
   runBacktest: jest.fn().mockResolvedValue({}),
   backTestInProgress: false,
   backTestProgress: 0,
+  backTestResult: null,
 };
 
 function renderDialog(open = true, onClose = jest.fn()) {
@@ -53,48 +54,45 @@ describe('BacktestConfigDialog', () => {
     expect(screen.getByText(/Backtest Configuration/)).toBeInTheDocument();
   });
 
-  it('shows date, capital, and commission inputs', () => {
+  it('shows chip rows for Lookback, Training, Testing with preset day buttons', () => {
     renderDialog();
-    expect(screen.getByLabelText(/Start Date/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/End Date/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Initial Capital/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Commission/)).toBeInTheDocument();
+    // Lookback, Training, Testing rows each have 30d and 90d chips
+    const thirtyDButtons = screen.getAllByRole('button', { name: '30d' });
+    const ninetyDButtons = screen.getAllByRole('button', { name: '90d' });
+    expect(thirtyDButtons.length).toBeGreaterThanOrEqual(1);
+    expect(ninetyDButtons.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('shows preset day buttons', () => {
+  it('shows 3-column structure: Configuration, Adaptive SL v2.0, Risk/Reward', () => {
     renderDialog();
-    expect(screen.getByRole('button', { name: '30d' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '90d' })).toBeInTheDocument();
+    // Column headers — use getAllByText to handle 'Configuration' appearing in header+title
+    expect(screen.getAllByText(/Configuration/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Adaptive SL v2\.0/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Risk \/ Reward/i).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('calls runBacktest and closes on Run click', async () => {
-    const onClose = jest.fn();
-    renderDialog(true, onClose);
-    fireEvent.click(screen.getByRole('button', { name: /Run Backtest/ }));
+  it('calls runBacktest on Run Test click', async () => {
+    renderDialog();
+    fireEvent.click(screen.getByRole('button', { name: /Run Test/ }));
     await waitFor(() => {
       expect(defaultStore.runBacktest).toHaveBeenCalledWith(
         expect.objectContaining({ strategyId: 'strat-1' }),
       );
-      expect(onClose).toHaveBeenCalled();
     });
   });
 
-  it('shows error when dates are invalid', async () => {
-    renderDialog();
-    fireEvent.change(screen.getByLabelText(/Start Date/), { target: { value: '2026-06-01' } });
-    fireEvent.change(screen.getByLabelText(/End Date/), { target: { value: '2026-01-01' } });
-    fireEvent.click(screen.getByRole('button', { name: /Run Backtest/ }));
-    await waitFor(() => expect(screen.getByText(/Start date must be before/)).toBeInTheDocument());
-  });
-
-  it('disables Run Backtest when backtest is in progress', () => {
+  it('shows Running button and disables it when backtest is in progress', () => {
     mockStore.mockReturnValue({ ...defaultStore, backTestInProgress: true } as any);
     render(
       <Providers tooltips={{}}>
         <BacktestConfigDialog open onClose={jest.fn()} />
       </Providers>
     );
-    expect(screen.getByRole('button', { name: /Running/ })).toBeDisabled();
+    // Find the "Running…" button in the footer (not any status text elsewhere)
+    const runningBtns = screen.getAllByText(/Running/);
+    const runningBtn = runningBtns.find(el => el.closest('button'));
+    expect(runningBtn).toBeDefined();
+    expect(runningBtn!.closest('button')).toBeDisabled();
   });
 
   it('shows progress bar when running', () => {
