@@ -36,6 +36,7 @@ import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { ValidationReport, ValidationIssue, ValidationSeverity } from '@/lib/strategy-builder/types';
 import { AutoFixConfirmDialog } from './AutoFixConfirmDialog';
 import { AppBrand } from '@/components/shared/AppBrand';
+import { status } from '@/lib/status';
 
 export interface ValidationReportWindowProps {
   open: boolean;
@@ -868,7 +869,26 @@ function getComplexityLevel(score: number): string {
 }
 
 export function ValidationReportWindow({ open, onClose, report, standalone = false }: ValidationReportWindowProps) {
-  const { validationMessages, isValidating, validateStrategy, clearValidation, currentStrategy, applyAutoFix, applyLocalAutoFix, fixedIssuesInSession, undoAutoFix } = useStrategyStore();
+  const { validationMessages, isValidating, validateStrategy, clearValidation, currentStrategy, applyAutoFix, applyLocalAutoFix, fixedIssuesInSession, undoAutoFix, saveStrategy } = useStrategyStore();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = useCallback(async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      const saved = await saveStrategy();
+      const versionNumber = (saved as { versionNumber?: number }).versionNumber;
+      status.emit(
+        versionNumber ? `Strategy saved (v${versionNumber})` : 'Strategy saved',
+        { duration: 2000 },
+      );
+      onClose();
+    } catch {
+      status.emit('Save failed', { duration: 2000, variant: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [isSaving, saveStrategy, onClose]);
 
   const handlePopOut = useCallback(() => {
     const win = window.open(
@@ -1554,11 +1574,13 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
             ↩ Undo Last Fix
           </button>
           <button
-            onClick={onClose}
-            className="px-4 py-2 rounded text-sm font-medium transition-colors"
+            onClick={displayReport.is_valid ? handleSave : onClose}
+            disabled={displayReport.is_valid && isSaving}
+            className="px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50"
             style={closeButtonStyle}
+            title={displayReport.is_valid ? 'Save strategy as a new version' : 'Close validation report'}
           >
-            {displayReport.is_valid ? '✓ All Clear' : '✕ Close'}
+            {displayReport.is_valid ? (isSaving ? 'Saving…' : 'Save') : '✕ Close'}
           </button>
         </div>
       </div>
