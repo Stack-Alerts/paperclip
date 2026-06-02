@@ -222,26 +222,34 @@ def check_blocker_is_auth_related(blocked_issue_id: str) -> bool:
 
 
 def get_issues_blocked_longer_than_threshold(hours: int = BLOCK_THRESHOLD_HOURS) -> List[Dict]:
-    """Fetch issues that have been blocked for > threshold hours."""
+    """Fetch issues that have been blocked for > threshold hours (paginated)."""
     try:
-        # Get in_progress issues (most likely to be blocked)
-        issues = _api_request(
-            "GET",
-            f"/api/companies/{PAPERCLIP_COMPANY_ID}/issues?status=in_progress,todo&limit=100"
-        )
+        all_issues = []
+        offset = 0
+        page_size = 100
 
-        if not issues:
-            return []
+        while True:
+            page = _api_request(
+                "GET",
+                f"/api/companies/{PAPERCLIP_COMPANY_ID}/issues?status=in_progress,todo,blocked&limit={page_size}&offset={offset}"
+            )
+            if not page:
+                break
+            items = page if isinstance(page, list) else page.get("items", [])
+            if not items:
+                break
+            all_issues.extend(items)
+            if len(items) < page_size:
+                break
+            offset += page_size
 
         long_blocked = []
         now = datetime.now(timezone.utc)
         cutoff = now - timedelta(hours=hours)
 
-        for issue in (issues if isinstance(issues, list) else issues.get("items", [])):
-            # Only consider issues with blockedBy
-            blocked_by = issue.get("blockedBy", [])
-            if not blocked_by:
-                continue
+        for issue in all_issues:
+            # Note: blockedBy is null in list responses; individual fetch in check_blocker_is_auth_related
+            # handles actual relation lookup. Here we only filter by duration.
 
             # Check block duration
             status_changed = issue.get("statusChangedAt")
