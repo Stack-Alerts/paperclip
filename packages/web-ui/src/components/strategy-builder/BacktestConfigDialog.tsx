@@ -160,7 +160,7 @@ function ConfigTab({
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 1: CONFIGURATION (35%)
             ════════════════════════════════════════════════════════════════════ */}
-        <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-400px)]">
+        <div className="space-y-3">
           {/* Column header */}
           <div className="mb-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
@@ -209,7 +209,7 @@ function ConfigTab({
             <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
               Mode
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-row flex-wrap gap-1">
               {(['walk-forward', 'walk', 'live-replay'] as const).map((m) => {
                 const labels = {
                   'walk-forward': 'Mode 1: Historical',
@@ -222,11 +222,17 @@ function ConfigTab({
                     key={m}
                     disabled={disabled}
                     onClick={() => setMode(m)}
-                    className="px-2 py-1 rounded text-[11px] font-medium text-left transition-colors disabled:opacity-50"
+                    className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight"
                     style={{
                       background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                       border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
                       color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
                     }}
                   >
                     {labels[m]}
@@ -262,7 +268,7 @@ function ConfigTab({
             <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
               Stop Loss Adjustment
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-row flex-wrap gap-1">
               {(['Adaptive v2.0', 'Static'] as const).map((opt) => {
                 const isActive = slAdjustment === opt;
                 return (
@@ -270,11 +276,17 @@ function ConfigTab({
                     key={opt}
                     disabled={disabled}
                     onClick={() => setSlAdjustment(opt)}
-                    className="px-2 py-1 rounded text-[11px] font-medium text-left transition-colors disabled:opacity-50"
+                    className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight"
                     style={{
                       background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                       border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
                       color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
                     }}
                   >
                     {opt}
@@ -288,7 +300,7 @@ function ConfigTab({
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 2: ADAPTIVE SL v2.0 (35%)
             ════════════════════════════════════════════════════════════════════ */}
-        <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-400px)]">
+        <div className="space-y-3">
           {/* Column header */}
           <div className="mb-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
@@ -301,7 +313,7 @@ function ConfigTab({
             <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
               Presets
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-row flex-wrap gap-1">
               {(['Conservative', 'Balanced', 'Aggressive', 'Custom'] as const).map((preset) => {
                 const isActive = adaptivePreset === preset;
                 return (
@@ -309,11 +321,18 @@ function ConfigTab({
                     key={preset}
                     disabled={disabled}
                     onClick={() => setAdaptivePreset(preset)}
-                    className="px-2 py-1 rounded text-[11px] font-medium text-left transition-colors disabled:opacity-50"
+                    className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight"
                     style={{
                       background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                       border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
                       color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                      minWidth: 38,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
                     }}
                   >
                     {preset}
@@ -324,7 +343,7 @@ function ConfigTab({
           </div>
 
           {/* Checkboxes */}
-          <div className="space-y-1.5">
+          <div className="flex flex-row flex-wrap gap-3">
             <label className="flex items-center gap-2 text-[11px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
               <input
                 type="checkbox"
@@ -406,7 +425,7 @@ function ConfigTab({
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 3: RISK / REWARD (30%)
             ════════════════════════════════════════════════════════════════════ */}
-        <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-400px)]">
+        <div className="space-y-3">
           {/* Column header */}
           <div className="mb-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
