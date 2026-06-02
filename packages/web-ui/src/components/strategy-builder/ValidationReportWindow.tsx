@@ -52,7 +52,7 @@ const SEVERITY_STYLES: Record<
   [ValidationSeverity.CRITICAL]: {
     text: { color: 'var(--accent-red)' },
     bg: { background: 'var(--accent-red-deeper)' },
-    badge: { background: 'var(--accent-red)', color: 'var(--btn-primary-text)' },
+    badge: { background: 'color-mix(in srgb, var(--accent-red) 28%, var(--bg-panel))', color: 'var(--accent-red)' },
   },
   [ValidationSeverity.ERROR]: {
     text: { color: 'var(--accent-red)' },
@@ -219,7 +219,7 @@ function IssuesTable({
                     <button
                       onClick={() => onFixClick(issue)}
                       className="px-2 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap"
-                      style={{ background: 'var(--accent-orange)', color: 'var(--btn-primary-text)' }}
+                      style={{ background: 'color-mix(in srgb, var(--accent-blue) 28%, var(--bg-panel))', color: 'var(--accent-blue)' }}
                       title={getFixButtonTooltip(issue.rule_id)}
                     >
                       {getFixButtonLabel(issue.rule_id)}
@@ -1088,7 +1088,7 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
           <AppBrand size={24} />
           <span className="flex items-center gap-2">
             <ShieldCheck style={{ width: 16, height: 16, flexShrink: 0 }} />
-            <span>Validation Report</span>
+            <span>Strategy Validation</span>
           </span>
         </h2>
         <div className="flex items-center gap-2">
@@ -1432,14 +1432,6 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
             title="Revert the most recently applied auto-fix"
           >
             ↩ Undo Last Fix
-          </button>
-          <button
-            className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--accent-blue-dark)', color: 'var(--btn-primary-text)' }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--accent-blue-mid)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--accent-blue-dark)')}
-          >
-            📝 Generate Code
           </button>
           <button
             onClick={onClose}
