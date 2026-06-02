@@ -1219,6 +1219,16 @@ class _AutoFixRequest(BaseModel):
     auto_fix_data: Optional[dict] = None
 
 
+class _RevertRequest(BaseModel):
+    """Body for POST /strategy-builder/strategies/{id}/revert.
+
+    Accepts the original blocks from a pre-fix snapshot and persists them
+    as a new version to undo a previous auto-fix (BTCAAAAA-33599).
+    """
+
+    blocks: list[dict]
+
+
 def _apply_auto_fix(blocks: list[dict], rule_id: str, data: dict) -> tuple[list[dict], bool]:
     """Mutate `blocks` in place per the requested auto-fix rule.
 
@@ -1392,6 +1402,70 @@ async def sb_auto_fix_strategy(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Auto-fix failed: {exc}",
+        ) from exc
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy '{strategy_id}' not found",
+        )
+    return result
+
+
+@app.post(
+    "/strategy-builder/strategies/{strategy_id}/revert",
+    tags=["Strategy Builder"],
+    summary="Revert a strategy to previous blocks (undo an auto-fix)",
+)
+async def sb_revert_strategy(
+    strategy_id: str,
+    body: _RevertRequest,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Revert to a previous blocks snapshot by persisting them as a new version.
+
+    Used by the Undo button on fixed validation issues — takes the original blocks
+    from the pre-fix snapshot and creates a new version to undo a prior auto-fix.
+    Returns the updated strategy in the same shape the GET route uses (BTCAAAAA-33599).
+    """
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    def _run() -> Optional[dict]:
+        with db.scoped_managers() as scoped:
+            latest = scoped.strategy.get_latest_version(strategy_id)
+            if latest is None:
+                return None
+
+            # Reuse the latest version's metadata but replace blocks with the snapshot's
+            _strip = {
+                "version_id", "version_number", "timestamp", "created_at",
+                "config_hash", "validation_timestamp",
+            }
+            version_data: dict = {
+                k: v for k, v in latest.items() if k not in _strip
+            }
+            version_data["strategy_id"] = strategy_id
+            version_data["blocks"] = body.blocks
+
+            version_id = scoped.strategy.create_strategy_version(version_data)
+            new_version = scoped.strategy.get_strategy_version(version_id)
+            try:
+                tests = scoped.test_results.get_version_test_results(
+                    str(version_id)
+                )
+            except Exception:
+                tests = []
+            return _build_sb_strategy(strategy_id, new_version, tests)
+
+    try:
+        result = await asyncio.to_thread(_run)
+    except Exception as exc:
+        logger.exception("Revert failed for strategy %s", strategy_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Revert failed: {exc}",
         ) from exc
 
     if result is None:

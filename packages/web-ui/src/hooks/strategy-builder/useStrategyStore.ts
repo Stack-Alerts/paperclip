@@ -17,7 +17,7 @@ import {
   BacktestResult,
   StrategySettings,
 } from '@/lib/strategy-builder/types';
-import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults, validateStrategy as validateStrategyAPI, autoFixStrategy as autoFixStrategyAPI } from '@/lib/strategy-builder/api';
+import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults, validateStrategy as validateStrategyAPI, autoFixStrategy as autoFixStrategyAPI, revertStrategy as revertStrategyAPI } from '@/lib/strategy-builder/api';
 import { validateStrategyLocal, enrichReportWithNarrative } from '@/lib/strategy-builder/validation';
 
 // Strategies loaded from the strategy-builder API have IDs of the form
@@ -750,30 +750,37 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     const fixedEntry = fixedIssuesInSession.find((entry) => entry.key === key);
     if (!fixedEntry) return;
 
-    // Restore the snapshot
-    set({ currentStrategy: fixedEntry.undoSnapshot });
+    const strategyId = fixedEntry.undoSnapshot.id;
 
-    // For backend strategies, save the revert so it persists
-    if (isBackendStrategyId(fixedEntry.undoSnapshot.id)) {
+    // For backend strategies, call the revert endpoint BEFORE clearing the fixed entry
+    // so a failed revert leaves the FIXED state visible for retry
+    if (isBackendStrategyId(strategyId)) {
       try {
-        await (get().saveStrategy as () => Promise<Strategy>)();
+        const reverted = await revertStrategyAPI(
+          strategyId,
+          fixedEntry.undoSnapshot.blocks
+        );
+        // Update currentStrategy from the revert response
+        set({ currentStrategy: reverted as Strategy });
       } catch (error) {
-        console.error('Failed to save undo:', error);
+        console.error('Failed to revert strategy:', error);
+        throw error;
       }
     } else {
-      // For local drafts, persist to localStorage
+      // For local drafts, restore the snapshot and persist to localStorage
+      set({ currentStrategy: fixedEntry.undoSnapshot });
       saveToStorage([
-        ...loadFromStorage().filter((s) => s.id !== fixedEntry.undoSnapshot.id),
+        ...loadFromStorage().filter((s) => s.id !== strategyId),
         fixedEntry.undoSnapshot,
       ]);
     }
 
-    // Remove from fixed issues
+    // Remove from fixed issues only after the revert succeeds
     set((state) => ({
       fixedIssuesInSession: state.fixedIssuesInSession.filter((entry) => entry.key !== key),
     }));
 
-    // Re-run validation
+    // Re-run validation so the now-tripping issue re-appears in the LIVE list
     await (get().validateStrategy as () => Promise<void>)();
   },
 }));

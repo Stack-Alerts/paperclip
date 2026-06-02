@@ -186,6 +186,14 @@ export async function autoFixStrategy(
   });
 }
 
+export async function revertStrategy(id: string, blocks: unknown[]) {
+  // Revert to a previous blocks snapshot by persisting them as a new version.
+  // Used by the Undo button to revert a prior auto-fix (BTCAAAAA-33599).
+  return post(`/strategy-builder/strategies/${id}/revert`, {
+    blocks,
+  });
+}
+
 export async function runBacktest(id: string, config: unknown) {
   return post(`/strategies/${id}/backtest`, config);
 }
