@@ -38,6 +38,7 @@ import { AutoFixConfirmDialog } from './AutoFixConfirmDialog';
 import { AppBrand } from '@/components/shared/AppBrand';
 import { status } from '@/lib/status';
 import { RichTooltip } from './RichTooltip';
+import { FixedIssuesList } from './FixedIssuesList';
 
 export interface ValidationReportWindowProps {
   open: boolean;
@@ -1280,6 +1281,19 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
           </div>
         </div>
       </div>
+
+        {/* Fixed-in-session callout — rendered above the tabs so it shows
+            on every view, not just the Issues tab. Mirrors the thick-client
+            PyQt5 layout where "Fixed in this session" is a top-level section
+            with per-row Undo (BTCAAAAA-33738 Bug 3). */}
+        {fixedIssuesInSession.length > 0 && (
+          <div className="flex-shrink-0 px-6 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+            <FixedIssuesList
+              entries={fixedIssuesInSession}
+              onUndo={handleUndoFixedIssue}
+            />
+          </div>
+        )}
 
         {/* Summary bar */}
         <div

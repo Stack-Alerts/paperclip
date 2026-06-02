@@ -129,7 +129,7 @@ interface StrategyStoreState {
   addBlock: (type: BlockType, position: number) => void;
   updateBlock: (index: number, data: BlockData) => void;
   reorderBlocks: (fromIdx: number, toIdx: number) => void;
-  validateStrategy: () => Promise<void>;
+  validateStrategy: (opts?: { localOnly?: boolean }) => Promise<void>;
   applyAutoFix: (ruleId: string, autoFixData: Record<string, unknown> | undefined) => Promise<boolean>;
   applyLocalAutoFix: (ruleId: string, data: Record<string, unknown>) => Promise<boolean>;
   undoAutoFix: (key: string) => Promise<void>;
@@ -411,13 +411,20 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   // own executionFlow/confluenceScoring/scenarios narrative on top of the
   // report. Falls back to the TypeScript structural checker only when the
   // backend is unreachable (e.g. dev with no API server). BTCAAAAA-32954.
-  validateStrategy: async () => {
+  validateStrategy: async (opts) => {
     const { currentStrategy } = get();
     if (!currentStrategy) return;
 
     set({ isValidating: true, validationReport: null });
 
-    if (isBackendStrategyId(currentStrategy.id)) {
+    // localOnly bypasses the backend (which always validates the *latest*
+    // stored version) and runs the TypeScript structural checker against the
+    // in-memory blocks. Required when the user loaded a non-latest version
+    // via the Strategy Browser — backend's latest-only validation would
+    // misreport pass/fail for the historical blocks (BTCAAAAA-33738 Bug 2).
+    const localOnly = opts?.localOnly === true;
+
+    if (!localOnly && isBackendStrategyId(currentStrategy.id)) {
       try {
         const apiReport = await validateStrategyAPI(currentStrategy.id) as ValidationReport;
         // The backend owns issues/complexity/timing; the executionFlow,
@@ -737,7 +744,12 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     set({ selectedBlockIndex: index });
   },
 
-  // Set current strategy directly
+  // Set current strategy directly. Also clears the previous strategy/version's
+  // live validation surface (validationReport, validationMessages) so issues
+  // from the prior load don't bleed through to the newly-loaded version —
+  // callers (e.g. the Strategy Browser open path) re-run validateStrategy()
+  // once the swap lands so the panel reflects the version actually loaded
+  // (BTCAAAAA-33738 Bug 2).
   setCurrentStrategy: (strategy: Strategy | null) => {
     // Rehydrate fixedIssuesInSession from persisted validationHistory
     let fixedIssuesInSession: FixedIssueEntry[] = [];
@@ -758,7 +770,12 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
           undoSnapshot: strategy,
         }));
     }
-    set({ currentStrategy: strategy, fixedIssuesInSession });
+    set({
+      currentStrategy: strategy,
+      fixedIssuesInSession,
+      validationReport: null,
+      validationMessages: [],
+    });
   },
 
   highlightedLibraryBlockId: null,

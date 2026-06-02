@@ -3,13 +3,13 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ValidationPanel } from '@/components/strategy-builder/ValidationPanel';
 import { Providers } from '@/components/strategy-builder/Providers';
-import { ValidationLevel } from '@/lib/strategy-builder/types';
+import { ValidationLevel, ValidationSeverity } from '@/lib/strategy-builder/types';
 
-jest.mock('@/hooks/useStrategyStore', () => ({
+jest.mock('@/hooks/strategy-builder/useStrategyStore', () => ({
   useStrategyStore: jest.fn(),
 }));
 
-import { useStrategyStore } from '@/hooks/useStrategyStore';
+import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 
 const mockStore = useStrategyStore as jest.MockedFunction<typeof useStrategyStore>;
 
@@ -27,6 +27,11 @@ const defaultStore = {
   validateStrategy: jest.fn().mockResolvedValue(undefined),
   clearValidation: jest.fn(),
   selectBlock: jest.fn(),
+  saveStrategy: jest.fn().mockResolvedValue({}),
+  runBacktest: jest.fn().mockResolvedValue({}),
+  currentStrategy: null,
+  fixedIssuesInSession: [],
+  undoAutoFix: jest.fn().mockResolvedValue(undefined),
 };
 
 function renderPanel(overrides = {}) {
@@ -108,5 +113,51 @@ describe('ValidationPanel', () => {
   it('shows block index badge when blockIndex is set', () => {
     renderPanel({ validationMessages: [makeMsg(ValidationLevel.ERROR, 'err', 0)] });
     expect(screen.getByText('#1')).toBeInTheDocument();
+  });
+
+  it('renders the "Fixed in this session" section when fixedIssuesInSession has entries', () => {
+    renderPanel({
+      fixedIssuesInSession: [
+        {
+          key: 'TIMING_004-2025-12-01T00:00:00Z',
+          appliedAt: '2025-12-01T00:00:00Z',
+          undoSnapshot: {} as any,
+          issue: {
+            rule_id: 'TIMING_004',
+            rule_name: 'Timing window exceeds recheck delay',
+            severity: ValidationSeverity.ERROR,
+            category: '',
+            message: 'Fixed: Timing window exceeds recheck delay',
+            location: 'Block::1',
+          },
+        },
+      ],
+    });
+    expect(screen.getByRole('heading', { name: /Fixed in this session/i })).toBeInTheDocument();
+    expect(screen.getByText('Timing window exceeds recheck delay')).toBeInTheDocument();
+  });
+
+  it('calls undoAutoFix(key) when the Undo button on a rehydrated fixed entry is clicked', () => {
+    const undoAutoFix = jest.fn().mockResolvedValue(undefined);
+    renderPanel({
+      undoAutoFix,
+      fixedIssuesInSession: [
+        {
+          key: 'rehydrated-key-xyz',
+          appliedAt: '2025-12-01T00:00:00Z',
+          undoSnapshot: {} as any,
+          issue: {
+            rule_id: 'TIMING_004',
+            rule_name: 'Timing window exceeds recheck delay',
+            severity: ValidationSeverity.ERROR,
+            category: '',
+            message: '',
+            location: '',
+          },
+        },
+      ],
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Undo fix for/i }));
+    expect(undoAutoFix).toHaveBeenCalledWith('rehydrated-key-xyz');
   });
 });

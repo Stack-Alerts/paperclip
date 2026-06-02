@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { StrategyBrowserDialog } from './StrategyBrowserDialog';
+import { StrategyBrowserDialog, type StrategySelectOptions } from './StrategyBrowserDialog';
 import { SaveStrategyModeDialog } from './SaveStrategyModeDialog';
 import { BacktestConfigDialog } from './BacktestConfigDialog';
 import { ValidationDialog } from './ValidationDialog';
@@ -170,6 +170,12 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [errorSteps, setErrorSteps] = useState<Set<number>>(new Set());
+
+  // Tracks whether the currently-loaded strategy is a non-latest version
+  // selected via the Strategy Browser. Persists across the panel so the
+  // toolbar Validate button also runs the local validator (the backend
+  // endpoint always validates against latest — BTCAAAAA-33738 Bug 2).
+  const [loadedHistoricalVersion, setLoadedHistoricalVersion] = useState(false);
 
   // Dirty-flag
   const [cleanSnapshot, setCleanSnapshot] = useState<string>('');
@@ -417,6 +423,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     setCurrentStep(0);
     setCompletedSteps(new Set());
     setErrorSteps(new Set());
+    setLoadedHistoricalVersion(false);
     // Focus the Name input on the next paint after StrategyInfoPanel remounts
     // its uncontrolled input on the new strategy id.
     requestAnimationFrame(() => {
@@ -463,13 +470,16 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     setCurrentStep(1);
     setActiveDialog('validation');
     try {
-      await validateStrategy();
+      // Historical versions must use the local validator because the backend's
+      // POST /validate endpoint always validates against the latest stored
+      // version (BTCAAAAA-33738 Bug 2).
+      await validateStrategy({ localOnly: loadedHistoricalVersion });
       setCompletedSteps(prev => new Set([...prev, 1]));
       setErrorSteps(prev => { const s = new Set(prev); s.delete(1); return s; });
     } catch {
       setErrorSteps(prev => new Set([...prev, 1]));
     }
-  }, [validateStrategy]);
+  }, [validateStrategy, loadedHistoricalVersion]);
 
   const handleQuickPreview = useCallback(async () => {
     if (!currentStrategy || backTestInProgress) return;
@@ -495,7 +505,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // Strategy browser
   // -------------------------------------------------------------------------
   const handleStrategySelect = useCallback(
-    (strategy: Strategy) => {
+    (strategy: Strategy, selectOpts?: StrategySelectOptions) => {
       // BTCAAAAA-29995: the dialog fetches strategies from the strategy-builder
       // API, which returns blocks in the Python domain shape
       // `{name, logic, signals, ...}`. The frontend Block contract is
@@ -640,8 +650,23 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       setCompletedSteps(new Set());
       setErrorSteps(new Set());
       close();
+      // Re-run validation against the just-loaded version so the validation
+      // panel shows live issues for *this* version, not stale issues from the
+      // previously-loaded strategy (BTCAAAAA-33738 Bug 2). setCurrentStrategy
+      // clears the prior validationReport so the dialog stays empty until
+      // this re-validate resolves. For historical versions we force the local
+      // validator because the backend's POST /validate endpoint always runs
+      // against the strategy's *latest* stored version — running it on a
+      // historical version would surface latest's findings, not the loaded
+      // version's.
+      const newId = normalized.id as unknown as string;
+      const isHistorical = selectOpts?.historicalVersion === true;
+      setLoadedHistoricalVersion(isHistorical);
+      if (typeof newId === 'string' && newId.startsWith('strategy_')) {
+        validateStrategy({ localOnly: isHistorical }).catch(console.error);
+      }
     },
-    [close, setCurrentStrategy]
+    [close, setCurrentStrategy, validateStrategy]
   );
 
   // Pop In: receive state from a popped-out Strategy Browser window and
