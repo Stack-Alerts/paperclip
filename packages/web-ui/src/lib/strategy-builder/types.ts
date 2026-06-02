@@ -43,6 +43,17 @@ export interface Block {
   };
 }
 
+// Validation fix event - persisted as part of the strategy
+export interface ValidationFixEvent {
+  rule_id: string;
+  rule_name: string;
+  mode?: string; // Fix mode (e.g., 'rename_signal', 'remove_block', etc.)
+  targetIndex?: number; // Index of the target block if applicable
+  newName?: string; // New name if the fix involves renaming
+  timestamp: string; // ISO 8601 timestamp when the fix was applied
+  undone?: boolean; // Whether this fix was later undone
+}
+
 // Strategy core structure
 export interface Strategy {
   id: string;
@@ -62,6 +73,7 @@ export interface Strategy {
   strategyType?: string;
   validationStatus?: 'Pass' | 'Fail' | 'Un-Validated';
   versions?: StrategyVersion[];
+  validationHistory?: ValidationFixEvent[];
 }
 
 // Strategy version snapshot for history/rollback
