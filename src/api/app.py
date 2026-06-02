@@ -872,6 +872,7 @@ def _build_sb_strategy(strategy_id: str, version: dict, tests: list) -> dict:
         "backtestResults": backtest_results,
         "published": False,
         "testCount": len(tests),
+        "validationHistory": version.get("validation_history"),
     }
 
 
@@ -906,6 +907,7 @@ class _UpdateSBStrategyRequest(BaseModel):
     description: Optional[str] = None
     strategyType: Optional[str] = None
     tags: Optional[list] = None
+    validationHistory: Optional[list] = None
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -1535,6 +1537,8 @@ async def sb_update_strategy(
                 version_data["strategy_type"] = body.strategyType
             if body.tags is not None:
                 version_data["tags"] = body.tags
+            if body.validationHistory is not None:
+                version_data["validation_history"] = body.validationHistory
 
             # Rename the parent strategy record so list views reflect the new
             # name even before the new version row is read back. Safe to call

@@ -12,6 +12,8 @@ import {
   ValidationLevel,
   ValidationReport,
   ValidationIssue,
+  ValidationFixEvent,
+  ValidationSeverity,
   BacktestConfig,
   BacktestConfigFull,
   BacktestResult,
@@ -227,6 +229,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
           description: updated.description ?? '',
           strategyType: (updated as { strategyType?: string }).strategyType,
           tags: updated.tags,
+          validationHistory: updated.validationHistory,
         },
       );
       // Keep the locally-normalized blocks so the in-flight builder view
@@ -241,6 +244,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
           ?? (updated as { versionNumber?: number }).versionNumber,
         versionId: (saved as { versionId?: string }).versionId
           ?? (updated as { versionId?: string }).versionId,
+        validationHistory: saved.validationHistory ?? updated.validationHistory,
       };
     }
 
@@ -492,20 +496,42 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
 
       await autoFixStrategyAPI(currentStrategy.id, ruleId, autoFixData);
 
-      // Track the fixed issue before re-validation
+      // Track the fixed issue before re-validation and persist to strategy
       if (matchingIssue) {
         const key = `${ruleId}-${matchingIssue.location || 'global'}`;
-        set((state) => ({
-          fixedIssuesInSession: [
-            ...state.fixedIssuesInSession,
-            {
-              key,
-              issue: matchingIssue,
-              appliedAt: new Date().toISOString(),
-              undoSnapshot: currentStrategy,
+        const timestamp = new Date().toISOString();
+        const fixEvent: ValidationFixEvent = {
+          rule_id: matchingIssue.rule_id,
+          rule_name: matchingIssue.rule_name,
+          timestamp,
+        };
+        if (typeof autoFixData === 'object' && autoFixData !== null) {
+          fixEvent.mode = (autoFixData as Record<string, unknown>).mode as string | undefined;
+          fixEvent.targetIndex = (autoFixData as Record<string, unknown>).targetIndex as number | undefined;
+          fixEvent.newName = (autoFixData as Record<string, unknown>).newName as string | undefined;
+        }
+        set((state) => {
+          const strategy = state.currentStrategy;
+          if (!strategy) return state;
+          return {
+            currentStrategy: {
+              ...strategy,
+              validationHistory: [
+                ...(strategy.validationHistory ?? []),
+                fixEvent,
+              ],
             },
-          ],
-        }));
+            fixedIssuesInSession: [
+              ...state.fixedIssuesInSession,
+              {
+                key,
+                issue: matchingIssue,
+                appliedAt: timestamp,
+                undoSnapshot: strategy,
+              },
+            ],
+          };
+        });
       }
 
       await (get().validateStrategy as () => Promise<void>)();
@@ -545,22 +571,34 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
       ];
       const matchingIssue = allIssues.find((issue) => issue.rule_id === ruleId);
 
-      set({ currentStrategy: updated });
-
-      // Track the fixed issue before re-validation
+      // Track the fixed issue before persisting and add to validationHistory
       if (matchingIssue) {
         const key = `${ruleId}-${matchingIssue.location || 'global'}`;
+        const timestamp = new Date().toISOString();
+        const fixEvent: ValidationFixEvent = {
+          rule_id: matchingIssue.rule_id,
+          rule_name: matchingIssue.rule_name,
+          mode: 'auto_fix_local',
+          timestamp,
+        };
+        updated.validationHistory = [
+          ...(updated.validationHistory ?? []),
+          fixEvent,
+        ];
         set((state) => ({
+          currentStrategy: updated,
           fixedIssuesInSession: [
             ...state.fixedIssuesInSession,
             {
               key,
               issue: matchingIssue,
-              appliedAt: new Date().toISOString(),
+              appliedAt: timestamp,
               undoSnapshot: currentStrategy,
             },
           ],
         }));
+      } else {
+        set({ currentStrategy: updated });
       }
 
       // For backend strategies, save the change so it persists across reload
@@ -701,7 +739,26 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
 
   // Set current strategy directly
   setCurrentStrategy: (strategy: Strategy | null) => {
-    set({ currentStrategy: strategy });
+    // Rehydrate fixedIssuesInSession from persisted validationHistory
+    let fixedIssuesInSession: FixedIssueEntry[] = [];
+    if (strategy?.validationHistory) {
+      fixedIssuesInSession = strategy.validationHistory
+        .filter((event) => !event.undone)
+        .map((event) => ({
+          key: `${event.rule_id}-${event.timestamp}`,
+          issue: {
+            rule_id: event.rule_id,
+            rule_name: event.rule_name,
+            severity: 'ERROR' as ValidationSeverity,
+            category: '',
+            message: `Fixed: ${event.rule_name}`,
+            location: '',
+          },
+          appliedAt: event.timestamp,
+          undoSnapshot: strategy,
+        }));
+    }
+    set({ currentStrategy: strategy, fixedIssuesInSession });
   },
 
   highlightedLibraryBlockId: null,
@@ -778,10 +835,19 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
       ]);
     }
 
-    // Remove from fixed issues only after the revert succeeds
-    set((state) => ({
-      fixedIssuesInSession: state.fixedIssuesInSession.filter((entry) => entry.key !== key),
-    }));
+    // Mark the history entry as undone instead of deleting it (audit trail preservation)
+    set((state) => {
+      const strategy = state.currentStrategy ?? currentStrategy;
+      if (!strategy || !strategy.validationHistory) return state;
+      const ruleId = fixedEntry.issue.rule_id;
+      const updatedHistory = strategy.validationHistory.map((event) =>
+        event.rule_id === ruleId && !event.undone ? { ...event, undone: true } : event
+      );
+      return {
+        currentStrategy: { ...strategy, validationHistory: updatedHistory },
+        fixedIssuesInSession: state.fixedIssuesInSession.filter((entry) => entry.key !== key),
+      };
+    });
 
     // Re-run validation so the now-tripping issue re-appears in the LIVE list
     await (get().validateStrategy as () => Promise<void>)();
