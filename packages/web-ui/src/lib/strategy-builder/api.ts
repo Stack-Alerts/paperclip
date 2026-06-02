@@ -153,8 +153,13 @@ export async function duplicateStrategyScoped(
   id: string,
   scope: 'version' | 'strategy',
   newName?: string,
+  sourceVersionId?: string | null,
 ) {
-  return post(`${SB}/${id}/duplicate`, { scope, name: newName });
+  return post(`${SB}/${id}/duplicate`, {
+    scope,
+    name: newName,
+    source_version_id: sourceVersionId ?? undefined,
+  });
 }
 
 export async function getBlockLibrary() {
