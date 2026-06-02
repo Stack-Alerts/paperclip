@@ -160,14 +160,14 @@ function IssuesTable({
 }) {
   const getFixButtonLabel = (ruleId: string): string => {
     const labels: Record<string, string> = {
-      DIRECTION_001: '🔄 Switch',
-      TIMING_004: '⏱️ Fix',
-      EXIT_009: '🔗 Consolidate',
-      LOGIC_003: '🗑️ Remove',
-      missing_timeframe: '⏱️ Set',
-      missing_target_market: '📊 Set',
+      DIRECTION_001: 'Switch',
+      TIMING_004: 'Fix',
+      EXIT_009: 'Consolidate',
+      LOGIC_003: 'Remove',
+      missing_timeframe: 'Set',
+      missing_target_market: 'Set',
     };
-    return labels[ruleId] || '🔧 Fix';
+    return labels[ruleId] || 'Fix';
   };
 
   return (
