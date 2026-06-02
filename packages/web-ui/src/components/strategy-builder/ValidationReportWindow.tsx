@@ -164,6 +164,8 @@ function IssuesTable({
       TIMING_004: '⏱️ Fix',
       EXIT_009: '🔗 Consolidate',
       LOGIC_003: '🗑️ Remove',
+      missing_timeframe: '⏱️ Set',
+      missing_target_market: '📊 Set',
     };
     return labels[ruleId] || '🔧 Fix';
   };
@@ -310,6 +312,8 @@ function getFixButtonTooltip(ruleId: string): string {
     TIMING_004: 'Click to reduce RECHECK delay to fit within timing window.',
     EXIT_009: 'Click to merge duplicate exit conditions.',
     LOGIC_003: 'Click to disable unreachable signals.',
+    missing_timeframe: 'Click to select a timeframe for your strategy.',
+    missing_target_market: 'Click to specify the trading pair for your strategy.',
   };
   return tooltips[ruleId] || 'Click to apply automated fix.';
 }
@@ -784,7 +788,7 @@ function getComplexityLevel(score: number): string {
 }
 
 export function ValidationReportWindow({ open, onClose, report, standalone = false }: ValidationReportWindowProps) {
-  const { validationMessages, isValidating, validateStrategy, clearValidation, currentStrategy, applyAutoFix } = useStrategyStore();
+  const { validationMessages, isValidating, validateStrategy, clearValidation, currentStrategy, applyAutoFix, applyLocalAutoFix } = useStrategyStore();
 
   const handlePopOut = useCallback(() => {
     const win = window.open(
@@ -951,7 +955,7 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
     // Try to get signals from different possible locations
     let signals = block.data?.signals as any[];
     if (!signals) {
-      signals = block.signals as any[];
+      signals = (block.data as any)?.signals as any[];
     }
     if (!Array.isArray(signals)) {
       signals = [];
@@ -996,19 +1000,28 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
     ]);
 
     try {
-      let fixData = selectedIssue.auto_fix_data as Record<string, unknown> | undefined;
+      let applied = false;
 
-      // For STRUCTURAL_005, merge the user input with auto_fix_data
-      if (selectedIssue.rule_id === 'STRUCTURAL_005' && userInput && userInput.mode) {
-        fixData = {
-          ...(selectedIssue.auto_fix_data as Record<string, unknown>),
-          mode: userInput.mode,
-          target_index: userInput.targetIndex,
-          ...(userInput.newName && { new_name: userInput.newName }),
-        };
+      // Local auto-fixes (client-side validation issues)
+      if ((selectedIssue.rule_id === 'missing_timeframe' || selectedIssue.rule_id === 'missing_target_market') && userInput?.value) {
+        applied = await applyLocalAutoFix(selectedIssue.rule_id, { value: userInput.value });
+      } else {
+        // Backend auto-fixes (institutional validation issues)
+        let fixData = selectedIssue.auto_fix_data as Record<string, unknown> | undefined;
+
+        // For STRUCTURAL_005, merge the user input with auto_fix_data
+        if (selectedIssue.rule_id === 'STRUCTURAL_005' && userInput && userInput.mode) {
+          fixData = {
+            ...(selectedIssue.auto_fix_data as Record<string, unknown>),
+            mode: userInput.mode,
+            target_index: userInput.targetIndex,
+            ...(userInput.newName && { new_name: userInput.newName }),
+          };
+        }
+
+        applied = await applyAutoFix(selectedIssue.rule_id, fixData);
       }
 
-      const applied = await applyAutoFix(selectedIssue.rule_id, fixData);
       setShowAutoFix(false);
       setSelectedIssue(null);
       if (!applied) {
@@ -1021,7 +1034,7 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
       setSelectedIssue(null);
       setUndoStack((prev) => prev.slice(0, -1));
     }
-  }, [selectedIssue, currentStrategy, applyAutoFix]);
+  }, [selectedIssue, currentStrategy, applyAutoFix, applyLocalAutoFix]);
 
   const handleUndo = useCallback(() => {
     if (undoStack.length > 0) {

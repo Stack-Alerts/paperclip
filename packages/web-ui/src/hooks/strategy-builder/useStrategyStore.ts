@@ -120,6 +120,7 @@ interface StrategyStoreState {
   reorderBlocks: (fromIdx: number, toIdx: number) => void;
   validateStrategy: () => Promise<void>;
   applyAutoFix: (ruleId: string, autoFixData: Record<string, unknown> | undefined) => Promise<boolean>;
+  applyLocalAutoFix: (ruleId: string, data: Record<string, unknown>) => Promise<boolean>;
   runBacktest: (config: BacktestConfig | BacktestConfigFull) => Promise<BacktestResult>;
   loadBlockLibrary: () => Promise<void>;
   clearValidation: () => void;
@@ -476,6 +477,44 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     }
   },
 
+  // Apply a local auto-fix for client-side validation issues (missing_timeframe,
+  // missing_target_market). Mutates currentStrategy.settings directly, persists
+  // to localStorage or backend, then re-runs validation so the panel reflects
+  // the cleared warning.
+  applyLocalAutoFix: async (ruleId, data) => {
+    const { currentStrategy } = get();
+    if (!currentStrategy) return false;
+
+    try {
+      const updated: Strategy = { ...currentStrategy };
+
+      if (ruleId === 'missing_timeframe' && typeof data.value === 'string') {
+        updated.settings.timeframe = data.value;
+      } else if (ruleId === 'missing_target_market' && typeof data.value === 'string') {
+        updated.settings.targetMarket = data.value;
+      } else {
+        return false;
+      }
+
+      set({ currentStrategy: updated });
+
+      // For backend strategies, save the change so it persists across reload
+      if (isBackendStrategyId(updated.id)) {
+        await (get().saveStrategy as () => Promise<Strategy>)();
+      } else {
+        // For local drafts, saveStrategy will handle localStorage
+        saveToStorage([...loadFromStorage().filter((s) => s.id !== updated.id), updated]);
+      }
+
+      // Re-run validation so the panel reflects the cleared warning
+      await (get().validateStrategy as () => Promise<void>)();
+      return true;
+    } catch (error) {
+      console.error('Local auto-fix failed:', error);
+      return false;
+    }
+  },
+
   // Run backtest via backend API (BTCAAAAA-31183 / parent BTCAAAAA-31180):
   //   POST /strategies/{id}/backtest -> { runId }
   //   poll GET /strategies/{id}/backtest/{runId} until status in ('done','error')
@@ -490,7 +529,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
 
       // Poll loop: 1s cadence, 30 min ceiling.
       const deadline = Date.now() + 30 * 60_000;
-      // eslint-disable-next-line no-constant-condition
+       
       while (true) {
         if (Date.now() > deadline) throw new Error('Backtest timed out after 30 minutes');
         await new Promise((r) => setTimeout(r, 1000));

@@ -2,6 +2,8 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import Structural005FixDialog from './Structural005FixDialog';
+import MissingTimeframeFixDialog from './MissingTimeframeFixDialog';
+import MissingTargetMarketFixDialog from './MissingTargetMarketFixDialog';
 
 export interface AutoFixOption {
   key: string;
@@ -28,7 +30,7 @@ export interface AutoFixConfirmDialogProps {
   options?: AutoFixOption[];
   ruleId?: string;
   structural005Data?: Structural005Data;
-  onConfirm: (userOptions: Record<string, boolean> | { mode: string; targetIndex: number; newName?: string }) => void;
+  onConfirm: (userOptions: Record<string, boolean> | { mode: string; targetIndex: number; newName?: string } | { value: string }) => void;
   onCancel: () => void;
 }
 
@@ -77,6 +79,8 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
     Object.fromEntries(options.map((o) => [o.key, o.defaultChecked ?? false]))
   );
   const isStructural005 = ruleId === 'STRUCTURAL_005' && structural005Data;
+  const isMissingTimeframe = ruleId === 'missing_timeframe';
+  const isMissingTargetMarket = ruleId === 'missing_target_market';
 
   // Reset state when the dialog opens. The previous form of this effect
   // depended on `options` directly; callers pass it as an inline array (or
@@ -131,7 +135,8 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
           {/* Description */}
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{fixDescription}</p>
 
-          {/* ── Before / Arrow / After ── */}
+          {/* ── Before / Arrow / After (skip for local auto-fixes) ── */}
+          {!isMissingTimeframe && !isMissingTargetMarket && (
           <div className="flex items-start gap-3">
             {/* Before */}
             <div className="flex-1 min-w-0">
@@ -158,14 +163,17 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
               </pre>
             </div>
           </div>
+          )}
 
-          {/* ── Impact Analysis ── */}
+          {/* ── Impact Analysis (skip for local auto-fixes) ── */}
+          {!isMissingTimeframe && !isMissingTargetMarket && (
           <div className="rounded-r px-4 py-3" style={{ borderLeft: '4px solid var(--accent-blue)', background: 'color-mix(in srgb, var(--bg-deep) 60%, transparent)' }}>
             <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--accent-blue)' }}>
               📊 Impact Analysis
             </p>
             <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>{impactAnalysis}</p>
           </div>
+          )}
 
           {/* ── Rule-specific Controls ── */}
           {isStructural005 && structural005Data && (
@@ -177,6 +185,24 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
               signalDetails={structural005Data.signalDetails}
               onConfirm={(mode, targetIndex, newName) => {
                 onConfirm({ mode, targetIndex, newName });
+              }}
+              onCancel={onCancel}
+            />
+          )}
+
+          {isMissingTimeframe && (
+            <MissingTimeframeFixDialog
+              onConfirm={(value) => {
+                onConfirm({ value });
+              }}
+              onCancel={onCancel}
+            />
+          )}
+
+          {isMissingTargetMarket && (
+            <MissingTargetMarketFixDialog
+              onConfirm={(value) => {
+                onConfirm({ value });
               }}
               onCancel={onCancel}
             />
@@ -210,8 +236,8 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
           )}
         </div>
 
-        {/* ── Sticky footer (hidden for STRUCTURAL_005 which has its own buttons) ── */}
-        {!isStructural005 && (
+        {/* ── Sticky footer (hidden for rule types with their own buttons) ── */}
+        {!isStructural005 && !isMissingTimeframe && !isMissingTargetMarket && (
           <div className="flex justify-end gap-2 px-6 py-4 border-t sticky bottom-0 z-10" style={{ borderColor: 'var(--border)', background: 'var(--bg-panel)' }}>
             <button
               onClick={onCancel}

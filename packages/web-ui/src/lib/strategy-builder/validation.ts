@@ -318,6 +318,10 @@ export function validateStrategyLocal(strategy: Strategy): ValidationReport {
       category: 'settings',
       message: 'Timeframe is required (e.g., 1h, 4h, 1d)',
       location: 'Strategy::settings::timeframe',
+      auto_fix_available: true,
+      auto_fix_data: {
+        rule_id: 'missing_timeframe',
+      },
     });
   }
 
@@ -329,6 +333,10 @@ export function validateStrategyLocal(strategy: Strategy): ValidationReport {
       category: 'settings',
       message: 'Target market should be specified (e.g., BTC/USDT)',
       location: 'Strategy::settings::targetMarket',
+      auto_fix_available: true,
+      auto_fix_data: {
+        rule_id: 'missing_target_market',
+      },
     });
   }
 
