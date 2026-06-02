@@ -257,6 +257,23 @@ Make Paperclip skills discoverable to your agent runtime without writing to the 
 - Always enforce timeout and grace period
 - The UI parser module runs in a browser sandbox — zero runtime imports, no side effects
 
+### Env-binding contract
+
+`adapterConfig.env` is a map of env-var name to one of:
+
+- `{ "type": "plain", "value": "<literal>" }` — a plain-text value. The Paperclip API redacts this to `"***REDACTED***"` for every caller that does not hold the new `secrets:read` permission. Treat it as a development convenience, not a secret store.
+- `{ "type": "secret_ref", "secretId": "<uuid>", "version": <number|"latest"> }` — an opaque reference to a company-managed secret. The Paperclip platform resolves the reference at adapter start and never returns the resolved value over the API. Prefer this for any credential, token, or key.
+- A bare string — accepted for backward compatibility and normalized to the `plain` shape on write; same redaction rules apply.
+
+Adapter authors MUST:
+
+- Read the `value` of a `plain` binding at execution time and inject it via the child process env. Do not log the value, write it to disk, or echo it back through stdout/stderr.
+- For a `secret_ref`, do not implement a custom resolver. The platform provides the resolved value to your execution context; you only need to inject the env var name you were given.
+- Never write secret material into `AGENTS.md`, prompt templates, or any file under the agent's working directory.
+- Never include env values in activity log payloads, error messages, or audit events.
+
+Server-side redaction (for activity log and API responses) is enforced by the platform via `redactAdapterConfigEnvForResponse` in `server/src/redaction.ts`. If you add a new endpoint that returns an agent record, route it through `buildAgentDetail` (or `redactAgentConfiguration`/`redactConfigRevision`) so the env redaction is applied consistently.
+
 ## Next Steps
 
 - [External Adapters](/adapters/external-adapters) — build a standalone adapter plugin

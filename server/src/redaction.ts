@@ -13,6 +13,7 @@ const JSON_SECRET_FIELD_TEXT_RE =
 const ESCAPED_JSON_SECRET_FIELD_TEXT_RE =
   /((?:\\")?(?:api[-_]?key|access[-_]?token|auth(?:_?token)?|authorization|bearer|secret|passwd|password|credential|jwt|private[-_]?key|cookie|connectionstring)(?:\\")?\s*:\s*(?:\\"))[^\\\r\n]+((?:\\"))/gi;
 export const REDACTED_EVENT_VALUE = "***REDACTED***";
+export const REDACTED_ENV_PLAIN_VALUE = "***REDACTED***";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
@@ -101,3 +102,58 @@ export function redactSensitiveText(input: string): string {
     REDACTED_EVENT_VALUE,
   );
 }
+
+/**
+ * Returns the env-key names whose plain values were redacted, in insertion order.
+ * Plain values are always redacted; `secret_ref` bindings are left as-is (they
+ * never carry a plaintext value to begin with) and are not counted.
+ *
+ * Use this from API handlers that need to decide whether to log an
+ * `agent.env.read` activity event with the keys that were actually returned.
+ */
+export interface RedactAdapterConfigEnvResult {
+  env: Record<string, unknown>;
+  redactedPlainKeys: string[];
+}
+
+export function redactAdapterConfigEnvForResponse(
+  adapterConfig: unknown,
+): RedactAdapterConfigEnvResult {
+  if (!isPlainObject(adapterConfig)) {
+    return { env: {}, redactedPlainKeys: [] };
+  }
+  const envValue = adapterConfig.env;
+  if (!isPlainObject(envValue)) {
+    return { env: {}, redactedPlainKeys: [] };
+  }
+
+  const redacted: Record<string, unknown> = {};
+  const redactedPlainKeys: string[] = [];
+  for (const [key, raw] of Object.entries(envValue)) {
+    if (typeof raw === "string") {
+      redacted[key] = { type: "plain", value: REDACTED_ENV_PLAIN_VALUE };
+      redactedPlainKeys.push(key);
+      continue;
+    }
+    if (!isPlainObject(raw)) {
+      redacted[key] = raw;
+      continue;
+    }
+    if (isSecretRefBinding(raw)) {
+      redacted[key] = {
+        type: "secret_ref",
+        secretId: raw.secretId,
+        ...(raw.version === undefined ? {} : { version: raw.version }),
+      };
+      continue;
+    }
+    if (isPlainBinding(raw)) {
+      redacted[key] = { type: "plain", value: REDACTED_ENV_PLAIN_VALUE };
+      redactedPlainKeys.push(key);
+      continue;
+    }
+    redacted[key] = raw;
+  }
+  return { env: redacted, redactedPlainKeys };
+}
+

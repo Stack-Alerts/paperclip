@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { REDACTED_EVENT_VALUE, redactEventPayload, redactSensitiveText, sanitizeRecord } from "../redaction.js";
+import {
+  REDACTED_EVENT_VALUE,
+  REDACTED_ENV_PLAIN_VALUE,
+  redactAdapterConfigEnvForResponse,
+  redactEventPayload,
+  redactSensitiveText,
+  sanitizeRecord,
+} from "../redaction.js";
 
 describe("redaction", () => {
   it("redacts sensitive keys and nested secret values", () => {
@@ -130,5 +137,110 @@ describe("redaction", () => {
 
     expect(result?.args).toEqual(["--api-key", "not-a-command-secret"]);
     expect(result?.argv).toEqual(["--api-key", REDACTED_EVENT_VALUE]);
+  });
+
+  describe("redactAdapterConfigEnvForResponse", () => {
+    it("redacts every plain env value and leaves secret_ref entries opaque", () => {
+      const adapterConfig = {
+        env: {
+          OPENAI_API_KEY: { type: "plain", value: "sk-live" },
+          OPENAI_BASE_URL: { type: "plain", value: "https://api.example.com" },
+          OPENAI_API_KEY_REF: {
+            type: "secret_ref",
+            secretId: "11111111-1111-1111-1111-111111111111",
+            version: 2,
+          },
+        },
+        model: "gpt-4o",
+      };
+
+      const result = redactAdapterConfigEnvForResponse(adapterConfig);
+
+      expect(result.env).toEqual({
+        OPENAI_API_KEY: { type: "plain", value: REDACTED_ENV_PLAIN_VALUE },
+        OPENAI_BASE_URL: { type: "plain", value: REDACTED_ENV_PLAIN_VALUE },
+        OPENAI_API_KEY_REF: {
+          type: "secret_ref",
+          secretId: "11111111-1111-1111-1111-111111111111",
+          version: 2,
+        },
+      });
+      expect(result.redactedPlainKeys.sort()).toEqual(["OPENAI_API_KEY", "OPENAI_BASE_URL"]);
+    });
+
+    it("promotes legacy string env entries to a redacted plain binding", () => {
+      const adapterConfig = {
+        env: {
+          LEGACY_TOKEN: "sk-from-binding",
+        },
+      };
+
+      const result = redactAdapterConfigEnvForResponse(adapterConfig);
+
+      expect(result.env).toEqual({
+        LEGACY_TOKEN: { type: "plain", value: REDACTED_ENV_PLAIN_VALUE },
+      });
+      expect(result.redactedPlainKeys).toEqual(["LEGACY_TOKEN"]);
+    });
+
+    it("does not mutate the input object", () => {
+      const adapterConfig = {
+        env: {
+          OPENAI_API_KEY: { type: "plain", value: "sk-live" },
+        },
+      };
+      const envRef = adapterConfig.env as Record<string, unknown>;
+
+      redactAdapterConfigEnvForResponse(adapterConfig);
+
+      expect((envRef.OPENAI_API_KEY as { value: string }).value).toBe("sk-live");
+    });
+
+    it("returns an empty result when adapterConfig is missing or not an object", () => {
+      expect(redactAdapterConfigEnvForResponse(null)).toEqual({
+        env: {},
+        redactedPlainKeys: [],
+      });
+      expect(redactAdapterConfigEnvForResponse(undefined)).toEqual({
+        env: {},
+        redactedPlainKeys: [],
+      });
+      expect(redactAdapterConfigEnvForResponse("not-an-object")).toEqual({
+        env: {},
+        redactedPlainKeys: [],
+      });
+    });
+
+    it("returns an empty result when env is missing or not an object", () => {
+      expect(redactAdapterConfigEnvForResponse({})).toEqual({
+        env: {},
+        redactedPlainKeys: [],
+      });
+      expect(redactAdapterConfigEnvForResponse({ env: null })).toEqual({
+        env: {},
+        redactedPlainKeys: [],
+      });
+      expect(redactAdapterConfigEnvForResponse({ env: "not-an-object" })).toEqual({
+        env: {},
+        redactedPlainKeys: [],
+      });
+    });
+
+    it("ignores entries whose shape is neither plain nor secret_ref", () => {
+      const adapterConfig = {
+        env: {
+          WEIRD: { type: "unknown", value: "skip-me" },
+          NULL_VALUE: null,
+        },
+      };
+
+      const result = redactAdapterConfigEnvForResponse(adapterConfig);
+
+      expect(result.env).toEqual({
+        WEIRD: { type: "unknown", value: "skip-me" },
+        NULL_VALUE: null,
+      });
+      expect(result.redactedPlainKeys).toEqual([]);
+    });
   });
 });

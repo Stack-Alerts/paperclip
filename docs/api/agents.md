@@ -52,6 +52,22 @@ Returns the agent record for the currently authenticated agent.
 }
 ```
 
+## Secret redaction on agent reads
+
+Every endpoint that returns an `adapterConfig` redacts `adapterConfig.env` plain values by default.
+
+| Endpoint | Plain env values returned |
+| --- | --- |
+| `GET /api/agents/me` | Full (the agent needs its own secrets to start) |
+| `GET /api/agents/{agentId}` | Only when the caller has the `secrets:read` permission (or is the agent itself); otherwise each `{ "type": "plain", "value": "..." }` is replaced with `{ "type": "plain", "value": "***REDACTED***" }` |
+| `GET /api/companies/{companyId}/agents` | Only when the caller has the `secrets:read` permission |
+| `GET /api/agents/{agentId}/configuration` | Only when the caller has the `secrets:read` permission |
+| `GET /api/agents/{agentId}/config-revisions[/{revisionId}]` | Only when the caller has the `secrets:read` permission |
+
+`secret_ref` bindings are never revealed — they are already opaque references to a company-managed secret store. Local-instance admins (`local_implicit`) and `instance_admin` callers bypass the `secrets:read` check.
+
+Every successful read of plain env values via a board caller emits an `agent.env.read` activity event with the env keys accessed (not the values). Agent self-reads are not logged.
+
 ## Create Agent
 
 ```

@@ -7,6 +7,7 @@ const mockAgentService = vi.hoisted(() => ({
   update: vi.fn(),
   create: vi.fn(),
   resolveByReference: vi.fn(),
+  getChainOfCommand: vi.fn(async () => []),
 }));
 
 const mockAccessService = vi.hoisted(() => ({
