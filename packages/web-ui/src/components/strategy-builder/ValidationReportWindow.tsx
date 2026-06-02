@@ -151,13 +151,23 @@ function CollapsibleSection({
   );
 }
 
-function IssuesTable({
-  issues,
-  onFixClick,
-}: {
-  issues: ValidationIssue[];
+interface IssueTableRowProps {
+  issue: ValidationIssue;
+  isFixed?: boolean;
   onFixClick: (issue: ValidationIssue) => void;
-}) {
+  onUndoClick?: (key: string) => void;
+  fixedIssueKey?: string;
+}
+
+function IssueTableRow({ issue, isFixed = false, onFixClick, onUndoClick, fixedIssueKey }: IssueTableRowProps) {
+  const styles = isFixed
+    ? {
+        text: { color: 'var(--text-muted)' },
+        bg: { background: 'var(--bg-panel)', opacity: 0.6 },
+        badge: SEVERITY_STYLES[issue.severity].badge,
+      }
+    : SEVERITY_STYLES[issue.severity];
+
   const getFixButtonLabel = (ruleId: string): string => {
     const labels: Record<string, string> = {
       DIRECTION_001: 'Switch',
@@ -171,103 +181,173 @@ function IssuesTable({
   };
 
   return (
+    <div
+      className="rounded border transition-colors"
+      style={{
+        borderColor: 'var(--border)',
+        ...styles.bg,
+        padding: '10px',
+        opacity: isFixed ? 0.75 : 1,
+      }}
+    >
+              {/* Issue Header Row */}
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <span
+            className="inline-block px-2 py-0.5 rounded text-[10px] font-bold flex-shrink-0 uppercase"
+            style={{ ...styles.badge, letterSpacing: '0.05em' }}
+          >
+            {issue.severity}
+          </span>
+          <div className="flex-1 min-w-0">
+            <div
+              className="font-bold text-sm flex items-center gap-2"
+              style={{
+                color: isFixed ? 'var(--text-muted)' : 'var(--text-secondary)',
+                marginBottom: '2px',
+                textDecoration: isFixed ? 'line-through' : 'none',
+              }}
+            >
+              {issue.rule_name}
+              {isFixed && (
+                <span
+                  className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold"
+                  style={{
+                    background: 'color-mix(in srgb, var(--accent-green) 20%, var(--bg-panel))',
+                    color: 'var(--accent-green)',
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  ✓ FIXED
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              {issue.category}
+            </div>
+          </div>
+        </div>
+        <div className="flex-shrink-0">
+          {isFixed ? (
+            <button
+              onClick={() => onUndoClick?.(fixedIssueKey || '')}
+              className="px-2 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap"
+              style={{
+                background: 'color-mix(in srgb, var(--accent-blue) 28%, var(--bg-panel))',
+                color: 'var(--accent-blue)',
+                border: '1px solid var(--accent-blue)',
+              }}
+              title="Undo this fix"
+            >
+              Undo
+            </button>
+          ) : issue.severity === ValidationSeverity.INFO ? (
+            <span className="text-xs font-bold" style={{ color: 'var(--accent-green)' }}>
+              ✓
+            </span>
+          ) : issue.auto_fix_available ? (
+            <button
+              onClick={() => onFixClick(issue)}
+              className="px-2 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap"
+              style={{
+                background: 'color-mix(in srgb, var(--accent-blue) 28%, var(--bg-panel))',
+                color: 'var(--accent-blue)',
+              }}
+              title={getFixButtonTooltip(issue.rule_id)}
+            >
+              {getFixButtonLabel(issue.rule_id)}
+            </button>
+          ) : (
+            <span
+              className="text-xs font-bold whitespace-nowrap"
+              title="No auto-fix is available for this rule — see the How to Fix hint below the message."
+              style={{
+                color:
+                  issue.severity === ValidationSeverity.CRITICAL ||
+                  issue.severity === ValidationSeverity.ERROR
+                    ? 'color-mix(in srgb, var(--accent-red) 70%, var(--text-secondary))'
+                    : 'var(--text-muted)',
+                cursor: 'help',
+              }}
+            >
+              {getActionText(issue.severity)}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Message */}
+      <div
+        style={{
+          fontSize: '12px',
+          color: isFixed ? 'var(--text-muted)' : 'var(--text-secondary)',
+          lineHeight: '1.4',
+          marginBottom: '6px',
+        }}
+      >
+        {issue.message}
+      </div>
+
+      {/* Location & Suggestion */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 12px', fontSize: '11px' }}>
+        {issue.location && (
+          <>
+            <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Location:</span>
+            <code
+              style={{
+                color: isFixed ? 'var(--text-muted)' : 'var(--text-secondary)',
+                fontFamily: 'monospace',
+                whiteSpace: 'pre-wrap',
+              }}
+            >
+              {formatLocation(issue.location)}
+            </code>
+          </>
+        )}
+        {issue.suggestion && (
+          <>
+            <span style={{ color: 'var(--accent-blue)', fontWeight: '600' }}>💡 How to Fix:</span>
+            <span style={{ color: 'var(--accent-blue)' }}>{issue.suggestion}</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function IssuesTable({
+  issues,
+  fixedIssuesInSession,
+  showFixed,
+  onFixClick,
+  onUndoClick,
+}: {
+  issues: ValidationIssue[];
+  fixedIssuesInSession?: Array<{ key: string; issue: ValidationIssue }>;
+  showFixed?: boolean;
+  onFixClick: (issue: ValidationIssue) => void;
+  onUndoClick?: (key: string) => void;
+}) {
+  const fixedIssuesDisplay = showFixed ? (fixedIssuesInSession ?? []) : [];
+  const allIssuesDisplay = [...issues, ...fixedIssuesDisplay.map((f) => ({ ...f.issue, isFixed: true, fixedIssueKey: f.key }))];
+
+  return (
     <div className="space-y-2">
-      {issues.length === 0 ? (
+      {allIssuesDisplay.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
           No issues found.
         </div>
       ) : (
-        issues.map((issue, idx) => {
-          const styles = SEVERITY_STYLES[issue.severity];
-          return (
-            <div
-              key={`${issue.rule_id}-${idx}`}
-              className="rounded border transition-colors"
-              style={{
-                borderColor: 'var(--border)',
-                ...styles.bg,
-                padding: '10px',
-              }}
-            >
-              {/* Issue Header Row */}
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <span
-                    className="inline-block px-2 py-0.5 rounded text-[10px] font-bold flex-shrink-0 uppercase"
-                    style={{ ...styles.badge, letterSpacing: '0.05em' }}
-                  >
-                    {issue.severity}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm" style={{ color: 'var(--text-secondary)', marginBottom: '2px' }}>
-                      {issue.rule_name}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      {issue.category}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex-shrink-0">
-                  {issue.severity === ValidationSeverity.INFO ? (
-                    <span
-                      className="text-xs font-bold"
-                      style={{ color: 'var(--accent-green)' }}
-                    >
-                      ✓
-                    </span>
-                  ) : issue.auto_fix_available ? (
-                    <button
-                      onClick={() => onFixClick(issue)}
-                      className="px-2 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap"
-                      style={{ background: 'color-mix(in srgb, var(--accent-blue) 28%, var(--bg-panel))', color: 'var(--accent-blue)' }}
-                      title={getFixButtonTooltip(issue.rule_id)}
-                    >
-                      {getFixButtonLabel(issue.rule_id)}
-                    </button>
-                  ) : (
-                    <span
-                      className="text-xs font-bold whitespace-nowrap"
-                      title="No auto-fix is available for this rule — see the How to Fix hint below the message."
-                      style={{
-                        color:
-                          issue.severity === ValidationSeverity.CRITICAL ||
-                          issue.severity === ValidationSeverity.ERROR
-                            ? 'color-mix(in srgb, var(--accent-red) 70%, var(--text-secondary))'
-                            : 'var(--text-muted)',
-                        cursor: 'help',
-                      }}
-                    >
-                      {getActionText(issue.severity)}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Message */}
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '6px' }}>
-                {issue.message}
-              </div>
-
-              {/* Location & Suggestion */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 12px', fontSize: '11px' }}>
-                {issue.location && (
-                  <>
-                    <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Location:</span>
-                    <code style={{ color: 'var(--text-secondary)', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-                      {formatLocation(issue.location)}
-                    </code>
-                  </>
-                )}
-                {issue.suggestion && (
-                  <>
-                    <span style={{ color: 'var(--accent-blue)', fontWeight: '600' }}>💡 How to Fix:</span>
-                    <span style={{ color: 'var(--accent-blue)' }}>{issue.suggestion}</span>
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })
+        allIssuesDisplay.map((issue: any, idx) => (
+          <IssueTableRow
+            key={`${issue.rule_id}-${idx}`}
+            issue={issue}
+            isFixed={issue.isFixed}
+            onFixClick={onFixClick}
+            onUndoClick={onUndoClick}
+            fixedIssueKey={issue.fixedIssueKey}
+          />
+        ))
       )}
     </div>
   );
@@ -788,7 +868,7 @@ function getComplexityLevel(score: number): string {
 }
 
 export function ValidationReportWindow({ open, onClose, report, standalone = false }: ValidationReportWindowProps) {
-  const { validationMessages, isValidating, validateStrategy, clearValidation, currentStrategy, applyAutoFix, applyLocalAutoFix } = useStrategyStore();
+  const { validationMessages, isValidating, validateStrategy, clearValidation, currentStrategy, applyAutoFix, applyLocalAutoFix, fixedIssuesInSession, undoAutoFix } = useStrategyStore();
 
   const handlePopOut = useCallback(() => {
     const win = window.open(
@@ -815,6 +895,7 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
   const [undoStack, setUndoStack] = useState<UndoState[]>([]);
   const [showAutoFix, setShowAutoFix] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<ValidationIssue | null>(null);
+  const [showFixedIssues, setShowFixedIssues] = useState(true);
 
   // For demo: create a mock report if none provided
   const mockReport: ValidationReport = useMemo(() => ({
@@ -1043,6 +1124,13 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
       validateStrategy().catch(console.error);
     }
   }, [undoStack, validateStrategy]);
+
+  const handleUndoFixedIssue = useCallback(
+    (key: string) => {
+      undoAutoFix(key).catch(console.error);
+    },
+    [undoAutoFix],
+  );
 
   if (!open) return null;
 
@@ -1368,12 +1456,44 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
 
           {currentTab === 'issues' && (
             <div className="space-y-4">
-              {allIssues.length === 0 ? (
+              {allIssues.length === 0 && fixedIssuesInSession.length === 0 ? (
                 <div className="text-center py-8" style={{ color: 'var(--text-muted)' }}>
                   No validation issues found.
                 </div>
               ) : (
-                <IssuesTable issues={allIssues} onFixClick={handleFixClick} />
+                <>
+                  {fixedIssuesInSession.length > 0 && (
+                    <div
+                      className="flex items-center gap-2 p-2 rounded"
+                      style={{
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border)',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        id="show-fixed-toggle"
+                        checked={showFixedIssues}
+                        onChange={(e) => setShowFixedIssues(e.target.checked)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <label
+                        htmlFor="show-fixed-toggle"
+                        className="text-xs font-medium flex-1"
+                        style={{ cursor: 'pointer', color: 'var(--text-secondary)' }}
+                      >
+                        Show fixed issues ({fixedIssuesInSession.length})
+                      </label>
+                    </div>
+                  )}
+                  <IssuesTable
+                    issues={allIssues}
+                    fixedIssuesInSession={fixedIssuesInSession}
+                    showFixed={showFixedIssues}
+                    onFixClick={handleFixClick}
+                    onUndoClick={handleUndoFixedIssue}
+                  />
+                </>
               )}
             </div>
           )}

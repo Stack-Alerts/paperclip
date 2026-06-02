@@ -11,6 +11,7 @@ import {
   ValidationMessage,
   ValidationLevel,
   ValidationReport,
+  ValidationIssue,
   BacktestConfig,
   BacktestConfigFull,
   BacktestResult,
@@ -87,6 +88,13 @@ function initCurrentStrategy(): { current: Strategy | null; list: Strategy[] } {
   return { current: fresh, list: [fresh] };
 }
 
+export interface FixedIssueEntry {
+  key: string;
+  issue: ValidationIssue;
+  appliedAt: string;
+  undoSnapshot: Strategy;
+}
+
 interface StrategyStoreState {
   // Strategy data
   currentStrategy: Strategy | null;
@@ -107,6 +115,7 @@ interface StrategyStoreState {
   backTestInProgress: boolean;
   backTestProgress: number;
   backTestResult: BacktestResult | null;
+  fixedIssuesInSession: FixedIssueEntry[];
 
   // Actions
   hydrateFromLocalStorage: () => void;
@@ -121,6 +130,7 @@ interface StrategyStoreState {
   validateStrategy: () => Promise<void>;
   applyAutoFix: (ruleId: string, autoFixData: Record<string, unknown> | undefined) => Promise<boolean>;
   applyLocalAutoFix: (ruleId: string, data: Record<string, unknown>) => Promise<boolean>;
+  undoAutoFix: (key: string) => Promise<void>;
   runBacktest: (config: BacktestConfig | BacktestConfigFull) => Promise<BacktestResult>;
   loadBlockLibrary: () => Promise<void>;
   clearValidation: () => void;
@@ -150,6 +160,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   backTestInProgress: false,
   backTestProgress: 0,
   backTestResult: null,
+  fixedIssuesInSession: [],
 
   // Load localStorage state after client mount — keeps SSR/client renders in sync.
   hydrateFromLocalStorage: () => {
@@ -462,13 +473,41 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   // un-normalized swap crashed StrategyInfoPanel::computeStats. Instead we
   // re-run validateStrategy, which re-reads from the DB and reflects the
   // fix in the validation panel directly. BTCAAAAA-32954.
+  // After fix, track the issue as fixed so the row stays visible with undo.
   applyAutoFix: async (ruleId, autoFixData) => {
-    const { currentStrategy } = get();
+    const { currentStrategy, validationReport } = get();
     if (!currentStrategy || !isBackendStrategyId(currentStrategy.id)) {
       return false;
     }
     try {
+      // Find the issue being fixed so we can track it as fixed
+      const allIssues = [
+        ...(validationReport?.critical_issues ?? []),
+        ...(validationReport?.errors ?? []),
+        ...(validationReport?.warnings ?? []),
+        ...(validationReport?.notices ?? []),
+        ...(validationReport?.info ?? []),
+      ];
+      const matchingIssue = allIssues.find((issue) => issue.rule_id === ruleId);
+
       await autoFixStrategyAPI(currentStrategy.id, ruleId, autoFixData);
+
+      // Track the fixed issue before re-validation
+      if (matchingIssue) {
+        const key = `${ruleId}-${matchingIssue.location || 'global'}`;
+        set((state) => ({
+          fixedIssuesInSession: [
+            ...state.fixedIssuesInSession,
+            {
+              key,
+              issue: matchingIssue,
+              appliedAt: new Date().toISOString(),
+              undoSnapshot: currentStrategy,
+            },
+          ],
+        }));
+      }
+
       await (get().validateStrategy as () => Promise<void>)();
       return true;
     } catch (error) {
@@ -480,9 +519,9 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   // Apply a local auto-fix for client-side validation issues (missing_timeframe,
   // missing_target_market). Mutates currentStrategy.settings directly, persists
   // to localStorage or backend, then re-runs validation so the panel reflects
-  // the cleared warning.
+  // the cleared warning. Track the issue as fixed so the row stays visible.
   applyLocalAutoFix: async (ruleId, data) => {
-    const { currentStrategy } = get();
+    const { currentStrategy, validationReport } = get();
     if (!currentStrategy) return false;
 
     try {
@@ -496,7 +535,33 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
         return false;
       }
 
+      // Find the issue being fixed so we can track it as fixed
+      const allIssues = [
+        ...(validationReport?.critical_issues ?? []),
+        ...(validationReport?.errors ?? []),
+        ...(validationReport?.warnings ?? []),
+        ...(validationReport?.notices ?? []),
+        ...(validationReport?.info ?? []),
+      ];
+      const matchingIssue = allIssues.find((issue) => issue.rule_id === ruleId);
+
       set({ currentStrategy: updated });
+
+      // Track the fixed issue before re-validation
+      if (matchingIssue) {
+        const key = `${ruleId}-${matchingIssue.location || 'global'}`;
+        set((state) => ({
+          fixedIssuesInSession: [
+            ...state.fixedIssuesInSession,
+            {
+              key,
+              issue: matchingIssue,
+              appliedAt: new Date().toISOString(),
+              undoSnapshot: currentStrategy,
+            },
+          ],
+        }));
+      }
 
       // For backend strategies, save the change so it persists across reload
       if (isBackendStrategyId(updated.id)) {
@@ -677,5 +742,38 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
         status: StrategyStatus.DRAFT,
       },
     });
+  },
+
+  // Undo a fixed issue by restoring the pre-fix snapshot
+  undoAutoFix: async (key) => {
+    const { fixedIssuesInSession, currentStrategy } = get();
+    const fixedEntry = fixedIssuesInSession.find((entry) => entry.key === key);
+    if (!fixedEntry) return;
+
+    // Restore the snapshot
+    set({ currentStrategy: fixedEntry.undoSnapshot });
+
+    // For backend strategies, save the revert so it persists
+    if (isBackendStrategyId(fixedEntry.undoSnapshot.id)) {
+      try {
+        await (get().saveStrategy as () => Promise<Strategy>)();
+      } catch (error) {
+        console.error('Failed to save undo:', error);
+      }
+    } else {
+      // For local drafts, persist to localStorage
+      saveToStorage([
+        ...loadFromStorage().filter((s) => s.id !== fixedEntry.undoSnapshot.id),
+        fixedEntry.undoSnapshot,
+      ]);
+    }
+
+    // Remove from fixed issues
+    set((state) => ({
+      fixedIssuesInSession: state.fixedIssuesInSession.filter((entry) => entry.key !== key),
+    }));
+
+    // Re-run validation
+    await (get().validateStrategy as () => Promise<void>)();
   },
 }));
