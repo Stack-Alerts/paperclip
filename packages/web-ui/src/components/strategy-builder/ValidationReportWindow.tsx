@@ -37,6 +37,7 @@ import { ValidationReport, ValidationIssue, ValidationSeverity } from '@/lib/str
 import { AutoFixConfirmDialog } from './AutoFixConfirmDialog';
 import { AppBrand } from '@/components/shared/AppBrand';
 import { status } from '@/lib/status';
+import { RichTooltip } from './RichTooltip';
 
 export interface ValidationReportWindowProps {
   open: boolean;
@@ -230,49 +231,61 @@ function IssueTableRow({ issue, isFixed = false, onFixClick, onUndoClick, fixedI
         </div>
         <div className="flex-shrink-0">
           {isFixed ? (
-            <button
-              onClick={() => onUndoClick?.(fixedIssueKey || '')}
-              className="px-2 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap"
-              style={{
-                background: 'color-mix(in srgb, var(--accent-blue) 28%, var(--bg-panel))',
-                color: 'var(--accent-blue)',
-                border: '1px solid var(--accent-blue)',
-              }}
-              title="Undo this fix"
-            >
-              Undo
-            </button>
+            <RichTooltip content={{
+              title: 'Undo Fix',
+              body: 'Revert this fix and restore the issue. Validation will re-run automatically.',
+            }}>
+              <button
+                onClick={() => onUndoClick?.(fixedIssueKey || '')}
+                className="px-2 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap"
+                style={{
+                  background: 'color-mix(in srgb, var(--accent-blue) 28%, var(--bg-panel))',
+                  color: 'var(--accent-blue)',
+                  border: '1px solid var(--accent-blue)',
+                }}
+              >
+                Undo
+              </button>
+            </RichTooltip>
           ) : issue.severity === ValidationSeverity.INFO ? (
             <span className="text-xs font-bold" style={{ color: 'var(--accent-green)' }}>
               ✓
             </span>
           ) : issue.auto_fix_available ? (
-            <button
-              onClick={() => onFixClick(issue)}
-              className="px-2 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap"
-              style={{
-                background: 'color-mix(in srgb, var(--accent-blue) 28%, var(--bg-panel))',
-                color: 'var(--accent-blue)',
-              }}
-              title={getFixButtonTooltip(issue.rule_id)}
-            >
-              {getFixButtonLabel(issue.rule_id)}
-            </button>
+            <RichTooltip content={{
+              title: getFixButtonLabel(issue.rule_id),
+              body: getFixButtonTooltip(issue.rule_id),
+            }}>
+              <button
+                onClick={() => onFixClick(issue)}
+                className="px-2 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap"
+                style={{
+                  background: 'color-mix(in srgb, var(--accent-blue) 28%, var(--bg-panel))',
+                  color: 'var(--accent-blue)',
+                }}
+              >
+                {getFixButtonLabel(issue.rule_id)}
+              </button>
+            </RichTooltip>
           ) : (
-            <span
-              className="text-xs font-bold whitespace-nowrap"
-              title="No auto-fix is available for this rule — see the How to Fix hint below the message."
-              style={{
-                color:
-                  issue.severity === ValidationSeverity.CRITICAL ||
-                  issue.severity === ValidationSeverity.ERROR
-                    ? 'color-mix(in srgb, var(--accent-red) 70%, var(--text-secondary))'
-                    : 'var(--text-muted)',
-                cursor: 'help',
-              }}
-            >
-              {getActionText(issue.severity)}
-            </span>
+            <RichTooltip content={{
+              title: 'No Auto-Fix Available',
+              body: 'This rule does not have an automatic fix. See the "How to Fix" hint below the issue message for the recommended manual remediation.',
+            }}>
+              <span
+                className="text-xs font-bold whitespace-nowrap"
+                style={{
+                  color:
+                    issue.severity === ValidationSeverity.CRITICAL ||
+                    issue.severity === ValidationSeverity.ERROR
+                      ? 'color-mix(in srgb, var(--accent-red) 70%, var(--text-secondary))'
+                      : 'var(--text-muted)',
+                  cursor: 'help',
+                }}
+              >
+                {getActionText(issue.severity)}
+              </span>
+            </RichTooltip>
           )}
         </div>
       </div>
@@ -1201,28 +1214,36 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
         </h2>
         <div className="flex items-center gap-2">
           {!standalone && (
-            <button
-              onClick={handlePopOut}
-              title="Open this report in a separate window that can be moved to another monitor"
-              className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
-              style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
-            >
-              ↗ Pop Out
-            </button>
+            <RichTooltip content={{
+              title: 'Pop Out',
+              body: 'Open this report in a separate window that can be moved to another monitor.',
+            }}>
+              <button
+                onClick={handlePopOut}
+                className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
+                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
+              >
+                ↗ Pop Out
+              </button>
+            </RichTooltip>
           )}
           {canPopIn && (
-            <button
-              onClick={handlePopIn}
-              title="Return this report to the main app window"
-              className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
-              style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
-            >
-              ↙ Pop In
-            </button>
+            <RichTooltip content={{
+              title: 'Pop In',
+              body: 'Return this report to the main app window.',
+            }}>
+              <button
+                onClick={handlePopIn}
+                className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
+                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
+              >
+                ↙ Pop In
+              </button>
+            </RichTooltip>
           )}
           <button
             onClick={onClose}
@@ -1560,28 +1581,43 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
             <Download size={14} strokeWidth={1.75} /> Export to CSV
           </button>
           <div className="flex-1" />
-          <button
-            onClick={handleUndo}
-            disabled={undoStack.length === 0}
-            className="px-4 py-2 rounded disabled:opacity-50 text-sm font-medium transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
-            onMouseEnter={(e) => {
-              if (undoStack.length > 0) e.currentTarget.style.background = 'var(--bg-card)';
-            }}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
-            title="Revert the most recently applied auto-fix"
-          >
-            ↩ Undo Last Fix
-          </button>
-          <button
-            onClick={displayReport.is_valid ? handleSave : onClose}
-            disabled={displayReport.is_valid && isSaving}
-            className="px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50"
-            style={closeButtonStyle}
-            title={displayReport.is_valid ? 'Save strategy as a new version' : 'Close validation report'}
-          >
-            {displayReport.is_valid ? (isSaving ? 'Saving…' : 'Save') : '✕ Close'}
-          </button>
+          <RichTooltip content={{
+            title: 'Undo Last Fix',
+            body: 'Revert the most recently applied auto-fix and re-run validation.',
+          }}>
+            <button
+              onClick={handleUndo}
+              disabled={undoStack.length === 0}
+              className="px-4 py-2 rounded disabled:opacity-50 text-sm font-medium transition-colors"
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+              onMouseEnter={(e) => {
+                if (undoStack.length > 0) e.currentTarget.style.background = 'var(--bg-card)';
+              }}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
+            >
+              ↩ Undo Last Fix
+            </button>
+          </RichTooltip>
+          <RichTooltip content={
+            displayReport.is_valid
+              ? {
+                  title: 'Save',
+                  body: 'Save the current strategy as a new version. Increments the version number and persists all changes — including any auto-fixes applied in this session — to the strategy store.',
+                }
+              : {
+                  title: 'Close',
+                  body: 'Dismiss the validation report. Blocking issues must be resolved before the strategy can be saved.',
+                }
+          }>
+            <button
+              onClick={displayReport.is_valid ? handleSave : onClose}
+              disabled={displayReport.is_valid && isSaving}
+              className="px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50"
+              style={closeButtonStyle}
+            >
+              {displayReport.is_valid ? (isSaving ? 'Saving…' : 'Save') : '✕ Close'}
+            </button>
+          </RichTooltip>
         </div>
       </div>
   );

@@ -5,6 +5,7 @@ import { Wrench, BarChart3, Settings } from 'lucide-react';
 import Structural005FixDialog from './Structural005FixDialog';
 import MissingTimeframeFixDialog from './MissingTimeframeFixDialog';
 import MissingTargetMarketFixDialog from './MissingTargetMarketFixDialog';
+import { RichTooltip } from './RichTooltip';
 
 export interface AutoFixOption {
   key: string;
@@ -215,24 +216,30 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
               <p className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
                 <Settings size={12} strokeWidth={1.75} /> Options
               </p>
-              {options.map((opt) => (
-                <label
-                  key={opt.key}
-                  className="flex items-start gap-3 cursor-pointer group"
-                  title={opt.tooltip}
-                >
-                  <input
-                    type="checkbox"
-                    checked={userOptions[opt.key] ?? false}
-                    onChange={(e) => handleOptionChange(opt.key, e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded cursor-pointer flex-shrink-0"
-                    style={{ borderColor: 'var(--border)', background: 'var(--bg-card)', accentColor: 'var(--accent-blue)' }}
-                  />
-                  <span className="text-sm transition-colors" style={{ color: 'var(--text-secondary)' }}>
-                    {opt.label}
-                  </span>
-                </label>
-              ))}
+              {options.map((opt) => {
+                const optionRow = (
+                  <label
+                    key={opt.key}
+                    className="flex items-start gap-3 cursor-pointer group"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={userOptions[opt.key] ?? false}
+                      onChange={(e) => handleOptionChange(opt.key, e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded cursor-pointer flex-shrink-0"
+                      style={{ borderColor: 'var(--border)', background: 'var(--bg-card)', accentColor: 'var(--accent-blue)' }}
+                    />
+                    <span className="text-sm transition-colors" style={{ color: 'var(--text-secondary)' }}>
+                      {opt.label}
+                    </span>
+                  </label>
+                );
+                return opt.tooltip ? (
+                  <RichTooltip key={opt.key} content={{ title: opt.label, body: opt.tooltip }}>
+                    {optionRow}
+                  </RichTooltip>
+                ) : optionRow;
+              })}
             </div>
           )}
         </div>
