@@ -931,12 +931,15 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
   const [showFixedIssues, setShowFixedIssues] = useState(true);
 
   // For demo: create a mock report if none provided
-  const mockReport: ValidationReport = useMemo(() => ({
+  const mockReport: ValidationReport = useMemo(() => {
+    const cs = currentStrategy as (typeof currentStrategy & { versionNumber?: number }) | null;
+    const versionNumber = cs?.versionNumber;
+    return ({
     is_valid: validationMessages.length === 0,
     timestamp: new Date().toISOString(),
     strategy_summary: {
-      name: currentStrategy?.name || 'Unknown',
-      version: '1.0',
+      name: cs?.name || 'Unknown',
+      version: versionNumber ? String(versionNumber) : '1',
     },
     critical_issues: [],
     errors: validationMessages.filter((m) => m.level === 'error').map((m) => ({
@@ -968,7 +971,8 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
     complexity_metrics: {
       complexity_score: 45,
     },
-  }), [validationMessages, currentStrategy]);
+    });
+  }, [validationMessages, currentStrategy]);
 
   const displayReport = report || mockReport;
 

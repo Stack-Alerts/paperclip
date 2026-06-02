@@ -780,8 +780,9 @@ export function StrategyBrowserDialog({
   }, [refreshList]);
 
   const handleSelect = useCallback(() => {
-    if (selectedStrategy) { onSelect(selectedStrategy); onClose(); }
-  }, [selectedStrategy, onSelect, onClose]);
+    const target = detailOverride ?? selectedStrategy;
+    if (target) { onSelect(target); onClose(); }
+  }, [detailOverride, selectedStrategy, onSelect, onClose]);
 
   const handleRowDoubleClick = useCallback((s: Strategy) => {
     onSelect(s); onClose();
