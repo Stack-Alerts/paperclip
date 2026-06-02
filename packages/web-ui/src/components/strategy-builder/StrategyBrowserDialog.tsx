@@ -509,9 +509,16 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
 
 // ── Main dialog ───────────────────────────────────────────────────────────────
 
+export interface StrategySelectOptions {
+  // True when the picked version is older than the listed latest — the caller
+  // needs this to validate against the in-memory blocks rather than the
+  // backend's latest-only validator (BTCAAAAA-33738 Bug 2).
+  historicalVersion?: boolean;
+}
+
 export interface StrategyBrowserDialogProps {
   open: boolean;
-  onSelect: (strategy: Strategy) => void;
+  onSelect: (strategy: Strategy, opts?: StrategySelectOptions) => void;
   onClose: () => void;
   mode?: 'open' | 'save_as';
   standalone?: boolean;
@@ -543,6 +550,11 @@ export function StrategyBrowserDialog({
   const [versions, setVersions]               = useState<StrategyVersion[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [detailOverride, setDetailOverride]    = useState<Strategy | null>(null);
+  const [loadingVersionId, setLoadingVersionId] = useState<string | null>(null);
+  // Monotonic counter to discard stale loadStrategyVersion responses when the
+  // user clicks faster than the network. Only the most-recent request's
+  // result becomes the override (BTCAAAAA-33738).
+  const versionLoadSeqRef = useRef(0);
   const importRef = useRef<HTMLInputElement>(null);
 
   // Splitter state: table flex-basis percentage. Stored value (if any) is
@@ -603,11 +615,17 @@ export function StrategyBrowserDialog({
 
   const handleVersionChange = useCallback(async (strategyId: string, versionId: string) => {
     setSelectedVersionId(versionId);
+    setLoadingVersionId(versionId);
+    const seq = ++versionLoadSeqRef.current;
     try {
       const data = await loadStrategyVersion(strategyId, versionId);
+      // Discard if a newer pick has superseded this load (rapid dropdown clicks).
+      if (seq !== versionLoadSeqRef.current) return;
       setDetailOverride(data as Strategy);
     } catch {
-      setDetailOverride(null);
+      if (seq === versionLoadSeqRef.current) setDetailOverride(null);
+    } finally {
+      if (seq === versionLoadSeqRef.current) setLoadingVersionId(null);
     }
   }, []);
 
@@ -779,19 +797,50 @@ export function StrategyBrowserDialog({
     if (importRef.current) importRef.current.value = '';
   }, [refreshList]);
 
-  const handleSelect = useCallback(() => {
-    const target = detailOverride ?? selectedStrategy;
-    if (target) { onSelect(target); onClose(); }
-  }, [detailOverride, selectedStrategy, onSelect, onClose]);
+  const handleSelect = useCallback(async () => {
+    if (!selectedStrategy) return;
+    // Resolve the version the user actually picked. Race guard: if the version
+    // pick is still in flight (handleVersionChange not yet resolved), or the
+    // dropdown value disagrees with the cached detailOverride, fetch the
+    // selected version inline so we never fall back to the latest-row data
+    // (BTCAAAAA-33738 Bug 1: clicking Open before loadStrategyVersion resolved
+    // would pass selectedStrategy — i.e. the latest row — to the builder).
+    const latestVersionId = selectedStrategy.versionId ?? null;
+    const overrideVersionId = (detailOverride as { versionId?: string } | null)?.versionId ?? null;
+    const needsExplicitLoad =
+      selectedVersionId != null &&
+      selectedVersionId !== latestVersionId &&
+      selectedVersionId !== overrideVersionId;
+
+    let target: Strategy = detailOverride ?? selectedStrategy;
+    if (needsExplicitLoad) {
+      try {
+        const data = await loadStrategyVersion(selectedStrategy.id, selectedVersionId!);
+        target = data as Strategy;
+        setDetailOverride(target);
+      } catch {
+        // Fall back to whatever we have rather than silently load latest;
+        // surface a status so the user knows the version load failed.
+        setControlMsg('Failed to load the selected version');
+        return;
+      }
+    }
+    const targetVersionId = (target as { versionId?: string }).versionId ?? null;
+    const isHistorical = targetVersionId != null && targetVersionId !== latestVersionId;
+    onSelect(target, { historicalVersion: isHistorical });
+    onClose();
+  }, [detailOverride, selectedStrategy, selectedVersionId, onSelect, onClose]);
 
   const handleRowDoubleClick = useCallback((s: Strategy) => {
-    onSelect(s); onClose();
+    // Double-click bypasses the version dropdown by definition (the row is
+    // the latest version), so pass it through unchanged.
+    onSelect(s, { historicalVersion: false }); onClose();
   }, [onSelect, onClose]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
-      if (e.key === 'Enter' && selectedId) handleSelect();
+      if (e.key === 'Enter' && selectedId) handleSelect().catch(console.error);
     },
     [selectedId, onClose, handleSelect],
   );
@@ -1153,9 +1202,15 @@ export function StrategyBrowserDialog({
             Cancel
           </button>
           <button
-            onClick={handleSelect}
-            disabled={!selectedId}
-            title={isSaveAs ? 'Save the strategy to the selected location' : 'Open the selected strategy in the Strategy Builder'}
+            onClick={() => { handleSelect().catch(console.error); }}
+            disabled={!selectedId || loadingVersionId != null}
+            title={
+              loadingVersionId != null
+                ? 'Loading the selected version…'
+                : isSaveAs
+                  ? 'Save the strategy to the selected location'
+                  : 'Open the selected strategy in the Strategy Builder'
+            }
             className="flex items-center gap-1.5 px-4 py-1.5 rounded text-sm font-medium transition-all border select-none disabled:opacity-40"
             style={{
               background: 'rgba(255,255,255,0.04)',
@@ -1179,7 +1234,7 @@ export function StrategyBrowserDialog({
             {isSaveAs
               ? <Save size={14} strokeWidth={1.5} aria-hidden="true" />
               : <FolderOpen size={14} strokeWidth={1.5} aria-hidden="true" />}
-            {confirmLabel}
+            {loadingVersionId != null ? 'Loading…' : confirmLabel}
           </button>
         </div>
       </div>

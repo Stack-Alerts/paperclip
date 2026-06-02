@@ -13,6 +13,7 @@ import {
   BacktestConfig,
 } from '@/lib/strategy-builder/types';
 import { InfoTooltip } from './InfoTooltip';
+import { FixedIssuesList } from './FixedIssuesList';
 
 // ---------------------------------------------------------------------------
 // Legacy flat-message helpers (existing store uses ValidationMessage[])
@@ -358,6 +359,8 @@ function ValidationPanel({ currentVersionId }, ref) {
     saveStrategy,
     runBacktest,
     currentStrategy,
+    fixedIssuesInSession,
+    undoAutoFix,
   } = useStrategyStore();
 
   // ValidationReport is produced by the full report endpoint; this panel
@@ -539,8 +542,23 @@ function ValidationPanel({ currentVersionId }, ref) {
 
       {/* Scrollable results area */}
       <div className="overflow-y-auto flex-1 min-h-0">
+        {/* "Fixed in this session" section — rehydrated from
+            validationHistory by setCurrentStrategy (BTCAAAAA-33700) and made
+            visible per-row with Undo (BTCAAAAA-33738 Bug 3). Rendered before
+            the live results so users see their applied fixes alongside any
+            still-outstanding issues. */}
+        {fixedIssuesInSession.length > 0 && (
+          <div className="px-4 pt-3">
+            <FixedIssuesList
+              entries={fixedIssuesInSession}
+              onUndo={(key) => { undoAutoFix(key).catch(console.error); }}
+              compact
+            />
+          </div>
+        )}
+
         {/* No results placeholder */}
-        {!hasMessages && !report && !isValidating && (
+        {!hasMessages && !report && !isValidating && fixedIssuesInSession.length === 0 && (
           <p className="px-4 py-2 text-xs" style={{ color: 'var(--text-faintest)' }}>
             No validation results — click Validate to run checks.
           </p>
