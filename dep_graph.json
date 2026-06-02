@@ -218,6 +218,9 @@
     "scripts/scan_fix_issues_done.py": [
       "src/impact_gate/scan_fix_issues_done.py"
     ],
+    "scripts/seed_validation_test_strategy.py": [
+      "src/optimizer_v3/database/__init__.py"
+    ],
     "scripts/snapshot_touch_index_quality.py": [
       "src/touch_index/db.py",
       "src/touch_index/quality.py"
@@ -276,6 +279,8 @@
       "src/api/auth.py",
       "src/api/models.py",
       "src/api/redis_client.py",
+      "src/strategy_builder/persistence/strategy_persistence.py",
+      "src/optimizer_v3/validation/institutional_validator.py",
       "src/optimizer_v3/core/backtest_data_provider.py",
       "src/optimizer_v3/core/multicore_backtest_engine.py",
       "src/itm/domain/events.py",
@@ -4524,6 +4529,7 @@
       "delete_orphan.py",
       "scripts/migrate_strategy_type.py",
       "scripts/qa_live_1096_training_panel_cache_gate.py",
+      "scripts/seed_validation_test_strategy.py",
       "src/api/app.py",
       "src/optimizer_v3/ui/training_panel.py",
       "src/strategy_builder/integration/strategy_builder_orchestrator.py",
@@ -5100,6 +5106,28 @@
     ],
     "src/api/redis_client.py": [
       "src/api/app.py"
+    ],
+    "src/strategy_builder/persistence/strategy_persistence.py": [
+      "src/api/app.py",
+      "src/strategy_builder/integration/strategy_builder_orchestrator.py",
+      "test_real_data_save.py",
+      "tests/bug_regression/test_btcaaaaa_929_regression.py",
+      "tests/strategy_builder/persistence/test_strategy_persistence.py",
+      "tests/strategy_builder/test_auto_fix_db_persistence.py",
+      "tests/strategy_builder/test_exit_persistence.py"
+    ],
+    "src/optimizer_v3/validation/institutional_validator.py": [
+      "src/api/app.py",
+      "src/optimizer_v3/validation/__init__.py",
+      "src/strategy_builder/ui/strategy_builder_main_window.py",
+      "src/strategy_builder/ui/validation_report_window.py",
+      "src/strategy_builder/validation/auto_fix.py",
+      "tests/bug_regression/test_btcaaaaa_119_regression.py",
+      "tests/optimizer_v3/validation/test_institutional_validator.py",
+      "tests/strategy_builder/test_auto_fix_integration.py",
+      "tests/strategy_builder/test_validation_report_fix_signal.py",
+      "tests/ui_qt/test_reports.py",
+      "tests/ui_qt/test_window_geometry.py"
     ],
     "src/optimizer_v3/core/multicore_backtest_engine.py": [
       "src/api/app.py",
@@ -5855,18 +5883,6 @@
       "test_ai_request_preview_system.py",
       "tests/strategy_builder/ui/test_confluence_repair.py"
     ],
-    "src/optimizer_v3/validation/institutional_validator.py": [
-      "src/optimizer_v3/validation/__init__.py",
-      "src/strategy_builder/ui/strategy_builder_main_window.py",
-      "src/strategy_builder/ui/validation_report_window.py",
-      "src/strategy_builder/validation/auto_fix.py",
-      "tests/bug_regression/test_btcaaaaa_119_regression.py",
-      "tests/optimizer_v3/validation/test_institutional_validator.py",
-      "tests/strategy_builder/test_auto_fix_integration.py",
-      "tests/strategy_builder/test_validation_report_fix_signal.py",
-      "tests/ui_qt/test_reports.py",
-      "tests/ui_qt/test_window_geometry.py"
-    ],
     "src/detectors/building_blocks/patterns/double_top.py": [
       "src/strategies/.backups/strategy_01_reversal_m_pattern_backup_20260109_171349.py",
       "src/strategies/strategy_01_reversal_m_pattern.py",
@@ -6117,14 +6133,6 @@
       "src/strategy_builder/ui/validation_report_window.py",
       "tests/strategy_builder/testing/test_walkforward_test_engine.py",
       "tests/ui_qt/test_reports.py"
-    ],
-    "src/strategy_builder/persistence/strategy_persistence.py": [
-      "src/strategy_builder/integration/strategy_builder_orchestrator.py",
-      "test_real_data_save.py",
-      "tests/bug_regression/test_btcaaaaa_929_regression.py",
-      "tests/strategy_builder/persistence/test_strategy_persistence.py",
-      "tests/strategy_builder/test_auto_fix_db_persistence.py",
-      "tests/strategy_builder/test_exit_persistence.py"
     ],
     "src/strategy_builder/core/nautilus_code_generator.py": [
       "src/strategy_builder/integration/strategy_builder_orchestrator.py",
@@ -7792,6 +7800,7 @@
     "scripts/run_walkforward_ci.py",
     "scripts/scan_done_alert.py",
     "scripts/scan_fix_issues_done.py",
+    "scripts/seed_validation_test_strategy.py",
     "scripts/setup_branch_protection.py",
     "scripts/snapshot_touch_index_quality.py",
     "scripts/static_dep_graph.py",
@@ -7799,6 +7808,7 @@
     "scripts/sync_trace_requirements.py",
     "scripts/sync_trace_test_cases.py",
     "scripts/test_all_building_blocks.py",
+    "scripts/token_gap_escalation_blocker_verification.py",
     "scripts/traceability_monitor.py",
     "scripts/validate_data_quality.py",
     "scripts/validate_dependencies.py",
@@ -8918,6 +8928,7 @@
     "tests/performance/__init__.py",
     "tests/performance/test_profiling.py",
     "tests/qa/test_fact_check_pipeline.py",
+    "tests/scripts/test_token_gap_escalation_blocker_verification.py",
     "tests/strategies/01_test_strategy_Reversal_M_Pattern_Standard.py",
     "tests/strategies/02_test_strategy_Reversal_W_Pattern_Standard.py",
     "tests/strategies/backtest_simulator.py",
@@ -9021,6 +9032,7 @@
     "tests/test_scripts/test_paperclip_recovery_monitor.py",
     "tests/test_scripts/test_paperclip_recovery_monitor_backup.py",
     "tests/test_scripts/test_paperclip_stalled_workflow_reporter.py",
+    "tests/test_scripts/test_prune_local_dumps.py",
     "tests/test_scripts/test_rclone_oauth_health.py",
     "tests/test_scripts/test_report_recovery_health_check.py",
     "tests/test_scripts/test_validate_testnet_env.py",
@@ -9085,10 +9097,10 @@
     "src/detectors/building_blocks/patterns/triple_top.py"
   ],
   "stats": {
-    "total_files": 1419,
-    "parsed_files": 1403,
+    "total_files": 1423,
+    "parsed_files": 1407,
     "error_files": 16,
-    "parse_rate_pct": 98.87,
-    "edge_count": 2473
+    "parse_rate_pct": 98.88,
+    "edge_count": 2476
   }
 }
