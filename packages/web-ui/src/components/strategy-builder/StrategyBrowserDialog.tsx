@@ -602,16 +602,29 @@ export function StrategyBrowserDialog({
   // DetailsPanel shows the version-overridden data when a different version is selected
   const detailsStrategy = detailOverride ?? selectedStrategy;
 
+  // Re-fetch the version dropdown for a given strategy. Used by the selection
+  // effect AND by mutation handlers (duplicate as new version) so the dropdown
+  // reflects newly-created rows without requiring the user to deselect and
+  // re-pick the strategy (BTCAAAAA-33886).
+  const reloadVersions = useCallback(async (strategyId: string) => {
+    try {
+      const v = await getStrategyVersions(strategyId);
+      setVersions((v as StrategyVersion[]) ?? []);
+      return (v as StrategyVersion[]) ?? [];
+    } catch {
+      setVersions([]);
+      return [];
+    }
+  }, []);
+
   // Load versions when selection changes; reset version override
   useEffect(() => {
     if (!selectedId) { setVersions([]); setSelectedVersionId(null); setDetailOverride(null); return; }
     const currentVersionId = displayList.find(s => s.id === selectedId)?.versionId ?? null;
     setSelectedVersionId(currentVersionId);
     setDetailOverride(null);
-    getStrategyVersions(selectedId)
-      .then((v) => setVersions((v as StrategyVersion[]) ?? []))
-      .catch(() => setVersions([]));
-  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+    reloadVersions(selectedId);
+  }, [selectedId, reloadVersions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleVersionChange = useCallback(async (strategyId: string, versionId: string) => {
     setSelectedVersionId(versionId);
@@ -760,13 +773,33 @@ export function StrategyBrowserDialog({
     setShowDupModal(false);
     setControlling(true); setControlMsg(null);
     try {
-      await duplicateStrategyScoped(selectedId, scope, newName);
+      // Pass selectedVersionId so the backend clones the version the user is
+      // actually viewing — without it the backend always sources from latest
+      // (BTCAAAAA-33886).
+      const result = await duplicateStrategyScoped(
+        selectedId,
+        scope,
+        newName,
+        scope === 'version' ? selectedVersionId : null,
+      ) as { versionId?: string } | null;
       setControlMsg(scope === 'version' ? 'New version created' : 'Strategy duplicated');
       await refreshList();
+      // For scope='version' the selected strategy is unchanged, so the
+      // selection-keyed useEffect won't re-fetch versions. Refresh the
+      // dropdown explicitly and point selection at the newly-created row
+      // so the user sees the new version immediately (BTCAAAAA-33886).
+      if (scope === 'version') {
+        await reloadVersions(selectedId);
+        const newVersionId = result?.versionId ?? null;
+        if (newVersionId) {
+          setSelectedVersionId(newVersionId);
+          setDetailOverride(null);
+        }
+      }
     }
     catch { setControlMsg('Duplicate failed'); }
     finally { setControlling(false); }
-  }, [selectedId, refreshList]);
+  }, [selectedId, selectedVersionId, refreshList, reloadVersions]);
 
   const handleExportJson = useCallback(() => {
     if (!selectedStrategy) return;

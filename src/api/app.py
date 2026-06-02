@@ -890,6 +890,10 @@ class _DeleteVersionsRequest(BaseModel):
 class _DuplicateRequest(BaseModel):
     scope: str = "version"
     name: Optional[str] = None
+    # Optional: source a specific version instead of the strategy's latest.
+    # When omitted (legacy callers) we keep the get_latest_version behaviour
+    # so old clients are not broken (BTCAAAAA-33886).
+    source_version_id: Optional[str] = None
 
 
 class _UpdateSBStrategyRequest(BaseModel):
@@ -1669,17 +1673,27 @@ async def sb_duplicate_strategy(
 
     def _duplicate() -> Optional[dict]:
         with db.scoped_managers() as scoped:
-            latest = scoped.strategy.get_latest_version(strategy_id)
-            if latest is None:
+            # Source from the user-picked version when supplied; otherwise
+            # fall back to the strategy's latest (legacy clients). When the
+            # supplied version doesn't belong to this strategy, treat it as
+            # not-found so we don't silently leak data across strategies.
+            source: Optional[dict] = None
+            if body.source_version_id:
+                source = scoped.strategy.get_strategy_version(body.source_version_id)
+                if source is None or source.get("strategy_id") != strategy_id:
+                    return None
+            else:
+                source = scoped.strategy.get_latest_version(strategy_id)
+            if source is None:
                 return None
 
             # Strip auto-generated fields before re-inserting
             _strip = {"version_id", "version_number", "timestamp", "created_at",
                       "config_hash", "validation_timestamp"}
-            version_data = {k: v for k, v in latest.items() if k not in _strip}
+            version_data = {k: v for k, v in source.items() if k not in _strip}
 
             if body.scope == "strategy":
-                new_name = body.name or f"{latest['name']} (Copy)"
+                new_name = body.name or f"{source['name']} (Copy)"
                 new_strategy_id = scoped.strategy.create_strategy(new_name)
                 version_data["strategy_id"] = new_strategy_id
                 version_data["name"] = new_name
