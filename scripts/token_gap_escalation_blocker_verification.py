@@ -151,7 +151,7 @@ def has_fix_sha_none_comment(issue_id: str) -> bool:
                     pass
 
             body = comment.get("body", "").lower()
-            if "fix-sha: none" in body or "fix-sha:\s*none" in body:
+            if "fix-sha: none" in body or re.search(r"fix-sha:\s*none", body):
                 logger.info(f"  Found Fix-SHA: NONE comment on {issue_id}, skipping re-escalation")
                 return True
     except Exception as e:
