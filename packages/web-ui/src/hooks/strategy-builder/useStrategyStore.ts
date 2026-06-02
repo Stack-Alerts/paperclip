@@ -756,12 +756,15 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     // so a failed revert leaves the FIXED state visible for retry
     if (isBackendStrategyId(strategyId)) {
       try {
-        const reverted = await revertStrategyAPI(
-          strategyId,
-          fixedEntry.undoSnapshot.blocks
-        );
-        // Update currentStrategy from the revert response
-        set({ currentStrategy: reverted as Strategy });
+        const versionId = fixedEntry.undoSnapshot.versionId;
+        if (!versionId) {
+          throw new Error('Cannot undo: pre-fix snapshot has no versionId');
+        }
+        await revertStrategyAPI(strategyId, versionId);
+        // Restore the pre-fix snapshot (already in UI-format blocks) rather than
+        // using the raw-blocks API response, which StrategyInfoPanel can't render.
+        // validateStrategy() below re-validates the new DB version.
+        set({ currentStrategy: fixedEntry.undoSnapshot });
       } catch (error) {
         console.error('Failed to revert strategy:', error);
         throw error;

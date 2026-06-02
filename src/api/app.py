@@ -1222,11 +1222,13 @@ class _AutoFixRequest(BaseModel):
 class _RevertRequest(BaseModel):
     """Body for POST /strategy-builder/strategies/{id}/revert.
 
-    Accepts the original blocks from a pre-fix snapshot and persists them
-    as a new version to undo a previous auto-fix (BTCAAAAA-33599).
+    Accepts the DB version ID of the pre-fix snapshot and copies its raw blocks
+    into a new version to undo a previous auto-fix (BTCAAAAA-33599).
+    Using versionId avoids the UI-format vs raw-format mismatch that occurs when
+    the frontend sends already-normalized blocks.
     """
 
-    blocks: list[dict]
+    versionId: str
 
 
 def _apply_auto_fix(blocks: list[dict], rule_id: str, data: dict) -> tuple[list[dict], bool]:
@@ -1424,21 +1426,33 @@ async def sb_revert_strategy(
 ) -> dict:
     """Revert to a previous blocks snapshot by persisting them as a new version.
 
-    Used by the Undo button on fixed validation issues — takes the original blocks
-    from the pre-fix snapshot and creates a new version to undo a prior auto-fix.
+    Used by the Undo button on fixed validation issues — looks up the raw blocks
+    from the specified DB version and creates a new version to undo a prior auto-fix.
     Returns the updated strategy in the same shape the GET route uses (BTCAAAAA-33599).
     """
     db = _get_sb_db()
     if db is None:
         raise _sb_db_unavailable()
 
+    logger.info("Revert request: strategy_id=%s versionId=%s", strategy_id, body.versionId)
+
     def _run() -> Optional[dict]:
         with db.scoped_managers() as scoped:
+            # Load blocks from the source version (pre-fix snapshot) — raw DB format
+            source_version = scoped.strategy.get_strategy_version(body.versionId)
+            if source_version is None:
+                logger.warning("Revert: source version %s not found", body.versionId)
+                return None
+
+            source_blocks = source_version.get("blocks") or []
+            logger.info("Revert: source version %s has %d blocks, first block keys=%s",
+                        body.versionId, len(source_blocks),
+                        list(source_blocks[0].keys()) if source_blocks else [])
+
             latest = scoped.strategy.get_latest_version(strategy_id)
             if latest is None:
                 return None
 
-            # Reuse the latest version's metadata but replace blocks with the snapshot's
             _strip = {
                 "version_id", "version_number", "timestamp", "created_at",
                 "config_hash", "validation_timestamp",
@@ -1447,7 +1461,7 @@ async def sb_revert_strategy(
                 k: v for k, v in latest.items() if k not in _strip
             }
             version_data["strategy_id"] = strategy_id
-            version_data["blocks"] = body.blocks
+            version_data["blocks"] = source_blocks
 
             version_id = scoped.strategy.create_strategy_version(version_data)
             new_version = scoped.strategy.get_strategy_version(version_id)

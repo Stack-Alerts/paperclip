@@ -186,11 +186,12 @@ export async function autoFixStrategy(
   });
 }
 
-export async function revertStrategy(id: string, blocks: unknown[]) {
-  // Revert to a previous blocks snapshot by persisting them as a new version.
-  // Used by the Undo button to revert a prior auto-fix (BTCAAAAA-33599).
+export async function revertStrategy(id: string, versionId: string) {
+  // Revert to a previous DB version's blocks by creating a new version.
+  // Uses versionId so the backend reads raw DB blocks, avoiding the UI-format
+  // mismatch that occurs when the frontend sends normalized blocks (BTCAAAAA-33599).
   return post(`/strategy-builder/strategies/${id}/revert`, {
-    blocks,
+    versionId,
   });
 }
 
