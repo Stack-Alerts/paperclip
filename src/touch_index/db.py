@@ -9,7 +9,7 @@ from sqlalchemy.engine import Engine
 def get_engine(pool_size: int = 2) -> Engine:
     # POSTGRES_* loaded via pydantic-settings (BTCAAAAA-30576) — .env is the
     # single source of truth, no start.sh allowlist needed.
-    from src.optimizer_v3.database.settings import get_database_settings
+    from optimizer_v3.database.settings import get_database_settings
 
     s = get_database_settings()
     return create_engine(
