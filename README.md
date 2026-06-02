@@ -34,6 +34,31 @@ python -c "import nautilus_trader as nt; print(f'✅ v{nt.__version__}')"
 
 See `AGENTS.md` for details on when to use each.
 
+### Dev/Test Lifecycle Management
+
+The development stack includes three services: backend API (:8765), supervised web UI (:3010), and ephemeral test UI (:3000).
+
+**Status and Diagnostics:**
+```bash
+./status-dev.sh  # Health check: HTTP probes, PIDs, uptime, git state
+```
+
+**Stopping Services:**
+```bash
+./stop-dev.sh       # Stop supervised web UI (:3010)
+./stop-backend.sh   # Stop backend API (:8765)
+./stop-test.sh      # Stop ephemeral test UI (:3000)
+```
+
+**Restarting with Smart Hang Detection:**
+```bash
+./restart-dev.sh [--clean]                    # Restart web UI (optional cache clean)
+./restart-backend.sh                           # Restart backend (hang-aware)
+./restart-test.sh [--clean] [--branch <name>] # Restart test instance
+```
+
+These scripts detect hangs (port bound but service unresponsive) and force-kill immediately instead of waiting for graceful shutdown. See `AGENTS.md` for details on hang detection and recovery.
+
 ## Documentation
 
 **START HERE:** `docs/archive/v3-legacy/V3_IMPLEMENTATION_MASTER_GUIDE.md`

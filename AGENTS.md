@@ -192,3 +192,97 @@ systemctl --user stop btc-dev-server.service
 
 The original `./start.sh` is deprecated and now prints a deprecation notice. Use one of
 the above instead.
+
+## Dev/Test Stack Lifecycle Management (BTCAAAAA-33697)
+
+The development stack consists of three services. When they hang or crash, use these
+commands to stop, diagnose, and recover without CEO intervention.
+
+### Services
+
+| Service | Port | Script | systemd Unit |
+|---------|------|--------|--------------|
+| Backend API | `:8765` | `start_api.sh` | `btc-dev-backend.service` |
+| Supervised Web UI | `:3010` | `start-dev.sh` | `btc-dev-server.service` |
+| Ephemeral Test Web UI | `:3000` | `start-test.sh` | (not under systemd) |
+
+### Diagnostics
+
+```bash
+./status-dev.sh  # Health check for all three services
+```
+
+Prints:
+- HTTP probe result (2s timeout) for each service
+- PID, uptime, and uptime of each
+- Backend SHA from `/health` endpoint (main branch verification)
+- Git state (HEAD vs `origin/main` with drift detection)
+
+Exits 0 if all healthy, non-zero if any service is degraded.
+
+### Stopping Services
+
+```bash
+./stop-dev.sh       # Stop supervised web UI (:3010)
+./stop-backend.sh   # Stop backend API (:8765)
+./stop-test.sh      # Stop ephemeral test instance (:3000)
+```
+
+Each script:
+1. Sends `SIGTERM` to the process/service
+2. Waits 5 seconds for graceful shutdown
+3. If still running, sends `SIGKILL`
+4. Reports success/failure
+
+### Restarting with Smart Hang Detection (BTCAAAAA-33696 Recovery)
+
+```bash
+./restart-dev.sh [--clean]                    # Restart supervised web UI
+./restart-backend.sh                           # Restart backend API
+./restart-test.sh [--clean] [--branch <name>] # Restart ephemeral test
+```
+
+**Smart hang detection logic:**
+
+When a service hangs (the BTCAAAAA-29995 scenario), the process is alive and the port is
+bound, but the HTTP endpoint is unresponsive. The restart scripts detect this automatically:
+
+1. **Stop the service** (graceful shutdown, 5s timeout)
+2. **Detect hang:** Is the port still bound? Is `/health` (or `/` for web UI) responding?
+   - Probe 3 times with 2s timeout each
+   - If all 3 probes fail but port is bound → **hang detected**
+3. **Kill immediately:** If hang detected, send `SIGKILL` directly (don't wait for graceful shutdown)
+4. **Restart fresh:** Start the service and poll for HTTP 200 (30s timeout)
+
+This prevents the operator from waiting indefinitely for a graceful shutdown that will never
+come. Total recovery time: <15s for most scenarios (confirmed by acceptance testing on
+BTCAAAAA-33697).
+
+**Example: hung backend (port bound, but uvicorn deadlocked)**
+
+```bash
+./restart-backend.sh
+# [restart-backend] ★ restarting backend API...
+# [restart-backend] stopping current instance...
+#   [stop-backend] ...
+# [restart-backend] checking for hangs...
+# [restart-backend] ⚠ hang detected, force-killing...
+# [restart-backend] starting btc-dev-backend.service...
+# [restart-backend] waiting for HTTP 200 on /health...
+# [restart-backend] attempt 1/30 → ✓ ready
+#
+# ✓ Backend restarted successfully
+```
+
+**Options:**
+
+- `./restart-dev.sh --clean` — Also removes `.next/dev` cache before restart
+- `./restart-test.sh --clean` — Also removes `.next` cache before restart
+- `./restart-test.sh --branch <name>` — Switch to branch before restart
+
+### Related Issues
+
+- **[BTCAAAAA-29995](/BTCAAAAA/issues/BTCAAAAA-29995)** — Root cause: uvicorn deadlock during high load
+- **[BTCAAAAA-33696](/BTCAAAAA/issues/BTCAAAAA-33696)** — Watchdog fixes (systemd WatchdogSec=, uvicorn diagnostics)
+- **[BTCAAAAA-31132](/BTCAAAAA/issues/BTCAAAAA-31132)** — Original split of start.sh into start-dev.sh and start-test.sh
+- **[BTCAAAAA-31234](/BTCAAAAA/issues/BTCAAAAA-31234)** — Wrapper PATH design
