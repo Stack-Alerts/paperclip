@@ -85,6 +85,29 @@ fi
 
 CURRENT_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)"
 
+# Check if we're on main but ahead of origin/main (unpushed commits).
+if [[ "$CURRENT_BRANCH" == "main" ]]; then
+  COMMITS_AHEAD="$(git -C "$REPO_ROOT" rev-list --count "origin/main..HEAD" 2>/dev/null || echo unknown)"
+  if [[ "$COMMITS_AHEAD" != "unknown" ]] && [[ "$COMMITS_AHEAD" -gt 0 ]]; then
+    red    '================================================================'
+    red    '  predev branch-gate REFUSED to start `next dev`.'
+    red    ''
+    red    "  Local main is $COMMITS_AHEAD commit(s) ahead of origin/main."
+    red    "  HEAD ($HEAD_SHA) vs origin/main ($MAIN_SHA)."
+    red    ''
+    red    '  Why this matters (BTCAAAAA-31217):'
+    red    '    npm run dev compiles whatever is on disk. The dev server should'
+    red    '    run against published code on origin/main, not unpushed work.'
+    red    ''
+    red    '  How to proceed:'
+    red    '    1. git push origin main                    (recommended — sync with origin)'
+    red    '    2. ./start-dev.sh                          (supervised dev on origin/main)'
+    red    '    3. FORCE_NON_MAIN_DEV=1 npm run dev        (intentional non-main, loud banner)'
+    red    '================================================================'
+    exit 1
+  fi
+fi
+
 red    '================================================================'
 red    '  predev branch-gate REFUSED to start `next dev`.'
 red    ''
@@ -93,12 +116,12 @@ red    "  is not origin/main ($MAIN_SHA)."
 red    ''
 red    '  Why this matters (BTCAAAAA-31217):'
 red    '    npm run dev compiles whatever is on disk. If you are on a stale'
-red    '    branch (e.g. master 5 commits behind), the board will see old UI'
+red    '    branch (e.g. feature branch), the board will see old UI'
 red    '    and wrongly conclude "no progress was made".'
 red    ''
 red    '  How to proceed:'
-red    '    1. ./start.sh                                  (recommended — switches to main)'
-red    '    2. git switch main && git pull --ff-only origin main'
+red    '    1. ./start-dev.sh                              (recommended — supervised :3010)'
+red    '    2. git pull --ff-only origin main && ./start-test.sh  (sync + ephemeral :3000)'
 red    '    3. FORCE_NON_MAIN_DEV=1 npm run dev            (intentional non-main, loud banner)'
 red    '================================================================'
 exit 1
