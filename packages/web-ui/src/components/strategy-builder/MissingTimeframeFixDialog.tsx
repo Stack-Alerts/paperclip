@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { Clock, Lightbulb } from 'lucide-react';
 
 const CANONICAL_TIMEFRAMES = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'];
 
@@ -28,8 +29,8 @@ export const MissingTimeframeFixDialog: React.FC<MissingTimeframeFixDialogProps>
 
       {/* Timeframe selector */}
       <div className="rounded-lg px-5 py-4 space-y-3 border" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-card) 30%, transparent)' }}>
-        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-          ⏱️ Select Timeframe
+        <p className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+          <Clock size={12} strokeWidth={1.75} /> Select Timeframe
         </p>
         <div className="grid grid-cols-4 gap-2">
           {CANONICAL_TIMEFRAMES.map((tf) => (
@@ -52,8 +53,8 @@ export const MissingTimeframeFixDialog: React.FC<MissingTimeframeFixDialogProps>
 
       {/* Impact note */}
       <div className="rounded-r px-4 py-3" style={{ borderLeft: '4px solid var(--accent-blue)', background: 'color-mix(in srgb, var(--bg-deep) 60%, transparent)' }}>
-        <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--accent-blue)' }}>
-          💡 Impact
+        <p className="text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--accent-blue)' }}>
+          <Lightbulb size={12} strokeWidth={1.75} /> Impact
         </p>
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
           Setting timeframe to {selectedTimeframe} will allow timing-based blocks and signal evaluations to work correctly with {selectedTimeframe} candles.
@@ -76,7 +77,7 @@ export const MissingTimeframeFixDialog: React.FC<MissingTimeframeFixDialogProps>
           className="px-4 py-2 rounded text-sm font-medium transition-colors"
           style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }}
         >
-          ✅ Set Timeframe
+          Set Timeframe
         </button>
       </div>
     </div>

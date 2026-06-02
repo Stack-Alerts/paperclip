@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useMemo } from 'react';
+import { TrendingUp, Lightbulb } from 'lucide-react';
 
 const SUGGESTED_MARKETS = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT'];
 
@@ -50,8 +51,8 @@ export const MissingTargetMarketFixDialog: React.FC<MissingTargetMarketFixDialog
 
       {/* Suggested markets */}
       <div className="rounded-lg px-5 py-4 space-y-3 border" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-card) 30%, transparent)' }}>
-        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-          📊 Popular Markets
+        <p className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+          <TrendingUp size={12} strokeWidth={1.75} /> Popular Markets
         </p>
         <div className="flex gap-2 flex-wrap">
           {SUGGESTED_MARKETS.map((market) => (
@@ -105,8 +106,8 @@ export const MissingTargetMarketFixDialog: React.FC<MissingTargetMarketFixDialog
 
       {/* Impact note */}
       <div className="rounded-r px-4 py-3" style={{ borderLeft: '4px solid var(--accent-blue)', background: 'color-mix(in srgb, var(--bg-deep) 60%, transparent)' }}>
-        <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--accent-blue)' }}>
-          💡 Impact
+        <p className="text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--accent-blue)' }}>
+          <Lightbulb size={12} strokeWidth={1.75} /> Impact
         </p>
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
           Setting target market to {currentValue || 'your chosen pair'} allows the strategy to validate and backtest against the correct asset pair.
@@ -135,7 +136,7 @@ export const MissingTargetMarketFixDialog: React.FC<MissingTargetMarketFixDialog
             opacity: isValid ? 1 : 0.6,
           }}
         >
-          ✅ Set Market
+          Set Market
         </button>
       </div>
     </div>

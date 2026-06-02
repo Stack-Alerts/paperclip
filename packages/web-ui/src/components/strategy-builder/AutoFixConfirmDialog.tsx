@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { Wrench, BarChart3, Settings } from 'lucide-react';
 import Structural005FixDialog from './Structural005FixDialog';
 import MissingTimeframeFixDialog from './MissingTimeframeFixDialog';
 import MissingTargetMarketFixDialog from './MissingTargetMarketFixDialog';
@@ -121,7 +122,7 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
 
         {/* ── Sticky header ── */}
         <div className="flex items-center gap-3 border-b px-6 py-4 sticky top-0 z-10" style={{ borderColor: 'var(--border)', background: 'var(--bg-panel)' }}>
-          <span className="text-xl">🔧</span>
+          <Wrench size={18} strokeWidth={1.75} style={{ color: 'var(--text-secondary)' }} />
           <div>
             <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>
               Auto-Fix: {fixType}
@@ -140,8 +141,8 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
           <div className="flex items-start gap-3">
             {/* Before */}
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--accent-red)' }}>
-                ❌ Current State (Has Issues)
+              <p className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--accent-red)' }}>
+                <span aria-hidden="true">✕</span> Current State (Has Issues)
               </p>
               <pre className="rounded p-3 text-xs overflow-auto max-h-48 font-mono whitespace-pre-wrap break-words border" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
                 {beforeFormatted}
@@ -155,8 +156,8 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
 
             {/* After */}
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--accent-green)' }}>
-                ✅ After Fix (Corrected)
+              <p className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--accent-green)' }}>
+                <span aria-hidden="true">✓</span> After Fix (Corrected)
               </p>
               <pre className="rounded p-3 text-xs overflow-auto max-h-48 font-mono whitespace-pre-wrap break-words border" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
                 {afterFormatted}
@@ -168,8 +169,8 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
           {/* ── Impact Analysis (skip for local auto-fixes) ── */}
           {!isMissingTimeframe && !isMissingTargetMarket && (
           <div className="rounded-r px-4 py-3" style={{ borderLeft: '4px solid var(--accent-blue)', background: 'color-mix(in srgb, var(--bg-deep) 60%, transparent)' }}>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--accent-blue)' }}>
-              📊 Impact Analysis
+            <p className="text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--accent-blue)' }}>
+              <BarChart3 size={12} strokeWidth={1.75} /> Impact Analysis
             </p>
             <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>{impactAnalysis}</p>
           </div>
@@ -211,8 +212,8 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
           {/* ── Checkbox Options ── */}
           {!isStructural005 && options.length > 0 && (
             <div className="rounded-lg px-5 py-4 space-y-3 border" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-card) 30%, transparent)' }}>
-              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-                ⚙️ Options
+              <p className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                <Settings size={12} strokeWidth={1.75} /> Options
               </p>
               {options.map((opt) => (
                 <label
@@ -253,7 +254,7 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
               className="px-4 py-2 rounded text-sm font-medium transition-colors"
               style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
             >
-              ✅ Apply Fix
+              Apply Fix
             </button>
           </div>
         )}

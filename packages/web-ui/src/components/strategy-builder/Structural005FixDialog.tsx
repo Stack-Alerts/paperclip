@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { Wrench, Trash2, Pencil, Target, FileEdit, AlertTriangle, BarChart3 } from 'lucide-react';
 
 export interface Structural005FixDialogProps {
   strategyId: string;
@@ -63,8 +64,8 @@ export const Structural005FixDialog: React.FC<Structural005FixDialogProps> = ({
     <div className="space-y-4">
       {/* Mode Selection */}
       <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-card) 30%, transparent)' }}>
-        <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-secondary)' }}>
-          🔧 Fix Method
+        <p className="text-xs font-semibold uppercase tracking-wider mb-3 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+          <Wrench size={12} strokeWidth={1.75} /> Fix Method
         </p>
         <div className="space-y-2">
           <label className="flex items-center gap-3 cursor-pointer">
@@ -80,8 +81,8 @@ export const Structural005FixDialog: React.FC<Structural005FixDialogProps> = ({
               className="w-4 h-4"
               style={{ accentColor: 'var(--accent-blue)' }}
             />
-            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              🗑️ <strong>Remove</strong> — Delete one duplicate signal
+            <span className="text-sm flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <Trash2 size={14} strokeWidth={1.75} /> <strong>Remove</strong> — Delete one duplicate signal
             </span>
           </label>
           <label className="flex items-center gap-3 cursor-pointer">
@@ -97,8 +98,8 @@ export const Structural005FixDialog: React.FC<Structural005FixDialogProps> = ({
               className="w-4 h-4"
               style={{ accentColor: 'var(--accent-blue)' }}
             />
-            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              ✏️ <strong>Rename</strong> — Rename one signal to make it unique
+            <span className="text-sm flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <Pencil size={14} strokeWidth={1.75} /> <strong>Rename</strong> — Rename one signal to make it unique
             </span>
           </label>
         </div>
@@ -106,8 +107,8 @@ export const Structural005FixDialog: React.FC<Structural005FixDialogProps> = ({
 
       {/* Target Selection */}
       <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-card) 30%, transparent)' }}>
-        <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-secondary)' }}>
-          🎯 Select Target Signal
+        <p className="text-xs font-semibold uppercase tracking-wider mb-3 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+          <Target size={12} strokeWidth={1.75} /> Select Target Signal
         </p>
         <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
           Block: <strong>{blockName}</strong> • Duplicates of: <strong>{signalName}</strong>
@@ -148,8 +149,8 @@ export const Structural005FixDialog: React.FC<Structural005FixDialogProps> = ({
       {mode === 'rename' && (
         <div className="rounded-lg border p-4" style={{ borderColor: nameError ? 'var(--accent-red)' : 'var(--border)', background: 'color-mix(in srgb, var(--bg-card) 30%, transparent)' }}>
           <label className="block">
-            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-secondary)' }}>
-              📝 New Name
+            <p className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <FileEdit size={12} strokeWidth={1.75} /> New Name
             </p>
             <input
               type="text"
@@ -165,8 +166,8 @@ export const Structural005FixDialog: React.FC<Structural005FixDialogProps> = ({
             />
           </label>
           {nameError && (
-            <p className="text-xs mt-2" style={{ color: 'var(--accent-red)' }}>
-              ⚠️ {nameError}
+            <p className="text-xs mt-2 flex items-center gap-1.5" style={{ color: 'var(--accent-red)' }}>
+              <AlertTriangle size={12} strokeWidth={1.75} /> {nameError}
             </p>
           )}
         </div>
@@ -181,8 +182,8 @@ export const Structural005FixDialog: React.FC<Structural005FixDialogProps> = ({
             background: 'color-mix(in srgb, var(--bg-deep) 60%, transparent)',
           }}
         >
-          <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--accent-blue)' }}>
-            📊 Impact Preview
+          <p className="text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--accent-blue)' }}>
+            <BarChart3 size={12} strokeWidth={1.75} /> Impact Preview
           </p>
           <div className="text-xs space-y-1" style={{ color: 'var(--text-secondary)' }}>
             <p>
@@ -218,7 +219,7 @@ export const Structural005FixDialog: React.FC<Structural005FixDialogProps> = ({
           className="px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50"
           style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
         >
-          ✅ {mode === 'remove' ? 'Remove Signal' : 'Rename Signal'}
+          {mode === 'remove' ? 'Remove Signal' : 'Rename Signal'}
         </button>
       </div>
     </div>

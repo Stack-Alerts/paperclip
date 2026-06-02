@@ -31,7 +31,7 @@
  */
 
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { ShieldCheck, BarChart3, AlertTriangle, TrendingUp } from 'lucide-react';
+import { ShieldCheck, BarChart3, AlertTriangle, TrendingUp, Maximize2, Download } from 'lucide-react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { ValidationReport, ValidationIssue, ValidationSeverity } from '@/lib/strategy-builder/types';
 import { AutoFixConfirmDialog } from './AutoFixConfirmDialog';
@@ -130,7 +130,7 @@ function CollapsibleSection({
             className="px-2 py-1 rounded text-xs font-medium transition-colors flex-shrink-0 ml-2"
             style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)', border: 'none', cursor: 'pointer' }}
           >
-            🗖
+            <Maximize2 size={12} strokeWidth={1.75} />
           </button>
         )}
       </button>
@@ -306,7 +306,7 @@ function IssueTableRow({ issue, isFixed = false, onFixClick, onUndoClick, fixedI
         )}
         {issue.suggestion && (
           <>
-            <span style={{ color: 'var(--accent-blue)', fontWeight: '600' }}>💡 How to Fix:</span>
+            <span style={{ color: 'var(--accent-blue)', fontWeight: '600' }}>How to Fix:</span>
             <span style={{ color: 'var(--accent-blue)' }}>{issue.suggestion}</span>
           </>
         )}
@@ -378,11 +378,11 @@ function getActionText(severity: ValidationSeverity): string {
   switch (severity) {
     case ValidationSeverity.CRITICAL:
     case ValidationSeverity.ERROR:
-      return '⚠️ Must Fix';
+      return 'Must Fix';
     case ValidationSeverity.WARNING:
-      return '⚡ Should Review';
+      return 'Should Review';
     default:
-      return 'ℹ️ Review';
+      return 'Review';
   }
 }
 
@@ -436,7 +436,7 @@ function getExitStrategyAnalysis(strategy: any): string {
 
 function getTimingConflictAnalysis(timingConflicts: any[]): string {
   const lines: string[] = [];
-  lines.push('⚠️ TIMING CONFLICT DETECTED - CRITICAL ISSUE');
+  lines.push('TIMING CONFLICT DETECTED — CRITICAL ISSUE');
   lines.push('='.repeat(60));
   lines.push('');
   lines.push('WHAT THIS MEANS:');
@@ -450,7 +450,7 @@ function getTimingConflictAnalysis(timingConflicts: any[]): string {
     lines.push(`CONFLICT #${idx + 1}:`);
     lines.push(`Signal: ${conflict.signal}`);
     lines.push('');
-    lines.push('❌ Problem:');
+    lines.push('Problem:');
     lines.push(`   Timing Window: ${conflict.timing_window} bars`);
     lines.push(`   RECHECK Delay: ${conflict.recheck_delay} bars`);
     lines.push('');
@@ -458,7 +458,7 @@ function getTimingConflictAnalysis(timingConflicts: any[]): string {
     lines.push(`   but the timing window expires at bar ${conflict.timing_window}.`);
     lines.push('   This signal will NEVER trigger!');
     lines.push('');
-    lines.push('✅ Solution:');
+    lines.push('Solution:');
     lines.push(`   1. Reduce RECHECK delay to ≤ ${conflict.timing_window} bars, OR`);
     lines.push(`   2. Increase timing window to ≥ ${conflict.recheck_delay} bars`);
     lines.push('');
@@ -526,12 +526,12 @@ function buildExecutionFlowSections(
       lines.push(`📦 BLOCK ${num}: ${block.name.toUpperCase()} (${logicNote})`);
       lines.push('');
       (block.signals || []).forEach((sig) => {
-        lines.push(`   🎯 ENTRY SIGNAL: ${sig.name}`);
+        lines.push(`   ENTRY SIGNAL: ${sig.name}`);
         if (sig.timingConstraint) {
           const ref = sig.timingConstraint.ofSignal
             ? ` of '${sig.timingConstraint.ofSignal}'`
             : '';
-          lines.push(`      └── ⏱  Timing: Must trigger within ${sig.timingConstraint.withinCandles} candles${ref}`);
+          lines.push(`      └── Timing: Must trigger within ${sig.timingConstraint.withinCandles} candles${ref}`);
         }
         if (sig.recheck) {
           lines.push(`      └── 🔄 RECHECK: Validate '${sig.recheck.signal}' after ${sig.recheck.afterBars} bars`);
@@ -781,7 +781,7 @@ function getSignalDirectionAnalysis(strategy: any): string {
 
   if (bullishCount > 0) {
     const bullishPct = ((bullishCount / totalSignals) * 100).toFixed(1);
-    lines.push(`📈 BULLISH SIGNALS: ${bullishCount} (${bullishPct}%)`);
+    lines.push(`BULLISH SIGNALS: ${bullishCount} (${bullishPct}%)`);
     bullishSignals.forEach((s) => lines.push(`   • ${s}`));
     lines.push('');
   }
@@ -803,14 +803,14 @@ function getSignalDirectionAnalysis(strategy: any): string {
   lines.push('='.repeat(60));
 
   if (bullishCount > 0 && bearishCount > 0) {
-    lines.push('⚠️ MIXED DIRECTION DETECTED');
+    lines.push('MIXED DIRECTION DETECTED');
     lines.push('Trading in mixed directions may cause conflicting orders.');
   } else if (bullishCount > 0) {
-    lines.push('✅ ALIGNED BULLISH DIRECTION');
+    lines.push('ALIGNED BULLISH DIRECTION');
   } else if (bearishCount > 0) {
-    lines.push('✅ ALIGNED BEARISH DIRECTION');
+    lines.push('ALIGNED BEARISH DIRECTION');
   } else {
-    lines.push('⚠️ NO DIRECTIONAL SIGNALS');
+    lines.push('NO DIRECTIONAL SIGNALS');
   }
 
   return lines.join('\n');
@@ -855,15 +855,15 @@ function getCompositionBreakdown(strategy: any): Array<{ label: string; count: n
 
 function getComplexityLevel(score: number): string {
   if (score < 20) {
-    return '🟢 Very Simple - Minimal blocks and signals, easy to maintain';
+    return 'Very Simple — Minimal blocks and signals, easy to maintain';
   } else if (score < 40) {
-    return '🟢 Simple - Low complexity, straightforward strategy';
+    return 'Simple — Low complexity, straightforward strategy';
   } else if (score < 60) {
-    return '🟡 Moderate - Standard complexity, balanced approach';
+    return 'Moderate — Standard complexity, balanced approach';
   } else if (score < 80) {
-    return '🟠 Complex - Multiple blocks and signals, careful testing required';
+    return 'Complex — Multiple blocks and signals, careful testing required';
   } else {
-    return '🔴 Very Complex - Extensive configuration, high maintenance requirements';
+    return 'Very Complex — Extensive configuration, high maintenance requirements';
   }
 }
 
@@ -1414,7 +1414,7 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
                       letterSpacing: '0.12em',
                     }}
                   >
-                    ⚠ Timing Conflicts
+                    Timing Conflicts
                   </h3>
                   <div className="space-y-2" style={{ fontSize: '12px' }}>
                     {displayReport.timing_conflicts.map((conflict, idx) => (
@@ -1501,24 +1501,24 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
           {currentTab === 'metrics' && (
             <div className="space-y-4">
               <CollapsibleSection
-                title="✅ Exit Strategy Analysis"
+                title="Exit Strategy Analysis"
                 content={getExitStrategyAnalysis(currentStrategy)}
               />
               {displayReport.timing_conflicts && displayReport.timing_conflicts.length > 0 && (
                 <CollapsibleSection
-                  title="❌ Timing Conflict Analysis"
+                  title="Timing Conflict Analysis"
                   content={getTimingConflictAnalysis(displayReport.timing_conflicts)}
                   titleColor="var(--accent-red)"
                 />
               )}
               {(!displayReport.timing_conflicts || displayReport.timing_conflicts.length === 0) && (
                 <CollapsibleSection
-                  title="✅ Timing Conflict Analysis"
+                  title="Timing Conflict Analysis"
                   content="No timing conflicts detected. All RECHECK delays are within their timing windows."
                 />
               )}
               <CollapsibleSection
-                title="✅ Signal Direction Analysis"
+                title="Signal Direction Analysis"
                 content={getSignalDirectionAnalysis(currentStrategy)}
               />
             </div>
@@ -1532,12 +1532,12 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
         >
           <button
             onClick={handleExportCSV}
-            className="px-4 py-2 rounded text-sm font-medium transition-colors"
+            className="px-4 py-2 rounded text-sm font-medium transition-colors flex items-center gap-1.5"
             style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-card)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
           >
-            📄 Export to CSV
+            <Download size={14} strokeWidth={1.75} /> Export to CSV
           </button>
           <div className="flex-1" />
           <button
@@ -1558,7 +1558,7 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
             style={closeButtonStyle}
           >
-            {displayReport.is_valid ? '✓ All Clear' : '⚠ Close'}
+            {displayReport.is_valid ? '✓ All Clear' : '✕ Close'}
           </button>
         </div>
       </div>
