@@ -10,6 +10,8 @@ import { TradesPanel } from '@/components/backtest/trades/TradesPanel';
 import { MetricsPanel } from '@/components/backtest/metrics/MetricsPanel';
 import { AiRecommendationsPanel } from '@/components/backtest/ai-recommendations/AiRecommendationsPanel';
 import { ComparePanel } from '@/components/backtest/compare/ComparePanel';
+import { BacktestProgressMeter } from '@/components/backtest/progress-meter';
+import { BacktestStatusPanel } from '@/components/backtest/status-panel';
 
 export interface BacktestConfigDialogProps {
   open: boolean;
@@ -716,67 +718,6 @@ function ConfigTab({
   );
 }
 
-// ─── Status log panel — mirrors thickclient bottom status box ──────────────────────────
-function StatusLogPanel({
-  logs,
-  isRunning,
-}: {
-  logs: BacktestStatusMessage[];
-  isRunning: boolean;
-}) {
-  if (logs.length === 0 && !isRunning) return null;
-  const recent = logs.slice(-5);
-  return (
-    <div
-      className="rounded-[4px] mb-4"
-      style={{
-        background: 'var(--bg-deep)',
-        border: '1px solid var(--border)',
-      }}
-    >
-      <div
-        className="flex items-center justify-between px-3 py-1.5"
-        style={{ borderBottom: '1px solid var(--border)' }}
-      >
-        <span
-          className="text-xs font-semibold uppercase tracking-wide"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          Status
-        </span>
-        <span
-          className="text-xs"
-          style={{ color: isRunning ? 'var(--accent-blue)' : 'var(--text-faint)' }}
-        >
-          {isRunning ? 'Running…' : 'Idle'}
-        </span>
-      </div>
-      <ul className="px-3 py-2 space-y-0.5 max-h-28 overflow-auto">
-        {recent.map((log, idx) => (
-          <li
-            key={`${log.timestamp}-${idx}`}
-            className="text-xs font-mono leading-snug"
-            style={{
-              color:
-                log.level === 'ERROR'
-                  ? 'var(--accent-red)'
-                  : log.level === 'SYSTEM'
-                    ? 'var(--accent-blue)'
-                    : 'var(--text-secondary)',
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            <span style={{ color: 'var(--text-faint)' }}>
-              {new Date(log.timestamp).toISOString().slice(11, 19)}{' '}
-            </span>
-            {log.message}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 // ─── Main dialog ───────────────────────────────────────────────────────────────
 export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProps) {
   const {
@@ -963,43 +904,21 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
           className="flex-shrink-0 px-6 py-4"
           style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-panel)' }}
         >
-          {/* Status log panel — drawer footer mirrors thickclient bottom status box */}
-          <StatusLogPanel logs={outputLogs} isRunning={backTestInProgress} />
-
-          {/* Progress bar — thickclient parity: Candles N/M, Trades K, TPSL Adjustments K */}
-          {(backTestInProgress || backTestProgress > 0) && (
-            <div className="mb-4 space-y-1">
-              <div
-                className="text-[11px]"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                <span className="font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Progress</span>
-                <span className="ml-3" style={{ color: 'var(--text-muted)' }}>
-                  Candles:{' '}
-                  <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>
-                    {(backTestResult?.trades && (backTestResult as unknown as { totalBars?: number }).totalBars) ?? '—'}
-                  </span>
-                </span>
-                <span className="ml-3" style={{ color: 'var(--text-muted)' }}>
-                  Trades:{' '}
-                  <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>
-                    {backTestResult?.trades?.length ?? '—'}
-                  </span>
-                </span>
-                <span className="ml-3" style={{ color: 'var(--text-muted)' }}>
-                  TPSL Adjustments:{' '}
-                  <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-faint)' }}>—</span>
-                </span>
-                <span className="ml-3 float-right" style={{ fontVariantNumeric: 'tabular-nums' }}>{backTestProgress}%</span>
-              </div>
-              <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-card)' }}>
-                <div
-                  className="h-full rounded-full transition-all duration-300"
-                  style={{ width: `${backTestProgress}%`, background: 'var(--accent-blue)' }}
-                />
-              </div>
-            </div>
-          )}
+          {/* Thick-client parity (BTCAAAAA-34190): Progress meter + Status panel
+              always rendered so the idle layout matches the PyQt5 surface — bar
+              starts at 0%, candle/trade/TP-SL counters at 0, and the Status box
+              shows the idle checklist until logs stream in. */}
+          <div className="mb-4 space-y-3">
+            <BacktestProgressMeter
+              progress={backTestProgress}
+              isRunning={backTestInProgress}
+              result={backTestResult}
+            />
+            <BacktestStatusPanel
+              logs={outputLogs}
+              isRunning={backTestInProgress}
+            />
+          </div>
 
           {error && (
             <p className="text-xs mb-3" style={{ color: 'var(--accent-red)' }}>{error}</p>

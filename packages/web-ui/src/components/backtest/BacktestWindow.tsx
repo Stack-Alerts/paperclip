@@ -8,6 +8,8 @@ import { AppBrand } from '@/components/shared/AppBrand';
 import { LiveOutputPanel } from './live-output/LiveOutputPanel';
 import { MetricsPanel } from './metrics/MetricsPanel';
 import { TradesPanel } from './trades/TradesPanel';
+import { BacktestProgressMeter } from './progress-meter';
+import { BacktestStatusPanel } from './status-panel';
 
 export interface BacktestWindowProps {
   progress?: BacktestProgress;
@@ -172,85 +174,27 @@ export function BacktestWindow({
     </div>
   );
 
-  // Render progress tab content
-  const progressContent = progress ? (
+  // Render progress tab content — thick-client parity (BTCAAAAA-34190).
+  // Meter and status panel are always rendered so the idle layout matches
+  // the PyQt5 reference (bar at 0%, candle/trade/TP-SL counters at 0, status
+  // box showing the "what you will see" checklist).
+  const progressPct = progress
+    ? progress.totalCandles > 0
+      ? Math.round((progress.currentCandle / progress.totalCandles) * 100)
+      : 0
+    : 0;
+  const candles = progress
+    ? { current: progress.currentCandle, total: progress.totalCandles }
+    : undefined;
+  const progressContent = (
     <div className="space-y-3">
-      <div className="rounded border p-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-        <h3 className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}>
-          Live Progress
-        </h3>
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { label: 'Status', value: progress.status },
-            { label: 'Candles', value: `${progress.currentCandle} / ${progress.totalCandles}` },
-            { label: 'Trades', value: `${progress.currentTrade} / ${progress.totalTrades}` },
-            { label: 'Message', value: progress.message || '—' },
-          ].map(item => (
-            <div
-              key={item.label}
-              className="rounded p-2"
-              style={{
-                background: 'var(--bg-panel)',
-                border: '1px solid var(--border)',
-              }}
-            >
-              <div style={{ fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                {item.label}
-              </div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', lineHeight: 1 }} className="truncate">
-                {item.value}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Progress Bars */}
-      <div className="rounded border p-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-        <h3 className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)', letterSpacing: '0.12em' }}>
-          Progress Bars
-        </h3>
-        <div className="space-y-3">
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Candles</label>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                {progress.currentCandle} / {progress.totalCandles}
-              </span>
-            </div>
-            <div className="w-full h-2 rounded" style={{ background: 'var(--bg-panel)', overflow: 'hidden' }}>
-              <div
-                className="h-full transition-all"
-                style={{
-                  width: `${progress.totalCandles > 0 ? (progress.currentCandle / progress.totalCandles) * 100 : 0}%`,
-                  background: 'var(--accent-blue)',
-                }}
-              />
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Trades</label>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                {progress.currentTrade} / {progress.totalTrades}
-              </span>
-            </div>
-            <div className="w-full h-2 rounded" style={{ background: 'var(--bg-panel)', overflow: 'hidden' }}>
-              <div
-                className="h-full transition-all"
-                style={{
-                  width: `${progress.totalTrades > 0 ? (progress.currentTrade / progress.totalTrades) * 100 : 0}%`,
-                  background: 'var(--accent-green)',
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  ) : (
-    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-      <p>No backtest running.</p>
+      <BacktestProgressMeter
+        progress={progressPct}
+        isRunning={isRunning}
+        result={result ?? null}
+        candles={candles}
+      />
+      <BacktestStatusPanel logs={logs} isRunning={isRunning} />
     </div>
   );
 
