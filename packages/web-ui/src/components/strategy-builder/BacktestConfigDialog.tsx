@@ -185,7 +185,12 @@ function ChipRow({
           aria-label={`${label} value`}
           className="flex-1 min-w-0 px-0.5 text-[11px] focus:outline-none focus:ring-0 disabled:opacity-50 disabled:cursor-not-allowed text-right bg-transparent appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
           style={{
-            color: 'var(--text-primary)',
+            // Muted-blue value text — same `--text-secondary` (#8AAEC8) the chip-row
+            // labels ("Lookback", "Training", "Starting Capital", "Min Risk:Reward",
+            // "Risk %", "Leverage") already use, so the spinbox value sits in the same
+            // visual tier as its immediately-adjacent row label and complements the
+            // theme (board post-merge revision 9).
+            color: 'var(--text-secondary)',
             fontVariantNumeric: 'tabular-nums',
           }}
         />
