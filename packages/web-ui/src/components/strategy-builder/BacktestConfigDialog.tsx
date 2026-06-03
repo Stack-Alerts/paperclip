@@ -41,6 +41,11 @@ function daysAgo(n: number) {
 }
 
 // ─── Chip row helper (used for parity with thickclient duration / percentage rows) ─────
+//
+// Each row pairs (a) preset chip buttons with (b) a numeric spinbox + unit suffix on the
+// right. Both controls write to the same `onSelect` setter, so typing in the spinbox or
+// using the up/down spinners updates the active chip, and clicking a chip updates the
+// spinbox value. This mirrors the thick-client which exposes both controls on every row.
 type ChipValue = string | number;
 function ChipRow({
   label,
@@ -49,6 +54,11 @@ function ChipRow({
   onSelect,
   disabled,
   format,
+  unit,
+  unitPosition = 'suffix',
+  min,
+  max,
+  step,
 }: {
   label: string;
   values: ChipValue[];
@@ -56,17 +66,35 @@ function ChipRow({
   onSelect: (v: ChipValue) => void;
   disabled: boolean;
   format?: (v: ChipValue) => string;
+  unit?: string;
+  unitPosition?: 'prefix' | 'suffix';
+  min?: number;
+  max?: number;
+  step?: number;
 }) {
   const fmt = format ?? ((v: ChipValue) => String(v));
+  const numericCurrent =
+    current === null || current === undefined
+      ? ''
+      : typeof current === 'number'
+        ? current
+        : Number(current);
+  const handleSpinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (raw === '') return;
+    const n = Number(raw);
+    if (Number.isNaN(n)) return;
+    onSelect(n);
+  };
   return (
-    <div className="grid grid-cols-[110px_1fr_56px] items-center gap-x-3 gap-y-0">
+    <div className="grid grid-cols-[110px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0">
       <span
         className="text-[10px] font-medium uppercase tracking-wider truncate"
         style={{ color: 'var(--text-muted)' }}
       >
         {label}
       </span>
-      <div className="flex gap-1 flex-wrap items-center">
+      <div className="flex gap-1 flex-wrap items-center min-w-0">
         {values.map((v) => {
           const isActive = current === v;
           return (
@@ -94,16 +122,43 @@ function ChipRow({
           );
         })}
       </div>
-      {/* Selected-value readout — mirrors thickclient row-end suffix ("90 days", "1.5x", "20 bars") */}
-      <span
-        className="text-[10px] text-right truncate"
-        style={{
-          color: current !== null && current !== undefined ? 'var(--accent-blue)' : 'var(--text-faint)',
-          fontVariantNumeric: 'tabular-nums',
-        }}
-      >
-        {current !== null && current !== undefined ? fmt(current) : '—'}
-      </span>
+      {/* Spinbox + unit — two-way binding with chips, matching thick-client row-end input */}
+      <div className="flex items-center gap-1 justify-end shrink-0">
+        {unit && unitPosition === 'prefix' && (
+          <span
+            className="text-[10px] leading-none whitespace-nowrap"
+            style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}
+          >
+            {unit}
+          </span>
+        )}
+        <input
+          type="number"
+          value={numericCurrent}
+          onChange={handleSpinChange}
+          disabled={disabled}
+          min={min}
+          max={max}
+          step={step}
+          aria-label={`${label} value`}
+          className="px-1.5 py-0.5 rounded text-[11px] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed text-right shrink-0"
+          style={{
+            background: 'var(--bg-deep)',
+            border: '1px solid var(--border)',
+            color: current !== null && current !== undefined ? 'var(--accent-blue)' : 'var(--text-secondary)',
+            fontVariantNumeric: 'tabular-nums',
+            width: 60,
+          }}
+        />
+        {unit && unitPosition === 'suffix' && (
+          <span
+            className="text-[10px] leading-none whitespace-nowrap"
+            style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}
+          >
+            {unit}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -155,7 +210,7 @@ function ConfigTab({
   return (
     <div className="h-full overflow-auto pb-6">
       {/* 3-Column Grid: Configuration | Adaptive SL v2.0 | Risk/Reward */}
-      <div className="grid grid-cols-[35%_35%_30%] gap-4 px-4 py-4">
+      <div className="grid grid-cols-[35fr_35fr_30fr] gap-4 px-4 py-4">
 
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 1: CONFIGURATION (35%)
@@ -181,6 +236,10 @@ function ConfigTab({
                 onSelect={(v) => applyLookbackToDates(Number(v))}
                 disabled={disabled}
                 format={(v) => `${v}d`}
+                unit="days"
+                min={1}
+                max={3650}
+                step={10}
               />
               <ChipRow
                 label="Training"
@@ -189,6 +248,10 @@ function ConfigTab({
                 onSelect={setTrainingDays}
                 disabled={disabled}
                 format={(v) => `${v}d`}
+                unit="days"
+                min={1}
+                max={3650}
+                step={10}
               />
               <ChipRow
                 label="Testing"
@@ -197,6 +260,10 @@ function ConfigTab({
                 onSelect={setTestingDays}
                 disabled={disabled}
                 format={(v) => `${v}d`}
+                unit="days"
+                min={1}
+                max={3650}
+                step={10}
               />
             </div>
           </div>
@@ -378,6 +445,10 @@ function ConfigTab({
               onSelect={setStopLossDelay}
               disabled={disabled}
               format={(v) => `${v}`}
+              unit="bars"
+              min={0}
+              max={50}
+              step={1}
             />
             <ChipRow
               label="Emergency"
@@ -386,6 +457,10 @@ function ConfigTab({
               onSelect={setEmergency}
               disabled={disabled}
               format={(v) => `${Number(v).toFixed(2)}`}
+              unit="%"
+              min={0.1}
+              max={20}
+              step={0.05}
             />
             <ChipRow
               label="Vol Lookback"
@@ -394,6 +469,10 @@ function ConfigTab({
               onSelect={setVolatilityLookback}
               disabled={disabled}
               format={(v) => `${v}`}
+              unit="bars"
+              min={5}
+              max={500}
+              step={1}
             />
             <ChipRow
               label="Vol Multiplier"
@@ -402,6 +481,10 @@ function ConfigTab({
               onSelect={setVolatilityMultiplier}
               disabled={disabled}
               format={(v) => `${v}x`}
+              unit="x"
+              min={0.1}
+              max={20}
+              step={0.1}
             />
             <ChipRow
               label="Min Stop-Loss"
@@ -410,6 +493,10 @@ function ConfigTab({
               onSelect={setMinStopLoss}
               disabled={disabled}
               format={(v) => `${Number(v).toFixed(1)}`}
+              unit="%"
+              min={0.1}
+              max={20}
+              step={0.1}
             />
             <ChipRow
               label="Max Stop-Loss"
@@ -418,6 +505,10 @@ function ConfigTab({
               onSelect={setMaxStopLoss}
               disabled={disabled}
               format={(v) => `${Number(v).toFixed(1)}`}
+              unit="%"
+              min={0.5}
+              max={50}
+              step={0.5}
             />
           </div>
         </div>
@@ -446,6 +537,11 @@ function ConfigTab({
                 if (n >= 1000) return `$${(n / 1000).toFixed(0)}k`;
                 return `$${n}`;
               }}
+              unit="$"
+              unitPosition="prefix"
+              min={100}
+              max={10_000_000}
+              step={100}
             />
             <ChipRow
               label="Min Risk:Reward"
@@ -454,6 +550,10 @@ function ConfigTab({
               onSelect={setMinRiskReward}
               disabled={disabled}
               format={(v) => `${v}x`}
+              unit="x"
+              min={1}
+              max={100}
+              step={1}
             />
             <ChipRow
               label="Risk %"
@@ -462,6 +562,10 @@ function ConfigTab({
               onSelect={setMaxRisk}
               disabled={disabled}
               format={(v) => `${v}%`}
+              unit="%"
+              min={0.5}
+              max={100}
+              step={0.5}
             />
             <ChipRow
               label="Leverage"
@@ -470,6 +574,10 @@ function ConfigTab({
               onSelect={setLeverage}
               disabled={disabled}
               format={(v) => `${v}x`}
+              unit="x"
+              min={1}
+              max={125}
+              step={1}
             />
           </div>
 
@@ -507,6 +615,10 @@ function ConfigTab({
                 onSelect={setMinBarsHeld}
                 disabled={disabled}
                 format={(v) => `${v}`}
+                unit="bars"
+                min={0}
+                max={1000}
+                step={1}
               />
               <ChipRow
                 label="Max Bars Held"
@@ -515,6 +627,10 @@ function ConfigTab({
                 onSelect={setMaxBarsHeld}
                 disabled={disabled}
                 format={(v) => `${v}`}
+                unit="bars"
+                min={1}
+                max={10000}
+                step={1}
               />
             </div>
           </div>
