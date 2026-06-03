@@ -6,28 +6,12 @@ import { BacktestStatusMessage, BacktestResult, Trade } from '@/lib/strategy-bui
 export interface LiveOutputPanelProps {
   logs?: BacktestStatusMessage[];
   isRunning?: boolean;
-  /** Latest run result — drives the TP/SL breakdown counters that used
-   *  to live in the Config tab's progress widget (board revision
-   *  2026-06-03 moved them into Live Output). */
+  /** Latest run result — drives the TP/SL breakdown counters at the top
+   *  of the panel. The idle Status checklist lives on the Config tab,
+   *  not here (cycle-13 board revision 2026-06-03: "Live Output has
+   *  separate functionality"). */
   result?: BacktestResult | null;
 }
-
-// Idle-state checklist — verbatim from the thick-client placeholder in
-// `_create_config_tab()` (src/strategy_builder/ui/backtest_config_panel.py
-// lines 1252–1273). Board moved this off the Config tab into Live Output
-// so the Config form fits without scrolling.
-const IDLE_LINES: string[] = [
-  'Status updates will appear here when backtest starts...',
-  '',
-  'During backtest you will see:',
-  '✅ Data loading progress from Unified Data Manager',
-  '✅ NautilusTrader initialization',
-  '✅ Bar aggregation status',
-  '✅ Hybrid data source routing (LakeAPI + Binance)',
-  '✅ Real-time processing updates',
-  '',
-  'All terminal output will be captured and displayed here.',
-];
 
 function tallyAdjustments(trades: Trade[] | undefined) {
   const tally = { TP1: 0, TP2: 0, TP3: 0, SL: 0 };
@@ -45,7 +29,6 @@ function tallyAdjustments(trades: Trade[] | undefined) {
 export function LiveOutputPanel({ logs = [], isRunning = false, result = null }: LiveOutputPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
-  const showIdle = logs.length === 0 && !isRunning;
   const tradeCount = result?.totalTrades ?? result?.trades?.length ?? 0;
   const adj = tallyAdjustments(result?.trades);
 
@@ -122,24 +105,10 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
           maxHeight: 400,
         }}
       >
-        {showIdle ? (
-          // Verbatim thick-client idle checklist (board revision 2026-06-03 moved
-          // it from a Config-tab Status panel into Live Output's empty state).
-          <ul className="space-y-0.5 leading-relaxed">
-            {IDLE_LINES.map((line, idx) => (
-              <li
-                key={idx}
-                style={{
-                  color: line.startsWith('✅') ? 'var(--text-secondary)' : 'var(--text-muted)',
-                  minHeight: '1em',
-                }}
-              >
-                {line || ' '}
-              </li>
-            ))}
-          </ul>
-        ) : logs.length === 0 ? (
-          <p style={{ color: 'var(--text-faint)' }}>Waiting for output…</p>
+        {logs.length === 0 ? (
+          <p style={{ color: 'var(--text-faint)' }}>
+            {isRunning ? 'Waiting for output…' : 'No output yet. Start a backtest to see live output.'}
+          </p>
         ) : (
           logs.map((msg, i) => (
             <div key={i} className="flex gap-2 mb-1 leading-relaxed">

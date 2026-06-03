@@ -31,19 +31,20 @@ function makeResult(overrides: Partial<BacktestResult> = {}): BacktestResult {
   };
 }
 
-describe('LiveOutputPanel — relocated Status checklist + TP/SL counters (BTCAAAAA-34190)', () => {
-  it('shows the thick-client idle checklist when no logs and not running', () => {
+// Cycle-13 board revision 2026-06-03: the idle Status checklist lives on
+// the Config tab; Live Output keeps its separate streaming role + run
+// counters. These tests lock that contract.
+describe('LiveOutputPanel — streaming output + run counters (cycle-13)', () => {
+  it('shows the natural "no output yet" placeholder when idle (no idle checklist)', () => {
     render(<LiveOutputPanel logs={[]} isRunning={false} />);
-    expect(screen.getByText(/Status updates will appear here when backtest starts/)).toBeInTheDocument();
-    expect(screen.getByText(/Data loading progress from Unified Data Manager/)).toBeInTheDocument();
-    expect(screen.getByText(/NautilusTrader initialization/)).toBeInTheDocument();
-    expect(screen.getByText(/Bar aggregation status/)).toBeInTheDocument();
-    expect(screen.getByText(/Hybrid data source routing \(LakeAPI \+ Binance\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Real-time processing updates/)).toBeInTheDocument();
-    expect(screen.getByText(/All terminal output will be captured and displayed here/)).toBeInTheDocument();
+    expect(screen.getByText(/No output yet/)).toBeInTheDocument();
+    // The thick-client checklist must NOT render here — it now lives on the
+    // Config tab as the StatusColumn right rail.
+    expect(screen.queryByText(/Status updates will appear here when backtest starts/)).toBeNull();
+    expect(screen.queryByText(/Data loading progress from Unified Data Manager/)).toBeNull();
   });
 
-  it('tallies TP/SL adjustments from completed trades', () => {
+  it('tallies TP/SL adjustments from completed trades in the header counter row', () => {
     const result = makeResult({
       totalTrades: 4,
       trades: [
@@ -57,13 +58,12 @@ describe('LiveOutputPanel — relocated Status checklist + TP/SL counters (BTCAA
     expect(screen.getByText('(TP1: 1, TP2: 1, TP3: 0, SL: 2)')).toBeInTheDocument();
   });
 
-  it('streams log lines when running and hides the idle checklist', () => {
+  it('streams log lines when active', () => {
     const logs: BacktestStatusMessage[] = [
       { message: 'Loading bars from Binance…', level: 'SYSTEM', timestamp: '2026-06-03T10:15:23Z' },
     ];
     render(<LiveOutputPanel logs={logs} isRunning={true} />);
     expect(screen.getByText(/Loading bars from Binance/)).toBeInTheDocument();
-    expect(screen.queryByText(/Status updates will appear here when backtest starts/)).toBeNull();
     expect(screen.getByText(/RUNNING/)).toBeInTheDocument();
   });
 });
