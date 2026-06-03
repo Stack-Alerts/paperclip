@@ -97,12 +97,6 @@ function ChipRow({
         ? current
         : Number(current);
   const numericValue = typeof numericCurrent === 'number' ? numericCurrent : 0;
-  // Spinbox border + value color match the chip accent when current value is one of the presets,
-  // so a glance pairs the highlighted chip with the spinbox readout.
-  const isPresetValue =
-    current !== null &&
-    current !== undefined &&
-    values.some((v) => v === current);
   const handleSpinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     if (raw === '') return;
@@ -191,7 +185,7 @@ function ChipRow({
           aria-label={`${label} value`}
           className="flex-1 min-w-0 px-0.5 text-[11px] focus:outline-none focus:ring-0 disabled:opacity-50 disabled:cursor-not-allowed text-right bg-transparent appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
           style={{
-            color: isPresetValue ? 'var(--accent-blue)' : 'var(--text-primary)',
+            color: 'var(--text-primary)',
             fontVariantNumeric: 'tabular-nums',
           }}
         />
