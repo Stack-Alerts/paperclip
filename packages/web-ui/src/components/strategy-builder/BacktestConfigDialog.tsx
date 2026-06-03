@@ -109,7 +109,7 @@ function ChipRow({
   };
   const stepDelta = step ?? 1;
   return (
-    <div className="grid grid-cols-[108px_minmax(0,1fr)_108px] items-center gap-x-2 gap-y-0">
+    <div className="grid grid-cols-[88px_minmax(0,1fr)_76px] items-center gap-x-1.5 gap-y-0">
       <span
         className="text-[11px] font-medium truncate"
         style={{ color: 'var(--text-secondary)' }}
@@ -117,7 +117,7 @@ function ChipRow({
       >
         {label}
       </span>
-      <div className="flex gap-1 flex-wrap items-center min-w-0">
+      <div className="flex gap-0.5 flex-nowrap items-center min-w-0 overflow-hidden">
         {values.map((v) => {
           const isActive = current === v;
           return (
@@ -125,13 +125,13 @@ function ChipRow({
               key={String(v)}
               disabled={disabled}
               onClick={() => onSelect(v)}
-              className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight"
+              className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
               style={{
                 background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
                 border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
                 color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
                 fontVariantNumeric: 'tabular-nums',
-                minWidth: 34,
+                minWidth: 0,
               }}
               onMouseEnter={(e) => {
                 if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
@@ -156,7 +156,7 @@ function ChipRow({
       >
         {unit && unitPosition === 'prefix' && (
           <span
-            className="flex items-center px-1.5 text-[11px] leading-none whitespace-nowrap"
+            className="flex items-center pl-1 pr-0.5 text-[11px] leading-none whitespace-nowrap"
             style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}
           >
             {unit}
@@ -171,7 +171,7 @@ function ChipRow({
           max={max}
           step={step}
           aria-label={`${label} value`}
-          className="flex-1 min-w-0 px-1.5 text-[11px] focus:outline-none focus:ring-0 disabled:opacity-50 disabled:cursor-not-allowed text-right bg-transparent appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+          className="flex-1 min-w-0 px-0.5 text-[11px] focus:outline-none focus:ring-0 disabled:opacity-50 disabled:cursor-not-allowed text-right bg-transparent appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
           style={{
             color: isPresetValue ? 'var(--accent-blue)' : 'var(--text-primary)',
             fontVariantNumeric: 'tabular-nums',
@@ -179,7 +179,7 @@ function ChipRow({
         />
         {unit && unitPosition === 'suffix' && (
           <span
-            className="flex items-center px-1 text-[10px] leading-none whitespace-nowrap"
+            className="flex items-center pl-0.5 pr-1 text-[10px] leading-none whitespace-nowrap"
             style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}
           >
             {unit}
@@ -240,7 +240,7 @@ function ChipRow({
 // Section card wrapper for visual separation (board polish-pass spec).
 const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section
-    className="rounded-lg px-3 py-3 space-y-3"
+    className="rounded-[4px] px-3 py-3 space-y-3"
     style={{
       border: '1px solid var(--border)',
       background: 'rgba(255, 255, 255, 0.02)',
@@ -295,7 +295,7 @@ function ConfigTab({
   return (
     <div className="h-full overflow-auto pb-6">
       {/* 3-Column Grid: Configuration | Adaptive SL v2.0 | Risk/Reward */}
-      <div className="grid grid-cols-[35fr_35fr_30fr] gap-5 px-4 py-4">
+      <div className="grid grid-cols-[33fr_33fr_34fr] gap-5 px-4 py-4">
 
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 1: CONFIGURATION (35%)
@@ -313,8 +313,7 @@ function ConfigTab({
                 current={lookbackDays}
                 onSelect={(v) => applyLookbackToDates(Number(v))}
                 disabled={disabled}
-                format={(v) => `${v}d`}
-                unit="days"
+                unit="d"
                 min={1}
                 max={3650}
                 step={10}
@@ -325,8 +324,7 @@ function ConfigTab({
                 current={trainingDays}
                 onSelect={setTrainingDays}
                 disabled={disabled}
-                format={(v) => `${v}d`}
-                unit="days"
+                unit="d"
                 min={1}
                 max={3650}
                 step={10}
@@ -337,8 +335,7 @@ function ConfigTab({
                 current={testingDays}
                 onSelect={setTestingDays}
                 disabled={disabled}
-                format={(v) => `${v}d`}
-                unit="days"
+                unit="d"
                 min={1}
                 max={3650}
                 step={10}
@@ -367,7 +364,7 @@ function ConfigTab({
                     key={m}
                     disabled={disabled}
                     onClick={() => setMode(m)}
-                    className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight"
+                    className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
                     style={{
                       background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                       border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
@@ -421,7 +418,7 @@ function ConfigTab({
                     key={opt}
                     disabled={disabled}
                     onClick={() => setSlAdjustment(opt)}
-                    className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight"
+                    className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
                     style={{
                       background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                       border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
@@ -459,12 +456,12 @@ function ConfigTab({
                     key={preset}
                     disabled={disabled}
                     onClick={() => setAdaptivePreset(preset)}
-                    className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight"
+                    className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
                     style={{
                       background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                       border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
                       color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                      minWidth: 34,
+                      minWidth: 0,
                     }}
                     onMouseEnter={(e) => {
                       if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
@@ -551,7 +548,6 @@ function ConfigTab({
               current={volatilityMultiplier}
               onSelect={setVolatilityMultiplier}
               disabled={disabled}
-              format={(v) => `${v}x`}
               unit="x"
               min={0.1}
               max={20}
@@ -598,8 +594,8 @@ function ConfigTab({
               disabled={disabled}
               format={(v) => {
                 const n = Number(v);
-                if (n >= 1000) return `$${(n / 1000).toFixed(0)}k`;
-                return `$${n}`;
+                if (n >= 1000) return `${(n / 1000).toFixed(0)}k`;
+                return `${n}`;
               }}
               unit="$"
               unitPosition="prefix"
@@ -613,7 +609,6 @@ function ConfigTab({
               current={minRiskReward}
               onSelect={setMinRiskReward}
               disabled={disabled}
-              format={(v) => `${v}x`}
               unit="x"
               min={1}
               max={100}
@@ -625,7 +620,6 @@ function ConfigTab({
               current={maxRisk}
               onSelect={setMaxRisk}
               disabled={disabled}
-              format={(v) => `${v}%`}
               unit="%"
               min={0.5}
               max={100}
@@ -637,7 +631,6 @@ function ConfigTab({
               current={leverage}
               onSelect={setLeverage}
               disabled={disabled}
-              format={(v) => `${v}x`}
               unit="x"
               min={1}
               max={125}
@@ -716,7 +709,7 @@ function StatusLogPanel({
   const recent = logs.slice(-5);
   return (
     <div
-      className="rounded-md mb-4"
+      className="rounded-[4px] mb-4"
       style={{
         background: 'var(--bg-deep)',
         border: '1px solid var(--border)',
