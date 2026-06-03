@@ -9,7 +9,6 @@ import { LiveOutputPanel } from './live-output/LiveOutputPanel';
 import { MetricsPanel } from './metrics/MetricsPanel';
 import { TradesPanel } from './trades/TradesPanel';
 import { BacktestProgressMeter } from './progress-meter';
-import { BacktestStatusPanel } from './status-panel';
 
 export interface BacktestWindowProps {
   progress?: BacktestProgress;
@@ -194,7 +193,7 @@ export function BacktestWindow({
         result={result ?? null}
         candles={candles}
       />
-      <BacktestStatusPanel logs={logs} isRunning={isRunning} />
+      <LiveOutputPanel logs={logs} isRunning={isRunning} result={result ?? null} />
     </div>
   );
 
@@ -317,7 +316,7 @@ export function BacktestWindow({
         {currentTab === 'progress' && progressContent}
         {currentTab === 'results' && resultsContent}
         {currentTab === 'trades' && <TradesPanel trades={trades} />}
-        {currentTab === 'live-output' && <LiveOutputPanel logs={logs} isRunning={isRunning} />}
+        {currentTab === 'live-output' && <LiveOutputPanel logs={logs} isRunning={isRunning} result={result ?? null} />}
       </div>
     </div>
   );

@@ -11,7 +11,6 @@ import { MetricsPanel } from '@/components/backtest/metrics/MetricsPanel';
 import { AiRecommendationsPanel } from '@/components/backtest/ai-recommendations/AiRecommendationsPanel';
 import { ComparePanel } from '@/components/backtest/compare/ComparePanel';
 import { BacktestProgressMeter } from '@/components/backtest/progress-meter';
-import { BacktestStatusPanel } from '@/components/backtest/status-panel';
 
 export interface BacktestConfigDialogProps {
   open: boolean;
@@ -257,16 +256,18 @@ function ChipRow({
 // spinbox slot, spinboxes line up section-wide.
 //
 // Section card wrapper for visual separation (board polish-pass spec).
+// Vertical padding reduced from `py-3 space-y-3` → `py-2 space-y-2` per board
+// revision 2026-06-03 so the three columns fit at 1280×720 without scroll.
 const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section
-    className="rounded-[4px] px-3 py-3 space-y-3"
+    className="rounded-[4px] px-3 py-2 space-y-2"
     style={{
       border: '1px solid var(--border)',
       background: 'rgba(255, 255, 255, 0.02)',
     }}
   >
     <h3
-      className="text-xs font-semibold uppercase tracking-wider pb-2"
+      className="text-xs font-semibold uppercase tracking-wider pb-1.5"
       style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}
     >
       {title}
@@ -312,9 +313,12 @@ function ConfigTab({
   }, [onChange]);
 
   return (
-    <div className="h-full overflow-auto pb-6">
-      {/* 3-Column Grid: Configuration | Adaptive SL v2.0 | Risk/Reward */}
-      <div className="grid grid-cols-[33fr_33fr_34fr] gap-5 px-2 py-3 items-start">
+    <div className="h-full pb-2">
+      {/* 3-Column Grid: Configuration | Adaptive SL v2.0 | Risk/Reward.
+          Outer wrapper drops `overflow-auto` (board revision 2026-06-03 — the
+          Config tab must not scroll at 1280×720); tightened gap+padding so the
+          three columns fit without sacrificing chip/spinbox sizes. */}
+      <div className="grid grid-cols-[33fr_33fr_34fr] gap-3 px-2 py-2 items-start">
 
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 1: CONFIGURATION (35%)
@@ -322,10 +326,10 @@ function ConfigTab({
         <SectionCard title="Configuration">
           {/* Basic Settings section */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
               Basic Settings
             </div>
-            <div className="space-y-3">
+            <div className="space-y-2">
               <ChipRow
                 label="Lookback"
                 values={chipSeries(30, 30, 8)}
@@ -367,7 +371,7 @@ function ConfigTab({
 
           {/* Mode section */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
               Mode
             </div>
             <div className="flex flex-row flex-wrap gap-1">
@@ -408,7 +412,7 @@ function ConfigTab({
 
           {/* TP/SL Config section */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
               TP/SL Config
             </div>
             <select
@@ -426,7 +430,7 @@ function ConfigTab({
 
           {/* Stop Loss Adjustment section */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
               Stop Loss Adjustment
             </div>
             <div className="flex flex-row flex-wrap gap-1">
@@ -464,7 +468,7 @@ function ConfigTab({
         <SectionCard title="Adaptive SL v2.0">
           {/* Presets section */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
               Presets
             </div>
             <div className="flex flex-row flex-wrap gap-1">
@@ -524,7 +528,7 @@ function ConfigTab({
           <div style={{ height: '1px', background: 'var(--border)' }} />
 
           {/* Volatility/SL Controls */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <ChipRow
               label="Stop Loss Delay"
               values={chipSeries(1, 1, 8)}
@@ -604,7 +608,7 @@ function ConfigTab({
             ════════════════════════════════════════════════════════════════════ */}
         <SectionCard title="Risk / Reward">
           {/* Capital & Exposure */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <ChipRow
               label="Starting Capital"
               values={chipSeries(5000, 5000, 8)}
@@ -664,7 +668,7 @@ function ConfigTab({
 
           {/* Confluence */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
               Confluence
             </div>
             <select
@@ -682,10 +686,10 @@ function ConfigTab({
 
           {/* Hold Duration */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
               Hold Duration
             </div>
-            <div className="space-y-3">
+            <div className="space-y-2">
               <ChipRow
                 label="Min Bars Held"
                 values={chipSeries(5, 5, 8)}
@@ -822,8 +826,11 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
         }}
       >
         {/* ── Header ── */}
+        {/* Header padding tightened `py-4` → `py-3` (board revision
+            2026-06-03) to claw back vertical room for the no-scroll
+            Config target. */}
         <div
-          className="flex items-center justify-between px-6 py-4 flex-shrink-0"
+          className="flex items-center justify-between px-6 py-3 flex-shrink-0"
           style={{ borderBottom: '1px solid var(--border)' }}
         >
           <div>
@@ -860,7 +867,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
-                className="flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors"
                 style={{
                   borderBottom: isActive ? '2px solid var(--accent-blue)' : '2px solid transparent',
                   color: isActive ? 'var(--text-secondary)' : 'var(--text-muted)',
@@ -878,12 +885,15 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
         </div>
 
         {/* ── Tab content ── */}
-        <div className="flex-1 overflow-auto px-4 py-4" style={{ background: 'var(--bg-deep)' }}>
+        {/* Vertical padding tightened from `py-4` → `py-2` (board revision
+            2026-06-03) so the Config tab's 3-column grid fits without
+            internal scroll at 1280×720. */}
+        <div className="flex-1 overflow-auto px-4 py-2" style={{ background: 'var(--bg-deep)' }}>
           {activeTab === 'config' && (
             <ConfigTab config={config} onChange={patchConfig} disabled={backTestInProgress} />
           )}
           {activeTab === 'output' && (
-            <LiveOutputPanel logs={outputLogs} isRunning={backTestInProgress} />
+            <LiveOutputPanel logs={outputLogs} isRunning={backTestInProgress} result={backTestResult} />
           )}
           {activeTab === 'trades' && (
             <TradesPanel trades={backTestResult?.trades ?? []} />
@@ -900,23 +910,21 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
         </div>
 
         {/* ── Footer: status, progress + run controls ── */}
+        {/* Footer padding trimmed `py-4` → `py-3` to claw back vertical
+            real estate for the 1280×720 no-scroll target. */}
         <div
-          className="flex-shrink-0 px-6 py-4"
+          className="flex-shrink-0 px-6 py-3"
           style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-panel)' }}
         >
-          {/* Thick-client parity (BTCAAAAA-34190): Progress meter + Status panel
-              always rendered so the idle layout matches the PyQt5 surface — bar
-              starts at 0%, candle/trade/TP-SL counters at 0, and the Status box
-              shows the idle checklist until logs stream in. */}
-          <div className="mb-4 space-y-3">
+          {/* Slim, frameless Progress bar (BTCAAAAA-34190 board revision
+              2026-06-03 — replaced the framed meter + Status card so the
+              Config form fits without scrolling). The Status checklist and
+              TP/SL counters now live in the Live Output tab. */}
+          <div className="mb-3">
             <BacktestProgressMeter
               progress={backTestProgress}
               isRunning={backTestInProgress}
               result={backTestResult}
-            />
-            <BacktestStatusPanel
-              logs={outputLogs}
-              isRunning={backTestInProgress}
             />
           </div>
 
