@@ -5,6 +5,20 @@ import { X, Play, Square, Pause, RotateCcw, Settings, Terminal, TrendingUp, BarC
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BacktestConfig, BacktestStatusMessage } from '@/lib/strategy-builder/types';
 import { InfoTooltip } from './InfoTooltip';
+import { RichTooltip, type TooltipContent } from './RichTooltip';
+import {
+  TT_LOOKBACK, TT_TRAINING, TT_TESTING,
+  TT_MODE_HISTORICAL, TT_MODE_WALK, TT_MODE_LIVE_REPLAY,
+  TT_TPSL_CONFIG, TT_SL_ADJUSTMENT,
+  TT_PRESET_CONSERVATIVE, TT_PRESET_BALANCED, TT_PRESET_AGGRESSIVE, TT_PRESET_CUSTOM,
+  TT_DELAY_STOP_LOSS, TT_MARKET_STRUCTURE_STOP,
+  TT_STOP_LOSS_DELAY, TT_EMERGENCY, TT_VOL_LOOKBACK, TT_VOL_MULTIPLIER,
+  TT_MIN_STOP_LOSS, TT_MAX_STOP_LOSS,
+  TT_STARTING_CAPITAL, TT_MIN_RR, TT_RISK_PCT, TT_LEVERAGE,
+  TT_CONFLUENCE, TT_HOLD_DURATION, TT_MIN_BARS_HELD, TT_MAX_BARS_HELD,
+  TT_PRESETS_LABEL,
+  TT_RUN_TEST, TT_PAUSE, TT_STOP, TT_CONFIG_DISCOVERY, TT_VIEW_LIVE_RESULTS, TT_CANCEL,
+} from './BacktestConfigTooltips';
 import { LiveOutputPanel } from '@/components/backtest/live-output/LiveOutputPanel';
 import { TradesPanel } from '@/components/backtest/trades/TradesPanel';
 import { MetricsPanel } from '@/components/backtest/metrics/MetricsPanel';
@@ -128,6 +142,7 @@ function ChipRow({
   min,
   max,
   step,
+  tooltip,
 }: {
   label: string;
   values: ChipValue[];
@@ -140,6 +155,9 @@ function ChipRow({
   min?: number;
   max?: number;
   step?: number;
+  // BTCAAAAA-34257: when supplied, the row label, every chip, and the spinbox
+  // surface the same field-level institutional definition on hover/focus.
+  tooltip?: TooltipContent;
 }) {
   const fmt = format ?? ((v: ChipValue) => String(v));
   // Chip sizing is now driven by `flex-1 basis-0` on each chip (board post-merge
@@ -177,21 +195,26 @@ function ChipRow({
     onSelect(rounded);
   };
   const stepDelta = step ?? 1;
+  // BTCAAAAA-34257: helper to wrap an element in RichTooltip when a row-level
+  // tooltip is supplied. Keeps the JSX below readable.
+  const wrap = (node: React.ReactElement) =>
+    tooltip ? <RichTooltip content={tooltip}>{node}</RichTooltip> : node;
   return (
     <div className="grid grid-cols-[88px_minmax(0,1fr)_76px] items-center gap-x-1.5 gap-y-0">
-      <span
-        className="text-[11px] font-medium truncate"
-        style={{ color: 'var(--text-secondary)' }}
-        title={label}
-      >
-        {label}
-      </span>
+      {wrap(
+        <span
+          className="text-[11px] font-medium truncate cursor-help"
+          style={{ color: 'var(--text-secondary)' }}
+          title={tooltip ? undefined : label}
+        >
+          {label}
+        </span>,
+      )}
       <div className="flex gap-1 flex-nowrap items-stretch min-w-0">
         {values.map((v) => {
           const isActive = current === v;
-          return (
+          const btn = (
             <button
-              key={String(v)}
               disabled={disabled}
               onClick={() => onSelect(v)}
               className="basis-0 grow shrink min-w-0 py-1 rounded-[4px] text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap text-center"
@@ -211,13 +234,21 @@ function ChipRow({
               {fmt(v)}
             </button>
           );
+          // BTCAAAAA-34257: every chip on the row shows the same field tooltip.
+          return tooltip ? (
+            <RichTooltip key={String(v)} content={tooltip}>{btn}</RichTooltip>
+          ) : (
+            <span key={String(v)} className="contents">{btn}</span>
+          );
         })}
       </div>
       {/* Spinbox: one bordered field with inline value + unit + stacked stepper buttons.
           Rest state: neutral border that matches the chip border weight — every spinbox
           looks identical (board post-merge revision 7). Hover reveals a subtle accent
           glow; focus-within keeps the accent for keyboard users. The value-text tint
-          when matching a chip preset is preserved as the only at-rest pairing signal. */}
+          when matching a chip preset is preserved as the only at-rest pairing signal.
+          BTCAAAAA-34257: spinbox shares the row tooltip with label + chips. */}
+      {wrap(
       <div
         className="flex items-stretch rounded overflow-hidden h-[22px] border border-solid border-[var(--border)] transition-[border-color,box-shadow] hover:border-[rgba(46,140,255,0.55)] hover:shadow-[0_0_0_2px_rgba(46,140,255,0.15)] focus-within:border-[rgba(46,140,255,0.55)] focus-within:shadow-[0_0_0_2px_rgba(46,140,255,0.25)]"
         style={{
@@ -300,7 +331,8 @@ function ChipRow({
             <ChevronDown size={10} />
           </button>
         </div>
-      </div>
+      </div>,
+      )}
     </div>
   );
 }
@@ -518,6 +550,7 @@ function ConfigTab({
                 min={1}
                 max={3650}
                 step={30}
+                tooltip={TT_LOOKBACK}
               />
               <ChipRow
                 label="Training"
@@ -529,6 +562,7 @@ function ConfigTab({
                 min={1}
                 max={3650}
                 step={30}
+                tooltip={TT_TRAINING}
               />
               <ChipRow
                 label="Testing"
@@ -540,6 +574,7 @@ function ConfigTab({
                 min={1}
                 max={3650}
                 step={30}
+                tooltip={TT_TESTING}
               />
             </div>
           </div>
@@ -559,27 +594,33 @@ function ConfigTab({
                   'walk': 'Mode 2: Walk',
                   'live-replay': 'Mode 2: Live Replay',
                 };
+                const tips: Record<typeof m, TooltipContent> = {
+                  'walk-forward': TT_MODE_HISTORICAL,
+                  'walk': TT_MODE_WALK,
+                  'live-replay': TT_MODE_LIVE_REPLAY,
+                };
                 const isActive = mode === m;
                 return (
-                  <button
-                    key={m}
-                    disabled={disabled}
-                    onClick={() => setMode(m)}
-                    className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
-                    style={{
-                      background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
-                      border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
-                      color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
-                    }}
-                  >
-                    {labels[m]}
-                  </button>
+                  <RichTooltip key={m} content={tips[m]}>
+                    <button
+                      disabled={disabled}
+                      onClick={() => setMode(m)}
+                      className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
+                      style={{
+                        background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
+                        border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
+                        color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
+                      }}
+                    >
+                      {labels[m]}
+                    </button>
+                  </RichTooltip>
                 );
               })}
             </div>
@@ -590,20 +631,24 @@ function ConfigTab({
 
           {/* TP/SL Config section */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
-              TP/SL Config
-            </div>
-            <select
-              disabled={disabled}
-              value={tpSlConfig}
-              onChange={(e) => setTpSlConfig(e.target.value)}
-              className="w-full px-2 py-1 rounded text-[11px] focus:outline-none disabled:opacity-50"
-              style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-            >
-              <option>Fibonacci</option>
-              <option>Hybrid</option>
-              <option>Fixed</option>
-            </select>
+            <RichTooltip content={TT_TPSL_CONFIG}>
+              <div className="text-[10px] font-medium uppercase mb-1 cursor-help" style={{ color: 'var(--text-muted)' }}>
+                TP/SL Config
+              </div>
+            </RichTooltip>
+            <RichTooltip content={TT_TPSL_CONFIG}>
+              <select
+                disabled={disabled}
+                value={tpSlConfig}
+                onChange={(e) => setTpSlConfig(e.target.value)}
+                className="w-full px-2 py-1 rounded text-[11px] focus:outline-none disabled:opacity-50"
+                style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+              >
+                <option>Fibonacci</option>
+                <option>Hybrid</option>
+                <option>Fixed</option>
+              </select>
+            </RichTooltip>
           </div>
 
           {/* Stop Loss Adjustment section */}
