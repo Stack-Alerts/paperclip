@@ -276,14 +276,96 @@ const SectionCard = ({ title, children }: { title: string; children: React.React
   </section>
 );
 //
+// Cycle-13 (board revision 2026-06-03): the thick-client `📊 Status:`
+// checklist lives on the Config tab itself — Live Output's separate function
+// (live event stream) should not carry the idle checklist. Rendered as a
+// frameless right-rail column with `Status` muted-label + the verbatim
+// idle lines (or the streaming feed when a run is active).
+const STATUS_IDLE_LINES: string[] = [
+  'Status updates will appear here when backtest starts.',
+  '',
+  'During backtest you will see:',
+  '✅ Data loading progress from Unified Data Manager',
+  '✅ NautilusTrader initialization',
+  '✅ Bar aggregation status',
+  '✅ Hybrid data source routing (LakeAPI + Binance)',
+  '✅ Real-time processing updates',
+  '',
+  'All terminal output will be captured and displayed here.',
+];
+
+function StatusColumn({
+  logs,
+  isRunning,
+}: {
+  logs: BacktestStatusMessage[];
+  isRunning: boolean;
+}) {
+  const showIdle = logs.length === 0 && !isRunning;
+  return (
+    <div className="space-y-1.5">
+      <div
+        className="text-[10px] font-medium uppercase tracking-wider"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        Status
+      </div>
+      <div
+        className="font-mono text-[10px] leading-relaxed space-y-0.5 overflow-y-auto"
+        style={{ color: 'var(--text-secondary)', maxHeight: 460 }}
+      >
+        {showIdle
+          ? STATUS_IDLE_LINES.map((line, idx) => (
+              <div
+                key={idx}
+                style={{
+                  color: line.startsWith('✅')
+                    ? 'var(--text-secondary)'
+                    : 'var(--text-muted)',
+                  minHeight: '1em',
+                }}
+              >
+                {line || ' '}
+              </div>
+            ))
+          : logs.slice(-200).map((msg, idx) => (
+              <div
+                key={`${msg.timestamp}-${idx}`}
+                style={{
+                  color:
+                    msg.level === 'ERROR'
+                      ? 'var(--accent-red)'
+                      : msg.level === 'SYSTEM'
+                        ? 'var(--accent-blue)'
+                        : 'var(--text-secondary)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                <span style={{ color: 'var(--text-faint)' }}>
+                  {msg.timestamp
+                    ? new Date(msg.timestamp).toISOString().slice(11, 19) + ' '
+                    : ''}
+                </span>
+                {msg.message}
+              </div>
+            ))}
+      </div>
+    </div>
+  );
+}
+
 function ConfigTab({
   config,
   onChange,
   disabled,
+  outputLogs,
+  isRunning,
 }: {
   config: Omit<BacktestConfig, 'strategyId'>;
   onChange: (patch: Partial<Omit<BacktestConfig, 'strategyId'>>) => void;
   disabled: boolean;
+  outputLogs: BacktestStatusMessage[];
+  isRunning: boolean;
 }) {
   const [lookbackDays, setLookbackDays] = useState<ChipValue>(90);
   const [trainingDays, setTrainingDays] = useState<ChipValue>(60);
@@ -314,11 +396,13 @@ function ConfigTab({
 
   return (
     <div className="h-full pb-2">
-      {/* 3-Column Grid: Configuration | Adaptive SL v2.0 | Risk/Reward.
-          Outer wrapper drops `overflow-auto` (board revision 2026-06-03 — the
-          Config tab must not scroll at 1280×720); tightened gap+padding so the
-          three columns fit without sacrificing chip/spinbox sizes. */}
-      <div className="grid grid-cols-[33fr_33fr_34fr] gap-3 px-2 py-2 items-start">
+      {/* 4-Column Grid: Configuration | Adaptive SL v2.0 | Risk/Reward | Status.
+          Status is a frameless right-rail column per cycle-13 board revision
+          2026-06-03 — the thick-client `📊 Status:` checklist belongs on the
+          Config tab itself (Live Output handles a separate streaming role).
+          The three form columns shrink proportionally; the form still fits at
+          1280×720 with no internal scroll. */}
+      <div className="grid grid-cols-[29fr_29fr_29fr_13fr] gap-3 px-2 py-2 items-start">
 
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 1: CONFIGURATION (35%)
@@ -717,6 +801,11 @@ function ConfigTab({
             </div>
           </div>
         </SectionCard>
+
+        {/* ═════════════════════════════════════════════════════════════════════
+            COLUMN 4: STATUS (cycle-13 board revision 2026-06-03)
+            ════════════════════════════════════════════════════════════════════ */}
+        <StatusColumn logs={outputLogs} isRunning={isRunning} />
       </div>
     </div>
   );
@@ -890,7 +979,13 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
             internal scroll at 1280×720. */}
         <div className="flex-1 overflow-auto px-4 py-2" style={{ background: 'var(--bg-deep)' }}>
           {activeTab === 'config' && (
-            <ConfigTab config={config} onChange={patchConfig} disabled={backTestInProgress} />
+            <ConfigTab
+              config={config}
+              onChange={patchConfig}
+              disabled={backTestInProgress}
+              outputLogs={outputLogs}
+              isRunning={backTestInProgress}
+            />
           )}
           {activeTab === 'output' && (
             <LiveOutputPanel logs={outputLogs} isRunning={backTestInProgress} result={backTestResult} />
