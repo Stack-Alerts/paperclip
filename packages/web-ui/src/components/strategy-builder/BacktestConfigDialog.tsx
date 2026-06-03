@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useContext, useEffect, useRef, createContext } from 'react';
 import { X, Play, Square, Pause, RotateCcw, Settings, Terminal, TrendingUp, BarChart3, Sparkles, GitCompare, ChevronUp, ChevronDown } from 'lucide-react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BacktestConfig, BacktestStatusMessage } from '@/lib/strategy-builder/types';
@@ -30,6 +30,124 @@ const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
 ];
 
 const PRESET_DAYS = [30, 90, 180, 365];
+
+// ─── Font scaling (BTCAAAAA-34264) ────────────────────────────────────────────
+//
+// The board's cycle-20 review flagged the dialog as "very cramped, difficult to
+// read" and asked for both a larger default and a user-adjustable control.
+// We expose three discrete steps:
+//   • Compact — the pre-34264 sizing, kept for power-users who want density
+//   • Normal  — new default; row labels / chips / status all ≥13px
+//   • Large   — one step bigger again for accessibility / large monitors
+// The choice persists across reloads in localStorage so the user only sets it once.
+type FontScale = 'Compact' | 'Normal' | 'Large';
+
+type BacktestFontSizes = {
+  /** ChipRow label cell, e.g. "Lookback", "Stop Loss Delay". */
+  rowLabel: string;
+  /** Chip button text inside a ChipRow. */
+  chipText: string;
+  /** Preset chip text (Conservative / Balanced / Aggressive / Custom). */
+  presetChip: string;
+  /** Spinbox numeric value text. */
+  spinboxValue: string;
+  /** Spinbox unit suffix/prefix text (e.g. "%", "bars", "$"). */
+  spinboxUnit: string;
+  /** Section card title (the h3 inside <SectionCard>). */
+  sectionTitle: string;
+  /** Mini sub-section heading ("Basic Settings", "Mode", "TP/SL Config" …). */
+  miniHeading: string;
+  /** Mode buttons + SL-adjustment buttons. */
+  modeButton: string;
+  /** Status section monospace lines. */
+  statusText: string;
+  /** Status section "Status" header label. */
+  statusLabel: string;
+  /** Checkbox label text ("Delay Stop-Loss", "Market Structure Stop-Loss"). */
+  checkboxLabel: string;
+  /** Dialog header "Backtest Configuration" title. */
+  headerTitle: string;
+  /** Strategy subtitle under the header title. */
+  headerStrategy: string;
+  /** Tab strip labels. */
+  tabLabel: string;
+  /** Max height of the Status scrolling block — Large needs more room per line. */
+  statusMaxHeight: number;
+};
+
+const FONT_SCALES: Record<FontScale, BacktestFontSizes> = {
+  Compact: {
+    rowLabel: '11px',
+    chipText: '12px',
+    presetChip: '10px',
+    spinboxValue: '11px',
+    spinboxUnit: '10px',
+    sectionTitle: '12px',
+    miniHeading: '10px',
+    modeButton: '11px',
+    statusText: '10px',
+    statusLabel: '10px',
+    checkboxLabel: '11px',
+    headerTitle: '14px',
+    headerStrategy: '12px',
+    tabLabel: '12px',
+    statusMaxHeight: 115,
+  },
+  Normal: {
+    rowLabel: '13px',
+    chipText: '13px',
+    presetChip: '12px',
+    spinboxValue: '13px',
+    spinboxUnit: '11px',
+    sectionTitle: '13px',
+    miniHeading: '11px',
+    modeButton: '12px',
+    statusText: '13px',
+    statusLabel: '11px',
+    checkboxLabel: '13px',
+    headerTitle: '15px',
+    headerStrategy: '13px',
+    tabLabel: '13px',
+    statusMaxHeight: 135,
+  },
+  Large: {
+    rowLabel: '15px',
+    chipText: '14px',
+    presetChip: '13px',
+    spinboxValue: '15px',
+    spinboxUnit: '12px',
+    sectionTitle: '14px',
+    miniHeading: '12px',
+    modeButton: '13px',
+    statusText: '14px',
+    statusLabel: '12px',
+    checkboxLabel: '14px',
+    headerTitle: '16px',
+    headerStrategy: '14px',
+    tabLabel: '14px',
+    statusMaxHeight: 155,
+  },
+};
+
+const FONT_SCALE_STORAGE_KEY = 'backtestConfigDialog.fontScale';
+
+function readStoredFontScale(): FontScale {
+  if (typeof window === 'undefined') return 'Normal';
+  try {
+    const raw = window.localStorage.getItem(FONT_SCALE_STORAGE_KEY);
+    if (raw === 'Compact' || raw === 'Normal' || raw === 'Large') return raw;
+  } catch {
+    // localStorage may be unavailable (private mode, SSR hydration); fall back silently.
+  }
+  return 'Normal';
+}
+
+// Threaded via context so we don't have to add a `fontSizes` prop to every
+// ChipRow / SectionCard call site (there are 15+ rows). The provider lives on
+// the dialog root and re-renders the whole subtree when the user picks a new
+// scale from the Aa−/Aa+ control.
+const FontSizesContext = createContext<BacktestFontSizes>(FONT_SCALES.Normal);
+const useFontSizes = () => useContext(FontSizesContext);
 
 // ─── Adaptive SL V2.0 — canonical preset values ──────────────────────────────
 //
@@ -141,6 +259,7 @@ function ChipRow({
   max?: number;
   step?: number;
 }) {
+  const fontSizes = useFontSizes();
   const fmt = format ?? ((v: ChipValue) => String(v));
   // Chip sizing is now driven by `flex-1 basis-0` on each chip (board post-merge
   // revision 6: "too cramped, there is more space available" + thick-client reference).
@@ -180,8 +299,8 @@ function ChipRow({
   return (
     <div className="grid grid-cols-[88px_minmax(0,1fr)_76px] items-center gap-x-1.5 gap-y-0">
       <span
-        className="text-[11px] font-medium truncate"
-        style={{ color: 'var(--text-secondary)' }}
+        className="font-medium truncate"
+        style={{ color: 'var(--text-secondary)', fontSize: fontSizes.rowLabel }}
         title={label}
       >
         {label}
@@ -194,12 +313,13 @@ function ChipRow({
               key={String(v)}
               disabled={disabled}
               onClick={() => onSelect(v)}
-              className="basis-0 grow shrink min-w-0 py-1 rounded-[4px] text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap text-center"
+              className="basis-0 grow shrink min-w-0 py-1 rounded-[4px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap text-center"
               style={{
                 background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
                 border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
                 color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
                 fontVariantNumeric: 'tabular-nums',
+                fontSize: fontSizes.chipText,
               }}
               onMouseEnter={(e) => {
                 if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
@@ -219,15 +339,19 @@ function ChipRow({
           glow; focus-within keeps the accent for keyboard users. The value-text tint
           when matching a chip preset is preserved as the only at-rest pairing signal. */}
       <div
-        className="flex items-stretch rounded overflow-hidden h-[22px] border border-solid border-[var(--border)] transition-[border-color,box-shadow] hover:border-[rgba(46,140,255,0.55)] hover:shadow-[0_0_0_2px_rgba(46,140,255,0.15)] focus-within:border-[rgba(46,140,255,0.55)] focus-within:shadow-[0_0_0_2px_rgba(46,140,255,0.25)]"
+        className="flex items-stretch rounded overflow-hidden border border-solid border-[var(--border)] transition-[border-color,box-shadow] hover:border-[rgba(46,140,255,0.55)] hover:shadow-[0_0_0_2px_rgba(46,140,255,0.15)] focus-within:border-[rgba(46,140,255,0.55)] focus-within:shadow-[0_0_0_2px_rgba(46,140,255,0.25)]"
         style={{
           background: 'rgba(255, 255, 255, 0.03)',
+          // Spinbox row height needs to grow with the font so the value text
+          // doesn't get vertically clipped at Normal/Large. Pre-34264 it was
+          // locked at 22px (text-[11px] ≈ 14px line-height + 8px chrome).
+          height: `calc(${fontSizes.spinboxValue} + 11px)`,
         }}
       >
         {unit && unitPosition === 'prefix' && (
           <span
-            className="flex items-center pl-1 pr-0.5 text-[11px] leading-none whitespace-nowrap"
-            style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}
+            className="flex items-center pl-1 pr-0.5 leading-none whitespace-nowrap"
+            style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', fontSize: fontSizes.spinboxUnit }}
           >
             {unit}
           </span>
@@ -241,7 +365,7 @@ function ChipRow({
           max={max}
           step={step}
           aria-label={`${label} value`}
-          className="flex-1 min-w-0 px-0.5 text-[11px] focus:outline-none focus:ring-0 disabled:opacity-50 disabled:cursor-not-allowed text-right bg-transparent appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+          className="flex-1 min-w-0 px-0.5 focus:outline-none focus:ring-0 disabled:opacity-50 disabled:cursor-not-allowed text-right bg-transparent appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
           style={{
             // Muted-blue value text — same `--text-secondary` (#8AAEC8) the chip-row
             // labels ("Lookback", "Training", "Starting Capital", "Min Risk:Reward",
@@ -250,12 +374,13 @@ function ChipRow({
             // theme (board post-merge revision 9).
             color: 'var(--text-secondary)',
             fontVariantNumeric: 'tabular-nums',
+            fontSize: fontSizes.spinboxValue,
           }}
         />
         {unit && unitPosition === 'suffix' && (
           <span
-            className="flex items-center pl-0.5 pr-1 text-[10px] leading-none whitespace-nowrap"
-            style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}
+            className="flex items-center pl-0.5 pr-1 leading-none whitespace-nowrap"
+            style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', fontSize: fontSizes.spinboxUnit }}
           >
             {unit}
           </span>
@@ -315,23 +440,36 @@ function ChipRow({
 // Section card wrapper for visual separation (board polish-pass spec).
 // Vertical padding reduced from `py-3 space-y-3` → `py-2 space-y-2` per board
 // revision 2026-06-03 so the three columns fit at 1280×720 without scroll.
-const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <section
-    className="rounded-[4px] px-3 py-1.5 space-y-1 h-full"
-    style={{
-      border: '1px solid var(--border)',
-      background: 'rgba(255, 255, 255, 0.02)',
-    }}
-  >
-    <h3
-      className="text-xs font-semibold uppercase tracking-wider pb-1"
-      style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}
+const SectionCard = ({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) => {
+  const fontSizes = useFontSizes();
+  return (
+    <section
+      className="rounded-[4px] px-3 py-1.5 space-y-1 h-full"
+      style={{
+        border: '1px solid var(--border)',
+        background: 'rgba(255, 255, 255, 0.02)',
+      }}
     >
-      {title}
-    </h3>
-    {children}
-  </section>
-);
+      <h3
+        className="font-semibold uppercase tracking-wider pb-1"
+        style={{
+          color: 'var(--text-secondary)',
+          borderBottom: '1px solid var(--border)',
+          fontSize: fontSizes.sectionTitle,
+        }}
+      >
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+};
 //
 // Cycle-13 (board revision 2026-06-03): the thick-client `📊 Status:`
 // checklist lives on the Config tab itself — Live Output's separate function
@@ -359,18 +497,19 @@ function StatusColumn({
   logs: BacktestStatusMessage[];
   isRunning: boolean;
 }) {
+  const fontSizes = useFontSizes();
   const showIdle = logs.length === 0 && !isRunning;
   return (
     <div className="space-y-0.5">
       <div
-        className="text-[10px] font-medium uppercase tracking-wider"
-        style={{ color: 'var(--text-muted)' }}
+        className="font-medium uppercase tracking-wider"
+        style={{ color: 'var(--text-muted)', fontSize: fontSizes.statusLabel }}
       >
         Status
       </div>
       <div
-        className="font-mono text-[10px] leading-tight space-y-0 overflow-y-auto"
-        style={{ color: 'var(--text-secondary)', maxHeight: 115 }}
+        className="font-mono leading-tight space-y-0 overflow-y-auto"
+        style={{ color: 'var(--text-secondary)', maxHeight: fontSizes.statusMaxHeight, fontSize: fontSizes.statusText }}
       >
         {showIdle
           ? STATUS_IDLE_LINES.map((line, idx) => (
@@ -425,6 +564,7 @@ function ConfigTab({
   outputLogs: BacktestStatusMessage[];
   isRunning: boolean;
 }) {
+  const fontSizes = useFontSizes();
   const [lookbackDays, setLookbackDays] = useState<ChipValue>(90);
   const [trainingDays, setTrainingDays] = useState<ChipValue>(60);
   const [testingDays, setTestingDays] = useState<ChipValue>(30);
@@ -504,7 +644,7 @@ function ConfigTab({
         <SectionCard title="Configuration">
           {/* Basic Settings section */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
+            <div className="font-medium uppercase mb-1" style={{ color: 'var(--text-muted)', fontSize: fontSizes.miniHeading }}>
               Basic Settings
             </div>
             <div className="space-y-0.5">
@@ -549,7 +689,7 @@ function ConfigTab({
 
           {/* Mode section */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
+            <div className="font-medium uppercase mb-1" style={{ color: 'var(--text-muted)', fontSize: fontSizes.miniHeading }}>
               Mode
             </div>
             <div className="flex flex-row flex-wrap gap-1">
@@ -565,11 +705,12 @@ function ConfigTab({
                     key={m}
                     disabled={disabled}
                     onClick={() => setMode(m)}
-                    className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
+                    className="px-1 py-0.5 rounded-[3px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
                     style={{
                       background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                       border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
                       color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                      fontSize: fontSizes.modeButton,
                     }}
                     onMouseEnter={(e) => {
                       if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
@@ -590,15 +731,15 @@ function ConfigTab({
 
           {/* TP/SL Config section */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
+            <div className="font-medium uppercase mb-1" style={{ color: 'var(--text-muted)', fontSize: fontSizes.miniHeading }}>
               TP/SL Config
             </div>
             <select
               disabled={disabled}
               value={tpSlConfig}
               onChange={(e) => setTpSlConfig(e.target.value)}
-              className="w-full px-2 py-1 rounded text-[11px] focus:outline-none disabled:opacity-50"
-              style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+              className="w-full px-2 py-1 rounded focus:outline-none disabled:opacity-50"
+              style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: fontSizes.modeButton }}
             >
               <option>Fibonacci</option>
               <option>Hybrid</option>
@@ -608,7 +749,7 @@ function ConfigTab({
 
           {/* Stop Loss Adjustment section */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
+            <div className="font-medium uppercase mb-1" style={{ color: 'var(--text-muted)', fontSize: fontSizes.miniHeading }}>
               Stop Loss Adjustment
             </div>
             <div className="flex flex-row flex-wrap gap-1">
@@ -619,11 +760,12 @@ function ConfigTab({
                     key={opt}
                     disabled={disabled}
                     onClick={() => setSlAdjustment(opt)}
-                    className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
+                    className="px-1 py-0.5 rounded-[3px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
                     style={{
                       background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                       border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
                       color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                      fontSize: fontSizes.modeButton,
                     }}
                     onMouseEnter={(e) => {
                       if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
@@ -651,8 +793,8 @@ function ConfigTab({
               choice, not a numeric value), so the spinbox cell stays empty. */}
           <div className="grid grid-cols-[88px_minmax(0,1fr)_76px] items-center gap-x-1.5 gap-y-0">
             <span
-              className="text-[11px] font-medium truncate"
-              style={{ color: 'var(--text-secondary)' }}
+              className="font-medium truncate"
+              style={{ color: 'var(--text-secondary)', fontSize: fontSizes.rowLabel }}
               title="Presets"
             >
               Presets
@@ -671,11 +813,12 @@ function ConfigTab({
                         applyAdaptivePreset(preset);
                       }
                     }}
-                    className="basis-0 grow shrink min-w-0 py-1 px-0.5 rounded-[4px] text-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-[1.1] text-center overflow-hidden"
+                    className="basis-0 grow shrink min-w-0 py-1 px-0.5 rounded-[4px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-[1.1] text-center overflow-hidden"
                     style={{
                       background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
                       border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
                       color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                      fontSize: fontSizes.presetChip,
                     }}
                     title={preset}
                     onMouseEnter={(e) => {
@@ -695,7 +838,7 @@ function ConfigTab({
 
           {/* Checkboxes */}
           <div className="flex flex-row flex-wrap gap-3">
-            <label className="flex items-center gap-2 text-[11px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+            <label className="flex items-center gap-2 cursor-pointer" style={{ color: 'var(--text-secondary)', fontSize: fontSizes.checkboxLabel }}>
               <input
                 type="checkbox"
                 disabled={disabled}
@@ -709,7 +852,7 @@ function ConfigTab({
               />
               Delay Stop-Loss
             </label>
-            <label className="flex items-center gap-2 text-[11px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+            <label className="flex items-center gap-2 cursor-pointer" style={{ color: 'var(--text-secondary)', fontSize: fontSizes.checkboxLabel }}>
               <input
                 type="checkbox"
                 disabled={disabled}
@@ -893,7 +1036,7 @@ function ConfigTab({
 
           {/* Hold Duration — moved above Confluence per BTCAAAAA-34256 Item B. */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
+            <div className="font-medium uppercase mb-1" style={{ color: 'var(--text-muted)', fontSize: fontSizes.miniHeading }}>
               Hold Duration
             </div>
             <div className="space-y-0.5">
@@ -926,15 +1069,15 @@ function ConfigTab({
 
           {/* Confluence */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
+            <div className="font-medium uppercase mb-1" style={{ color: 'var(--text-muted)', fontSize: fontSizes.miniHeading }}>
               Confluence
             </div>
             <select
               disabled={disabled}
               value={confluence}
               onChange={(e) => setConfluence(e.target.value)}
-              className="w-full px-2 py-1 rounded text-[11px] focus:outline-none disabled:opacity-50"
-              style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+              className="w-full px-2 py-1 rounded focus:outline-none disabled:opacity-50"
+              style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: fontSizes.modeButton }}
             >
               <option>Boost from Strategy</option>
               <option>Independent Score</option>
@@ -955,6 +1098,90 @@ function ConfigTab({
   );
 }
 
+// ─── Font scale picker — Aa−/Aa+ control (BTCAAAAA-34264) ─────────────────────
+//
+// Three discrete steps: Compact / Normal / Large. The Aa−/Aa+ buttons step
+// through them; the active step is rendered between the buttons so the user
+// always knows the current value. Sits in the dialog header next to the close
+// button. The choice is persisted to localStorage by the parent.
+const FONT_SCALE_ORDER: FontScale[] = ['Compact', 'Normal', 'Large'];
+const FontScalePicker = ({
+  scale,
+  onChange,
+  fontSizes,
+}: {
+  scale: FontScale;
+  onChange: (next: FontScale) => void;
+  fontSizes: BacktestFontSizes;
+}) => {
+  const idx = FONT_SCALE_ORDER.indexOf(scale);
+  const canShrink = idx > 0;
+  const canGrow = idx < FONT_SCALE_ORDER.length - 1;
+  const step = (delta: number) => {
+    const next = FONT_SCALE_ORDER[idx + delta];
+    if (next) onChange(next);
+  };
+  return (
+    <div
+      role="group"
+      aria-label="Dialog font size"
+      className="flex items-center rounded-[4px] overflow-hidden"
+      style={{ border: '1px solid var(--border)', background: 'var(--bg-deep)' }}
+    >
+      <button
+        type="button"
+        onClick={() => step(-1)}
+        disabled={!canShrink}
+        aria-label="Decrease font size"
+        title="Decrease font size"
+        className="px-2 py-1 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}
+        onMouseEnter={(e) => {
+          if (canShrink) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+        }}
+      >
+        <span style={{ fontSize: '11px' }}>A</span>
+        <span style={{ fontSize: '13px' }}>a</span>
+        <span style={{ marginLeft: 2 }}>−</span>
+      </button>
+      <span
+        aria-live="polite"
+        className="px-2 font-medium uppercase tracking-wider whitespace-nowrap select-none"
+        style={{
+          color: 'var(--text-muted)',
+          fontSize: fontSizes.miniHeading,
+          borderLeft: '1px solid var(--border)',
+          borderRight: '1px solid var(--border)',
+        }}
+      >
+        {scale}
+      </span>
+      <button
+        type="button"
+        onClick={() => step(1)}
+        disabled={!canGrow}
+        aria-label="Increase font size"
+        title="Increase font size"
+        className="px-2 py-1 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}
+        onMouseEnter={(e) => {
+          if (canGrow) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+        }}
+      >
+        <span style={{ fontSize: '11px' }}>A</span>
+        <span style={{ fontSize: '15px' }}>a</span>
+        <span style={{ marginLeft: 2 }}>+</span>
+      </button>
+    </div>
+  );
+};
+
 // ─── Main dialog ───────────────────────────────────────────────────────────────
 export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProps) {
   const {
@@ -966,6 +1193,24 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
   } = useStrategyStore();
 
   const [activeTab, setActiveTab] = useState<TabKey>('config');
+  // Font scale picked from header Aa−/Aa+ control. Defaults to `Normal` per
+  // BTCAAAAA-34264 acceptance #1; reads the persisted choice on mount so each
+  // dialog open respects the user's last selection.
+  const [fontScale, setFontScale] = useState<FontScale>('Normal');
+  useEffect(() => {
+    if (open) setFontScale(readStoredFontScale());
+  }, [open]);
+  const updateFontScale = useCallback((next: FontScale) => {
+    setFontScale(next);
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(FONT_SCALE_STORAGE_KEY, next);
+      } catch {
+        // localStorage may be disabled; choice still applies for this session.
+      }
+    }
+  }, []);
+  const fontSizes = FONT_SCALES[fontScale];
   const [config, setConfig] = useState<Omit<BacktestConfig, 'strategyId'>>({
     startDate: daysAgo(90),
     endDate: today(),
@@ -1035,6 +1280,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
   const canRun = !!currentStrategy && !!config.startDate && !!config.endDate && !backTestInProgress;
 
   return (
+    <FontSizesContext.Provider value={fontSizes}>
     <div
       role="dialog"
       aria-modal="true"
@@ -1069,24 +1315,37 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
           <div>
             <h2
               id="backtest-dialog-title"
-              className="text-sm font-semibold uppercase tracking-wide"
-              style={{ color: 'var(--text-secondary)' }}
+              className="font-semibold uppercase tracking-wide"
+              style={{ color: 'var(--text-secondary)', fontSize: fontSizes.headerTitle }}
             >
               Backtest Configuration
             </h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-0.5" style={{ color: 'var(--text-muted)', fontSize: fontSizes.headerStrategy }}>
               {currentStrategy?.name ? `${currentStrategy.name} Strategy` : 'No strategy loaded'}
             </p>
           </div>
-          <button
-            onClick={() => { if (!backTestInProgress) onClose(); }}
-            className="p-1 rounded transition-opacity hover:opacity-70"
-            style={{ color: 'var(--text-muted)' }}
-            aria-label="Close dialog"
-            disabled={backTestInProgress}
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Aa−/Aa+ font-scale control (BTCAAAAA-34264). Three discrete steps:
+                Compact / Normal / Large. Clicking Aa− steps down to the next
+                smaller size; Aa+ steps up. The active step is shown between
+                them as a muted label so the user always knows the current
+                value. Persists to localStorage under
+                `backtestConfigDialog.fontScale`. */}
+            <FontScalePicker
+              scale={fontScale}
+              onChange={updateFontScale}
+              fontSizes={fontSizes}
+            />
+            <button
+              onClick={() => { if (!backTestInProgress) onClose(); }}
+              className="p-1 rounded transition-opacity hover:opacity-70"
+              style={{ color: 'var(--text-muted)' }}
+              aria-label="Close dialog"
+              disabled={backTestInProgress}
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* ── Tab navigation ── */}
@@ -1100,12 +1359,13 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 font-medium whitespace-nowrap transition-colors"
                 style={{
                   borderBottom: isActive ? '2px solid var(--accent-blue)' : '2px solid transparent',
                   color: isActive ? 'var(--text-secondary)' : 'var(--text-muted)',
                   background: 'transparent',
                   marginBottom: -1,
+                  fontSize: fontSizes.tabLabel,
                 }}
                 onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
                 onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
@@ -1278,5 +1538,6 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
         </div>
       </div>
     </div>
+    </FontSizesContext.Provider>
   );
 }
