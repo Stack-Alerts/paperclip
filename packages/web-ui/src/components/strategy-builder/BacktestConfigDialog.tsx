@@ -260,7 +260,7 @@ function ChipRow({
 // revision 2026-06-03 so the three columns fit at 1280×720 without scroll.
 const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section
-    className="rounded-[4px] px-3 py-1.5 space-y-1"
+    className="rounded-[4px] px-3 py-1.5 space-y-1 h-full"
     style={{
       border: '1px solid var(--border)',
       background: 'rgba(255, 255, 255, 0.02)',
@@ -402,7 +402,7 @@ function ConfigTab({
           checklist belongs on the Config tab as a full-width text block
           **below** the 3-column grid — not as a 4th right-rail column.
           (Live Output handles a separate streaming role.) */}
-      <div className="grid grid-cols-[33fr_33fr_34fr] gap-3 px-2 py-2 items-start">
+      <div className="grid grid-cols-[33fr_33fr_34fr] gap-3 px-2 py-2 items-stretch">
 
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 1: CONFIGURATION (35%)
@@ -550,12 +550,20 @@ function ConfigTab({
             COLUMN 2: ADAPTIVE SL v2.0 (35%)
             ════════════════════════════════════════════════════════════════════ */}
         <SectionCard title="Adaptive SL v2.0">
-          {/* Presets section */}
-          <div>
-            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
+          {/* Presets row — inline (cycle-16 board revision 2026-06-03).
+              Matches ChipRow's `88px label | 1fr chips | 76px spinbox` template
+              so the chip track aligns with Stop Loss Delay / Emergency / Vol
+              Lookback below. No spinbox for this row (Presets is a discrete
+              choice, not a numeric value), so the spinbox cell stays empty. */}
+          <div className="grid grid-cols-[88px_minmax(0,1fr)_76px] items-center gap-x-1.5 gap-y-0">
+            <span
+              className="text-[11px] font-medium truncate"
+              style={{ color: 'var(--text-secondary)' }}
+              title="Presets"
+            >
               Presets
-            </div>
-            <div className="flex flex-row flex-wrap gap-1">
+            </span>
+            <div className="flex gap-1 flex-nowrap items-stretch min-w-0">
               {(['Conservative', 'Balanced', 'Aggressive', 'Custom'] as const).map((preset) => {
                 const isActive = adaptivePreset === preset;
                 return (
@@ -563,13 +571,13 @@ function ConfigTab({
                     key={preset}
                     disabled={disabled}
                     onClick={() => setAdaptivePreset(preset)}
-                    className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
+                    className="basis-0 grow shrink min-w-0 py-1 px-0.5 rounded-[4px] text-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-[1.1] text-center overflow-hidden"
                     style={{
-                      background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
-                      border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
+                      background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
+                      border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
                       color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                      minWidth: 0,
                     }}
+                    title={preset}
                     onMouseEnter={(e) => {
                       if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
                     }}
@@ -582,6 +590,7 @@ function ConfigTab({
                 );
               })}
             </div>
+            <div aria-hidden="true" />
           </div>
 
           {/* Checkboxes */}
