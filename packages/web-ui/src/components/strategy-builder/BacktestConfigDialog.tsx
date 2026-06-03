@@ -137,7 +137,7 @@ function ChipRow({
               key={String(v)}
               disabled={disabled}
               onClick={() => onSelect(v)}
-              className="basis-0 grow shrink min-w-0 py-2 rounded-[4px] text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap text-center"
+              className="basis-0 grow shrink min-w-0 py-1 rounded-[4px] text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap text-center"
               style={{
                 background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
                 border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
@@ -162,7 +162,7 @@ function ChipRow({
           glow; focus-within keeps the accent for keyboard users. The value-text tint
           when matching a chip preset is preserved as the only at-rest pairing signal. */}
       <div
-        className="flex items-stretch rounded overflow-hidden h-[26px] border border-solid border-[var(--border)] transition-[border-color,box-shadow] hover:border-[rgba(46,140,255,0.55)] hover:shadow-[0_0_0_2px_rgba(46,140,255,0.15)] focus-within:border-[rgba(46,140,255,0.55)] focus-within:shadow-[0_0_0_2px_rgba(46,140,255,0.25)]"
+        className="flex items-stretch rounded overflow-hidden h-[22px] border border-solid border-[var(--border)] transition-[border-color,box-shadow] hover:border-[rgba(46,140,255,0.55)] hover:shadow-[0_0_0_2px_rgba(46,140,255,0.15)] focus-within:border-[rgba(46,140,255,0.55)] focus-within:shadow-[0_0_0_2px_rgba(46,140,255,0.25)]"
         style={{
           background: 'rgba(255, 255, 255, 0.03)',
         }}
@@ -260,14 +260,14 @@ function ChipRow({
 // revision 2026-06-03 so the three columns fit at 1280×720 without scroll.
 const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section
-    className="rounded-[4px] px-3 py-2 space-y-2"
+    className="rounded-[4px] px-3 py-1.5 space-y-1"
     style={{
       border: '1px solid var(--border)',
       background: 'rgba(255, 255, 255, 0.02)',
     }}
   >
     <h3
-      className="text-xs font-semibold uppercase tracking-wider pb-1.5"
+      className="text-xs font-semibold uppercase tracking-wider pb-1"
       style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}
     >
       {title}
@@ -281,16 +281,17 @@ const SectionCard = ({ title, children }: { title: string; children: React.React
 // (live event stream) should not carry the idle checklist. Rendered as a
 // frameless right-rail column with `Status` muted-label + the verbatim
 // idle lines (or the streaming feed when a run is active).
+// Verbatim thick-client content. Empty spacer lines from the cycle-10
+// reference were dropped in cycle-13b to fit at 1280×720 — the section
+// headers still scan visually because each is a different color tier.
 const STATUS_IDLE_LINES: string[] = [
   'Status updates will appear here when backtest starts.',
-  '',
   'During backtest you will see:',
   '✅ Data loading progress from Unified Data Manager',
   '✅ NautilusTrader initialization',
   '✅ Bar aggregation status',
   '✅ Hybrid data source routing (LakeAPI + Binance)',
   '✅ Real-time processing updates',
-  '',
   'All terminal output will be captured and displayed here.',
 ];
 
@@ -303,7 +304,7 @@ function StatusColumn({
 }) {
   const showIdle = logs.length === 0 && !isRunning;
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-0.5">
       <div
         className="text-[10px] font-medium uppercase tracking-wider"
         style={{ color: 'var(--text-muted)' }}
@@ -311,8 +312,8 @@ function StatusColumn({
         Status
       </div>
       <div
-        className="font-mono text-[10px] leading-relaxed space-y-0.5 overflow-y-auto"
-        style={{ color: 'var(--text-secondary)', maxHeight: 460 }}
+        className="font-mono text-[10px] leading-tight space-y-0 overflow-y-auto"
+        style={{ color: 'var(--text-secondary)', maxHeight: 115 }}
       >
         {showIdle
           ? STATUS_IDLE_LINES.map((line, idx) => (
@@ -396,13 +397,12 @@ function ConfigTab({
 
   return (
     <div className="h-full pb-2">
-      {/* 4-Column Grid: Configuration | Adaptive SL v2.0 | Risk/Reward | Status.
-          Status is a frameless right-rail column per cycle-13 board revision
-          2026-06-03 — the thick-client `📊 Status:` checklist belongs on the
-          Config tab itself (Live Output handles a separate streaming role).
-          The three form columns shrink proportionally; the form still fits at
-          1280×720 with no internal scroll. */}
-      <div className="grid grid-cols-[29fr_29fr_29fr_13fr] gap-3 px-2 py-2 items-start">
+      {/* 3-Column Grid + below-grid Status section.
+          Cycle-13b clarification 2026-06-03: the thick-client `📊 Status:`
+          checklist belongs on the Config tab as a full-width text block
+          **below** the 3-column grid — not as a 4th right-rail column.
+          (Live Output handles a separate streaming role.) */}
+      <div className="grid grid-cols-[33fr_33fr_34fr] gap-3 px-2 py-2 items-start">
 
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 1: CONFIGURATION (35%)
@@ -413,7 +413,7 @@ function ConfigTab({
             <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
               Basic Settings
             </div>
-            <div className="space-y-2">
+            <div className="space-y-0.5">
               <ChipRow
                 label="Lookback"
                 values={chipSeries(30, 30, 8)}
@@ -612,7 +612,7 @@ function ConfigTab({
           <div style={{ height: '1px', background: 'var(--border)' }} />
 
           {/* Volatility/SL Controls */}
-          <div className="space-y-2">
+          <div className="space-y-0.5">
             <ChipRow
               label="Stop Loss Delay"
               values={chipSeries(1, 1, 8)}
@@ -692,7 +692,7 @@ function ConfigTab({
             ════════════════════════════════════════════════════════════════════ */}
         <SectionCard title="Risk / Reward">
           {/* Capital & Exposure */}
-          <div className="space-y-2">
+          <div className="space-y-0.5">
             <ChipRow
               label="Starting Capital"
               values={chipSeries(5000, 5000, 8)}
@@ -773,7 +773,7 @@ function ConfigTab({
             <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
               Hold Duration
             </div>
-            <div className="space-y-2">
+            <div className="space-y-0.5">
               <ChipRow
                 label="Min Bars Held"
                 values={chipSeries(5, 5, 8)}
@@ -802,9 +802,12 @@ function ConfigTab({
           </div>
         </SectionCard>
 
-        {/* ═════════════════════════════════════════════════════════════════════
-            COLUMN 4: STATUS (cycle-13 board revision 2026-06-03)
-            ════════════════════════════════════════════════════════════════════ */}
+      </div>
+
+      {/* Status section — full-width below the 3-column grid (cycle-13b
+          clarification 2026-06-03: "status is supposed to be below the
+          Configuration Blocks"). Frameless monospace text block. */}
+      <div className="px-2 pt-1">
         <StatusColumn logs={outputLogs} isRunning={isRunning} />
       </div>
     </div>
@@ -977,7 +980,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
         {/* Vertical padding tightened from `py-4` → `py-2` (board revision
             2026-06-03) so the Config tab's 3-column grid fits without
             internal scroll at 1280×720. */}
-        <div className="flex-1 overflow-auto px-4 py-2" style={{ background: 'var(--bg-deep)' }}>
+        <div className="flex-1 overflow-auto px-4 py-1" style={{ background: 'var(--bg-deep)' }}>
           {activeTab === 'config' && (
             <ConfigTab
               config={config}
@@ -1005,17 +1008,17 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
         </div>
 
         {/* ── Footer: status, progress + run controls ── */}
-        {/* Footer padding trimmed `py-4` → `py-3` to claw back vertical
-            real estate for the 1280×720 no-scroll target. */}
+        {/* Footer padding trimmed `py-4` → `py-2` (cycle-13b 2026-06-03)
+            to fit the below-grid Status block at 1280×720. */}
         <div
-          className="flex-shrink-0 px-6 py-3"
+          className="flex-shrink-0 px-6 py-2"
           style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-panel)' }}
         >
           {/* Slim, frameless Progress bar (BTCAAAAA-34190 board revision
               2026-06-03 — replaced the framed meter + Status card so the
               Config form fits without scrolling). The Status checklist and
               TP/SL counters now live in the Live Output tab. */}
-          <div className="mb-3">
+          <div className="mb-1">
             <BacktestProgressMeter
               progress={backTestProgress}
               isRunning={backTestInProgress}
