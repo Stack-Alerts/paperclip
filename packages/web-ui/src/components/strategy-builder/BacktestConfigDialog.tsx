@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { X, Play, Square, Pause, RotateCcw, Settings, Terminal, TrendingUp, BarChart3, Sparkles, GitCompare, ChevronUp, ChevronDown } from 'lucide-react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BacktestConfig, BacktestStatusMessage } from '@/lib/strategy-builder/types';
-import { InfoTooltip } from './InfoTooltip';
 import { RichTooltip, type TooltipContent } from './RichTooltip';
 import {
   TT_LOOKBACK, TT_TRAINING, TT_TESTING,
@@ -913,6 +912,7 @@ function ConfigTab({
               min={100}
               max={10_000_000}
               step={1000}
+              tooltip={TT_STARTING_CAPITAL}
             />
             <ChipRow
               label="Min Risk:Reward"
@@ -925,6 +925,7 @@ function ConfigTab({
               min={1}
               max={100}
               step={0.5}
+              tooltip={TT_MIN_RR}
             />
             <ChipRow
               label="Risk %"
@@ -937,6 +938,7 @@ function ConfigTab({
               min={0.5}
               max={100}
               step={0.5}
+              tooltip={TT_RISK_PCT}
             />
             <ChipRow
               label="Leverage"
@@ -948,6 +950,7 @@ function ConfigTab({
               min={1}
               max={125}
               step={5}
+              tooltip={TT_LEVERAGE}
             />
           </div>
 
@@ -956,9 +959,11 @@ function ConfigTab({
 
           {/* Hold Duration — moved above Confluence per BTCAAAAA-34256 Item B. */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
-              Hold Duration
-            </div>
+            <RichTooltip content={TT_HOLD_DURATION}>
+              <div className="text-[10px] font-medium uppercase mb-1 cursor-help" style={{ color: 'var(--text-muted)' }}>
+                Hold Duration
+              </div>
+            </RichTooltip>
             <div className="space-y-0.5">
               <ChipRow
                 label="Min Bars Held"
@@ -971,6 +976,7 @@ function ConfigTab({
                 min={0}
                 max={1000}
                 step={5}
+                tooltip={TT_MIN_BARS_HELD}
               />
               <ChipRow
                 label="Max Bars Held"
@@ -983,26 +989,31 @@ function ConfigTab({
                 min={1}
                 max={10000}
                 step={25}
+                tooltip={TT_MAX_BARS_HELD}
               />
             </div>
           </div>
 
           {/* Confluence */}
           <div>
-            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
-              Confluence
-            </div>
-            <select
-              disabled={disabled}
-              value={confluence}
-              onChange={(e) => setConfluence(e.target.value)}
-              className="w-full px-2 py-1 rounded text-[11px] focus:outline-none disabled:opacity-50"
-              style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-            >
-              <option>Boost from Strategy</option>
-              <option>Independent Score</option>
-              <option>Disabled</option>
-            </select>
+            <RichTooltip content={TT_CONFLUENCE}>
+              <div className="text-[10px] font-medium uppercase mb-1 cursor-help" style={{ color: 'var(--text-muted)' }}>
+                Confluence
+              </div>
+            </RichTooltip>
+            <RichTooltip content={TT_CONFLUENCE}>
+              <select
+                disabled={disabled}
+                value={confluence}
+                onChange={(e) => setConfluence(e.target.value)}
+                className="w-full px-2 py-1 rounded text-[11px] focus:outline-none disabled:opacity-50"
+                style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+              >
+                <option>Boost from Strategy</option>
+                <option>Independent Score</option>
+                <option>Disabled</option>
+              </select>
+            </RichTooltip>
           </div>
         </SectionCard>
 
@@ -1238,7 +1249,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
           <div className="flex items-center justify-between gap-2">
             {/* Left cluster — primary run controls (thickclient leading edge) */}
             <div className="flex items-center gap-2">
-              <InfoTooltip id="bt-run-btn">
+              <RichTooltip content={TT_RUN_TEST}>
                 {!backTestInProgress ? (
                   <button
                     onClick={handleStart}
@@ -1256,35 +1267,32 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                     className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium"
                     style={{ background: '#32557c', color: 'var(--btn-primary-text, white)', opacity: 0.6, cursor: 'not-allowed' }}
                     disabled
-                    title="Stop not yet available — awaiting backend contract"
                   >
                     <Square size={14} />
                     Running…
                   </button>
                 )}
-              </InfoTooltip>
-              <InfoTooltip id="bt-pause-btn">
+              </RichTooltip>
+              <RichTooltip content={TT_PAUSE}>
                 <button
                   disabled
-                  title="Pause/Resume — deferred (control endpoint coming in follow-up)"
                   className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
                 >
                   <Pause size={14} />
                   Pause
                 </button>
-              </InfoTooltip>
-              <InfoTooltip id="bt-stop-btn">
+              </RichTooltip>
+              <RichTooltip content={TT_STOP}>
                 <button
                   disabled
-                  title="Stop — deferred (control endpoint coming in follow-up)"
                   className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
                 >
                   <Square size={14} />
                   Stop
                 </button>
-              </InfoTooltip>
+              </RichTooltip>
               {/* "Config saved at HH:MM:SS (after test run)" — italic, only after a run completes */}
               {backTestResult?.completedAt && (
                 <span
@@ -1298,10 +1306,9 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
 
             {/* Right cluster — ancillary actions + close */}
             <div className="flex items-center gap-2">
-              <InfoTooltip id="bt-config-discovery-btn">
+              <RichTooltip content={TT_CONFIG_DISCOVERY}>
                 <button
                   disabled
-                  title="Config Discovery — auto-tune TP/SL across recent windows (deferred to BTCAAAAA-31247)"
                   className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium disabled:cursor-not-allowed"
                   style={{
                     background: 'rgba(46, 140, 255, 0.10)',
@@ -1312,8 +1319,8 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                   <Settings size={14} />
                   Config Discovery
                 </button>
-              </InfoTooltip>
-              <InfoTooltip id="bt-view-live-btn">
+              </RichTooltip>
+              <RichTooltip content={TT_VIEW_LIVE_RESULTS}>
                 <button
                   disabled={!backTestResult}
                   onClick={() => setActiveTab('trades')}
@@ -1323,8 +1330,8 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                   <TrendingUp size={14} />
                   View Live Results
                 </button>
-              </InfoTooltip>
-              <InfoTooltip id="bt-cancel-btn">
+              </RichTooltip>
+              <RichTooltip content={TT_CANCEL}>
                 <button
                   onClick={onClose}
                   disabled={backTestInProgress}
@@ -1335,7 +1342,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                 >
                   {backTestResult ? 'Close' : 'Cancel'}
                 </button>
-              </InfoTooltip>
+              </RichTooltip>
             </div>
           </div>
         </div>
