@@ -7672,6 +7672,7 @@
     "alembic/versions/20260512_add_fr_files_source_col.py",
     "alembic/versions/20260512_add_source_column_to_touch_index_tables.py",
     "alembic/versions/20260513_add_traceability_schema.py",
+    "alembic/versions/20260602_add_validation_history.py",
     "clean_corrupt_data.py",
     "conftest.py",
     "debug_config_structure.py",
@@ -9097,8 +9098,8 @@
     "src/detectors/building_blocks/patterns/triple_top.py"
   ],
   "stats": {
-    "total_files": 1423,
-    "parsed_files": 1407,
+    "total_files": 1424,
+    "parsed_files": 1408,
     "error_files": 16,
     "parse_rate_pct": 98.88,
     "edge_count": 2476
