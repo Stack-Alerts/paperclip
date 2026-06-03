@@ -660,25 +660,26 @@ function ConfigTab({
               {(['Adaptive v2.0', 'Static'] as const).map((opt) => {
                 const isActive = slAdjustment === opt;
                 return (
-                  <button
-                    key={opt}
-                    disabled={disabled}
-                    onClick={() => setSlAdjustment(opt)}
-                    className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
-                    style={{
-                      background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
-                      border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
-                      color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
-                    }}
-                  >
-                    {opt}
-                  </button>
+                  <RichTooltip key={opt} content={TT_SL_ADJUSTMENT}>
+                    <button
+                      disabled={disabled}
+                      onClick={() => setSlAdjustment(opt)}
+                      className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
+                      style={{
+                        background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
+                        border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
+                        color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
+                      }}
+                    >
+                      {opt}
+                    </button>
+                  </RichTooltip>
                 );
               })}
             </div>
@@ -695,43 +696,50 @@ function ConfigTab({
               Lookback below. No spinbox for this row (Presets is a discrete
               choice, not a numeric value), so the spinbox cell stays empty. */}
           <div className="grid grid-cols-[88px_minmax(0,1fr)_76px] items-center gap-x-1.5 gap-y-0">
-            <span
-              className="text-[11px] font-medium truncate"
-              style={{ color: 'var(--text-secondary)' }}
-              title="Presets"
-            >
-              Presets
-            </span>
+            <RichTooltip content={TT_PRESETS_LABEL}>
+              <span
+                className="text-[11px] font-medium truncate cursor-help"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Presets
+              </span>
+            </RichTooltip>
             <div className="flex gap-1 flex-nowrap items-stretch min-w-0">
               {(['Conservative', 'Balanced', 'Aggressive', 'Custom'] as const).map((preset) => {
+                const tips: Record<typeof preset, TooltipContent> = {
+                  Conservative: TT_PRESET_CONSERVATIVE,
+                  Balanced: TT_PRESET_BALANCED,
+                  Aggressive: TT_PRESET_AGGRESSIVE,
+                  Custom: TT_PRESET_CUSTOM,
+                };
                 const isActive = adaptivePreset === preset;
                 return (
-                  <button
-                    key={preset}
-                    disabled={disabled}
-                    onClick={() => {
-                      if (preset === 'Custom') {
-                        setAdaptivePreset('Custom');
-                      } else {
-                        applyAdaptivePreset(preset);
-                      }
-                    }}
-                    className="basis-0 grow shrink min-w-0 py-1 px-0.5 rounded-[4px] text-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-[1.1] text-center overflow-hidden"
-                    style={{
-                      background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
-                      border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
-                      color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                    }}
-                    title={preset}
-                    onMouseEnter={(e) => {
-                      if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
-                    }}
-                  >
-                    {preset}
-                  </button>
+                  <RichTooltip key={preset} content={tips[preset]}>
+                    <button
+                      disabled={disabled}
+                      onClick={() => {
+                        if (preset === 'Custom') {
+                          setAdaptivePreset('Custom');
+                        } else {
+                          applyAdaptivePreset(preset);
+                        }
+                      }}
+                      className="basis-0 grow shrink min-w-0 py-1 px-0.5 rounded-[4px] text-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-[1.1] text-center overflow-hidden"
+                      style={{
+                        background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
+                        border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
+                        color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
+                      }}
+                    >
+                      {preset}
+                    </button>
+                  </RichTooltip>
                 );
               })}
             </div>
@@ -740,34 +748,38 @@ function ConfigTab({
 
           {/* Checkboxes */}
           <div className="flex flex-row flex-wrap gap-3">
-            <label className="flex items-center gap-2 text-[11px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-              <input
-                type="checkbox"
-                disabled={disabled}
-                checked={delayStopLoss}
-                onChange={(e) => {
-                  const next = e.target.checked;
-                  setDelayStopLoss(next);
-                  checkAdaptivePresetMatch({ ...currentAdaptive, delayStopLoss: next });
-                }}
-                style={{ accentColor: 'var(--accent-blue)' }}
-              />
-              Delay Stop-Loss
-            </label>
-            <label className="flex items-center gap-2 text-[11px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-              <input
-                type="checkbox"
-                disabled={disabled}
-                checked={marketStructureStop}
-                onChange={(e) => {
-                  const next = e.target.checked;
-                  setMarketStructureStop(next);
-                  checkAdaptivePresetMatch({ ...currentAdaptive, marketStructureStop: next });
-                }}
-                style={{ accentColor: 'var(--accent-blue)' }}
-              />
-              Market Structure Stop-Loss
-            </label>
+            <RichTooltip content={TT_DELAY_STOP_LOSS}>
+              <label className="flex items-center gap-2 text-[11px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input
+                  type="checkbox"
+                  disabled={disabled}
+                  checked={delayStopLoss}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setDelayStopLoss(next);
+                    checkAdaptivePresetMatch({ ...currentAdaptive, delayStopLoss: next });
+                  }}
+                  style={{ accentColor: 'var(--accent-blue)' }}
+                />
+                Delay Stop-Loss
+              </label>
+            </RichTooltip>
+            <RichTooltip content={TT_MARKET_STRUCTURE_STOP}>
+              <label className="flex items-center gap-2 text-[11px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input
+                  type="checkbox"
+                  disabled={disabled}
+                  checked={marketStructureStop}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setMarketStructureStop(next);
+                    checkAdaptivePresetMatch({ ...currentAdaptive, marketStructureStop: next });
+                  }}
+                  style={{ accentColor: 'var(--accent-blue)' }}
+                />
+                Market Structure Stop-Loss
+              </label>
+            </RichTooltip>
           </div>
 
           {/* Divider */}
@@ -790,6 +802,7 @@ function ConfigTab({
               min={0}
               max={50}
               step={1}
+              tooltip={TT_STOP_LOSS_DELAY}
             />
             <ChipRow
               label="Emergency"
@@ -806,6 +819,7 @@ function ConfigTab({
               min={0.1}
               max={20}
               step={0.25}
+              tooltip={TT_EMERGENCY}
             />
             <ChipRow
               label="Vol Lookback"
@@ -822,6 +836,7 @@ function ConfigTab({
               min={5}
               max={500}
               step={5}
+              tooltip={TT_VOL_LOOKBACK}
             />
             <ChipRow
               label="Vol Multiplier"
@@ -837,6 +852,7 @@ function ConfigTab({
               min={0.1}
               max={20}
               step={0.5}
+              tooltip={TT_VOL_MULTIPLIER}
             />
             <ChipRow
               label="Min Stop-Loss"
@@ -853,6 +869,7 @@ function ConfigTab({
               min={0.1}
               max={20}
               step={0.5}
+              tooltip={TT_MIN_STOP_LOSS}
             />
             <ChipRow
               label="Max Stop-Loss"
@@ -869,6 +886,7 @@ function ConfigTab({
               min={0.5}
               max={50}
               step={1}
+              tooltip={TT_MAX_STOP_LOSS}
             />
           </div>
         </SectionCard>
