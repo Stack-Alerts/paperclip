@@ -84,6 +84,15 @@ function ChipRow({
   step?: number;
 }) {
   const fmt = format ?? ((v: ChipValue) => String(v));
+  // Per-row uniform chip width: pick the widest formatted label in this row and apply
+  // that width to every chip so the row reads as a clean column-aligned grid (board
+  // pre-merge revision 5: "all the buttons should be uniform in size"). Using a
+  // tabular-nums / monospace digit estimate of 6.5px per char + px-1 padding (4px each).
+  const maxLabelLen = values.reduce<number>(
+    (m, v) => Math.max(m, fmt(v).length),
+    1,
+  );
+  const chipPx = Math.ceil(maxLabelLen * 6.5) + 8;
   const numericCurrent =
     current === null || current === undefined
       ? ''
@@ -136,13 +145,14 @@ function ChipRow({
               key={String(v)}
               disabled={disabled}
               onClick={() => onSelect(v)}
-              className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
+              className="py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0 text-center"
               style={{
                 background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
                 border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
                 color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
                 fontVariantNumeric: 'tabular-nums',
-                minWidth: 0,
+                width: chipPx,
+                minWidth: chipPx,
               }}
               onMouseEnter={(e) => {
                 if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
@@ -519,7 +529,7 @@ function ConfigTab({
           <div className="space-y-3">
             <ChipRow
               label="Stop Loss Delay"
-              values={chipSeries(1, 1, 12)}
+              values={chipSeries(1, 1, 11)}
               current={stopLossDelay}
               onSelect={setStopLossDelay}
               disabled={disabled}
@@ -543,7 +553,7 @@ function ConfigTab({
             />
             <ChipRow
               label="Vol Lookback"
-              values={chipSeries(5, 5, 10)}
+              values={chipSeries(5, 5, 11)}
               current={volatilityLookback}
               onSelect={setVolatilityLookback}
               disabled={disabled}
@@ -555,7 +565,7 @@ function ConfigTab({
             />
             <ChipRow
               label="Vol Multiplier"
-              values={chipSeries(0.5, 0.5, 10, 1)}
+              values={chipSeries(0.5, 0.5, 8, 1)}
               current={volatilityMultiplier}
               onSelect={setVolatilityMultiplier}
               disabled={disabled}
@@ -566,7 +576,7 @@ function ConfigTab({
             />
             <ChipRow
               label="Min Stop-Loss"
-              values={chipSeries(0.5, 0.5, 9, 1)}
+              values={chipSeries(0.5, 0.5, 8, 1)}
               current={minStopLoss}
               onSelect={setMinStopLoss}
               disabled={disabled}
@@ -578,7 +588,7 @@ function ConfigTab({
             />
             <ChipRow
               label="Max Stop-Loss"
-              values={chipSeries(1, 1, 12)}
+              values={chipSeries(1, 1, 11)}
               current={maxStopLoss}
               onSelect={setMaxStopLoss}
               disabled={disabled}
@@ -599,7 +609,7 @@ function ConfigTab({
           <div className="space-y-3">
             <ChipRow
               label="Starting Capital"
-              values={chipSeries(5000, 5000, 9)}
+              values={chipSeries(5000, 5000, 8)}
               current={config.initialCapital ?? 10000}
               onSelect={(v) => onChange({ initialCapital: Number(v) })}
               disabled={disabled}
@@ -616,7 +626,7 @@ function ConfigTab({
             />
             <ChipRow
               label="Min Risk:Reward"
-              values={chipSeries(1, 0.5, 9, 1)}
+              values={chipSeries(1, 0.5, 8, 1)}
               current={minRiskReward}
               onSelect={setMinRiskReward}
               disabled={disabled}
@@ -628,7 +638,7 @@ function ConfigTab({
             />
             <ChipRow
               label="Risk %"
-              values={chipSeries(0.5, 0.5, 9, 1)}
+              values={chipSeries(0.5, 0.5, 8, 1)}
               current={maxRisk}
               onSelect={setMaxRisk}
               disabled={disabled}
@@ -692,7 +702,7 @@ function ConfigTab({
               />
               <ChipRow
                 label="Max Bars Held"
-                values={chipSeries(25, 25, 9)}
+                values={chipSeries(25, 25, 8)}
                 current={maxBarsHeld}
                 onSelect={setMaxBarsHeld}
                 disabled={disabled}
