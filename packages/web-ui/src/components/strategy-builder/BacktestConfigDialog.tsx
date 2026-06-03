@@ -4,7 +4,20 @@ import { useState, useCallback, useContext, useEffect, useRef, createContext } f
 import { X, Play, Square, Pause, RotateCcw, Settings, Terminal, TrendingUp, BarChart3, Sparkles, GitCompare, ChevronUp, ChevronDown } from 'lucide-react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BacktestConfig, BacktestStatusMessage } from '@/lib/strategy-builder/types';
-import { InfoTooltip } from './InfoTooltip';
+import { RichTooltip, type TooltipContent } from './RichTooltip';
+import {
+  TT_LOOKBACK, TT_TRAINING, TT_TESTING,
+  TT_MODE_HISTORICAL, TT_MODE_WALK, TT_MODE_LIVE_REPLAY,
+  TT_TPSL_CONFIG, TT_SL_ADJUSTMENT,
+  TT_PRESET_CONSERVATIVE, TT_PRESET_BALANCED, TT_PRESET_AGGRESSIVE, TT_PRESET_CUSTOM,
+  TT_DELAY_STOP_LOSS, TT_MARKET_STRUCTURE_STOP,
+  TT_STOP_LOSS_DELAY, TT_EMERGENCY, TT_VOL_LOOKBACK, TT_VOL_MULTIPLIER,
+  TT_MIN_STOP_LOSS, TT_MAX_STOP_LOSS,
+  TT_STARTING_CAPITAL, TT_MIN_RR, TT_RISK_PCT, TT_LEVERAGE,
+  TT_CONFLUENCE, TT_HOLD_DURATION, TT_MIN_BARS_HELD, TT_MAX_BARS_HELD,
+  TT_PRESETS_LABEL,
+  TT_RUN_TEST, TT_PAUSE, TT_STOP, TT_CONFIG_DISCOVERY, TT_VIEW_LIVE_RESULTS, TT_CANCEL,
+} from './BacktestConfigTooltips';
 import { LiveOutputPanel } from '@/components/backtest/live-output/LiveOutputPanel';
 import { TradesPanel } from '@/components/backtest/trades/TradesPanel';
 import { MetricsPanel } from '@/components/backtest/metrics/MetricsPanel';
@@ -246,6 +259,7 @@ function ChipRow({
   min,
   max,
   step,
+  tooltip,
 }: {
   label: string;
   values: ChipValue[];
@@ -258,6 +272,9 @@ function ChipRow({
   min?: number;
   max?: number;
   step?: number;
+  // BTCAAAAA-34257: when supplied, the row label, every chip, and the spinbox
+  // surface the same field-level institutional definition on hover/focus.
+  tooltip?: TooltipContent;
 }) {
   const fontSizes = useFontSizes();
   const fmt = format ?? ((v: ChipValue) => String(v));
@@ -296,21 +313,26 @@ function ChipRow({
     onSelect(rounded);
   };
   const stepDelta = step ?? 1;
+  // BTCAAAAA-34257: helper to wrap an element in RichTooltip when a row-level
+  // tooltip is supplied. Keeps the JSX below readable.
+  const wrap = (node: React.ReactElement) =>
+    tooltip ? <RichTooltip content={tooltip}>{node}</RichTooltip> : node;
   return (
     <div className="grid grid-cols-[88px_minmax(0,1fr)_76px] items-center gap-x-1.5 gap-y-0">
-      <span
-        className="font-medium truncate"
-        style={{ color: 'var(--text-secondary)', fontSize: fontSizes.rowLabel }}
-        title={label}
-      >
-        {label}
-      </span>
+      {wrap(
+        <span
+          className="font-medium truncate cursor-help"
+          style={{ color: 'var(--text-secondary)', fontSize: fontSizes.rowLabel }}
+          title={tooltip ? undefined : label}
+        >
+          {label}
+        </span>,
+      )}
       <div className="flex gap-1 flex-nowrap items-stretch min-w-0">
         {values.map((v) => {
           const isActive = current === v;
-          return (
+          const btn = (
             <button
-              key={String(v)}
               disabled={disabled}
               onClick={() => onSelect(v)}
               className="basis-0 grow shrink min-w-0 py-1 rounded-[4px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap text-center"
@@ -331,13 +353,21 @@ function ChipRow({
               {fmt(v)}
             </button>
           );
+          // BTCAAAAA-34257: every chip on the row shows the same field tooltip.
+          return tooltip ? (
+            <RichTooltip key={String(v)} content={tooltip}>{btn}</RichTooltip>
+          ) : (
+            <span key={String(v)} className="contents">{btn}</span>
+          );
         })}
       </div>
       {/* Spinbox: one bordered field with inline value + unit + stacked stepper buttons.
           Rest state: neutral border that matches the chip border weight — every spinbox
           looks identical (board post-merge revision 7). Hover reveals a subtle accent
           glow; focus-within keeps the accent for keyboard users. The value-text tint
-          when matching a chip preset is preserved as the only at-rest pairing signal. */}
+          when matching a chip preset is preserved as the only at-rest pairing signal.
+          BTCAAAAA-34257: spinbox shares the row tooltip with label + chips. */}
+      {wrap(
       <div
         className="flex items-stretch rounded overflow-hidden border border-solid border-[var(--border)] transition-[border-color,box-shadow] hover:border-[rgba(46,140,255,0.55)] hover:shadow-[0_0_0_2px_rgba(46,140,255,0.15)] focus-within:border-[rgba(46,140,255,0.55)] focus-within:shadow-[0_0_0_2px_rgba(46,140,255,0.25)]"
         style={{
@@ -425,7 +455,8 @@ function ChipRow({
             <ChevronDown size={10} />
           </button>
         </div>
-      </div>
+      </div>,
+      )}
     </div>
   );
 }
@@ -658,6 +689,7 @@ function ConfigTab({
                 min={1}
                 max={3650}
                 step={30}
+                tooltip={TT_LOOKBACK}
               />
               <ChipRow
                 label="Training"
@@ -669,6 +701,7 @@ function ConfigTab({
                 min={1}
                 max={3650}
                 step={30}
+                tooltip={TT_TRAINING}
               />
               <ChipRow
                 label="Testing"
@@ -680,6 +713,7 @@ function ConfigTab({
                 min={1}
                 max={3650}
                 step={30}
+                tooltip={TT_TESTING}
               />
             </div>
           </div>
@@ -699,28 +733,34 @@ function ConfigTab({
                   'walk': 'Mode 2: Walk',
                   'live-replay': 'Mode 2: Live Replay',
                 };
+                const tips: Record<typeof m, TooltipContent> = {
+                  'walk-forward': TT_MODE_HISTORICAL,
+                  'walk': TT_MODE_WALK,
+                  'live-replay': TT_MODE_LIVE_REPLAY,
+                };
                 const isActive = mode === m;
                 return (
-                  <button
-                    key={m}
-                    disabled={disabled}
-                    onClick={() => setMode(m)}
-                    className="px-1 py-0.5 rounded-[3px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
-                    style={{
-                      background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
-                      border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
-                      color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                      fontSize: fontSizes.modeButton,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
-                    }}
-                  >
-                    {labels[m]}
-                  </button>
+                  <RichTooltip key={m} content={tips[m]}>
+                    <button
+                      disabled={disabled}
+                      onClick={() => setMode(m)}
+                      className="px-1 py-0.5 rounded-[3px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
+                      style={{
+                        background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
+                        border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
+                        color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                        fontSize: fontSizes.modeButton,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
+                      }}
+                    >
+                      {labels[m]}
+                    </button>
+                  </RichTooltip>
                 );
               })}
             </div>
@@ -731,20 +771,24 @@ function ConfigTab({
 
           {/* TP/SL Config section */}
           <div>
-            <div className="font-medium uppercase mb-1" style={{ color: 'var(--text-muted)', fontSize: fontSizes.miniHeading }}>
-              TP/SL Config
-            </div>
-            <select
-              disabled={disabled}
-              value={tpSlConfig}
-              onChange={(e) => setTpSlConfig(e.target.value)}
-              className="w-full px-2 py-1 rounded focus:outline-none disabled:opacity-50"
-              style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: fontSizes.modeButton }}
-            >
-              <option>Fibonacci</option>
-              <option>Hybrid</option>
-              <option>Fixed</option>
-            </select>
+            <RichTooltip content={TT_TPSL_CONFIG}>
+              <div className="font-medium uppercase mb-1 cursor-help" style={{ color: 'var(--text-muted)', fontSize: fontSizes.miniHeading }}>
+                TP/SL Config
+              </div>
+            </RichTooltip>
+            <RichTooltip content={TT_TPSL_CONFIG}>
+              <select
+                disabled={disabled}
+                value={tpSlConfig}
+                onChange={(e) => setTpSlConfig(e.target.value)}
+                className="w-full px-2 py-1 rounded focus:outline-none disabled:opacity-50"
+                style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: fontSizes.modeButton }}
+              >
+                <option>Fibonacci</option>
+                <option>Hybrid</option>
+                <option>Fixed</option>
+              </select>
+            </RichTooltip>
           </div>
 
           {/* Stop Loss Adjustment section */}
@@ -756,26 +800,27 @@ function ConfigTab({
               {(['Adaptive v2.0', 'Static'] as const).map((opt) => {
                 const isActive = slAdjustment === opt;
                 return (
-                  <button
-                    key={opt}
-                    disabled={disabled}
-                    onClick={() => setSlAdjustment(opt)}
-                    className="px-1 py-0.5 rounded-[3px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
-                    style={{
-                      background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
-                      border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
-                      color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                      fontSize: fontSizes.modeButton,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
-                    }}
-                  >
-                    {opt}
-                  </button>
+                  <RichTooltip key={opt} content={TT_SL_ADJUSTMENT}>
+                    <button
+                      disabled={disabled}
+                      onClick={() => setSlAdjustment(opt)}
+                      className="px-1 py-0.5 rounded-[3px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
+                      style={{
+                        background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
+                        border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
+                        color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                        fontSize: fontSizes.modeButton,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
+                      }}
+                    >
+                      {opt}
+                    </button>
+                  </RichTooltip>
                 );
               })}
             </div>
@@ -792,44 +837,51 @@ function ConfigTab({
               Lookback below. No spinbox for this row (Presets is a discrete
               choice, not a numeric value), so the spinbox cell stays empty. */}
           <div className="grid grid-cols-[88px_minmax(0,1fr)_76px] items-center gap-x-1.5 gap-y-0">
-            <span
-              className="font-medium truncate"
-              style={{ color: 'var(--text-secondary)', fontSize: fontSizes.rowLabel }}
-              title="Presets"
-            >
-              Presets
-            </span>
+            <RichTooltip content={TT_PRESETS_LABEL}>
+              <span
+                className="font-medium truncate cursor-help"
+                style={{ color: 'var(--text-secondary)', fontSize: fontSizes.rowLabel }}
+              >
+                Presets
+              </span>
+            </RichTooltip>
             <div className="flex gap-1 flex-nowrap items-stretch min-w-0">
               {(['Conservative', 'Balanced', 'Aggressive', 'Custom'] as const).map((preset) => {
+                const tips: Record<typeof preset, TooltipContent> = {
+                  Conservative: TT_PRESET_CONSERVATIVE,
+                  Balanced: TT_PRESET_BALANCED,
+                  Aggressive: TT_PRESET_AGGRESSIVE,
+                  Custom: TT_PRESET_CUSTOM,
+                };
                 const isActive = adaptivePreset === preset;
                 return (
-                  <button
-                    key={preset}
-                    disabled={disabled}
-                    onClick={() => {
-                      if (preset === 'Custom') {
-                        setAdaptivePreset('Custom');
-                      } else {
-                        applyAdaptivePreset(preset);
-                      }
-                    }}
-                    className="basis-0 grow shrink min-w-0 py-1 px-0.5 rounded-[4px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-[1.1] text-center overflow-hidden"
-                    style={{
-                      background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
-                      border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
-                      color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                      fontSize: fontSizes.presetChip,
-                    }}
-                    title={preset}
-                    onMouseEnter={(e) => {
-                      if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
-                    }}
-                  >
-                    {preset}
-                  </button>
+                  <RichTooltip key={preset} content={tips[preset]}>
+                    <button
+                      disabled={disabled}
+                      onClick={() => {
+                        if (preset === 'Custom') {
+                          setAdaptivePreset('Custom');
+                        } else {
+                          applyAdaptivePreset(preset);
+                        }
+                      }}
+                      className="basis-0 grow shrink min-w-0 py-1 px-0.5 rounded-[4px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-[1.1] text-center overflow-hidden"
+                      style={{
+                        background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
+                        border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
+                        color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                        fontSize: fontSizes.presetChip,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
+                      }}
+                    >
+                      {preset}
+                    </button>
+                  </RichTooltip>
                 );
               })}
             </div>
@@ -838,34 +890,38 @@ function ConfigTab({
 
           {/* Checkboxes */}
           <div className="flex flex-row flex-wrap gap-3">
-            <label className="flex items-center gap-2 cursor-pointer" style={{ color: 'var(--text-secondary)', fontSize: fontSizes.checkboxLabel }}>
-              <input
-                type="checkbox"
-                disabled={disabled}
-                checked={delayStopLoss}
-                onChange={(e) => {
-                  const next = e.target.checked;
-                  setDelayStopLoss(next);
-                  checkAdaptivePresetMatch({ ...currentAdaptive, delayStopLoss: next });
-                }}
-                style={{ accentColor: 'var(--accent-blue)' }}
-              />
-              Delay Stop-Loss
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer" style={{ color: 'var(--text-secondary)', fontSize: fontSizes.checkboxLabel }}>
-              <input
-                type="checkbox"
-                disabled={disabled}
-                checked={marketStructureStop}
-                onChange={(e) => {
-                  const next = e.target.checked;
-                  setMarketStructureStop(next);
-                  checkAdaptivePresetMatch({ ...currentAdaptive, marketStructureStop: next });
-                }}
-                style={{ accentColor: 'var(--accent-blue)' }}
-              />
-              Market Structure Stop-Loss
-            </label>
+            <RichTooltip content={TT_DELAY_STOP_LOSS}>
+              <label className="flex items-center gap-2 cursor-pointer" style={{ color: 'var(--text-secondary)', fontSize: fontSizes.checkboxLabel }}>
+                <input
+                  type="checkbox"
+                  disabled={disabled}
+                  checked={delayStopLoss}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setDelayStopLoss(next);
+                    checkAdaptivePresetMatch({ ...currentAdaptive, delayStopLoss: next });
+                  }}
+                  style={{ accentColor: 'var(--accent-blue)' }}
+                />
+                Delay Stop-Loss
+              </label>
+            </RichTooltip>
+            <RichTooltip content={TT_MARKET_STRUCTURE_STOP}>
+              <label className="flex items-center gap-2 cursor-pointer" style={{ color: 'var(--text-secondary)', fontSize: fontSizes.checkboxLabel }}>
+                <input
+                  type="checkbox"
+                  disabled={disabled}
+                  checked={marketStructureStop}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setMarketStructureStop(next);
+                    checkAdaptivePresetMatch({ ...currentAdaptive, marketStructureStop: next });
+                  }}
+                  style={{ accentColor: 'var(--accent-blue)' }}
+                />
+                Market Structure Stop-Loss
+              </label>
+            </RichTooltip>
           </div>
 
           {/* Divider */}
@@ -888,6 +944,7 @@ function ConfigTab({
               min={0}
               max={50}
               step={1}
+              tooltip={TT_STOP_LOSS_DELAY}
             />
             <ChipRow
               label="Emergency"
@@ -904,6 +961,7 @@ function ConfigTab({
               min={0.1}
               max={20}
               step={0.25}
+              tooltip={TT_EMERGENCY}
             />
             <ChipRow
               label="Vol Lookback"
@@ -920,6 +978,7 @@ function ConfigTab({
               min={5}
               max={500}
               step={5}
+              tooltip={TT_VOL_LOOKBACK}
             />
             <ChipRow
               label="Vol Multiplier"
@@ -935,6 +994,7 @@ function ConfigTab({
               min={0.1}
               max={20}
               step={0.5}
+              tooltip={TT_VOL_MULTIPLIER}
             />
             <ChipRow
               label="Min Stop-Loss"
@@ -951,6 +1011,7 @@ function ConfigTab({
               min={0.1}
               max={20}
               step={0.5}
+              tooltip={TT_MIN_STOP_LOSS}
             />
             <ChipRow
               label="Max Stop-Loss"
@@ -967,6 +1028,7 @@ function ConfigTab({
               min={0.5}
               max={50}
               step={1}
+              tooltip={TT_MAX_STOP_LOSS}
             />
           </div>
         </SectionCard>
@@ -993,6 +1055,7 @@ function ConfigTab({
               min={100}
               max={10_000_000}
               step={1000}
+              tooltip={TT_STARTING_CAPITAL}
             />
             <ChipRow
               label="Min Risk:Reward"
@@ -1005,6 +1068,7 @@ function ConfigTab({
               min={1}
               max={100}
               step={0.5}
+              tooltip={TT_MIN_RR}
             />
             <ChipRow
               label="Risk %"
@@ -1017,6 +1081,7 @@ function ConfigTab({
               min={0.5}
               max={100}
               step={0.5}
+              tooltip={TT_RISK_PCT}
             />
             <ChipRow
               label="Leverage"
@@ -1028,6 +1093,7 @@ function ConfigTab({
               min={1}
               max={125}
               step={5}
+              tooltip={TT_LEVERAGE}
             />
           </div>
 
@@ -1036,9 +1102,11 @@ function ConfigTab({
 
           {/* Hold Duration — moved above Confluence per BTCAAAAA-34256 Item B. */}
           <div>
-            <div className="font-medium uppercase mb-1" style={{ color: 'var(--text-muted)', fontSize: fontSizes.miniHeading }}>
-              Hold Duration
-            </div>
+            <RichTooltip content={TT_HOLD_DURATION}>
+              <div className="font-medium uppercase mb-1 cursor-help" style={{ color: 'var(--text-muted)', fontSize: fontSizes.miniHeading }}>
+                Hold Duration
+              </div>
+            </RichTooltip>
             <div className="space-y-0.5">
               <ChipRow
                 label="Min Bars Held"
@@ -1051,6 +1119,7 @@ function ConfigTab({
                 min={0}
                 max={1000}
                 step={5}
+                tooltip={TT_MIN_BARS_HELD}
               />
               <ChipRow
                 label="Max Bars Held"
@@ -1063,26 +1132,31 @@ function ConfigTab({
                 min={1}
                 max={10000}
                 step={25}
+                tooltip={TT_MAX_BARS_HELD}
               />
             </div>
           </div>
 
           {/* Confluence */}
           <div>
-            <div className="font-medium uppercase mb-1" style={{ color: 'var(--text-muted)', fontSize: fontSizes.miniHeading }}>
-              Confluence
-            </div>
-            <select
-              disabled={disabled}
-              value={confluence}
-              onChange={(e) => setConfluence(e.target.value)}
-              className="w-full px-2 py-1 rounded focus:outline-none disabled:opacity-50"
-              style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: fontSizes.modeButton }}
-            >
-              <option>Boost from Strategy</option>
-              <option>Independent Score</option>
-              <option>Disabled</option>
-            </select>
+            <RichTooltip content={TT_CONFLUENCE}>
+              <div className="font-medium uppercase mb-1 cursor-help" style={{ color: 'var(--text-muted)', fontSize: fontSizes.miniHeading }}>
+                Confluence
+              </div>
+            </RichTooltip>
+            <RichTooltip content={TT_CONFLUENCE}>
+              <select
+                disabled={disabled}
+                value={confluence}
+                onChange={(e) => setConfluence(e.target.value)}
+                className="w-full px-2 py-1 rounded focus:outline-none disabled:opacity-50"
+                style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: fontSizes.modeButton }}
+              >
+                <option>Boost from Strategy</option>
+                <option>Independent Score</option>
+                <option>Disabled</option>
+              </select>
+            </RichTooltip>
           </div>
         </SectionCard>
 
@@ -1435,7 +1509,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
           <div className="flex items-center justify-between gap-2">
             {/* Left cluster — primary run controls (thickclient leading edge) */}
             <div className="flex items-center gap-2">
-              <InfoTooltip id="bt-run-btn">
+              <RichTooltip content={TT_RUN_TEST}>
                 {!backTestInProgress ? (
                   <button
                     onClick={handleStart}
@@ -1453,35 +1527,32 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                     className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium"
                     style={{ background: '#32557c', color: 'var(--btn-primary-text, white)', opacity: 0.6, cursor: 'not-allowed' }}
                     disabled
-                    title="Stop not yet available — awaiting backend contract"
                   >
                     <Square size={14} />
                     Running…
                   </button>
                 )}
-              </InfoTooltip>
-              <InfoTooltip id="bt-pause-btn">
+              </RichTooltip>
+              <RichTooltip content={TT_PAUSE}>
                 <button
                   disabled
-                  title="Pause/Resume — deferred (control endpoint coming in follow-up)"
                   className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
                 >
                   <Pause size={14} />
                   Pause
                 </button>
-              </InfoTooltip>
-              <InfoTooltip id="bt-stop-btn">
+              </RichTooltip>
+              <RichTooltip content={TT_STOP}>
                 <button
                   disabled
-                  title="Stop — deferred (control endpoint coming in follow-up)"
                   className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
                 >
                   <Square size={14} />
                   Stop
                 </button>
-              </InfoTooltip>
+              </RichTooltip>
               {/* "Config saved at HH:MM:SS (after test run)" — italic, only after a run completes */}
               {backTestResult?.completedAt && (
                 <span
@@ -1495,10 +1566,9 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
 
             {/* Right cluster — ancillary actions + close */}
             <div className="flex items-center gap-2">
-              <InfoTooltip id="bt-config-discovery-btn">
+              <RichTooltip content={TT_CONFIG_DISCOVERY}>
                 <button
                   disabled
-                  title="Config Discovery — auto-tune TP/SL across recent windows (deferred to BTCAAAAA-31247)"
                   className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium disabled:cursor-not-allowed"
                   style={{
                     background: 'rgba(46, 140, 255, 0.10)',
@@ -1509,8 +1579,8 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                   <Settings size={14} />
                   Config Discovery
                 </button>
-              </InfoTooltip>
-              <InfoTooltip id="bt-view-live-btn">
+              </RichTooltip>
+              <RichTooltip content={TT_VIEW_LIVE_RESULTS}>
                 <button
                   disabled={!backTestResult}
                   onClick={() => setActiveTab('trades')}
@@ -1520,8 +1590,8 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                   <TrendingUp size={14} />
                   View Live Results
                 </button>
-              </InfoTooltip>
-              <InfoTooltip id="bt-cancel-btn">
+              </RichTooltip>
+              <RichTooltip content={TT_CANCEL}>
                 <button
                   onClick={onClose}
                   disabled={backTestInProgress}
@@ -1532,7 +1602,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
                 >
                   {backTestResult ? 'Close' : 'Cancel'}
                 </button>
-              </InfoTooltip>
+              </RichTooltip>
             </div>
           </div>
         </div>
