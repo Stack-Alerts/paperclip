@@ -295,7 +295,7 @@ function ConfigTab({
   return (
     <div className="h-full overflow-auto pb-6">
       {/* 3-Column Grid: Configuration | Adaptive SL v2.0 | Risk/Reward */}
-      <div className="grid grid-cols-[33fr_33fr_34fr] gap-5 px-4 py-4">
+      <div className="grid grid-cols-[33fr_33fr_34fr] gap-5 px-2 py-3 items-start">
 
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 1: CONFIGURATION (35%)
@@ -918,7 +918,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
         </div>
 
         {/* ── Tab content ── */}
-        <div className="flex-1 overflow-auto p-6" style={{ background: 'var(--bg-deep)' }}>
+        <div className="flex-1 overflow-auto px-4 py-4" style={{ background: 'var(--bg-deep)' }}>
           {activeTab === 'config' && (
             <ConfigTab config={config} onChange={patchConfig} disabled={backTestInProgress} />
           )}
