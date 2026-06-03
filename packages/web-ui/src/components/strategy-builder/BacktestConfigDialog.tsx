@@ -31,6 +31,63 @@ const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
 
 const PRESET_DAYS = [30, 90, 180, 365];
 
+// ─── Adaptive SL V2.0 — canonical preset values ──────────────────────────────
+//
+// Each named preset (Conservative / Balanced / Aggressive) is a frozen snapshot
+// of the 8 Adaptive SL knobs. Clicking a preset chip applies all 8 at once.
+// Whenever the user diverges any single knob from the active preset's snapshot,
+// the chip auto-flips to `Custom` so the label never lies about what's loaded.
+// (BTCAAAAA-34256 Item A.)
+type AdaptivePresetName = 'Conservative' | 'Balanced' | 'Aggressive' | 'Custom';
+type AdaptiveValues = {
+  delayStopLoss: boolean;
+  marketStructureStop: boolean;
+  stopLossDelay: number;
+  emergency: number;
+  volatilityLookback: number;
+  volatilityMultiplier: number;
+  minStopLoss: number;
+  maxStopLoss: number;
+};
+const ADAPTIVE_PRESETS: Record<Exclude<AdaptivePresetName, 'Custom'>, AdaptiveValues> = {
+  Conservative: {
+    delayStopLoss: true,
+    marketStructureStop: true,
+    stopLossDelay: 3,
+    emergency: 1.5,
+    volatilityLookback: 30,
+    volatilityMultiplier: 1.0,
+    minStopLoss: 0.5,
+    maxStopLoss: 1.5,
+  },
+  Balanced: {
+    delayStopLoss: true,
+    marketStructureStop: true,
+    stopLossDelay: 2,
+    emergency: 2.0,
+    volatilityLookback: 20,
+    volatilityMultiplier: 1.2,
+    minStopLoss: 0.7,
+    maxStopLoss: 2.0,
+  },
+  Aggressive: {
+    delayStopLoss: false,
+    marketStructureStop: true,
+    stopLossDelay: 1,
+    emergency: 3.0,
+    volatilityLookback: 10,
+    volatilityMultiplier: 1.5,
+    minStopLoss: 1.0,
+    maxStopLoss: 3.0,
+  },
+};
+function adaptiveMatchesPreset(values: AdaptiveValues, preset: Exclude<AdaptivePresetName, 'Custom'>): boolean {
+  const canonical = ADAPTIVE_PRESETS[preset];
+  return (Object.keys(canonical) as Array<keyof AdaptiveValues>).every(
+    (k) => canonical[k] === values[k],
+  );
+}
+
 // Generate a uniform-step chip series. Per-row counts hand-picked to fill the
 // chip track at the standard 1440 dialog width without overflow into the
 // spinbox cell (board pre-merge revision 4: "by the same incrementation",
@@ -374,15 +431,52 @@ function ConfigTab({
   const [mode, setMode] = useState<'walk-forward' | 'walk' | 'live-replay'>('walk-forward');
   const [tpSlConfig, setTpSlConfig] = useState<string>('Default');
   const [slAdjustment, setSlAdjustment] = useState<'Adaptive v2.0' | 'Static'>('Adaptive v2.0');
-  const [adaptivePreset, setAdaptivePreset] = useState<'Conservative' | 'Balanced' | 'Aggressive' | 'Custom'>('Balanced');
-  const [delayStopLoss, setDelayStopLoss] = useState(true);
-  const [marketStructureStop, setMarketStructureStop] = useState(true);
-  const [stopLossDelay, setStopLossDelay] = useState<ChipValue>(2);
-  const [emergency, setEmergency] = useState<ChipValue>(2.0);
-  const [volatilityLookback, setVolatilityLookback] = useState<ChipValue>(20);
-  const [volatilityMultiplier, setVolatilityMultiplier] = useState<ChipValue>(1.2);
-  const [minStopLoss, setMinStopLoss] = useState<ChipValue>(0.7);
-  const [maxStopLoss, setMaxStopLoss] = useState<ChipValue>(2.0);
+  const [adaptivePreset, setAdaptivePreset] = useState<AdaptivePresetName>('Balanced');
+  const [delayStopLoss, setDelayStopLoss] = useState<boolean>(ADAPTIVE_PRESETS.Balanced.delayStopLoss);
+  const [marketStructureStop, setMarketStructureStop] = useState<boolean>(ADAPTIVE_PRESETS.Balanced.marketStructureStop);
+  const [stopLossDelay, setStopLossDelay] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.stopLossDelay);
+  const [emergency, setEmergency] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.emergency);
+  const [volatilityLookback, setVolatilityLookback] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.volatilityLookback);
+  const [volatilityMultiplier, setVolatilityMultiplier] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.volatilityMultiplier);
+  const [minStopLoss, setMinStopLoss] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.minStopLoss);
+  const [maxStopLoss, setMaxStopLoss] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.maxStopLoss);
+
+  // Auto-Custom: re-evaluate whether the current 8 Adaptive SL values still
+  // match the active preset's canonical snapshot. If they diverge, flip the
+  // preset chip to `Custom`. A no-op when already on Custom or when the
+  // current values still match (e.g. just clicked the preset chip).
+  // BTCAAAAA-34256 Item A.
+  const checkAdaptivePresetMatch = useCallback(
+    (next: AdaptiveValues) => {
+      if (adaptivePreset === 'Custom') return;
+      if (!adaptiveMatchesPreset(next, adaptivePreset)) {
+        setAdaptivePreset('Custom');
+      }
+    },
+    [adaptivePreset],
+  );
+  const currentAdaptive: AdaptiveValues = {
+    delayStopLoss,
+    marketStructureStop,
+    stopLossDelay: Number(stopLossDelay),
+    emergency: Number(emergency),
+    volatilityLookback: Number(volatilityLookback),
+    volatilityMultiplier: Number(volatilityMultiplier),
+    minStopLoss: Number(minStopLoss),
+    maxStopLoss: Number(maxStopLoss),
+  };
+  const applyAdaptivePreset = useCallback((preset: Exclude<AdaptivePresetName, 'Custom'>) => {
+    const v = ADAPTIVE_PRESETS[preset];
+    setDelayStopLoss(v.delayStopLoss);
+    setMarketStructureStop(v.marketStructureStop);
+    setStopLossDelay(v.stopLossDelay);
+    setEmergency(v.emergency);
+    setVolatilityLookback(v.volatilityLookback);
+    setVolatilityMultiplier(v.volatilityMultiplier);
+    setMinStopLoss(v.minStopLoss);
+    setMaxStopLoss(v.maxStopLoss);
+    setAdaptivePreset(preset);
+  }, []);
   const [minRiskReward, setMinRiskReward] = useState<ChipValue>(1.2);
   const [maxRisk, setMaxRisk] = useState<ChipValue>(10);
   const [leverage, setLeverage] = useState<ChipValue>(10);
@@ -570,7 +664,13 @@ function ConfigTab({
                   <button
                     key={preset}
                     disabled={disabled}
-                    onClick={() => setAdaptivePreset(preset)}
+                    onClick={() => {
+                      if (preset === 'Custom') {
+                        setAdaptivePreset('Custom');
+                      } else {
+                        applyAdaptivePreset(preset);
+                      }
+                    }}
                     className="basis-0 grow shrink min-w-0 py-1 px-0.5 rounded-[4px] text-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-[1.1] text-center overflow-hidden"
                     style={{
                       background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
@@ -600,7 +700,11 @@ function ConfigTab({
                 type="checkbox"
                 disabled={disabled}
                 checked={delayStopLoss}
-                onChange={(e) => setDelayStopLoss(e.target.checked)}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setDelayStopLoss(next);
+                  checkAdaptivePresetMatch({ ...currentAdaptive, delayStopLoss: next });
+                }}
                 style={{ accentColor: 'var(--accent-blue)' }}
               />
               Delay Stop-Loss
@@ -610,7 +714,11 @@ function ConfigTab({
                 type="checkbox"
                 disabled={disabled}
                 checked={marketStructureStop}
-                onChange={(e) => setMarketStructureStop(e.target.checked)}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setMarketStructureStop(next);
+                  checkAdaptivePresetMatch({ ...currentAdaptive, marketStructureStop: next });
+                }}
                 style={{ accentColor: 'var(--accent-blue)' }}
               />
               Market Structure Stop-Loss
@@ -626,7 +734,11 @@ function ConfigTab({
               label="Stop Loss Delay"
               values={chipSeries(1, 1, 8)}
               current={stopLossDelay}
-              onSelect={setStopLossDelay}
+              onSelect={(v) => {
+                const n = Number(v);
+                setStopLossDelay(n);
+                checkAdaptivePresetMatch({ ...currentAdaptive, stopLossDelay: n });
+              }}
               disabled={disabled}
               format={(v) => `${v}`}
               unit="bars"
@@ -638,7 +750,11 @@ function ConfigTab({
               label="Emergency"
               values={chipSeries(1.0, 0.25, 7, 2)}
               current={emergency}
-              onSelect={setEmergency}
+              onSelect={(v) => {
+                const n = Number(v);
+                setEmergency(n);
+                checkAdaptivePresetMatch({ ...currentAdaptive, emergency: n });
+              }}
               disabled={disabled}
               format={(v) => `${Number(v).toFixed(2)}`}
               unit="%"
@@ -650,7 +766,11 @@ function ConfigTab({
               label="Vol Lookback"
               values={chipSeries(5, 5, 8)}
               current={volatilityLookback}
-              onSelect={setVolatilityLookback}
+              onSelect={(v) => {
+                const n = Number(v);
+                setVolatilityLookback(n);
+                checkAdaptivePresetMatch({ ...currentAdaptive, volatilityLookback: n });
+              }}
               disabled={disabled}
               format={(v) => `${v}`}
               unit="bars"
@@ -662,7 +782,11 @@ function ConfigTab({
               label="Vol Multiplier"
               values={chipSeries(0.5, 0.5, 8, 1)}
               current={volatilityMultiplier}
-              onSelect={setVolatilityMultiplier}
+              onSelect={(v) => {
+                const n = Number(v);
+                setVolatilityMultiplier(n);
+                checkAdaptivePresetMatch({ ...currentAdaptive, volatilityMultiplier: n });
+              }}
               disabled={disabled}
               unit="x"
               min={0.1}
@@ -673,7 +797,11 @@ function ConfigTab({
               label="Min Stop-Loss"
               values={chipSeries(0.5, 0.5, 8, 1)}
               current={minStopLoss}
-              onSelect={setMinStopLoss}
+              onSelect={(v) => {
+                const n = Number(v);
+                setMinStopLoss(n);
+                checkAdaptivePresetMatch({ ...currentAdaptive, minStopLoss: n });
+              }}
               disabled={disabled}
               format={(v) => `${Number(v).toFixed(1)}`}
               unit="%"
@@ -685,7 +813,11 @@ function ConfigTab({
               label="Max Stop-Loss"
               values={chipSeries(1, 1, 8)}
               current={maxStopLoss}
-              onSelect={setMaxStopLoss}
+              onSelect={(v) => {
+                const n = Number(v);
+                setMaxStopLoss(n);
+                checkAdaptivePresetMatch({ ...currentAdaptive, maxStopLoss: n });
+              }}
               disabled={disabled}
               format={(v) => `${Number(v).toFixed(0)}`}
               unit="%"
@@ -759,25 +891,7 @@ function ConfigTab({
           {/* Divider */}
           <div style={{ height: '1px', background: 'var(--border)' }} />
 
-          {/* Confluence */}
-          <div>
-            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
-              Confluence
-            </div>
-            <select
-              disabled={disabled}
-              value={confluence}
-              onChange={(e) => setConfluence(e.target.value)}
-              className="w-full px-2 py-1 rounded text-[11px] focus:outline-none disabled:opacity-50"
-              style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-            >
-              <option>Boost from Strategy</option>
-              <option>Independent Score</option>
-              <option>Disabled</option>
-            </select>
-          </div>
-
-          {/* Hold Duration */}
+          {/* Hold Duration — moved above Confluence per BTCAAAAA-34256 Item B. */}
           <div>
             <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
               Hold Duration
@@ -808,6 +922,24 @@ function ConfigTab({
                 step={25}
               />
             </div>
+          </div>
+
+          {/* Confluence */}
+          <div>
+            <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
+              Confluence
+            </div>
+            <select
+              disabled={disabled}
+              value={confluence}
+              onChange={(e) => setConfluence(e.target.value)}
+              className="w-full px-2 py-1 rounded text-[11px] focus:outline-none disabled:opacity-50"
+              style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+            >
+              <option>Boost from Strategy</option>
+              <option>Independent Score</option>
+              <option>Disabled</option>
+            </select>
           </div>
         </SectionCard>
 
