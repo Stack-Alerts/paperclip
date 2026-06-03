@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, Play, Square, Pause, RotateCcw, Settings, Terminal, TrendingUp, BarChart3, Sparkles, GitCompare } from 'lucide-react';
+import { X, Play, Square, Pause, RotateCcw, Settings, Terminal, TrendingUp, BarChart3, Sparkles, GitCompare, ChevronUp, ChevronDown } from 'lucide-react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BacktestConfig, BacktestStatusMessage } from '@/lib/strategy-builder/types';
 import { InfoTooltip } from './InfoTooltip';
@@ -30,6 +30,17 @@ const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
 
 const PRESET_DAYS = [30, 90, 180, 365];
 
+// Generate a uniform-step chip series. Per-row counts hand-picked to fill the
+// chip track at the standard 1440 dialog width without overflow into the
+// spinbox cell (board pre-merge revision 4: "by the same incrementation",
+// no irregular jumps, no leftover slack).
+function chipSeries(start: number, step: number, count: number, decimals = 0): number[] {
+  return Array.from({ length: count }, (_, i) => {
+    const v = start + i * step;
+    return decimals > 0 ? Number(v.toFixed(decimals)) : v;
+  });
+}
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -41,6 +52,11 @@ function daysAgo(n: number) {
 }
 
 // ─── Chip row helper (used for parity with thickclient duration / percentage rows) ─────
+//
+// Each row pairs (a) preset chip buttons with (b) a numeric spinbox + unit suffix on the
+// right. Both controls write to the same `onSelect` setter, so typing in the spinbox or
+// using the up/down spinners updates the active chip, and clicking a chip updates the
+// spinbox value. This mirrors the thick-client which exposes both controls on every row.
 type ChipValue = string | number;
 function ChipRow({
   label,
@@ -49,6 +65,11 @@ function ChipRow({
   onSelect,
   disabled,
   format,
+  unit,
+  unitPosition = 'suffix',
+  min,
+  max,
+  step,
 }: {
   label: string;
   values: ChipValue[];
@@ -56,17 +77,67 @@ function ChipRow({
   onSelect: (v: ChipValue) => void;
   disabled: boolean;
   format?: (v: ChipValue) => string;
+  unit?: string;
+  unitPosition?: 'prefix' | 'suffix';
+  min?: number;
+  max?: number;
+  step?: number;
 }) {
   const fmt = format ?? ((v: ChipValue) => String(v));
+  // Per-row uniform chip width: pick the widest formatted label in this row and apply
+  // that width to every chip so the row reads as a clean column-aligned grid (board
+  // pre-merge revision 5: "all the buttons should be uniform in size"). Using a
+  // tabular-nums / monospace digit estimate of 6.5px per char + px-1 padding (4px each).
+  const maxLabelLen = values.reduce<number>(
+    (m, v) => Math.max(m, fmt(v).length),
+    1,
+  );
+  const chipPx = Math.ceil(maxLabelLen * 6.5) + 8;
+  const numericCurrent =
+    current === null || current === undefined
+      ? ''
+      : typeof current === 'number'
+        ? current
+        : Number(current);
+  const numericValue = typeof numericCurrent === 'number' ? numericCurrent : 0;
+  // Spinbox border + value color match the chip accent when current value is one of the presets,
+  // so a glance pairs the highlighted chip with the spinbox readout.
+  const isPresetValue =
+    current !== null &&
+    current !== undefined &&
+    values.some((v) => v === current);
+  const handleSpinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (raw === '') return;
+    const n = Number(raw);
+    if (Number.isNaN(n)) return;
+    onSelect(n);
+  };
+  const bumpBy = (delta: number) => {
+    const next = numericValue + delta;
+    const clamped =
+      typeof max === 'number' && next > max
+        ? max
+        : typeof min === 'number' && next < min
+          ? min
+          : next;
+    // Avoid floating-point noise when step is a clean decimal.
+    const stepStr = step !== undefined ? String(step) : '1';
+    const decimals = stepStr.includes('.') ? stepStr.split('.')[1].length : 0;
+    const rounded = decimals > 0 ? Number(clamped.toFixed(decimals)) : clamped;
+    onSelect(rounded);
+  };
+  const stepDelta = step ?? 1;
   return (
-    <div className="grid grid-cols-[110px_1fr_56px] items-center gap-x-3 gap-y-0">
+    <div className="grid grid-cols-[88px_minmax(0,1fr)_76px] items-center gap-x-1.5 gap-y-0">
       <span
-        className="text-[10px] font-medium uppercase tracking-wider truncate"
-        style={{ color: 'var(--text-muted)' }}
+        className="text-[11px] font-medium truncate"
+        style={{ color: 'var(--text-secondary)' }}
+        title={label}
       >
         {label}
       </span>
-      <div className="flex gap-1 flex-wrap items-center">
+      <div className="flex gap-px flex-nowrap items-center min-w-0 overflow-hidden">
         {values.map((v) => {
           const isActive = current === v;
           return (
@@ -74,13 +145,14 @@ function ChipRow({
               key={String(v)}
               disabled={disabled}
               onClick={() => onSelect(v)}
-              className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight"
+              className="py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0 text-center"
               style={{
-                background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
-                border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
+                background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
+                border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
                 color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
                 fontVariantNumeric: 'tabular-nums',
-                minWidth: 38,
+                width: chipPx,
+                minWidth: chipPx,
               }}
               onMouseEnter={(e) => {
                 if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
@@ -94,27 +166,116 @@ function ChipRow({
           );
         })}
       </div>
-      {/* Selected-value readout — mirrors thickclient row-end suffix ("90 days", "1.5x", "20 bars") */}
-      <span
-        className="text-[10px] text-right truncate"
+      {/* Spinbox: one bordered field with inline value + unit + stacked stepper buttons.
+          Border + value color pair with the chip accent when the value matches a preset. */}
+      <div
+        className="flex items-stretch rounded overflow-hidden h-[26px]"
         style={{
-          color: current !== null && current !== undefined ? 'var(--accent-blue)' : 'var(--text-faint)',
-          fontVariantNumeric: 'tabular-nums',
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: `1px solid ${isPresetValue ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
         }}
       >
-        {current !== null && current !== undefined ? fmt(current) : '—'}
-      </span>
+        {unit && unitPosition === 'prefix' && (
+          <span
+            className="flex items-center pl-1 pr-0.5 text-[11px] leading-none whitespace-nowrap"
+            style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}
+          >
+            {unit}
+          </span>
+        )}
+        <input
+          type="number"
+          value={numericCurrent}
+          onChange={handleSpinChange}
+          disabled={disabled}
+          min={min}
+          max={max}
+          step={step}
+          aria-label={`${label} value`}
+          className="flex-1 min-w-0 px-0.5 text-[11px] focus:outline-none focus:ring-0 disabled:opacity-50 disabled:cursor-not-allowed text-right bg-transparent appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+          style={{
+            color: isPresetValue ? 'var(--accent-blue)' : 'var(--text-primary)',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        />
+        {unit && unitPosition === 'suffix' && (
+          <span
+            className="flex items-center pl-0.5 pr-1 text-[10px] leading-none whitespace-nowrap"
+            style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}
+          >
+            {unit}
+          </span>
+        )}
+        {/* Stacked stepper — always visible, not hidden behind browser spin-button defaults */}
+        <div
+          className="flex flex-col shrink-0 border-l"
+          style={{ borderColor: 'var(--border)' }}
+        >
+          <button
+            type="button"
+            tabIndex={-1}
+            disabled={disabled || (typeof max === 'number' && numericValue >= max)}
+            onClick={() => bumpBy(stepDelta)}
+            aria-label={`Increment ${label}`}
+            className="flex-1 px-1 flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={(e) => {
+              if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+            }}
+          >
+            <ChevronUp size={10} />
+          </button>
+          <button
+            type="button"
+            tabIndex={-1}
+            disabled={disabled || (typeof min === 'number' && numericValue <= min)}
+            onClick={() => bumpBy(-stepDelta)}
+            aria-label={`Decrement ${label}`}
+            className="flex-1 px-1 flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed border-t"
+            style={{ color: 'var(--text-muted)', borderColor: 'var(--border)' }}
+            onMouseEnter={(e) => {
+              if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+            }}
+          >
+            <ChevronDown size={10} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 // ─── Config Tab — 3-column grid layout matching thick-client exactly ─────────────────
 //
-// Layout: [Configuration (35%)] [Adaptive SL v2.0 (35%)] [Risk/Reward (30%)]
+// Layout: three bordered section cards [Configuration | Adaptive SL v2.0 | Risk/Reward].
+// Each card holds vertically-stacked ChipRow groups that share a single locked
+// `100px label + 1fr chips + 120px spinbox` template — chips never wrap into the
+// spinbox slot, spinboxes line up section-wide.
 //
-// Each column contains vertically-stacked field groups, all using ChipRow pattern.
-// Density: Fits 1280×800 without scrolling, matching thick client.
-// All state bindings and functional inventory preserved.
+// Section card wrapper for visual separation (board polish-pass spec).
+const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <section
+    className="rounded-[4px] px-3 py-3 space-y-3"
+    style={{
+      border: '1px solid var(--border)',
+      background: 'rgba(255, 255, 255, 0.02)',
+    }}
+  >
+    <h3
+      className="text-xs font-semibold uppercase tracking-wider pb-2"
+      style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}
+    >
+      {title}
+    </h3>
+    {children}
+  </section>
+);
 //
 function ConfigTab({
   config,
@@ -155,48 +316,50 @@ function ConfigTab({
   return (
     <div className="h-full overflow-auto pb-6">
       {/* 3-Column Grid: Configuration | Adaptive SL v2.0 | Risk/Reward */}
-      <div className="grid grid-cols-[35%_35%_30%] gap-4 px-4 py-4">
+      <div className="grid grid-cols-[33fr_33fr_34fr] gap-5 px-2 py-3 items-start">
 
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 1: CONFIGURATION (35%)
             ════════════════════════════════════════════════════════════════════ */}
-        <div className="space-y-3">
-          {/* Column header */}
-          <div className="mb-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Configuration
-            </h3>
-          </div>
-
+        <SectionCard title="Configuration">
           {/* Basic Settings section */}
           <div>
             <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
               Basic Settings
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <ChipRow
                 label="Lookback"
-                values={[30, 60, 90, 120, 180, 240, 360]}
+                values={chipSeries(30, 30, 8)}
                 current={lookbackDays}
                 onSelect={(v) => applyLookbackToDates(Number(v))}
                 disabled={disabled}
-                format={(v) => `${v}d`}
+                unit="d"
+                min={1}
+                max={3650}
+                step={30}
               />
               <ChipRow
                 label="Training"
-                values={[30, 60, 90, 120, 180, 240, 360]}
+                values={chipSeries(30, 30, 8)}
                 current={trainingDays}
                 onSelect={setTrainingDays}
                 disabled={disabled}
-                format={(v) => `${v}d`}
+                unit="d"
+                min={1}
+                max={3650}
+                step={30}
               />
               <ChipRow
                 label="Testing"
-                values={[30, 60, 90, 120, 180, 240, 360]}
+                values={chipSeries(30, 30, 8)}
                 current={testingDays}
                 onSelect={setTestingDays}
                 disabled={disabled}
-                format={(v) => `${v}d`}
+                unit="d"
+                min={1}
+                max={3650}
+                step={30}
               />
             </div>
           </div>
@@ -222,7 +385,7 @@ function ConfigTab({
                     key={m}
                     disabled={disabled}
                     onClick={() => setMode(m)}
-                    className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight"
+                    className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
                     style={{
                       background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                       border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
@@ -276,7 +439,7 @@ function ConfigTab({
                     key={opt}
                     disabled={disabled}
                     onClick={() => setSlAdjustment(opt)}
-                    className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight"
+                    className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
                     style={{
                       background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                       border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
@@ -295,19 +458,12 @@ function ConfigTab({
               })}
             </div>
           </div>
-        </div>
+        </SectionCard>
 
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 2: ADAPTIVE SL v2.0 (35%)
             ════════════════════════════════════════════════════════════════════ */}
-        <div className="space-y-3">
-          {/* Column header */}
-          <div className="mb-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Adaptive SL v2.0
-            </h3>
-          </div>
-
+        <SectionCard title="Adaptive SL v2.0">
           {/* Presets section */}
           <div>
             <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
@@ -321,12 +477,12 @@ function ConfigTab({
                     key={preset}
                     disabled={disabled}
                     onClick={() => setAdaptivePreset(preset)}
-                    className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight"
+                    className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
                     style={{
                       background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                       border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
                       color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                      minWidth: 38,
+                      minWidth: 0,
                     }}
                     onMouseEnter={(e) => {
                       if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
@@ -370,106 +526,138 @@ function ConfigTab({
           <div style={{ height: '1px', background: 'var(--border)' }} />
 
           {/* Volatility/SL Controls */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <ChipRow
               label="Stop Loss Delay"
-              values={[1, 2, 3, 4, 5, 6, 7]}
+              values={chipSeries(1, 1, 11)}
               current={stopLossDelay}
               onSelect={setStopLossDelay}
               disabled={disabled}
               format={(v) => `${v}`}
+              unit="bars"
+              min={0}
+              max={50}
+              step={1}
             />
             <ChipRow
               label="Emergency"
-              values={[1.0, 1.25, 1.5, 1.75, 2.0, 2.15, 2.25]}
+              values={chipSeries(1.0, 0.25, 7, 2)}
               current={emergency}
               onSelect={setEmergency}
               disabled={disabled}
               format={(v) => `${Number(v).toFixed(2)}`}
+              unit="%"
+              min={0.1}
+              max={20}
+              step={0.25}
             />
             <ChipRow
               label="Vol Lookback"
-              values={[10, 15, 20, 25, 30, 50]}
+              values={chipSeries(5, 5, 11)}
               current={volatilityLookback}
               onSelect={setVolatilityLookback}
               disabled={disabled}
               format={(v) => `${v}`}
+              unit="bars"
+              min={5}
+              max={500}
+              step={5}
             />
             <ChipRow
               label="Vol Multiplier"
-              values={[1, 2, 3, 4, 5]}
+              values={chipSeries(0.5, 0.5, 8, 1)}
               current={volatilityMultiplier}
               onSelect={setVolatilityMultiplier}
               disabled={disabled}
-              format={(v) => `${v}x`}
+              unit="x"
+              min={0.1}
+              max={20}
+              step={0.5}
             />
             <ChipRow
               label="Min Stop-Loss"
-              values={[0.5, 1.0, 1.5, 2.0, 2.5]}
+              values={chipSeries(0.5, 0.5, 8, 1)}
               current={minStopLoss}
               onSelect={setMinStopLoss}
               disabled={disabled}
               format={(v) => `${Number(v).toFixed(1)}`}
+              unit="%"
+              min={0.1}
+              max={20}
+              step={0.5}
             />
             <ChipRow
               label="Max Stop-Loss"
-              values={[2.0, 3.0, 5.0, 7.0, 10.0]}
+              values={chipSeries(1, 1, 11)}
               current={maxStopLoss}
               onSelect={setMaxStopLoss}
               disabled={disabled}
-              format={(v) => `${Number(v).toFixed(1)}`}
+              format={(v) => `${Number(v).toFixed(0)}`}
+              unit="%"
+              min={0.5}
+              max={50}
+              step={1}
             />
           </div>
-        </div>
+        </SectionCard>
 
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 3: RISK / REWARD (30%)
             ════════════════════════════════════════════════════════════════════ */}
-        <div className="space-y-3">
-          {/* Column header */}
-          <div className="mb-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Risk / Reward
-            </h3>
-          </div>
-
+        <SectionCard title="Risk / Reward">
           {/* Capital & Exposure */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <ChipRow
               label="Starting Capital"
-              values={[500, 1000, 2000, 5000, 10000, 25000, 50000]}
+              values={chipSeries(5000, 5000, 8)}
               current={config.initialCapital ?? 10000}
               onSelect={(v) => onChange({ initialCapital: Number(v) })}
               disabled={disabled}
               format={(v) => {
                 const n = Number(v);
-                if (n >= 1000) return `$${(n / 1000).toFixed(0)}k`;
-                return `$${n}`;
+                if (n >= 1000) return `${(n / 1000).toFixed(0)}k`;
+                return `${n}`;
               }}
+              unit="$"
+              unitPosition="prefix"
+              min={100}
+              max={10_000_000}
+              step={1000}
             />
             <ChipRow
               label="Min Risk:Reward"
-              values={[12, 15, 20, 22, 25, 27, 30]}
+              values={chipSeries(1, 0.5, 8, 1)}
               current={minRiskReward}
               onSelect={setMinRiskReward}
               disabled={disabled}
-              format={(v) => `${v}x`}
+              format={(v) => `${Number(v).toFixed(1)}`}
+              unit="x"
+              min={1}
+              max={100}
+              step={0.5}
             />
             <ChipRow
               label="Risk %"
-              values={[1, 2, 5, 7, 10, 12, 15]}
+              values={chipSeries(0.5, 0.5, 8, 1)}
               current={maxRisk}
               onSelect={setMaxRisk}
               disabled={disabled}
-              format={(v) => `${v}%`}
+              format={(v) => `${Number(v).toFixed(1)}`}
+              unit="%"
+              min={0.5}
+              max={100}
+              step={0.5}
             />
             <ChipRow
               label="Leverage"
-              values={[3, 5, 10, 15, 20, 25, 30]}
+              values={chipSeries(5, 5, 11)}
               current={leverage}
               onSelect={setLeverage}
               disabled={disabled}
-              format={(v) => `${v}x`}
+              unit="x"
+              min={1}
+              max={125}
+              step={5}
             />
           </div>
 
@@ -499,26 +687,34 @@ function ConfigTab({
             <div className="text-[10px] font-medium uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
               Hold Duration
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <ChipRow
                 label="Min Bars Held"
-                values={[1, 5, 10, 20, 40]}
+                values={chipSeries(5, 5, 11)}
                 current={minBarsHeld}
                 onSelect={setMinBarsHeld}
                 disabled={disabled}
                 format={(v) => `${v}`}
+                unit="bars"
+                min={0}
+                max={1000}
+                step={5}
               />
               <ChipRow
                 label="Max Bars Held"
-                values={[15, 20, 25, 30, 40, 50, 75]}
+                values={chipSeries(25, 25, 8)}
                 current={maxBarsHeld}
                 onSelect={setMaxBarsHeld}
                 disabled={disabled}
                 format={(v) => `${v}`}
+                unit="bars"
+                min={1}
+                max={10000}
+                step={25}
               />
             </div>
           </div>
-        </div>
+        </SectionCard>
       </div>
     </div>
   );
@@ -536,7 +732,7 @@ function StatusLogPanel({
   const recent = logs.slice(-5);
   return (
     <div
-      className="rounded-md mb-4"
+      className="rounded-[4px] mb-4"
       style={{
         background: 'var(--bg-deep)',
         border: '1px solid var(--border)',
@@ -745,7 +941,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
         </div>
 
         {/* ── Tab content ── */}
-        <div className="flex-1 overflow-auto p-6" style={{ background: 'var(--bg-deep)' }}>
+        <div className="flex-1 overflow-auto px-4 py-4" style={{ background: 'var(--bg-deep)' }}>
           {activeTab === 'config' && (
             <ConfigTab config={config} onChange={patchConfig} disabled={backTestInProgress} />
           )}

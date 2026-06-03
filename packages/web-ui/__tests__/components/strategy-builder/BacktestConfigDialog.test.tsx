@@ -56,11 +56,11 @@ describe('BacktestConfigDialog', () => {
 
   it('shows chip rows for Lookback, Training, Testing with preset day buttons', () => {
     renderDialog();
-    // Lookback, Training, Testing rows each have 30d and 90d chips
-    const thirtyDButtons = screen.getAllByRole('button', { name: '30d' });
-    const ninetyDButtons = screen.getAllByRole('button', { name: '90d' });
-    expect(thirtyDButtons.length).toBeGreaterThanOrEqual(1);
-    expect(ninetyDButtons.length).toBeGreaterThanOrEqual(1);
+    // Chip text is the bare number (thick-client parity); the unit is shown on the spinbox.
+    const thirtyButtons = screen.getAllByRole('button', { name: '30' });
+    const ninetyButtons = screen.getAllByRole('button', { name: '90' });
+    expect(thirtyButtons.length).toBeGreaterThanOrEqual(1);
+    expect(ninetyButtons.length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows 3-column structure: Configuration, Adaptive SL v2.0, Risk/Reward', () => {
