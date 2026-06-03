@@ -162,12 +162,14 @@ function ChipRow({
         })}
       </div>
       {/* Spinbox: one bordered field with inline value + unit + stacked stepper buttons.
-          Border + value color pair with the chip accent when the value matches a preset. */}
+          Rest state: neutral border that matches the chip border weight — every spinbox
+          looks identical (board post-merge revision 7). Hover reveals a subtle accent
+          glow; focus-within keeps the accent for keyboard users. The value-text tint
+          when matching a chip preset is preserved as the only at-rest pairing signal. */}
       <div
-        className="flex items-stretch rounded overflow-hidden h-[26px]"
+        className="flex items-stretch rounded overflow-hidden h-[26px] border border-solid border-[var(--border)] transition-[border-color,box-shadow] hover:border-[rgba(46,140,255,0.55)] hover:shadow-[0_0_0_2px_rgba(46,140,255,0.15)] focus-within:border-[rgba(46,140,255,0.55)] focus-within:shadow-[0_0_0_2px_rgba(46,140,255,0.25)]"
         style={{
           background: 'rgba(255, 255, 255, 0.03)',
-          border: `1px solid ${isPresetValue ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
         }}
       >
         {unit && unitPosition === 'prefix' && (
