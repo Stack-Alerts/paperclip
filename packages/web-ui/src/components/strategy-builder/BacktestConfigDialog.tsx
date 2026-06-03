@@ -30,6 +30,17 @@ const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
 
 const PRESET_DAYS = [30, 90, 180, 365];
 
+// Generate a uniform-step chip series. Per-row counts hand-picked to fill the
+// chip track at the standard 1440 dialog width without overflow into the
+// spinbox cell (board pre-merge revision 4: "by the same incrementation",
+// no irregular jumps, no leftover slack).
+function chipSeries(start: number, step: number, count: number, decimals = 0): number[] {
+  return Array.from({ length: count }, (_, i) => {
+    const v = start + i * step;
+    return decimals > 0 ? Number(v.toFixed(decimals)) : v;
+  });
+}
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -117,7 +128,7 @@ function ChipRow({
       >
         {label}
       </span>
-      <div className="flex gap-0.5 flex-nowrap items-center min-w-0 overflow-hidden">
+      <div className="flex gap-px flex-nowrap items-center min-w-0 overflow-hidden">
         {values.map((v) => {
           const isActive = current === v;
           return (
@@ -309,36 +320,36 @@ function ConfigTab({
             <div className="space-y-3">
               <ChipRow
                 label="Lookback"
-                values={[30, 60, 90, 120, 180, 240, 360]}
+                values={chipSeries(30, 30, 8)}
                 current={lookbackDays}
                 onSelect={(v) => applyLookbackToDates(Number(v))}
                 disabled={disabled}
                 unit="d"
                 min={1}
                 max={3650}
-                step={10}
+                step={30}
               />
               <ChipRow
                 label="Training"
-                values={[30, 60, 90, 120, 180, 240, 360]}
+                values={chipSeries(30, 30, 8)}
                 current={trainingDays}
                 onSelect={setTrainingDays}
                 disabled={disabled}
                 unit="d"
                 min={1}
                 max={3650}
-                step={10}
+                step={30}
               />
               <ChipRow
                 label="Testing"
-                values={[30, 60, 90, 120, 180, 240, 360]}
+                values={chipSeries(30, 30, 8)}
                 current={testingDays}
                 onSelect={setTestingDays}
                 disabled={disabled}
                 unit="d"
                 min={1}
                 max={3650}
-                step={10}
+                step={30}
               />
             </div>
           </div>
@@ -508,7 +519,7 @@ function ConfigTab({
           <div className="space-y-3">
             <ChipRow
               label="Stop Loss Delay"
-              values={[1, 2, 3, 4, 5, 6, 7]}
+              values={chipSeries(1, 1, 12)}
               current={stopLossDelay}
               onSelect={setStopLossDelay}
               disabled={disabled}
@@ -520,7 +531,7 @@ function ConfigTab({
             />
             <ChipRow
               label="Emergency"
-              values={[1.0, 1.25, 1.5, 1.75, 2.0, 2.15, 2.25]}
+              values={chipSeries(1.0, 0.25, 7, 2)}
               current={emergency}
               onSelect={setEmergency}
               disabled={disabled}
@@ -528,11 +539,11 @@ function ConfigTab({
               unit="%"
               min={0.1}
               max={20}
-              step={0.05}
+              step={0.25}
             />
             <ChipRow
               label="Vol Lookback"
-              values={[10, 15, 20, 25, 30, 50]}
+              values={chipSeries(5, 5, 10)}
               current={volatilityLookback}
               onSelect={setVolatilityLookback}
               disabled={disabled}
@@ -540,22 +551,22 @@ function ConfigTab({
               unit="bars"
               min={5}
               max={500}
-              step={1}
+              step={5}
             />
             <ChipRow
               label="Vol Multiplier"
-              values={[1, 2, 3, 4, 5]}
+              values={chipSeries(0.5, 0.5, 10, 1)}
               current={volatilityMultiplier}
               onSelect={setVolatilityMultiplier}
               disabled={disabled}
               unit="x"
               min={0.1}
               max={20}
-              step={0.1}
+              step={0.5}
             />
             <ChipRow
               label="Min Stop-Loss"
-              values={[0.5, 1.0, 1.5, 2.0, 2.5]}
+              values={chipSeries(0.5, 0.5, 9, 1)}
               current={minStopLoss}
               onSelect={setMinStopLoss}
               disabled={disabled}
@@ -563,19 +574,19 @@ function ConfigTab({
               unit="%"
               min={0.1}
               max={20}
-              step={0.1}
+              step={0.5}
             />
             <ChipRow
               label="Max Stop-Loss"
-              values={[2.0, 3.0, 5.0, 7.0, 10.0]}
+              values={chipSeries(1, 1, 12)}
               current={maxStopLoss}
               onSelect={setMaxStopLoss}
               disabled={disabled}
-              format={(v) => `${Number(v).toFixed(1)}`}
+              format={(v) => `${Number(v).toFixed(0)}`}
               unit="%"
               min={0.5}
               max={50}
-              step={0.5}
+              step={1}
             />
           </div>
         </SectionCard>
@@ -588,7 +599,7 @@ function ConfigTab({
           <div className="space-y-3">
             <ChipRow
               label="Starting Capital"
-              values={[500, 1000, 2000, 5000, 10000, 25000, 50000]}
+              values={chipSeries(5000, 5000, 9)}
               current={config.initialCapital ?? 10000}
               onSelect={(v) => onChange({ initialCapital: Number(v) })}
               disabled={disabled}
@@ -601,25 +612,27 @@ function ConfigTab({
               unitPosition="prefix"
               min={100}
               max={10_000_000}
-              step={100}
+              step={1000}
             />
             <ChipRow
               label="Min Risk:Reward"
-              values={[12, 15, 20, 22, 25, 27, 30]}
+              values={chipSeries(1, 0.5, 9, 1)}
               current={minRiskReward}
               onSelect={setMinRiskReward}
               disabled={disabled}
+              format={(v) => `${Number(v).toFixed(1)}`}
               unit="x"
               min={1}
               max={100}
-              step={1}
+              step={0.5}
             />
             <ChipRow
               label="Risk %"
-              values={[1, 2, 5, 7, 10, 12, 15]}
+              values={chipSeries(0.5, 0.5, 9, 1)}
               current={maxRisk}
               onSelect={setMaxRisk}
               disabled={disabled}
+              format={(v) => `${Number(v).toFixed(1)}`}
               unit="%"
               min={0.5}
               max={100}
@@ -627,14 +640,14 @@ function ConfigTab({
             />
             <ChipRow
               label="Leverage"
-              values={[3, 5, 10, 15, 20, 25, 30]}
+              values={chipSeries(5, 5, 11)}
               current={leverage}
               onSelect={setLeverage}
               disabled={disabled}
               unit="x"
               min={1}
               max={125}
-              step={1}
+              step={5}
             />
           </div>
 
@@ -667,7 +680,7 @@ function ConfigTab({
             <div className="space-y-3">
               <ChipRow
                 label="Min Bars Held"
-                values={[1, 5, 10, 20, 40]}
+                values={chipSeries(5, 5, 11)}
                 current={minBarsHeld}
                 onSelect={setMinBarsHeld}
                 disabled={disabled}
@@ -675,11 +688,11 @@ function ConfigTab({
                 unit="bars"
                 min={0}
                 max={1000}
-                step={1}
+                step={5}
               />
               <ChipRow
                 label="Max Bars Held"
-                values={[15, 20, 25, 30, 40, 50, 75]}
+                values={chipSeries(25, 25, 9)}
                 current={maxBarsHeld}
                 onSelect={setMaxBarsHeld}
                 disabled={disabled}
@@ -687,7 +700,7 @@ function ConfigTab({
                 unit="bars"
                 min={1}
                 max={10000}
-                step={1}
+                step={25}
               />
             </div>
           </div>
