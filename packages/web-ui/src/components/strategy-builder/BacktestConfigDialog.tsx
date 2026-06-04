@@ -279,7 +279,7 @@ function ChipRow({
             <button
               disabled={disabled}
               onClick={() => onSelect(v)}
-              className="basis-0 grow shrink min-w-0 py-1 rounded-[4px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap text-center"
+              className="basis-0 grow shrink min-w-0 py-1 rounded-[4px] text-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap text-center"
               style={{
                 background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
                 border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
@@ -455,19 +455,24 @@ const STATUS_IDLE_LINES: string[] = [
 function StatusColumn({
   logs,
   isRunning,
+  headerRight,
 }: {
   logs: BacktestStatusMessage[];
   isRunning: boolean;
+  headerRight?: React.ReactNode;
 }) {
   const fontSizes = useFontSizes();
   const showIdle = logs.length === 0 && !isRunning;
   return (
     <div className="space-y-0.5">
-      <div
-        className="font-medium uppercase tracking-wider"
-        style={{ color: 'var(--text-muted)', fontSize: fontSizes.statusLabel }}
-      >
-        Status
+      <div className="flex items-center justify-between gap-2">
+        <div
+          className="font-medium uppercase tracking-wider"
+          style={{ color: 'var(--text-muted)', fontSize: fontSizes.statusLabel }}
+        >
+          Status
+        </div>
+        {headerRight}
       </div>
       <div
         className="font-mono leading-tight space-y-0 overflow-y-auto"
@@ -519,12 +524,16 @@ function ConfigTab({
   disabled,
   outputLogs,
   isRunning,
+  fontScale,
+  onFontScaleChange,
 }: {
   config: Omit<BacktestConfig, 'strategyId'>;
   onChange: (patch: Partial<Omit<BacktestConfig, 'strategyId'>>) => void;
   disabled: boolean;
   outputLogs: BacktestStatusMessage[];
   isRunning: boolean;
+  fontScale: FontScale;
+  onFontScaleChange: (next: FontScale) => void;
 }) {
   const [lookbackDays, setLookbackDays] = useState<ChipValue>(90);
   const [trainingDays, setTrainingDays] = useState<ChipValue>(60);
@@ -1093,7 +1102,13 @@ function ConfigTab({
           clarification 2026-06-03: "status is supposed to be below the
           Configuration Blocks"). Frameless monospace text block. */}
       <div className="px-2 pt-1">
-        <StatusColumn logs={outputLogs} isRunning={isRunning} />
+        <StatusColumn
+          logs={outputLogs}
+          isRunning={isRunning}
+          headerRight={
+            <FontScalePicker scale={fontScale} onChange={onFontScaleChange} />
+          }
+        />
       </div>
     </div>
   );
@@ -1323,16 +1338,9 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {/* Aa−/Aa+ font-scale control (BTCAAAAA-34264). Three discrete steps:
-                Compact / Normal / Large. Clicking Aa− steps down to the next
-                smaller size; Aa+ steps up. The active step is shown between
-                them as a muted label so the user always knows the current
-                value. Persists to localStorage under
-                `backtestConfigDialog.fontScale`. */}
-            <FontScalePicker
-              scale={fontScale}
-              onChange={updateFontScale}
-            />
+            {/* Aa−/Aa+ font-scale control lives in the Status section header
+                now (BTCAAAAA-34531 r2 board ask), so the dialog header keeps
+                only the close button. */}
             <button
               onClick={() => { if (!backTestInProgress) onClose(); }}
               className="p-1 rounded transition-opacity hover:opacity-70"
@@ -1385,6 +1393,8 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
               disabled={backTestInProgress}
               outputLogs={outputLogs}
               isRunning={backTestInProgress}
+              fontScale={fontScale}
+              onFontScaleChange={updateFontScale}
             />
           )}
           {activeTab === 'output' && (
