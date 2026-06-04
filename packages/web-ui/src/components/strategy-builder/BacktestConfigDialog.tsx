@@ -1438,7 +1438,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
               </h2>
               <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
                 {currentStrategy?.name
-                  ? `${currentStrategy.name} Strategy${isPersistedStrategy ? '' : ' — Draft (save before running backtest)'}`
+                  ? `${currentStrategy.name} Strategy${isPersistedStrategy ? '' : ' — Draft (backend block round-trip pending BTCAAAAA-34618)'}`
                   : 'No strategy loaded'}
               </p>
             </div>

@@ -634,12 +634,19 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     // The backend backtest route POST /strategies/{id}/backtest loads the
     // strategy from the strategy-builder DB by id (app.py start_backtest).
     // Local drafts use a Date.now()-based id that the backend doesn't know
-    // about, which surfaces as a confusing "API error: 404 Not Found" in the
-    // Live Output footer (BTCAAAAA-34610). Surface the real cause and stop
-    // before issuing the request.
+    // about (BTCAAAAA-34610), and the in-builder block edits aren't yet
+    // round-tripped to the DB either — PUT /strategy-builder/strategies/{id}
+    // is metadata-only and there is no block denormalizer on the backend
+    // (useStrategyStore.ts:208–214, _UpdateSBStrategyRequest at app.py:899).
+    // So today there is no web-UI path that lets a draft (or even a renamed
+    // backend strategy with locally-edited blocks) reach a runnable backend
+    // state. Refuse early with an honest message; the actual unblock is
+    // tracked under BTCAAAAA-34618 (backend block round-trip).
     if (!isBackendStrategyId(strategyId)) {
       throw new Error(
-        'Run Test requires a saved strategy. Save this draft via Strategy Browser → New, then re-open it before running a backtest.',
+        'Run Test cannot run on a draft yet — backend block persistence is missing. '
+        + 'Tracking the fix under BTCAAAAA-34618; until it ships, only strategies '
+        + 'previously created by the thick client can be backtested from the web UI.',
       );
     }
     set({ backTestInProgress: true, backTestProgress: 0, backTestResult: undefined });
