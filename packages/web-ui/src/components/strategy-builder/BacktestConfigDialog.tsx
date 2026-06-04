@@ -279,7 +279,7 @@ function ChipRow({
             <button
               disabled={disabled}
               onClick={() => onSelect(v)}
-              className="basis-0 grow shrink min-w-0 py-1 rounded-[4px] text-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap text-center"
+              className="basis-0 grow shrink min-w-0 py-1.5 rounded-[4px] text-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap text-center"
               style={{
                 background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
                 border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
@@ -312,7 +312,7 @@ function ChipRow({
           BTCAAAAA-34257: spinbox shares the row tooltip with label + chips. */}
       {wrap(
       <div
-        className="flex items-stretch rounded overflow-hidden h-[22px] border border-solid border-[var(--border)] transition-[border-color,box-shadow] hover:border-[rgba(46,140,255,0.55)] hover:shadow-[0_0_0_2px_rgba(46,140,255,0.15)] focus-within:border-[rgba(46,140,255,0.55)] focus-within:shadow-[0_0_0_2px_rgba(46,140,255,0.25)]"
+        className="flex items-stretch rounded overflow-hidden h-[26px] border border-solid border-[var(--border)] transition-[border-color,box-shadow] hover:border-[rgba(46,140,255,0.55)] hover:shadow-[0_0_0_2px_rgba(46,140,255,0.15)] focus-within:border-[rgba(46,140,255,0.55)] focus-within:shadow-[0_0_0_2px_rgba(46,140,255,0.25)]"
         style={{
           background: 'rgba(255, 255, 255, 0.03)',
         }}
@@ -617,7 +617,7 @@ function ConfigTab({
             <div className="text-[10px] font-medium uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
               Basic Settings
             </div>
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               <ChipRow
                 label="Lookback"
                 values={chipSeries(30, 30, 8)}
@@ -683,7 +683,7 @@ function ConfigTab({
                     <button
                       disabled={disabled}
                       onClick={() => setMode(m)}
-                      className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
+                      className="px-1 py-1 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
                       style={{
                         background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                         border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
@@ -742,7 +742,7 @@ function ConfigTab({
                     <button
                       disabled={disabled}
                       onClick={() => setSlAdjustment(opt)}
-                      className="px-1 py-0.5 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
+                      className="px-1 py-1 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
                       style={{
                         background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
                         border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
@@ -802,7 +802,7 @@ function ConfigTab({
                           applyAdaptivePreset(preset);
                         }
                       }}
-                      className="basis-0 grow shrink min-w-0 py-1 px-0.5 rounded-[4px] text-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-[1.1] text-center overflow-hidden"
+                      className="basis-0 grow shrink min-w-0 py-1.5 px-0.5 rounded-[4px] text-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-[1.1] text-center overflow-hidden"
                       style={{
                         background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
                         border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
@@ -864,7 +864,7 @@ function ConfigTab({
           <div style={{ height: '1px', background: 'var(--border)' }} />
 
           {/* Volatility/SL Controls */}
-          <div className="space-y-0.5">
+          <div className="space-y-1">
             <ChipRow
               label="Stop Loss Delay"
               values={chipSeries(1, 1, 8)}
@@ -974,7 +974,7 @@ function ConfigTab({
             ════════════════════════════════════════════════════════════════════ */}
         <SectionCard title="Risk / Reward">
           {/* Capital & Exposure */}
-          <div className="space-y-0.5">
+          <div className="space-y-1">
             <ChipRow
               label="Starting Capital"
               values={chipSeries(5000, 5000, 8)}
@@ -1043,7 +1043,7 @@ function ConfigTab({
                 Hold Duration
               </div>
             </RichTooltip>
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               <ChipRow
                 label="Min Bars Held"
                 values={chipSeries(5, 5, 8)}
