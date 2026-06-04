@@ -899,19 +899,21 @@ class _DuplicateRequest(BaseModel):
 class _UpdateSBStrategyRequest(BaseModel):
     """Save-strategy payload from the web-UI Strategy Builder (BTCAAAAA-30023).
 
-    Metadata-only by design. Block editing is intentionally out of scope: the
-    web-UI's Block contract ({id,type,index,data}) does not match the DB's
-    raw {name,logic,signals,exit_conditions} shape, and sending it back
-    without a denormalizer corrupted the Strategy Browser blocks column in
-    early testing. A block-edit save needs a denormalize step both sides
-    agree on; that's a separate change. The previous version's blocks/etc.
-    are re-used verbatim so version history stays append-only.
+    Metadata-only by default. The optional ``blocks`` field (BTCAAAAA-34625)
+    allows callers to supply the raw DB-shaped block list
+    ``[{name, logic, signals, exit_conditions, …}]`` and have it written onto
+    the new version row. Callers that omit ``blocks`` keep the previous
+    inheriting behaviour — the prior version's blocks are re-used verbatim so
+    version history stays append-only. The frontend denormalizer is responsible
+    for converting the UI block contract to the DB shape before calling this
+    endpoint; no normalization is performed here.
     """
     name: str
     description: Optional[str] = None
     strategyType: Optional[str] = None
     tags: Optional[list] = None
     validationHistory: Optional[list] = None
+    blocks: Optional[list] = None
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -1543,6 +1545,8 @@ async def sb_update_strategy(
                 version_data["tags"] = body.tags
             if body.validationHistory is not None:
                 version_data["validation_history"] = body.validationHistory
+            if body.blocks is not None:
+                version_data["blocks"] = body.blocks
 
             # Rename the parent strategy record so list views reflect the new
             # name even before the new version row is read back. Safe to call
