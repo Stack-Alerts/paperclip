@@ -1,0 +1,26 @@
+#!/bin/bash
+# Auto-push hook for main branch commits
+#
+# This hook automatically pushes commits to origin/main within 60s of commit time,
+# closing the race window identified in BTCAAAAA-34529. The hook only runs on the
+# main branch and warns (but does not block) if the push fails.
+
+set -e
+
+# Get the current branch
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Only auto-push on main branch
+if [ "$BRANCH" != "main" ]; then
+  exit 0
+fi
+
+# Attempt to push to origin/main
+# Use 'timeout' to avoid hanging indefinitely
+if ! timeout 30 git push origin main 2>/dev/null; then
+  # Push failed, but don't block the commit
+  echo "⚠️  Warning: Failed to auto-push main branch to origin/main (post-commit hook)" >&2
+  exit 0
+fi
+
+exit 0
