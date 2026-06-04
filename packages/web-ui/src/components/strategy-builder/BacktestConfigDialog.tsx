@@ -479,14 +479,10 @@ function StatusColumn({
   logs,
   isRunning,
   headerRight,
-  footerRight,
 }: {
   logs: BacktestStatusMessage[];
   isRunning: boolean;
   headerRight?: React.ReactNode;
-  /** Optional right-aligned content rendered below the scroll container so it
-   *  stays visible regardless of log volume (BTCAAAAA-34582). */
-  footerRight?: React.ReactNode;
 }) {
   const fontSizes = useFontSizes();
   const showIdle = logs.length === 0 && !isRunning;
@@ -541,9 +537,6 @@ function StatusColumn({
               </div>
             ))}
       </div>
-      {footerRight && (
-        <div className="flex justify-end pt-0.5">{footerRight}</div>
-      )}
     </div>
   );
 }
@@ -554,7 +547,6 @@ function ConfigTab({
   disabled,
   outputLogs,
   isRunning,
-  result,
   fontScale,
   onFontScaleChange,
 }: {
@@ -563,9 +555,6 @@ function ConfigTab({
   disabled: boolean;
   outputLogs: BacktestStatusMessage[];
   isRunning: boolean;
-  /** Latest backtest result — drives the Candles/Trades/TP-SL counter row
-   *  anchored to the bottom-right of the STATUS section (BTCAAAAA-34582). */
-  result?: BacktestResult | null;
   fontScale: FontScale;
   onFontScaleChange: (next: FontScale) => void;
 }) {
@@ -1149,9 +1138,8 @@ function ConfigTab({
       {/* Status section — full-width below the 3-column grid (cycle-13b
           clarification 2026-06-03: "status is supposed to be below the
           Configuration Blocks"). Frameless monospace text block. The
-          Candles/Trades/TP-SL counter row is anchored to the bottom-right
-          via `footerRight` so it stays visible while STATUS scrolls
-          (BTCAAAAA-34582). */}
+          Candles/Trades/TP-SL counter row was relocated to the dialog
+          footer at the very bottom of the dialog (BTCAAAAA-34589). */}
       <div className="px-2 pt-1">
         <StatusColumn
           logs={outputLogs}
@@ -1159,7 +1147,6 @@ function ConfigTab({
           headerRight={
             <FontScalePicker scale={fontScale} onChange={onFontScaleChange} />
           }
-          footerRight={<BacktestCountersRow result={result} align="end" />}
         />
       </div>
     </div>
@@ -1448,7 +1435,6 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
               disabled={backTestInProgress}
               outputLogs={outputLogs}
               isRunning={backTestInProgress}
-              result={backTestResult}
               fontScale={fontScale}
               onFontScaleChange={updateFontScale}
             />
@@ -1477,6 +1463,18 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
           className="flex-shrink-0 px-6 py-2"
           style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-panel)' }}
         >
+          {/* Candles / Trades / TP-SL counter row — sits at the very bottom
+              of the dialog, just above the slim Progress strip and the
+              Run Test / Cancel action bar (BTCAAAAA-34589 board revision
+              2026-06-04: "right at the bottom"). Scoped to the Config tab
+              so the Live Output tab header counter (cycle 11 + 26) isn't
+              duplicated. */}
+          {activeTab === 'config' && (
+            <div className="mb-1">
+              <BacktestCountersRow result={backTestResult} align="start" />
+            </div>
+          )}
+
           {/* Slim, frameless Progress bar (BTCAAAAA-34190 board revision
               2026-06-03 — replaced the framed meter + Status card so the
               Config form fits without scrolling). The Status checklist and
