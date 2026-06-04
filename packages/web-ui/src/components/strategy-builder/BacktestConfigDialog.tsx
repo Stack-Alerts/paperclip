@@ -561,7 +561,7 @@ function ConfigTab({
   const [trainingDays, setTrainingDays] = useState<ChipValue>(60);
   const [testingDays, setTestingDays] = useState<ChipValue>(30);
   const [mode, setMode] = useState<'walk-forward' | 'walk' | 'live-replay'>('walk-forward');
-  const [tpSlConfig, setTpSlConfig] = useState<string>('Default');
+  const [tpSlConfig, setTpSlConfig] = useState<'Fibonacci' | 'Hybrid' | 'Fixed'>('Fibonacci');
   const [slAdjustment, setSlAdjustment] = useState<'Adaptive v2.0' | 'Static'>('Adaptive v2.0');
   const [adaptivePreset, setAdaptivePreset] = useState<AdaptivePresetName>('Balanced');
   const [delayStopLoss, setDelayStopLoss] = useState<boolean>(ADAPTIVE_PRESETS.Balanced.delayStopLoss);
@@ -736,19 +736,33 @@ function ConfigTab({
                 TP/SL Config
               </div>
             </RichTooltip>
-            <RichTooltip content={TT_TPSL_CONFIG}>
-              <select
-                disabled={disabled}
-                value={tpSlConfig}
-                onChange={(e) => setTpSlConfig(e.target.value)}
-                className="w-full px-2 py-1 rounded text-[11px] focus:outline-none disabled:opacity-50"
-                style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-              >
-                <option>Fibonacci</option>
-                <option>Hybrid</option>
-                <option>Fixed</option>
-              </select>
-            </RichTooltip>
+            <div className="flex flex-row flex-wrap gap-1">
+              {(['Fibonacci', 'Hybrid', 'Fixed'] as const).map((opt) => {
+                const isActive = tpSlConfig === opt;
+                return (
+                  <RichTooltip key={opt} content={TT_TPSL_CONFIG}>
+                    <button
+                      disabled={disabled}
+                      onClick={() => setTpSlConfig(opt)}
+                      className="px-1 py-1 rounded-[3px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap shrink-0"
+                      style={{
+                        background: isActive ? 'rgba(46, 140, 255, 0.15)' : 'var(--bg-deep)',
+                        border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.5)' : 'var(--border)'}`,
+                        color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!disabled && !isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)';
+                      }}
+                    >
+                      {opt}
+                    </button>
+                  </RichTooltip>
+                );
+              })}
+            </div>
           </div>
 
           {/* Stop Loss Adjustment section */}
