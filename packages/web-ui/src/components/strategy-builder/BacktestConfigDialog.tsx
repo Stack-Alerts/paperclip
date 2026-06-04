@@ -1591,7 +1591,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
                   <button
                     onClick={handleStart}
                     disabled={!canRun}
-                    data-testid="backtest-run-test"
+                    data-testid="strategy-builder-run-test"
                     className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ background: '#32557c', color: 'var(--btn-primary-text, white)' }}
                     onMouseEnter={e => { if (canRun) (e.currentTarget as HTMLButtonElement).style.opacity = '0.85'; }}

@@ -789,7 +789,7 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
         <RichTooltip content={TT_SHOW_SIGNALS}>
           <button
             onClick={() => setSignalsOpen(v => !v)}
-            data-testid={`block-library-expand-${blockSlug}`}
+            data-testid={`block-library-card-${blockSlug}-expand`}
             className="w-full px-3 pt-1.5 pb-2.5 text-left text-xs flex items-center gap-1.5 hover:opacity-80 transition-opacity"
             style={{
               color: 'var(--accent-blue)',
@@ -830,7 +830,7 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
             <RichTooltip content={TT_ADD_AND}>
               <button
                 onClick={() => handleAdd('AND')}
-                data-testid={`block-library-add-${blockSlug}`}
+                data-testid={`block-library-card-${blockSlug}-add`}
                 className="flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded border font-medium transition-colors"
                 style={{ borderColor: 'var(--accent-green-mid)', background: 'var(--accent-green-dark)', color: 'var(--accent-green)' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-green-mid)'; }}
@@ -843,7 +843,7 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
             <RichTooltip content={TT_ADD_OR}>
               <button
                 onClick={() => handleAdd('OR')}
-                data-testid={`block-library-add-${blockSlug}`}
+                data-testid={`block-library-card-${blockSlug}-add-or`}
                 className="flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded border font-medium transition-colors"
                 style={{ borderColor: 'var(--accent-blue-mid)', background: 'var(--accent-blue-dark)', color: 'var(--accent-blue)' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-blue-mid)'; }}
@@ -856,7 +856,7 @@ function BlockItem({ definition, onAdd, onAddExit, advancedMode, isHighlighted, 
             <RichTooltip content={TT_ADD_EXIT}>
               <button
                 onClick={handleAddExit}
-                data-testid={`block-library-add-${blockSlug}`}
+                data-testid={`block-library-card-${blockSlug}-add-exit`}
                 className="flex-1 flex items-center justify-center gap-1 text-xs py-1.5 rounded border font-medium transition-colors"
                 style={{ borderColor: 'var(--accent-red-dark)', background: 'var(--accent-red-deeper)', color: 'var(--accent-red)' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-red-dark)'; }}

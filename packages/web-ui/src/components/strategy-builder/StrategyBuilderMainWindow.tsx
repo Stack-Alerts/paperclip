@@ -844,7 +844,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             onClick={handleSave}
             disabled={!isModified}
             pulse={isModified}
-            testId="strategy-save"
+            testId="strategy-builder-save"
           />
           <div className="w-px h-5 mx-1 flex-shrink-0" style={{ background: 'var(--border)' }} />
           <ToolbarButton
