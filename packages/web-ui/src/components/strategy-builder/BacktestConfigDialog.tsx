@@ -235,6 +235,16 @@ function ChipRow({
         ? current
         : Number(current);
   const numericValue = typeof numericCurrent === 'number' ? numericCurrent : 0;
+  // BTCAAAAA-34541: when the typed/stepped value sits outside the chip preset
+  // range (no chip matches), the spinbox carries the same "selected" glow chips
+  // use — so every row still has exactly one element flagged as the active
+  // selection. Mirrors the chip's strict-equality `isActive` check, plus a
+  // null/empty guard so a cleared input never paints as selected.
+  const spinboxIsActiveSelection =
+    current !== null &&
+    current !== undefined &&
+    current !== '' &&
+    !values.some((v) => v === current);
   const handleSpinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     if (raw === '') return;
@@ -312,9 +322,17 @@ function ChipRow({
           BTCAAAAA-34257: spinbox shares the row tooltip with label + chips. */}
       {wrap(
       <div
-        className="flex items-stretch rounded overflow-hidden h-[26px] border border-solid border-[var(--border)] transition-[border-color,box-shadow] hover:border-[rgba(46,140,255,0.55)] hover:shadow-[0_0_0_2px_rgba(46,140,255,0.15)] focus-within:border-[rgba(46,140,255,0.55)] focus-within:shadow-[0_0_0_2px_rgba(46,140,255,0.25)]"
+        className={`flex items-stretch rounded overflow-hidden h-[26px] border border-solid transition-[border-color,box-shadow] hover:border-[rgba(46,140,255,0.55)] hover:shadow-[0_0_0_2px_rgba(46,140,255,0.15)] focus-within:border-[rgba(46,140,255,0.55)] focus-within:shadow-[0_0_0_2px_rgba(46,140,255,0.25)] ${
+          spinboxIsActiveSelection
+            ? 'border-[rgba(46,140,255,0.55)]'
+            : 'border-[var(--border)]'
+        }`}
         style={{
-          background: 'rgba(255, 255, 255, 0.03)',
+          // BTCAAAAA-34541: same subtle-blue background tint chips use when
+          // selected, so an out-of-range value reads as the active selection.
+          background: spinboxIsActiveSelection
+            ? 'rgba(46, 140, 255, 0.18)'
+            : 'rgba(255, 255, 255, 0.03)',
         }}
       >
         {unit && unitPosition === 'prefix' && (
@@ -340,8 +358,12 @@ function ChipRow({
             // labels ("Lookback", "Training", "Starting Capital", "Min Risk:Reward",
             // "Risk %", "Leverage") already use, so the spinbox value sits in the same
             // visual tier as its immediately-adjacent row label and complements the
-            // theme (board post-merge revision 9).
-            color: 'var(--text-secondary)',
+            // theme (board post-merge revision 9). When the value is outside the chip
+            // preset range, it switches to the chip-selected accent so the spinbox
+            // doesn't look like a blue frame around grey text (BTCAAAAA-34541).
+            color: spinboxIsActiveSelection
+              ? 'var(--accent-blue)'
+              : 'var(--text-secondary)',
             fontVariantNumeric: 'tabular-nums',
           }}
         />
