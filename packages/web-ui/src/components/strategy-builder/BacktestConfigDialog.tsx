@@ -279,7 +279,7 @@ function ChipRow({
             <button
               disabled={disabled}
               onClick={() => onSelect(v)}
-              className="basis-0 grow shrink min-w-0 py-1 rounded-[4px] text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap text-center"
+              className="basis-0 grow shrink min-w-0 py-1 rounded-[4px] text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap text-center"
               style={{
                 background: isActive ? 'rgba(46, 140, 255, 0.18)' : 'var(--bg-deep)',
                 border: `1px solid ${isActive ? 'rgba(46, 140, 255, 0.55)' : 'var(--border)'}`,
