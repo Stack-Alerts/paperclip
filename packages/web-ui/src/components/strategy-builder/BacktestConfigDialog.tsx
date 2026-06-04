@@ -1371,7 +1371,18 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
 
   if (!open) return null;
 
-  const canRun = !!currentStrategy && !!config.startDate && !!config.endDate && !backTestInProgress;
+  // POST /strategies/{id}/backtest looks up the strategy in the strategy-builder
+  // DB by id; local drafts (Date.now-based ids) aren't persisted there and the
+  // backend returns 404 — block Run Test until the strategy is saved so users
+  // get an explicit reason rather than the cryptic API error (BTCAAAAA-34610).
+  const isPersistedStrategy =
+    typeof currentStrategy?.id === 'string' && currentStrategy.id.startsWith('strategy_');
+  const canRun =
+    !!currentStrategy &&
+    isPersistedStrategy &&
+    !!config.startDate &&
+    !!config.endDate &&
+    !backTestInProgress;
 
   return (
     <FontSizesContext.Provider value={fontSizes}>
@@ -1426,7 +1437,9 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
                 <span className="truncate">Backtest Configuration</span>
               </h2>
               <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
-                {currentStrategy?.name ? `${currentStrategy.name} Strategy` : 'No strategy loaded'}
+                {currentStrategy?.name
+                  ? `${currentStrategy.name} Strategy${isPersistedStrategy ? '' : ' — Draft (save before running backtest)'}`
+                  : 'No strategy loaded'}
               </p>
             </div>
           </div>
