@@ -85,26 +85,44 @@ fi
 
 CURRENT_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)"
 
-# Check if we're on main but ahead of origin/main (unpushed commits).
+# Check if we're on main but diverged from origin/main (unpushed/unpulled commits).
 if [[ "$CURRENT_BRANCH" == "main" ]]; then
-  COMMITS_AHEAD="$(git -C "$REPO_ROOT" rev-list --count "origin/main..HEAD" 2>/dev/null || echo unknown)"
-  if [[ "$COMMITS_AHEAD" != "unknown" ]] && [[ "$COMMITS_AHEAD" -gt 0 ]]; then
-    red    '================================================================'
-    red    '  predev branch-gate REFUSED to start `next dev`.'
-    red    ''
-    red    "  Local main is $COMMITS_AHEAD commit(s) ahead of origin/main."
-    red    "  HEAD ($HEAD_SHA) vs origin/main ($MAIN_SHA)."
-    red    ''
-    red    '  Why this matters (BTCAAAAA-31217):'
-    red    '    npm run dev compiles whatever is on disk. The dev server should'
-    red    '    run against published code on origin/main, not unpushed work.'
-    red    ''
-    red    '  How to proceed:'
-    red    '    1. git push origin main                    (recommended — sync with origin)'
-    red    '    2. ./start-dev.sh                          (supervised dev on origin/main)'
-    red    '    3. FORCE_NON_MAIN_DEV=1 npm run dev        (intentional non-main, loud banner)'
-    red    '================================================================'
-    exit 1
+  COMMIT_COUNTS="$(git -C "$REPO_ROOT" rev-list --left-right --count "origin/main...HEAD" 2>/dev/null || echo unknown)"
+  if [[ "$COMMIT_COUNTS" != "unknown" ]]; then
+    COMMITS_BEHIND="${COMMIT_COUNTS%$'\t'*}"
+    COMMITS_AHEAD="${COMMIT_COUNTS#*$'\t'}"
+
+    # Only refuse if there's actual divergence (either ahead or behind or both)
+    if [[ "$COMMITS_AHEAD" -gt 0 ]] || [[ "$COMMITS_BEHIND" -gt 0 ]]; then
+      red    '================================================================'
+      red    '  predev branch-gate REFUSED to start `next dev`.'
+      red    ''
+
+      # Report the divergence state
+      if [[ "$COMMITS_BEHIND" -gt 0 ]] && [[ "$COMMITS_AHEAD" -gt 0 ]]; then
+        red    "  Local main is $COMMITS_AHEAD commit(s) ahead of and $COMMITS_BEHIND commit(s) behind origin/main."
+        REMEDY="git pull --rebase origin main && git push origin main"
+      elif [[ "$COMMITS_AHEAD" -gt 0 ]]; then
+        red    "  Local main is $COMMITS_AHEAD commit(s) ahead of origin/main."
+        REMEDY="git push origin main"
+      else
+        red    "  Local main is $COMMITS_BEHIND commit(s) behind origin/main."
+        REMEDY="git pull --ff-only origin main"
+      fi
+
+      red    "  HEAD ($HEAD_SHA) vs origin/main ($MAIN_SHA)."
+      red    ''
+      red    '  Why this matters (BTCAAAAA-31217):'
+      red    '    npm run dev compiles whatever is on disk. The dev server should'
+      red    '    run against published code on origin/main, not unpushed work.'
+      red    ''
+      red    '  How to proceed:'
+      red    "    1. $REMEDY                    (recommended — sync with origin)"
+      red    '    2. ./start-dev.sh                          (supervised dev on origin/main)'
+      red    '    3. FORCE_NON_MAIN_DEV=1 npm run dev        (intentional non-main, loud banner)'
+      red    '================================================================'
+      exit 1
+    fi
   fi
 fi
 
