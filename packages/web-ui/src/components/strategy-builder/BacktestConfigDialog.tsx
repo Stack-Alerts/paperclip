@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useCallback, useContext, useEffect, useRef, createContext } from 'react';
-import { X, Play, Square, Pause, RotateCcw, Settings, Terminal, TrendingUp, BarChart3, Sparkles, GitCompare, ChevronUp, ChevronDown } from 'lucide-react';
+import { X, Play, Square, Pause, RotateCcw, Settings, Terminal, TrendingUp, BarChart3, BarChart2, Sparkles, GitCompare, ChevronUp, ChevronDown } from 'lucide-react';
+import { AppBrand } from '@/components/shared/AppBrand';
+import { ThemeSelector } from './ThemeSelector';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BacktestConfig, BacktestResult, BacktestStatusMessage } from '@/lib/strategy-builder/types';
 import { RichTooltip, type TooltipContent } from './RichTooltip';
@@ -29,6 +31,12 @@ import { BacktestProgressMeter } from '@/components/backtest/progress-meter';
 export interface BacktestConfigDialogProps {
   open: boolean;
   onClose: () => void;
+  // When true, the dialog is being rendered in the popped-out window route
+  // (/strategy-builder/backtest-config). The standalone surface fills the
+  // viewport, shows Pop In instead of Pop Out, and skips the backdrop +
+  // sidebar-anchored geometry the inline drawer uses (BTCAAAAA-34600 —
+  // mirrors the StrategyBrowserDialog standalone pattern).
+  standalone?: boolean;
 }
 
 type TabKey = 'config' | 'output' | 'trades' | 'metrics' | 'ai' | 'compare';
@@ -1235,7 +1243,7 @@ const FontScalePicker = ({
 };
 
 // ─── Main dialog ───────────────────────────────────────────────────────────────
-export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProps) {
+export function BacktestConfigDialog({ open, onClose, standalone = false }: BacktestConfigDialogProps) {
   const {
     currentStrategy,
     backTestInProgress,
@@ -1327,6 +1335,40 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
     if (e.key === 'Escape' && !backTestInProgress) onClose();
   }, [onClose, backTestInProgress]);
 
+  // Pop Out → standalone window route. Mirrors StrategyBrowserDialog's
+  // window.open(URL, '_blank', size) pattern verbatim (BTCAAAAA-34600 Step 2):
+  // a new browser window navigates to /strategy-builder/backtest-config which
+  // re-mounts this same component with standalone={true}. Inline dialog
+  // closes itself so only one config surface is visible at a time.
+  const handlePopOut = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams({ popout: '1' });
+    if (currentStrategy?.id) params.set('strategyId', currentStrategy.id);
+    const win = window.open(
+      `/strategy-builder/backtest-config?${params.toString()}`,
+      '_blank',
+      'width=1440,height=900,menubar=no,toolbar=no,location=no,status=no',
+    );
+    if (win && !backTestInProgress) onClose();
+  }, [onClose, backTestInProgress, currentStrategy?.id]);
+
+  // Pop In: standalone window only. Closes itself; the opener window keeps
+  // showing the strategy-builder page where the user can re-open the dialog.
+  const handlePopIn = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    window.close();
+  }, []);
+
+  // Only show Pop In when this standalone window was opened via Pop Out
+  // (i.e., has an opener). Direct URL visits get no Pop In target — matches
+  // the Strategy Browser pattern.
+  const [canPopIn, setCanPopIn] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && standalone && window.opener) {
+      setCanPopIn(true);
+    }
+  }, [standalone]);
+
   if (!open) return null;
 
   const canRun = !!currentStrategy && !!config.startDate && !!config.endDate && !backTestInProgress;
@@ -1335,22 +1377,27 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
     <FontSizesContext.Provider value={fontSizes}>
     <div
       role="dialog"
-      aria-modal="true"
+      aria-modal={!standalone}
       aria-labelledby="backtest-dialog-title"
-      className="fixed inset-y-0 right-0 z-50 flex items-stretch"
-      style={{ left: 'var(--sidebar-width, 0px)' }}
+      className={standalone ? 'flex items-stretch w-full h-full' : 'fixed inset-y-0 right-0 z-50 flex items-stretch'}
+      style={standalone ? undefined : { left: 'var(--sidebar-width, 0px)' }}
       onKeyDown={handleKeyDown}
     >
-      {/* Backdrop — drawer-pattern parity with ValidationReportWindow / StrategyBrowserDialog */}
-      <div
-        className="absolute inset-0 bg-black/70 cursor-pointer"
-        onClick={() => { if (!backTestInProgress) onClose(); }}
-      />
+      {/* Backdrop — drawer-pattern parity with ValidationReportWindow / StrategyBrowserDialog.
+          In standalone (popped-out window) mode the dialog already fills the
+          viewport, so the backdrop is omitted and the wrapper is a plain block. */}
+      {!standalone && (
+        <div
+          className="absolute inset-0 bg-black/70 cursor-pointer"
+          onClick={() => { if (!backTestInProgress) onClose(); }}
+        />
+      )}
 
-      {/* Drawer box — full-height right-anchored window */}
+      {/* Drawer box — full-height right-anchored window (inline) or
+          viewport-filling window (standalone popout). */}
       <div
         ref={dialogRef}
-        className="relative flex flex-col flex-1 shadow-2xl"
+        className={standalone ? 'relative flex flex-col flex-1' : 'relative flex flex-col flex-1 shadow-2xl'}
         style={{
           border: '1px solid var(--border)',
           background: 'var(--bg-panel)',
@@ -1359,27 +1406,64 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
         {/* ── Header ── */}
         {/* Header padding tightened `py-4` → `py-3` (board revision
             2026-06-03) to claw back vertical room for the no-scroll
-            Config target. */}
+            Config target. Chrome (AppBrand + sidebar icon + ThemeSelector +
+            Pop Out / Pop In) added per BTCAAAAA-34600 to match Strategy
+            Browser. */}
         <div
-          className="flex items-center justify-between px-6 py-3 flex-shrink-0"
+          className="flex items-center justify-between px-6 py-3 flex-shrink-0 gap-3"
           style={{ borderBottom: '1px solid var(--border)' }}
         >
-          <div>
-            <h2
-              id="backtest-dialog-title"
-              className="text-sm font-semibold uppercase tracking-wide"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Backtest Configuration
-            </h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {currentStrategy?.name ? `${currentStrategy.name} Strategy` : 'No strategy loaded'}
-            </p>
+          {/* Left cluster — AppBrand prefix + Backtesting sidebar icon + titles */}
+          <div className="flex items-center gap-3 min-w-0">
+            <AppBrand size={24} />
+            <div className="min-w-0">
+              <h2
+                id="backtest-dialog-title"
+                className="text-sm font-semibold uppercase tracking-wide flex items-center gap-2"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <BarChart2 size={16} style={{ flexShrink: 0 }} aria-hidden="true" />
+                <span className="truncate">Backtest Configuration</span>
+              </h2>
+              <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                {currentStrategy?.name ? `${currentStrategy.name} Strategy` : 'No strategy loaded'}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Aa−/Aa+ font-scale control lives in the Status section header
-                now (BTCAAAAA-34531 r2 board ask), so the dialog header keeps
-                only the close button. */}
+          {/* Right cluster — ThemeSelector + Pop Out / Pop In + close.
+              ThemeSelector mirrors the toolbar instance from
+              StrategyBuilderMainWindow so the popped-out window has the
+              same Dark/Ocean control without depending on the parent
+              toolbar. Pop Out uses the StrategyBrowserDialog pattern
+              (window.open → /strategy-builder/backtest-config). */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <ThemeSelector />
+            <div className="w-px h-4" style={{ background: 'var(--border)' }} />
+            {!standalone && (
+              <button
+                onClick={handlePopOut}
+                disabled={backTestInProgress}
+                title="Open this dialog in a separate window that can be moved to another monitor"
+                className="px-2.5 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                onMouseEnter={e => { if (!backTestInProgress) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
+              >
+                ↗ Pop Out
+              </button>
+            )}
+            {canPopIn && (
+              <button
+                onClick={handlePopIn}
+                title="Return this dialog to the main app window"
+                className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
+                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-card)'; }}
+              >
+                ↙ Pop In
+              </button>
+            )}
             <button
               onClick={() => { if (!backTestInProgress) onClose(); }}
               className="p-1 rounded transition-opacity hover:opacity-70"

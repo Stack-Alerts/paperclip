@@ -34,10 +34,11 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { collapsed, setCollapsed } = useSidebar();
 
-  // Popped-out Strategy Browser window (BTCAAAAA-29978): the standalone
-  // /strategy-browser route renders no sidebar at all so the popout reads
-  // as a focused full-screen dialog matching the board reference.
-  if (pathname === '/strategy-browser') {
+  // Popped-out Strategy Browser window (BTCAAAAA-29978) and popped-out
+  // Backtest Configuration window (BTCAAAAA-34600): the standalone routes
+  // render no sidebar at all so each popout reads as a focused full-screen
+  // dialog matching the board reference.
+  if (pathname === '/strategy-browser' || pathname === '/strategy-builder/backtest-config') {
     return null;
   }
 
