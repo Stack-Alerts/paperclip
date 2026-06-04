@@ -1354,8 +1354,11 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
         </div>
 
         {/* ── Tab navigation ── */}
+        {/* overflow-y-hidden suppresses the hairline vertical scrollbar that
+            `overflow-x-auto` was triggering on the tab strip (BTCAAAAA-34540).
+            Horizontal auto-scroll is preserved for narrow viewports. */}
         <div
-          className="flex flex-shrink-0 overflow-x-auto"
+          className="flex flex-shrink-0 overflow-x-auto overflow-y-hidden"
           style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-deep)' }}
         >
           {TABS.map(({ key, label, icon }) => {
