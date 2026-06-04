@@ -689,6 +689,12 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
 
     // If this is a draft, auto-persist it first
     if (!isBackendStrategyId(strategyId)) {
+      // Guard: empty/whitespace names prevent backend strategy creation
+      const { currentStrategy } = get();
+      if (!currentStrategy || !currentStrategy.name || currentStrategy.name.trim() === '') {
+        throw new Error('Name your strategy before running a backtest');
+      }
+
       try {
         const saved = await (get().saveStrategy as () => Promise<Strategy>)();
         strategyId = saved.id;
