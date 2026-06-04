@@ -631,6 +631,17 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   runBacktest: async (config: BacktestConfig | BacktestConfigFull) => {
     const strategyId = (config as { strategyId?: string }).strategyId;
     if (!strategyId) throw new Error('Backtest: missing strategyId in config');
+    // The backend backtest route POST /strategies/{id}/backtest loads the
+    // strategy from the strategy-builder DB by id (app.py start_backtest).
+    // Local drafts use a Date.now()-based id that the backend doesn't know
+    // about, which surfaces as a confusing "API error: 404 Not Found" in the
+    // Live Output footer (BTCAAAAA-34610). Surface the real cause and stop
+    // before issuing the request.
+    if (!isBackendStrategyId(strategyId)) {
+      throw new Error(
+        'Run Test requires a saved strategy. Save this draft via Strategy Browser → New, then re-open it before running a backtest.',
+      );
+    }
     set({ backTestInProgress: true, backTestProgress: 0, backTestResult: undefined });
     try {
       const startResp = (await apiRunBacktest(strategyId, config)) as { runId: string; status: string };
