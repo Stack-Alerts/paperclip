@@ -3,7 +3,7 @@
 import { useState, useCallback, useContext, useEffect, useRef, createContext } from 'react';
 import { X, Play, Square, Pause, RotateCcw, Settings, Terminal, TrendingUp, BarChart3, Sparkles, GitCompare, ChevronUp, ChevronDown } from 'lucide-react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
-import { BacktestConfig, BacktestStatusMessage } from '@/lib/strategy-builder/types';
+import { BacktestConfig, BacktestResult, BacktestStatusMessage } from '@/lib/strategy-builder/types';
 import { RichTooltip, type TooltipContent } from './RichTooltip';
 import {
   TT_LOOKBACK, TT_TRAINING, TT_TESTING,
@@ -19,6 +19,7 @@ import {
   TT_RUN_TEST, TT_PAUSE, TT_STOP, TT_CONFIG_DISCOVERY, TT_VIEW_LIVE_RESULTS, TT_CANCEL,
 } from './BacktestConfigTooltips';
 import { LiveOutputPanel } from '@/components/backtest/live-output/LiveOutputPanel';
+import { BacktestCountersRow } from '@/components/backtest/live-output/BacktestCountersRow';
 import { TradesPanel } from '@/components/backtest/trades/TradesPanel';
 import { MetricsPanel } from '@/components/backtest/metrics/MetricsPanel';
 import { AiRecommendationsPanel } from '@/components/backtest/ai-recommendations/AiRecommendationsPanel';
@@ -478,10 +479,14 @@ function StatusColumn({
   logs,
   isRunning,
   headerRight,
+  footerRight,
 }: {
   logs: BacktestStatusMessage[];
   isRunning: boolean;
   headerRight?: React.ReactNode;
+  /** Optional right-aligned content rendered below the scroll container so it
+   *  stays visible regardless of log volume (BTCAAAAA-34582). */
+  footerRight?: React.ReactNode;
 }) {
   const fontSizes = useFontSizes();
   const showIdle = logs.length === 0 && !isRunning;
@@ -536,6 +541,9 @@ function StatusColumn({
               </div>
             ))}
       </div>
+      {footerRight && (
+        <div className="flex justify-end pt-0.5">{footerRight}</div>
+      )}
     </div>
   );
 }
@@ -546,6 +554,7 @@ function ConfigTab({
   disabled,
   outputLogs,
   isRunning,
+  result,
   fontScale,
   onFontScaleChange,
 }: {
@@ -554,6 +563,9 @@ function ConfigTab({
   disabled: boolean;
   outputLogs: BacktestStatusMessage[];
   isRunning: boolean;
+  /** Latest backtest result — drives the Candles/Trades/TP-SL counter row
+   *  anchored to the bottom-right of the STATUS section (BTCAAAAA-34582). */
+  result?: BacktestResult | null;
   fontScale: FontScale;
   onFontScaleChange: (next: FontScale) => void;
 }) {
@@ -1122,7 +1134,10 @@ function ConfigTab({
 
       {/* Status section — full-width below the 3-column grid (cycle-13b
           clarification 2026-06-03: "status is supposed to be below the
-          Configuration Blocks"). Frameless monospace text block. */}
+          Configuration Blocks"). Frameless monospace text block. The
+          Candles/Trades/TP-SL counter row is anchored to the bottom-right
+          via `footerRight` so it stays visible while STATUS scrolls
+          (BTCAAAAA-34582). */}
       <div className="px-2 pt-1">
         <StatusColumn
           logs={outputLogs}
@@ -1130,6 +1145,7 @@ function ConfigTab({
           headerRight={
             <FontScalePicker scale={fontScale} onChange={onFontScaleChange} />
           }
+          footerRight={<BacktestCountersRow result={result} align="end" />}
         />
       </div>
     </div>
@@ -1418,6 +1434,7 @@ export function BacktestConfigDialog({ open, onClose }: BacktestConfigDialogProp
               disabled={backTestInProgress}
               outputLogs={outputLogs}
               isRunning={backTestInProgress}
+              result={backTestResult}
               fontScale={fontScale}
               onFontScaleChange={updateFontScale}
             />

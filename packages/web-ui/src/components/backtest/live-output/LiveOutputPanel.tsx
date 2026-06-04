@@ -1,36 +1,21 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { BacktestStatusMessage, BacktestResult, Trade } from '@/lib/strategy-builder/types';
+import { BacktestStatusMessage, BacktestResult } from '@/lib/strategy-builder/types';
+import { BacktestCountersRow } from './BacktestCountersRow';
 
 export interface LiveOutputPanelProps {
   logs?: BacktestStatusMessage[];
   isRunning?: boolean;
-  /** Latest run result — drives the TP/SL breakdown counters at the top
-   *  of the panel. The idle Status checklist lives on the Config tab,
-   *  not here (cycle-13 board revision 2026-06-03: "Live Output has
-   *  separate functionality"). */
+  /** Latest run result — drives the Candles/Trades/TP-SL breakdown counters
+   *  at the top of the panel. The same counter row is also rendered at the
+   *  bottom-right of the Config tab STATUS section (BTCAAAAA-34582). */
   result?: BacktestResult | null;
-}
-
-function tallyAdjustments(trades: Trade[] | undefined) {
-  const tally = { TP1: 0, TP2: 0, TP3: 0, SL: 0 };
-  if (trades) {
-    for (const t of trades) {
-      const key = (t.exitType ?? '').toUpperCase();
-      if (key === 'TP1' || key === 'TP2' || key === 'TP3' || key === 'SL') {
-        tally[key] += 1;
-      }
-    }
-  }
-  return { ...tally, total: tally.TP1 + tally.TP2 + tally.TP3 + tally.SL };
 }
 
 export function LiveOutputPanel({ logs = [], isRunning = false, result = null }: LiveOutputPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
-  const tradeCount = result?.totalTrades ?? result?.trades?.length ?? 0;
-  const adj = tallyAdjustments(result?.trades);
 
   useEffect(() => {
     if (!isPaused && scrollRef.current) {
@@ -74,25 +59,11 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
         </div>
       </div>
 
-      {/* Run counters row — moved from the Config tab's progress widget
-          (BTCAAAAA-34190 board revision 2026-06-03). Trades + TP/SL
-          breakdown appear here so the Config tab can stay scroll-free. */}
-      <div
-        className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2 text-[11px]"
-        style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}
-      >
-        <span>
-          Trades:{' '}
-          <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{tradeCount.toLocaleString()}</span>
-        </span>
-        <span>
-          TP/SL Adjustments:{' '}
-          <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{adj.total.toLocaleString()}</span>{' '}
-          <span style={{ color: 'var(--text-faint)' }}>
-            (TP1: {adj.TP1}, TP2: {adj.TP2}, TP3: {adj.TP3}, SL: {adj.SL})
-          </span>
-        </span>
-      </div>
+      {/* Run counters row — shared with the Config tab STATUS section
+          (BTCAAAAA-34582). Both surfaces read from the same `result` so the
+          values always agree. */}
+      <BacktestCountersRow result={result} className="mb-2" />
+
 
       <div
         ref={scrollRef}
