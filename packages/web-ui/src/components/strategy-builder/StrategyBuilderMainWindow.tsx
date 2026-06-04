@@ -844,6 +844,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             onClick={handleSave}
             disabled={!isModified}
             pulse={isModified}
+            testId="strategy-save"
           />
           <div className="w-px h-5 mx-1 flex-shrink-0" style={{ background: 'var(--border)' }} />
           <ToolbarButton
@@ -1096,13 +1097,15 @@ interface ToolbarButtonProps {
   pulse?: boolean;
   icon?: React.ReactNode;
   trailing?: React.ReactNode;
+  testId?: string;
 }
 
-const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, tooltip, onClick, disabled, active, accent, pulse, icon, trailing }) => (
+const ToolbarButton: React.FC<ToolbarButtonProps> = ({ label, tooltip, onClick, disabled, active, accent, pulse, icon, trailing, testId }) => (
   <RichTooltip content={tooltip}>
     <button
       onClick={onClick}
       disabled={disabled}
+      data-testid={testId}
       className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors border ${
         disabled
           ? 'text-[var(--text-muted)] bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.05)] cursor-not-allowed'
