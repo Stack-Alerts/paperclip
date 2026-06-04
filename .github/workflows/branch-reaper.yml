@@ -1,0 +1,82 @@
+name: Branch Reaper
+
+on:
+  schedule:
+    # Run daily at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  cleanup-stale-branches:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Clean up stale branches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+
+          STALE_DAYS=30
+          CUTOFF_DATE=$(date -d "$STALE_DAYS days ago" +%s)
+          PROTECTED_BRANCHES=("main" "master" "develop" "dev")
+
+          echo "🧹 Branch Reaper: Cleaning branches not updated in $STALE_DAYS days"
+          echo "Cutoff date: $(date -d @$CUTOFF_DATE)"
+          echo ""
+
+          DELETED_COUNT=0
+          PROTECTED_COUNT=0
+          SKIPPED_COUNT=0
+
+          # Get list of all remote branches except protected ones
+          for branch in $(git branch -r | sed 's/origin\///g' | grep -v HEAD | sort); do
+            # Skip protected branches
+            if [[ " ${PROTECTED_BRANCHES[@]} " =~ " ${branch} " ]]; then
+              PROTECTED_COUNT=$((PROTECTED_COUNT + 1))
+              continue
+            fi
+
+            # Get the last commit timestamp for this branch
+            LAST_COMMIT_DATE=$(git log -1 --format=%ci "origin/$branch" 2>/dev/null | cut -d' ' -f1)
+
+            if [ -z "$LAST_COMMIT_DATE" ]; then
+              echo "⚠️  Skipping $branch (unable to get commit date)"
+              SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+              continue
+            fi
+
+            LAST_COMMIT_TIMESTAMP=$(date -d "$LAST_COMMIT_DATE" +%s)
+
+            # Check if branch is older than the cutoff
+            if [ "$LAST_COMMIT_TIMESTAMP" -lt "$CUTOFF_DATE" ]; then
+              # Check if branch is already merged to main
+              if git merge-base --is-ancestor "origin/$branch" "origin/main" 2>/dev/null; then
+                echo "🗑️  Deleting $branch (last updated: $LAST_COMMIT_DATE)"
+                git push origin --delete "$branch" 2>/dev/null || echo "⚠️  Failed to delete $branch"
+                DELETED_COUNT=$((DELETED_COUNT + 1))
+              else
+                echo "⏸️  Keeping $branch (not merged to main, last updated: $LAST_COMMIT_DATE)"
+                SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+              fi
+            fi
+          done
+
+          echo ""
+          echo "📊 Summary:"
+          echo "  Deleted: $DELETED_COUNT branches"
+          echo "  Protected: $PROTECTED_COUNT branches"
+          echo "  Skipped: $SKIPPED_COUNT branches"
+
+      - name: Report results
+        if: always()
+        run: |
+          echo "✅ Branch cleanup completed"
