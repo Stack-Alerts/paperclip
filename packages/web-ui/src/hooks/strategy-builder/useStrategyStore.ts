@@ -21,6 +21,7 @@ import {
 } from '@/lib/strategy-builder/types';
 import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults, validateStrategy as validateStrategyAPI, autoFixStrategy as autoFixStrategyAPI, revertStrategy as revertStrategyAPI } from '@/lib/strategy-builder/api';
 import { validateStrategyLocal, enrichReportWithNarrative } from '@/lib/strategy-builder/validation';
+import { denormalizeBlocks } from '@/lib/strategy-builder/blocks';
 
 // Strategies loaded from the strategy-builder API have IDs of the form
 // "strategy_<hex>" (see StrategyDatabaseManager.create_strategy); locally
@@ -201,17 +202,16 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     });
   },
 
-  // Save current strategy. For DB-backed strategies (loaded from the
-  // Strategy Browser) this PUTs to /strategy-builder/strategies/{id} so the
-  // rename + metadata edits round-trip to the backend; local drafts only hit
-  // localStorage (BTCAAAAA-30023).
+  // Save current strategy. For draft IDs (local-only, Date.now-based), promotes
+  // to a backend strategy via POST (create) then PUT (with denormalized blocks).
+  // For DB-backed strategies, PUTs metadata + blocks so renames and edits persist.
+  // Returns the saved strategy (with new ID if it was a draft).
   //
-  // Scope is intentionally metadata-only (name, description, strategyType,
-  // tags). The block list uses the frontend Block contract
-  // ({id,type,index,data,...synthetic exit blocks}) which does not match the
-  // API's raw {name,logic,signals,exit_conditions} shape — sending blocks
-  // back without a denormalizer corrupts the Strategy Browser list view.
-  // Block-edit persistence is a follow-up once a denormalize step is in.
+  // Draft promotion flow (BTCAAAAA-34626):
+  // 1. POST /strategy-builder/strategies { name, description } → { id: strategy_… }
+  // 2. PUT /strategy-builder/strategies/{newId} { metadata, blocks: denormalizeBlocks(...) }
+  // 3. Update currentStrategy.id to the new backend ID
+  // 4. Mirror the new ID into localStorage so next reload picks it up
   saveStrategy: async () => {
     const { currentStrategy } = get();
     if (!currentStrategy) throw new Error('No strategy to save');
@@ -221,31 +221,84 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
       updatedAt: new Date().toISOString(),
     };
 
-    if (isBackendStrategyId(updated.id)) {
-      const saved = await apiPut<Strategy>(
-        `/strategy-builder/strategies/${updated.id}`,
-        {
-          name: updated.name,
-          description: updated.description ?? '',
-          strategyType: (updated as { strategyType?: string }).strategyType,
-          tags: updated.tags,
-          validationHistory: updated.validationHistory,
-        },
-      );
-      // Keep the locally-normalized blocks so the in-flight builder view
-      // doesn't re-shape mid-session; merge server-authoritative metadata
-      // (updated name/description/timestamp/version) over the local copy.
-      updated = {
-        ...updated,
-        name: saved.name ?? updated.name,
-        description: saved.description ?? updated.description,
-        updatedAt: saved.updatedAt ?? updated.updatedAt,
-        versionNumber: (saved as { versionNumber?: number }).versionNumber
-          ?? (updated as { versionNumber?: number }).versionNumber,
-        versionId: (saved as { versionId?: string }).versionId
-          ?? (updated as { versionId?: string }).versionId,
-        validationHistory: saved.validationHistory ?? updated.validationHistory,
-      };
+    if (!isBackendStrategyId(updated.id)) {
+      // Draft → promote to backend strategy with block persistence
+      try {
+        const createResp = await apiPost<Strategy>(
+          '/strategy-builder/strategies',
+          {
+            name: updated.name,
+            description: updated.description ?? '',
+          },
+        );
+
+        const newId = createResp.id;
+        if (!newId) throw new Error('saveStrategy: backend did not return a new strategy ID');
+
+        // Now PUT with blocks denormalized to raw DB shape
+        const rawBlocks = denormalizeBlocks(updated.blocks);
+        const saved = await apiPut<Strategy>(
+          `/strategy-builder/strategies/${newId}`,
+          {
+            name: updated.name,
+            description: updated.description ?? '',
+            strategyType: (updated as { strategyType?: string }).strategyType,
+            tags: updated.tags,
+            validationHistory: updated.validationHistory,
+            blocks: rawBlocks,
+          },
+        );
+
+        // Merge server response (name/description/version) with the promoted strategy
+        updated = {
+          ...updated,
+          id: newId,
+          name: saved.name ?? updated.name,
+          description: saved.description ?? updated.description,
+          updatedAt: saved.updatedAt ?? updated.updatedAt,
+          versionNumber: (saved as { versionNumber?: number }).versionNumber
+            ?? (updated as { versionNumber?: number }).versionNumber,
+          versionId: (saved as { versionId?: string }).versionId
+            ?? (updated as { versionId?: string }).versionId,
+          validationHistory: saved.validationHistory ?? updated.validationHistory,
+        };
+      } catch (error) {
+        throw new Error(
+          `Failed to save draft strategy: ${error instanceof Error ? error.message : 'unknown error'}`
+        );
+      }
+    } else {
+      // Backend strategy → PUT with metadata + blocks
+      try {
+        const rawBlocks = denormalizeBlocks(updated.blocks);
+        const saved = await apiPut<Strategy>(
+          `/strategy-builder/strategies/${updated.id}`,
+          {
+            name: updated.name,
+            description: updated.description ?? '',
+            strategyType: (updated as { strategyType?: string }).strategyType,
+            tags: updated.tags,
+            validationHistory: updated.validationHistory,
+            blocks: rawBlocks,
+          },
+        );
+
+        updated = {
+          ...updated,
+          name: saved.name ?? updated.name,
+          description: saved.description ?? updated.description,
+          updatedAt: saved.updatedAt ?? updated.updatedAt,
+          versionNumber: (saved as { versionNumber?: number }).versionNumber
+            ?? (updated as { versionNumber?: number }).versionNumber,
+          versionId: (saved as { versionId?: string }).versionId
+            ?? (updated as { versionId?: string }).versionId,
+          validationHistory: saved.validationHistory ?? updated.validationHistory,
+        };
+      } catch (error) {
+        throw new Error(
+          `Failed to save strategy: ${error instanceof Error ? error.message : 'unknown error'}`
+        );
+      }
     }
 
     const strategies = loadFromStorage();
@@ -626,29 +679,28 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   },
 
   // Run backtest via backend API (BTCAAAAA-31183 / parent BTCAAAAA-31180):
-  //   POST /strategies/{id}/backtest -> { runId }
-  //   poll GET /strategies/{id}/backtest/{runId} until status in ('done','error')
+  // For drafts, auto-persists to backend before running (BTCAAAAA-34626):
+  //   1. saveStrategy() → promotes draft to backend with denormalized blocks
+  //   2. POST /strategies/{id}/backtest -> { runId }
+  //   3. Poll GET /strategies/{id}/backtest/{runId} until status in ('done','error')
   runBacktest: async (config: BacktestConfig | BacktestConfigFull) => {
-    const strategyId = (config as { strategyId?: string }).strategyId;
+    let strategyId = (config as { strategyId?: string }).strategyId;
     if (!strategyId) throw new Error('Backtest: missing strategyId in config');
-    // The backend backtest route POST /strategies/{id}/backtest loads the
-    // strategy from the strategy-builder DB by id (app.py start_backtest).
-    // Local drafts use a Date.now()-based id that the backend doesn't know
-    // about (BTCAAAAA-34610), and the in-builder block edits aren't yet
-    // round-tripped to the DB either — PUT /strategy-builder/strategies/{id}
-    // is metadata-only and there is no block denormalizer on the backend
-    // (useStrategyStore.ts:208–214, _UpdateSBStrategyRequest at app.py:899).
-    // So today there is no web-UI path that lets a draft (or even a renamed
-    // backend strategy with locally-edited blocks) reach a runnable backend
-    // state. Refuse early with an honest message; the actual unblock is
-    // tracked under BTCAAAAA-34618 (backend block round-trip).
+
+    // If this is a draft, auto-persist it first
     if (!isBackendStrategyId(strategyId)) {
-      throw new Error(
-        'Run Test cannot run on a draft yet — backend block persistence is missing. '
-        + 'Tracking the fix under BTCAAAAA-34618; until it ships, only strategies '
-        + 'previously created by the thick client can be backtested from the web UI.',
-      );
+      try {
+        const saved = await (get().saveStrategy as () => Promise<Strategy>)();
+        strategyId = saved.id;
+        // Update the config to use the new promoted ID
+        (config as { strategyId?: string }).strategyId = strategyId;
+      } catch (error) {
+        throw new Error(
+          `Failed to auto-save draft before backtest: ${error instanceof Error ? error.message : 'unknown error'}`
+        );
+      }
     }
+
     set({ backTestInProgress: true, backTestProgress: 0, backTestResult: undefined });
     try {
       const startResp = (await apiRunBacktest(strategyId, config)) as { runId: string; status: string };
@@ -657,7 +709,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
 
       // Poll loop: 1s cadence, 30 min ceiling.
       const deadline = Date.now() + 30 * 60_000;
-       
+
       while (true) {
         if (Date.now() > deadline) throw new Error('Backtest timed out after 30 minutes');
         await new Promise((r) => setTimeout(r, 1000));
