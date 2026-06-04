@@ -2,39 +2,55 @@
 
 ## Setup
 
+### Initial Repository Configuration
+
+After cloning this repository, configure git hooks:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This is a one-time setup that enables the post-commit auto-push hook for the `main` branch.
+
 ### Git Hooks
 
 This repository uses git hooks to enforce consistency and automate common tasks.
 
 #### Auto-Push Hook (post-commit)
 
-When you commit to the `main` branch, a post-commit hook automatically pushes your commit to `origin/main` within 60 seconds. This prevents race conditions where local commits diverge from the remote.
+When you commit to the `main` branch, a post-commit hook automatically pushes your commit to `origin/main` within 60 seconds. This prevents race conditions where local commits diverge from the remote (see BTCAAAAA-29995 for context).
 
 **What it does:**
 - Runs automatically after every commit
 - Only activates on the `main` branch
-- Pushes to `origin/main` asynchronously
+- Pushes to `origin/main` with a 30-second timeout
 - Warns (but does not block) if push fails
 - Silently succeeds on non-main branches
 
 **How it works:**
-The hook is located at `.githooks/post-commit` and is registered via:
+The hook is located at `.githooks/post-commit` and is enabled by the git config above.
+
+**Verification:**
+To verify the hook is working correctly:
 ```bash
-git config core.hooksPath .githooks
+git commit --allow-empty -m "test: verify hook"
+sleep 2
+git fetch
+git log origin/main..HEAD  # Should be empty if push succeeded
 ```
 
-This configuration is set automatically when you clone the repository.
+The commit should be pushed to origin/main within 3-5 seconds.
 
 **Troubleshooting:**
 If the hook doesn't run:
-1. Verify the configuration: `git config core.hooksPath`
-2. Verify the hook is executable: `ls -l .githooks/post-commit`
+1. Verify the configuration: `git config core.hooksPath` (should output `.githooks`)
+2. Verify the hook is executable: `ls -l .githooks/post-commit` (should show `x` permissions)
 3. Check git's debug output: `GIT_TRACE=1 git commit --allow-empty -m "test"`
 
 If pushes are failing:
 - Check your network connection and SSH key setup
 - Verify you have push permissions to `origin/main`
-- The warning message will appear in your commit output
+- The warning message will appear in your commit output when the hook runs
 
 ## Branch Strategy
 

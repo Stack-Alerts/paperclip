@@ -6,6 +6,16 @@
 
 ## Quick Start
 
+### Repository Setup
+
+After cloning, configure git hooks:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This enables the post-commit auto-push hook for the `main` branch (prevents commit-without-push races).
+
 ### Environment Setup
 
 ```bash
