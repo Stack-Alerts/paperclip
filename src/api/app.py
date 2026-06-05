@@ -1849,6 +1849,7 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
 
         trades = list(result.get("trades", []))
         errors = list(result.get("errors", []))
+        messages = list(result.get("messages", []))
         # Normalize trade fields the WebUI Trades tab expects so the front-end
         # doesn't have to bridge two shapes.
         normalized_trades = []
@@ -1891,6 +1892,17 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
             error="; ".join(errors) if errors else None,
             completedAt=datetime.now(timezone.utc).isoformat(),
         )
+
+        # Append per-bar decision messages from the engine to the live output
+        for msg in messages:
+            msg_text = msg.get("text", "")
+            msg_level = msg.get("level", "INFO")
+            # Normalize level to match BacktestStatusMessage enum (INFO | SYSTEM | ERROR)
+            # Engine uses 'DECISION' for per-bar decisions, map to 'INFO'
+            if msg_level == "DECISION" or msg_level not in ("INFO", "SYSTEM", "ERROR"):
+                msg_level = "INFO"
+            _append_backtest_log(run_id, msg_text, level=msg_level)
+
         _append_backtest_log(
             run_id,
             f"Backtest completed: {len(trades)} trades, win rate {win_rate:.1%}, total return {total_return:.2f}%",
