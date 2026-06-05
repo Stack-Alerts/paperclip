@@ -1440,7 +1440,57 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
         max_leverage: Number(leverage),
         confluence_threshold: confluence,
       };
-      await runBacktest(fullConfig);
+
+      // Start the backtest and get runId
+      const startResp = await runBacktest(fullConfig) as { runId: string };
+      const runId = startResp?.runId;
+      if (!runId) throw new Error('No runId returned from backtest start');
+
+      // Poll for results and logs until backtest is done
+      let attempts = 0;
+      const maxAttempts = 600; // 10 min at 1s intervals
+      const pollInterval = 1000;
+      let seenLogIds = new Set<string>();
+
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        attempts++;
+
+        try {
+          const result = await fetch(`/api/strategies/${currentStrategy.id}/backtest/${runId}`, {
+            headers: {
+              'Authorization': `Bearer ${typeof window !== 'undefined' && (window as any).localStorage?.getItem('auth_token') || ''}`,
+            },
+          }).then(r => r.json()) as {
+            status: string;
+            logs?: Array<{ message: string; level: string; timestamp: string }>;
+          };
+
+          if (result?.logs) {
+            result.logs.forEach((log, idx) => {
+              const logId = `${runId}-${idx}`;
+              if (!seenLogIds.has(logId)) {
+                seenLogIds.add(logId);
+                setOutputLogs(prev => [
+                  ...prev,
+                  {
+                    message: log.message,
+                    level: log.level as any,
+                    timestamp: log.timestamp,
+                  },
+                ]);
+              }
+            });
+          }
+
+          if (result?.status === 'done' || result?.status === 'error') {
+            break;
+          }
+        } catch (pollErr) {
+          console.warn('Poll error:', pollErr);
+        }
+      }
+
       setOutputLogs(prev => [
         ...prev,
         { message: 'Backtest completed.', level: 'SYSTEM', timestamp: new Date().toISOString() },
