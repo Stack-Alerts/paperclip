@@ -1852,22 +1852,25 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
         # Normalize trade fields the WebUI Trades tab expects so the front-end
         # doesn't have to bridge two shapes.
         normalized_trades = []
-        for t in trades:
+        for idx, t in enumerate(trades):
             normalized_trades.append({
-                "entryTimestamp": t.get("entry_time") or t.get("entryTimestamp"),
-                "exitTimestamp": t.get("exit_time") or t.get("exitTimestamp"),
+                "id": str(idx),
+                "entryTime": str(t["entry_timestamp"]) if t.get("entry_timestamp") else None,
+                "exitTime": str(t["exit_timestamp"]) if t.get("exit_timestamp") else None,
                 "side": t.get("side") or t.get("direction"),
-                "entryPrice": t.get("entry_price") or t.get("entryPrice"),
-                "exitPrice": t.get("exit_price") or t.get("exitPrice"),
-                "pnl": t.get("pnl"),
-                "pnlPercent": t.get("pnl_percent") or t.get("pnlPercent"),
-                "exitReason": t.get("exit_reason") or t.get("exitReason"),
-                "barsHeld": t.get("bars_held") or t.get("barsHeld"),
+                "entryPrice": float(t.get("entry_price") or t.get("entryPrice") or 0),
+                "exitPrice": float(t.get("exit_price") or t.get("exitPrice") or 0),
+                "quantity": float(t.get("quantity") or t.get("size") or 0),
+                "pnl": float(t.get("pnl") or 0),
+                "pnlPercentage": float(t.get("pnl_pct") or t.get("pnl_percent") or t.get("pnlPercentage") or 0),
+                "bars": int(t.get("bars_held") or t.get("barsHeld") or t.get("bars") or 0),
+                "exitType": t.get("exit_reason") or t.get("exitReason") or t.get("exitType"),
+                "status": "closed",
             })
 
         wins = [t for t in trades if (t.get("pnl") or 0) > 0]
         win_rate = (len(wins) / len(trades)) if trades else 0.0
-        total_return = sum(float(t.get("pnl_percent") or t.get("pnlPercent") or 0.0) for t in trades)
+        total_return = sum(float(t.get("pnl_pct") or t.get("pnl_percent") or 0.0) for t in trades)
 
         metrics = {
             "totalTrades": len(trades),
