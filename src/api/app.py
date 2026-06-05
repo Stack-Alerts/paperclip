@@ -1903,6 +1903,29 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
                 msg_level = "INFO"
             _append_backtest_log(run_id, msg_text, level=msg_level)
 
+        # Fallback: synthesize trade decision trace from trade data when engine
+        # messages are unavailable (multiprocessing pickling drops ChunkResult.messages).
+        if not messages and trades:
+            for idx, t in enumerate(trades, start=1):
+                entry_price = t.get("entry_price") or t.get("entryPrice") or 0
+                exit_price = t.get("exit_price") or t.get("exitPrice") or 0
+                side = t.get("side") or t.get("direction") or "LONG"
+                pnl = float(t.get("pnl") or 0)
+                pnl_pct = float(t.get("pnl_pct") or t.get("pnl_percent") or 0)
+                exit_reason = t.get("exit_reason") or t.get("exitReason") or "Unknown"
+                bars_held = int(t.get("bars_held") or t.get("barsHeld") or t.get("bars") or 0)
+                outcome = "WIN" if pnl > 0 else "LOSS"
+                _append_backtest_log(
+                    run_id,
+                    f"Entry #{idx}: {side} @ {entry_price:.2f}",
+                    level="INFO",
+                )
+                _append_backtest_log(
+                    run_id,
+                    f"Exit #{idx}: {outcome} | {exit_reason} @ {exit_price:.2f} | PnL: ${pnl:.2f} ({pnl_pct:.2f}%) | Bars: {bars_held}",
+                    level="INFO",
+                )
+
         _append_backtest_log(
             run_id,
             f"Backtest completed: {len(trades)} trades, win rate {win_rate:.1%}, total return {total_return:.2f}%",

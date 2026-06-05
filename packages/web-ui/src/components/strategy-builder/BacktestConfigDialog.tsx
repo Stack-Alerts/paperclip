@@ -6,6 +6,7 @@ import { AppBrand } from '@/components/shared/AppBrand';
 import { ThemeSelector } from './ThemeSelector';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BacktestConfig, BacktestResult, BacktestStatusMessage } from '@/lib/strategy-builder/types';
+import { getBacktestResults } from '@/lib/strategy-builder/api';
 import { RichTooltip, type TooltipContent } from './RichTooltip';
 import {
   TT_LOOKBACK, TT_TRAINING, TT_TESTING,
@@ -1457,11 +1458,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
         attempts++;
 
         try {
-          const result = await fetch(`/api/strategies/${currentStrategy.id}/backtest/${runId}`, {
-            headers: {
-              'Authorization': `Bearer ${typeof window !== 'undefined' && (window as any).localStorage?.getItem('auth_token') || ''}`,
-            },
-          }).then(r => r.json()) as {
+          const result = await getBacktestResults(currentStrategy.id, runId) as {
             status: string;
             logs?: Array<{ message: string; level: string; timestamp: string }>;
           };
