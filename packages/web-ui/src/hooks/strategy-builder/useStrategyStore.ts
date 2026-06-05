@@ -683,6 +683,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   //   1. saveStrategy() → promotes draft to backend with denormalized blocks
   //   2. POST /strategies/{id}/backtest -> { runId }
   //   3. Poll GET /strategies/{id}/backtest/{runId} until status in ('done','error')
+  // On 404 (stale registry id), promotes the in-memory strategy and retries (BTCAAAAA-34765).
   runBacktest: async (config: BacktestConfig | BacktestConfigFull) => {
     let strategyId = (config as { strategyId?: string }).strategyId;
     if (!strategyId) throw new Error('Backtest: missing strategyId in config');
@@ -709,7 +710,37 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
 
     set({ backTestInProgress: true, backTestProgress: 0, backTestResult: undefined });
     try {
-      const startResp = (await apiRunBacktest(strategyId, config)) as { runId: string; status: string };
+      let startResp: { runId: string; status: string };
+      try {
+        startResp = (await apiRunBacktest(strategyId, config)) as { runId: string; status: string };
+      } catch (err) {
+        // If the strategy ID looks backend-like but returned 404, it's stale in the registry.
+        // Promote the in-memory strategy and retry once (BTCAAAAA-34765).
+        const errMsg = err instanceof Error ? err.message : '';
+        if (isBackendStrategyId(strategyId) && /\b404\b/.test(errMsg)) {
+          // Stale registry id — force promote by temporarily replacing with a draft ID
+          // so saveStrategy POSTs a new backend strategy instead of PUTting the stale one
+          const { currentStrategy: originalStrategy } = get();
+          if (!originalStrategy || !originalStrategy.name || originalStrategy.name.trim() === '') {
+            throw new Error('Name your strategy before running a backtest');
+          }
+          // Temporarily swap to a draft ID so saveStrategy treats it as a new strategy
+          const tempDraftId = generateId();
+          set({ currentStrategy: { ...originalStrategy, id: tempDraftId } });
+          try {
+            const saved = await (get().saveStrategy as () => Promise<Strategy>)();
+            strategyId = saved.id;
+            (config as { strategyId?: string }).strategyId = strategyId;
+            startResp = (await apiRunBacktest(strategyId, config)) as { runId: string; status: string };
+          } catch (saveError) {
+            // If promotion still fails, restore original state
+            set({ currentStrategy: originalStrategy });
+            throw saveError;
+          }
+        } else {
+          throw err;
+        }
+      }
       const runId = startResp.runId;
       if (!runId) throw new Error('Backtest: backend did not return a runId');
 
