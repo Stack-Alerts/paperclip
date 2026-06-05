@@ -8245,6 +8245,7 @@
     "tests/api/test_event_publisher.py",
     "tests/api/test_p2_strategy_control.py",
     "tests/api/test_rest_endpoints.py",
+    "tests/api/test_strategy_builder_update.py",
     "tests/api/test_websockets.py",
     "tests/audit/test_btcaaaaa_25474_differential_pnl_audit.py",
     "tests/bug_regression/__init__.py",
@@ -9098,8 +9099,8 @@
     "src/detectors/building_blocks/patterns/triple_top.py"
   ],
   "stats": {
-    "total_files": 1424,
-    "parsed_files": 1408,
+    "total_files": 1425,
+    "parsed_files": 1409,
     "error_files": 16,
     "parse_rate_pct": 98.88,
     "edge_count": 2476
