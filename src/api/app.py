@@ -1820,10 +1820,29 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
             if msg:
                 _append_backtest_log(run_id, msg)
 
+        # Normalize block names: DB stores display names ("Asia Session 50 Percent")
+        # but BlockRegistry is keyed by snake_case ("asia_session_50_percent").
+        # Also back-fill signal weights from BlockRegistry base_points when weight is None —
+        # the DB stores None for weights saved via web UI, causing all signals to default
+        # to 10 pts and sum below the confluence threshold of 40.
+        # The thick client never hits either gap because it uses live Python objects.
+        import copy as _copy
+        from src.detectors.building_blocks.registry import BlockRegistry as _BR
+        strategy_normalized = _copy.deepcopy(strategy)
+        for blk in strategy_normalized.get("blocks") or []:
+            raw = blk.get("name", "")
+            blk["name"] = raw.lower().replace(" ", "_")
+            block_meta = _BR.get_block(blk["name"])
+            for sig in blk.get("signals") or []:
+                if sig.get("weight") is None and block_meta:
+                    tier = (block_meta.signal_tiers or {}).get(sig.get("name", ""))
+                    if tier:
+                        sig["weight"] = tier.get("base_points", 10)
+
         engine = MulticoreBacktestEngine()
         result = engine.run_backtest(
             bars=bars,
-            strategy_config=strategy,
+            strategy_config=strategy_normalized,
             backtest_config=config,
             progress_callback=_engine_progress,
         )
