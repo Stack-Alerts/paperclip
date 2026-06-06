@@ -159,7 +159,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
 
   if (trades.length === 0) {
     return (
-      <div className="flex flex-col" style={{ gap: 16 }}>
+      <div className="flex flex-col">
         <PerformanceSummary summary={summary} hasTrades={false} />
         <SectionShell title="Trade History">
           <div
@@ -177,7 +177,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
   const totalWidth = COLUMNS.reduce((s, c) => s + c.width, 0);
 
   return (
-    <div className="flex flex-col" style={{ gap: 16 }}>
+    <div className="flex flex-col">
       <PerformanceSummary summary={summary} hasTrades />
 
       <SectionShell title="Trade History">
@@ -241,7 +241,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
               {sortedTrades.map((trade, i) => {
                 // Alternate row dimming preserved from cycle 29C — softened to a
                 // subtle white tint so the panel reads as part of the dialog.
-                const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.02)';
+                const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.04)';
                 return <TradeRow key={`${trade.id}-${i}`} trade={trade} rowBg={rowBg} />;
               })}
             </tbody>
@@ -311,25 +311,24 @@ function PerformanceSummary({
   const shortColor  = hasTrades && summary.shorts  > 0 ? ACCENT.error   : 'var(--text-muted)';
 
   return (
-    <SectionShell title="Performance Summary">
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 30,
-          padding: '16px 14px',
-          color: 'var(--text-muted)',
-          fontSize: 13,
-        }}
-      >
-        <SummaryItem label="Total P&L" value={formatMoney(summary.totalPnl)} valueColor={totalPnlColor} />
-        <SummaryItem label="Win Rate" value={`${summary.winRate.toFixed(2)}%`} valueColor={winRateColored} />
-        <SummaryItem label="Long Trades" value={String(summary.longs)} valueColor={longColor} />
-        <SummaryItem label="Short Trades" value={String(summary.shorts)} valueColor={shortColor} />
-        <SummaryItem label="Winning Trades" value={String(summary.wins)} />
-        <SummaryItem label="Losing Trades" value={String(summary.losses)} />
-      </div>
-    </SectionShell>
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 30,
+        padding: '14px 14px',
+        borderBottom: '1px solid var(--border)',
+        color: 'var(--text-muted)',
+        fontSize: 13,
+      }}
+    >
+      <SummaryItem label="Total P&L" value={formatMoney(summary.totalPnl)} valueColor={totalPnlColor} />
+      <SummaryItem label="Win Rate" value={`${summary.winRate.toFixed(2)}%`} valueColor={winRateColored} />
+      <SummaryItem label="Long Trades" value={String(summary.longs)} valueColor={longColor} />
+      <SummaryItem label="Short Trades" value={String(summary.shorts)} valueColor={shortColor} />
+      <SummaryItem label="Winning Trades" value={String(summary.wins)} />
+      <SummaryItem label="Losing Trades" value={String(summary.losses)} />
+    </div>
   );
 }
 
