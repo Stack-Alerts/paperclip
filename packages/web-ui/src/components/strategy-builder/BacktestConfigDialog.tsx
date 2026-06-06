@@ -1326,6 +1326,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
     backTestInProgress,
     backTestProgress,
     backTestResult,
+    backTestLogs,
     runBacktest,
   } = useStrategyStore();
 
@@ -1359,6 +1360,25 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
   });
   const [outputLogs, setOutputLogs] = useState<BacktestStatusMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // BTCAAAAA-34942: tail in-flight logs from the store so the Live Output /
+  // STATUS panels update during the run instead of waiting for the 30 min
+  // poll loop to resolve. handleStart seeds a "Starting backtest…" line
+  // first; once the backend starts emitting via the store's poll loop, every
+  // new entry that didn't exist on the prior tick is appended. Length is the
+  // dedup key — backend `_backtest_runs[run_id]['logs']` is append-only.
+  const lastSeenLogCountRef = useRef(0);
+  useEffect(() => {
+    if (!backTestInProgress && backTestLogs.length === 0) {
+      lastSeenLogCountRef.current = 0;
+      return;
+    }
+    if (backTestLogs.length > lastSeenLogCountRef.current) {
+      const fresh = backTestLogs.slice(lastSeenLogCountRef.current);
+      lastSeenLogCountRef.current = backTestLogs.length;
+      setOutputLogs((prev) => [...prev, ...fresh]);
+    }
+  }, [backTestLogs, backTestInProgress]);
 
   // Backtest configuration state — lifted to parent so handleStart can access
   const [lookbackDays, setLookbackDays] = useState<ChipValue>(90);

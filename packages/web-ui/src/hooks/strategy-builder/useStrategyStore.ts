@@ -17,6 +17,7 @@ import {
   BacktestConfig,
   BacktestConfigFull,
   BacktestResult,
+  BacktestStatusMessage,
   StrategySettings,
 } from '@/lib/strategy-builder/types';
 import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults, validateStrategy as validateStrategyAPI, autoFixStrategy as autoFixStrategyAPI, revertStrategy as revertStrategyAPI } from '@/lib/strategy-builder/api';
@@ -118,6 +119,10 @@ interface StrategyStoreState {
   backTestInProgress: boolean;
   backTestProgress: number;
   backTestResult: BacktestResult | null;
+  // BTCAAAAA-34942: per-poll logs forwarded from the backend so the Live
+  // Output / STATUS panels can tail the run instead of waiting for the
+  // 30-min poll loop to resolve. Cleared at run start.
+  backTestLogs: BacktestStatusMessage[];
   fixedIssuesInSession: FixedIssueEntry[];
 
   // Actions
@@ -163,6 +168,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   backTestInProgress: false,
   backTestProgress: 0,
   backTestResult: null,
+  backTestLogs: [],
   fixedIssuesInSession: [],
 
   // Load localStorage state after client mount — keeps SSR/client renders in sync.
@@ -708,7 +714,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
       }
     }
 
-    set({ backTestInProgress: true, backTestProgress: 0, backTestResult: undefined });
+    set({ backTestInProgress: true, backTestProgress: 0, backTestResult: undefined, backTestLogs: [] });
     try {
       let startResp: { runId: string; status: string };
       try {
@@ -756,11 +762,24 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
           progress: number;
           trades?: unknown[];
           metrics?: Record<string, unknown>;
+          logs?: Array<{ message: string; level: string; timestamp: string }>;
           error?: string | null;
           startedAt?: string;
           completedAt?: string | null;
         };
         if (typeof status.progress === 'number') set({ backTestProgress: status.progress });
+        // BTCAAAAA-34942: forward in-flight `logs` so the Live Output and
+        // STATUS panels tail the run live. Replace-on-each-tick is safe —
+        // backend `_backtest_runs[run_id]['logs']` is append-only.
+        if (Array.isArray(status.logs)) {
+          set({
+            backTestLogs: status.logs.map((l) => ({
+              message: l.message,
+              level: (l.level as BacktestStatusMessage['level']) ?? 'INFO',
+              timestamp: l.timestamp,
+            })),
+          });
+        }
         if (status.status === 'error') {
           throw new Error(status.error || 'Backtest failed');
         }
