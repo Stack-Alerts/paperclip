@@ -7,21 +7,23 @@ export interface TradesPanelProps {
   trades?: Trade[];
 }
 
-// Exact PyQt5 thick-client values from src/strategy_builder/ui/styles.py
-// (COLORS dict + get_table_stylesheet). Board called for matching the
-// thick-client hex values rather than the web app's CSS variables.
-const TC = {
-  bgDark: '#0A0E15',
-  bgMedium: '#12171F',
-  border: '#2A3139',
-  textMuted: '#9AA0A6',
-  textPrimary: '#E8EAED',
-  success: '#10B981',
-  error: '#C35252',
-  panelTitle: '#095983',
-  rowHover: '#021a1e',
-  headerHover: '#252b36',
+// BTCAAAAA-34943: data-accent colors stay on exact thick-client hex (per board
+// "use exact thick-client hex/HSL values"); chrome (panel surfaces, borders,
+// titles, row dim) moves to dialog CSS variables to match the rest of the UI.
+const ACCENT = {
+  success: '#10B981',  // styles.py COLORS['success']
+  warning: '#FFA500',  // styles.py COLORS['warning']
+  error:   '#C35252',  // styles.py COLORS['error']
 } as const;
+
+// Win Rate bands match the thick-client strategy profile copy in
+// backtest_config_panel.py: aggressive 40-50%, balanced 50-60%, conservative
+// 60-70%. ≥60% = high (success), 40-<60% = mid (warning), <40% = low (error).
+function winRateColor(pct: number): string {
+  if (pct >= 60) return ACCENT.success;
+  if (pct >= 40) return ACCENT.warning;
+  return ACCENT.error;
+}
 
 type ColumnKey =
   | 'id' | 'time' | 'symbol' | 'side' | 'size' | 'entry' | 'exit'
@@ -155,22 +157,19 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
     }
   };
 
-  const totalPnlColor =
-    summary.totalPnl > 0 ? TC.success
-    : summary.totalPnl < 0 ? TC.error
-    : TC.textMuted;
-
   if (trades.length === 0) {
     return (
       <div className="flex flex-col" style={{ gap: 16 }}>
-        <PerformanceSummary summary={summary} totalPnlColor={TC.textMuted} />
-        <div
-          className="flex flex-col items-center justify-center py-12"
-          style={{ color: TC.textMuted, background: TC.bgDark, border: `1px solid ${TC.border}` }}
-        >
-          <p className="text-sm">No trades yet.</p>
-          <p className="text-xs mt-1">Run a backtest to see the trade log.</p>
-        </div>
+        <PerformanceSummary summary={summary} hasTrades={false} />
+        <SectionShell title="Trade History">
+          <div
+            className="flex flex-col items-center justify-center py-12"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <p className="text-sm">No trades yet.</p>
+            <p className="text-xs mt-1">Run a backtest to see the trade log.</p>
+          </div>
+        </SectionShell>
       </div>
     );
   }
@@ -179,29 +178,16 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
 
   return (
     <div className="flex flex-col" style={{ gap: 16 }}>
-      <PerformanceSummary summary={summary} totalPnlColor={totalPnlColor} />
+      <PerformanceSummary summary={summary} hasTrades />
 
-      <div style={{ background: TC.bgDark, border: `1px solid ${TC.border}` }}>
-        <div
-          style={{
-            color: TC.panelTitle,
-            padding: '10px 14px',
-            borderBottom: `1px solid ${TC.border}`,
-            fontWeight: 700,
-            fontSize: 13,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Trade History
-        </div>
+      <SectionShell title="Trade History">
         <div style={{ overflowX: 'auto' }}>
           <table
             style={{
               minWidth: totalWidth,
               width: '100%',
               borderCollapse: 'collapse',
-              color: TC.textMuted,
+              color: 'var(--text-secondary)',
               fontVariantNumeric: 'tabular-nums',
               fontSize: 12,
             }}
@@ -219,27 +205,30 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
                       onClick={() => handleHeaderClick(col)}
                       onMouseEnter={e => {
                         if (col.sortable) {
-                          (e.currentTarget as HTMLElement).style.background = TC.headerHover;
+                          (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.03)';
                         }
                       }}
                       onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.background = TC.bgMedium;
+                        (e.currentTarget as HTMLElement).style.background = 'transparent';
                       }}
                       style={{
-                        background: TC.bgMedium,
-                        color: TC.textMuted,
-                        padding: '14px 12px',
-                        border: `1px solid ${TC.border}`,
+                        background: 'transparent',
+                        color: 'var(--text-muted)',
+                        padding: '10px 12px',
+                        borderBottom: '1px solid var(--border)',
                         fontWeight: 600,
                         textAlign: 'center',
                         cursor: col.sortable ? 'pointer' : 'default',
                         userSelect: 'none',
                         whiteSpace: 'nowrap',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        fontSize: 11,
                       }}
                     >
                       {col.label}
                       {isSorted && (
-                        <span style={{ marginLeft: 6, color: TC.textPrimary }}>
+                        <span style={{ marginLeft: 6, color: 'var(--text-secondary)' }}>
                           {sortDir === 'asc' ? '▲' : '▼'}
                         </span>
                       )}
@@ -250,8 +239,9 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
             </thead>
             <tbody>
               {sortedTrades.map((trade, i) => {
-                // PyQt5 setAlternatingRowColors(True): row 0 = bg_dark, row 1 = bg_medium.
-                const rowBg = i % 2 === 0 ? TC.bgDark : TC.bgMedium;
+                // Alternate row dimming preserved from cycle 29C — softened to a
+                // subtle white tint so the panel reads as part of the dialog.
+                const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.02)';
                 return <TradeRow key={`${trade.id}-${i}`} trade={trade} rowBg={rowBg} />;
               })}
             </tbody>
@@ -260,58 +250,86 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
         <div
           style={{
             padding: '10px 14px',
-            borderTop: `1px solid ${TC.border}`,
-            color: TC.textMuted,
+            borderTop: '1px solid var(--border)',
+            color: 'var(--text-muted)',
             fontSize: 12,
           }}
         >
-          Showing: <b style={{ color: TC.textPrimary }}>All Trades ({trades.length})</b>
+          Showing: <b style={{ color: 'var(--text-secondary)' }}>All Trades ({trades.length})</b>
         </div>
-      </div>
+      </SectionShell>
     </div>
+  );
+}
+
+// Frameless section container matching the dialog's SectionCard pattern:
+// subtle hairline border, transparent tinted background, muted uppercase
+// title with a hairline divider underneath.
+function SectionShell({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section
+      className="rounded-[4px]"
+      style={{
+        border: '1px solid var(--border)',
+        background: 'rgba(255, 255, 255, 0.02)',
+      }}
+    >
+      <h3
+        className="text-xs font-semibold uppercase tracking-wider"
+        style={{
+          color: 'var(--text-secondary)',
+          padding: '10px 14px',
+          borderBottom: '1px solid var(--border)',
+          margin: 0,
+        }}
+      >
+        {title}
+      </h3>
+      {children}
+    </section>
   );
 }
 
 function PerformanceSummary({
   summary,
-  totalPnlColor,
+  hasTrades,
 }: {
   summary: { total: number; wins: number; losses: number; longs: number; shorts: number; totalPnl: number; winRate: number };
-  totalPnlColor: string;
+  hasTrades: boolean;
 }) {
+  // Total P&L: thick-client _update_metrics rule (success/error/muted by sign).
+  const totalPnlColor =
+    !hasTrades           ? 'var(--text-muted)'
+    : summary.totalPnl > 0 ? ACCENT.success
+    : summary.totalPnl < 0 ? ACCENT.error
+    :                       'var(--text-muted)';
+
+  // Win Rate / Long / Short coloring matches the issue's "thick-client pattern":
+  // win rate banded, long-green / short-red consistent with trade-row Side cell.
+  const winRateColored = hasTrades ? winRateColor(summary.winRate) : 'var(--text-muted)';
+  const longColor   = hasTrades && summary.longs   > 0 ? ACCENT.success : 'var(--text-muted)';
+  const shortColor  = hasTrades && summary.shorts  > 0 ? ACCENT.error   : 'var(--text-muted)';
+
   return (
-    <div style={{ background: TC.bgDark, border: `1px solid ${TC.border}` }}>
-      <div
-        style={{
-          color: TC.panelTitle,
-          padding: '10px 14px',
-          borderBottom: `1px solid ${TC.border}`,
-          fontWeight: 700,
-          fontSize: 13,
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase',
-        }}
-      >
-        Performance Summary
-      </div>
+    <SectionShell title="Performance Summary">
       <div
         style={{
           display: 'flex',
           flexWrap: 'wrap',
           gap: 30,
-          padding: '20px 15px 15px 15px',
-          color: TC.textMuted,
+          padding: '16px 14px',
+          color: 'var(--text-muted)',
           fontSize: 13,
         }}
       >
         <SummaryItem label="Total P&L" value={formatMoney(summary.totalPnl)} valueColor={totalPnlColor} />
-        <SummaryItem label="Win Rate" value={`${summary.winRate.toFixed(2)}%`} />
-        <SummaryItem label="Long Trades" value={String(summary.longs)} />
-        <SummaryItem label="Short Trades" value={String(summary.shorts)} />
+        <SummaryItem label="Win Rate" value={`${summary.winRate.toFixed(2)}%`} valueColor={winRateColored} />
+        <SummaryItem label="Long Trades" value={String(summary.longs)} valueColor={longColor} />
+        <SummaryItem label="Short Trades" value={String(summary.shorts)} valueColor={shortColor} />
         <SummaryItem label="Winning Trades" value={String(summary.wins)} />
         <SummaryItem label="Losing Trades" value={String(summary.losses)} />
       </div>
-    </div>
+    </SectionShell>
   );
 }
 
@@ -319,25 +337,25 @@ function SummaryItem({ label, value, valueColor }: { label: string; value: strin
   return (
     <span>
       {label}:{' '}
-      <b style={{ color: valueColor ?? TC.textPrimary }}>{value}</b>
+      <b style={{ color: valueColor ?? 'var(--text-secondary)' }}>{value}</b>
     </span>
   );
 }
 
 function TradeRow({ trade, rowBg }: { trade: Trade; rowBg: string }) {
   const [hovered, setHovered] = useState(false);
-  const bg = hovered ? TC.rowHover : rowBg;
+  const bg = hovered ? 'rgba(255, 255, 255, 0.04)' : rowBg;
   const side = normalizeSide(trade.side);
   const status = normalizeStatus(trade.status);
-  const pnlColor = trade.pnl > 0 ? TC.success : trade.pnl < 0 ? TC.error : TC.textMuted;
-  const pctColor = trade.pnlPercentage > 0 ? TC.success : trade.pnlPercentage < 0 ? TC.error : TC.textMuted;
-  const sideColor = side === 'LONG' ? TC.success : side === 'SHORT' ? TC.error : TC.textMuted;
-  const statusColor = status === 'OPEN' ? TC.success : TC.textMuted;
+  const pnlColor = trade.pnl > 0 ? ACCENT.success : trade.pnl < 0 ? ACCENT.error : 'var(--text-muted)';
+  const pctColor = trade.pnlPercentage > 0 ? ACCENT.success : trade.pnlPercentage < 0 ? ACCENT.error : 'var(--text-muted)';
+  const sideColor = side === 'LONG' ? ACCENT.success : side === 'SHORT' ? ACCENT.error : 'var(--text-muted)';
+  const statusColor = status === 'OPEN' ? ACCENT.success : 'var(--text-muted)';
   const partial = partialDisplay(trade);
 
   const cellStyle: React.CSSProperties = {
-    padding: '12px 8px',
-    border: `1px solid ${TC.border}`,
+    padding: '10px 8px',
+    borderBottom: '1px solid var(--border)',
     textAlign: 'center',
     whiteSpace: 'nowrap',
   };
