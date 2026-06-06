@@ -1,0 +1,5 @@
+2026-06-06 04:30:58,501 [INFO] Starting closure-gate routine (window=24h)
+2026-06-06 04:30:58,501 [INFO] Loaded closure-gate state: 131 tracked
+2026-06-06 04:30:58,617 [INFO] Found 0 done issues updated in last 24h
+2026-06-06 04:30:58,728 [INFO] Posted routine report to issue BTCAAAAA-30040
+2026-06-06 04:30:58,729 [INFO] Closure-gate routine completed successfully (deferral_flags=0)

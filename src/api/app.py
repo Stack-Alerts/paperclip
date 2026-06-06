@@ -1820,35 +1820,58 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
             if msg:
                 _append_backtest_log(run_id, msg)
 
+        # Normalize block names: DB stores display names ("Asia Session 50 Percent")
+        # but BlockRegistry is keyed by snake_case ("asia_session_50_percent").
+        # Also back-fill signal weights from BlockRegistry base_points when weight is None —
+        # the DB stores None for weights saved via web UI, causing all signals to default
+        # to 10 pts and sum below the confluence threshold of 40.
+        # The thick client never hits either gap because it uses live Python objects.
+        import copy as _copy
+        from src.detectors.building_blocks.registry import BlockRegistry as _BR
+        strategy_normalized = _copy.deepcopy(strategy)
+        for blk in strategy_normalized.get("blocks") or []:
+            raw = blk.get("name", "")
+            blk["name"] = raw.lower().replace(" ", "_")
+            block_meta = _BR.get_block(blk["name"])
+            for sig in blk.get("signals") or []:
+                if sig.get("weight") is None and block_meta:
+                    tier = (block_meta.signal_tiers or {}).get(sig.get("name", ""))
+                    if tier:
+                        sig["weight"] = tier.get("base_points", 10)
+
         engine = MulticoreBacktestEngine()
         result = engine.run_backtest(
             bars=bars,
-            strategy_config=strategy,
+            strategy_config=strategy_normalized,
             backtest_config=config,
             progress_callback=_engine_progress,
         )
 
         trades = list(result.get("trades", []))
         errors = list(result.get("errors", []))
+        messages = list(result.get("messages", []))
         # Normalize trade fields the WebUI Trades tab expects so the front-end
         # doesn't have to bridge two shapes.
         normalized_trades = []
-        for t in trades:
+        for idx, t in enumerate(trades):
             normalized_trades.append({
-                "entryTimestamp": t.get("entry_time") or t.get("entryTimestamp"),
-                "exitTimestamp": t.get("exit_time") or t.get("exitTimestamp"),
+                "id": str(idx),
+                "entryTime": str(t["entry_timestamp"]) if t.get("entry_timestamp") else None,
+                "exitTime": str(t["exit_timestamp"]) if t.get("exit_timestamp") else None,
                 "side": t.get("side") or t.get("direction"),
-                "entryPrice": t.get("entry_price") or t.get("entryPrice"),
-                "exitPrice": t.get("exit_price") or t.get("exitPrice"),
-                "pnl": t.get("pnl"),
-                "pnlPercent": t.get("pnl_percent") or t.get("pnlPercent"),
-                "exitReason": t.get("exit_reason") or t.get("exitReason"),
-                "barsHeld": t.get("bars_held") or t.get("barsHeld"),
+                "entryPrice": float(t.get("entry_price") or t.get("entryPrice") or 0),
+                "exitPrice": float(t.get("exit_price") or t.get("exitPrice") or 0),
+                "quantity": float(t.get("quantity") or t.get("size") or 0),
+                "pnl": float(t.get("pnl") or 0),
+                "pnlPercentage": float(t.get("pnl_pct") or t.get("pnl_percent") or t.get("pnlPercentage") or 0),
+                "bars": int(t.get("bars_held") or t.get("barsHeld") or t.get("bars") or 0),
+                "exitType": t.get("exit_reason") or t.get("exitReason") or t.get("exitType"),
+                "status": "closed",
             })
 
         wins = [t for t in trades if (t.get("pnl") or 0) > 0]
         win_rate = (len(wins) / len(trades)) if trades else 0.0
-        total_return = sum(float(t.get("pnl_percent") or t.get("pnlPercent") or 0.0) for t in trades)
+        total_return = sum(float(t.get("pnl_pct") or t.get("pnl_percent") or 0.0) for t in trades)
 
         metrics = {
             "totalTrades": len(trades),
@@ -1869,6 +1892,40 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
             error="; ".join(errors) if errors else None,
             completedAt=datetime.now(timezone.utc).isoformat(),
         )
+
+        # Append per-bar decision messages from the engine to the live output
+        for msg in messages:
+            msg_text = msg.get("text", "")
+            msg_level = msg.get("level", "INFO")
+            # Normalize level to match BacktestStatusMessage enum (INFO | SYSTEM | ERROR)
+            # Engine uses 'DECISION' for per-bar decisions, map to 'INFO'
+            if msg_level == "DECISION" or msg_level not in ("INFO", "SYSTEM", "ERROR"):
+                msg_level = "INFO"
+            _append_backtest_log(run_id, msg_text, level=msg_level)
+
+        # Fallback: synthesize trade decision trace from trade data when engine
+        # messages are unavailable (multiprocessing pickling drops ChunkResult.messages).
+        if not messages and trades:
+            for idx, t in enumerate(trades, start=1):
+                entry_price = t.get("entry_price") or t.get("entryPrice") or 0
+                exit_price = t.get("exit_price") or t.get("exitPrice") or 0
+                side = t.get("side") or t.get("direction") or "LONG"
+                pnl = float(t.get("pnl") or 0)
+                pnl_pct = float(t.get("pnl_pct") or t.get("pnl_percent") or 0)
+                exit_reason = t.get("exit_reason") or t.get("exitReason") or "Unknown"
+                bars_held = int(t.get("bars_held") or t.get("barsHeld") or t.get("bars") or 0)
+                outcome = "WIN" if pnl > 0 else "LOSS"
+                _append_backtest_log(
+                    run_id,
+                    f"Entry #{idx}: {side} @ {entry_price:.2f}",
+                    level="INFO",
+                )
+                _append_backtest_log(
+                    run_id,
+                    f"Exit #{idx}: {outcome} | {exit_reason} @ {exit_price:.2f} | PnL: ${pnl:.2f} ({pnl_pct:.2f}%) | Bars: {bars_held}",
+                    level="INFO",
+                )
+
         _append_backtest_log(
             run_id,
             f"Backtest completed: {len(trades)} trades, win rate {win_rate:.1%}, total return {total_return:.2f}%",

@@ -6,6 +6,7 @@ import { AppBrand } from '@/components/shared/AppBrand';
 import { ThemeSelector } from './ThemeSelector';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { BacktestConfig, BacktestResult, BacktestStatusMessage } from '@/lib/strategy-builder/types';
+import { getBacktestResults } from '@/lib/strategy-builder/api';
 import { RichTooltip, type TooltipContent } from './RichTooltip';
 import {
   TT_LOOKBACK, TT_TRAINING, TT_TESTING,
@@ -560,6 +561,48 @@ function ConfigTab({
   isRunning,
   fontScale,
   onFontScaleChange,
+  lookbackDays,
+  setLookbackDays,
+  trainingDays,
+  setTrainingDays,
+  testingDays,
+  setTestingDays,
+  mode,
+  setMode,
+  tpSlConfig,
+  setTpSlConfig,
+  slAdjustment,
+  setSlAdjustment,
+  adaptivePreset,
+  setAdaptivePreset,
+  delayStopLoss,
+  setDelayStopLoss,
+  marketStructureStop,
+  setMarketStructureStop,
+  stopLossDelay,
+  setStopLossDelay,
+  emergency,
+  setEmergency,
+  volatilityLookback,
+  setVolatilityLookback,
+  volatilityMultiplier,
+  setVolatilityMultiplier,
+  minStopLoss,
+  setMinStopLoss,
+  maxStopLoss,
+  setMaxStopLoss,
+  minRiskReward,
+  setMinRiskReward,
+  maxRisk,
+  setMaxRisk,
+  leverage,
+  setLeverage,
+  confluence,
+  setConfluence,
+  minBarsHeld,
+  setMinBarsHeld,
+  maxBarsHeld,
+  setMaxBarsHeld,
 }: {
   config: Omit<BacktestConfig, 'strategyId'>;
   onChange: (patch: Partial<Omit<BacktestConfig, 'strategyId'>>) => void;
@@ -568,22 +611,49 @@ function ConfigTab({
   isRunning: boolean;
   fontScale: FontScale;
   onFontScaleChange: (next: FontScale) => void;
+  lookbackDays: ChipValue;
+  setLookbackDays: (v: ChipValue) => void;
+  trainingDays: ChipValue;
+  setTrainingDays: (v: ChipValue) => void;
+  testingDays: ChipValue;
+  setTestingDays: (v: ChipValue) => void;
+  mode: 'walk-forward' | 'walk' | 'live-replay';
+  setMode: (v: 'walk-forward' | 'walk' | 'live-replay') => void;
+  tpSlConfig: 'Fibonacci' | 'Hybrid' | 'Fixed';
+  setTpSlConfig: (v: 'Fibonacci' | 'Hybrid' | 'Fixed') => void;
+  slAdjustment: 'Adaptive v2.0' | 'Static';
+  setSlAdjustment: (v: 'Adaptive v2.0' | 'Static') => void;
+  adaptivePreset: AdaptivePresetName;
+  setAdaptivePreset: (v: AdaptivePresetName) => void;
+  delayStopLoss: boolean;
+  setDelayStopLoss: (v: boolean) => void;
+  marketStructureStop: boolean;
+  setMarketStructureStop: (v: boolean) => void;
+  stopLossDelay: ChipValue;
+  setStopLossDelay: (v: ChipValue) => void;
+  emergency: ChipValue;
+  setEmergency: (v: ChipValue) => void;
+  volatilityLookback: ChipValue;
+  setVolatilityLookback: (v: ChipValue) => void;
+  volatilityMultiplier: ChipValue;
+  setVolatilityMultiplier: (v: ChipValue) => void;
+  minStopLoss: ChipValue;
+  setMinStopLoss: (v: ChipValue) => void;
+  maxStopLoss: ChipValue;
+  setMaxStopLoss: (v: ChipValue) => void;
+  minRiskReward: ChipValue;
+  setMinRiskReward: (v: ChipValue) => void;
+  maxRisk: ChipValue;
+  setMaxRisk: (v: ChipValue) => void;
+  leverage: ChipValue;
+  setLeverage: (v: ChipValue) => void;
+  confluence: string;
+  setConfluence: (v: string) => void;
+  minBarsHeld: ChipValue;
+  setMinBarsHeld: (v: ChipValue) => void;
+  maxBarsHeld: ChipValue;
+  setMaxBarsHeld: (v: ChipValue) => void;
 }) {
-  const [lookbackDays, setLookbackDays] = useState<ChipValue>(90);
-  const [trainingDays, setTrainingDays] = useState<ChipValue>(60);
-  const [testingDays, setTestingDays] = useState<ChipValue>(30);
-  const [mode, setMode] = useState<'walk-forward' | 'walk' | 'live-replay'>('walk-forward');
-  const [tpSlConfig, setTpSlConfig] = useState<'Fibonacci' | 'Hybrid' | 'Fixed'>('Fibonacci');
-  const [slAdjustment, setSlAdjustment] = useState<'Adaptive v2.0' | 'Static'>('Adaptive v2.0');
-  const [adaptivePreset, setAdaptivePreset] = useState<AdaptivePresetName>('Balanced');
-  const [delayStopLoss, setDelayStopLoss] = useState<boolean>(ADAPTIVE_PRESETS.Balanced.delayStopLoss);
-  const [marketStructureStop, setMarketStructureStop] = useState<boolean>(ADAPTIVE_PRESETS.Balanced.marketStructureStop);
-  const [stopLossDelay, setStopLossDelay] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.stopLossDelay);
-  const [emergency, setEmergency] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.emergency);
-  const [volatilityLookback, setVolatilityLookback] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.volatilityLookback);
-  const [volatilityMultiplier, setVolatilityMultiplier] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.volatilityMultiplier);
-  const [minStopLoss, setMinStopLoss] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.minStopLoss);
-  const [maxStopLoss, setMaxStopLoss] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.maxStopLoss);
 
   // Auto-Custom: re-evaluate whether the current 8 Adaptive SL values still
   // match the active preset's canonical snapshot. If they diverge, flip the
@@ -621,12 +691,6 @@ function ConfigTab({
     setMaxStopLoss(v.maxStopLoss);
     setAdaptivePreset(preset);
   }, []);
-  const [minRiskReward, setMinRiskReward] = useState<ChipValue>(1.2);
-  const [maxRisk, setMaxRisk] = useState<ChipValue>(10);
-  const [leverage, setLeverage] = useState<ChipValue>(10);
-  const [confluence, setConfluence] = useState<string>('Boost from Strategy');
-  const [minBarsHeld, setMinBarsHeld] = useState<ChipValue>(5);
-  const [maxBarsHeld, setMaxBarsHeld] = useState<ChipValue>(200);
 
   const applyLookbackToDates = useCallback((days: number) => {
     setLookbackDays(days);
@@ -1296,6 +1360,29 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
   const [outputLogs, setOutputLogs] = useState<BacktestStatusMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Backtest configuration state — lifted to parent so handleStart can access
+  const [lookbackDays, setLookbackDays] = useState<ChipValue>(90);
+  const [trainingDays, setTrainingDays] = useState<ChipValue>(60);
+  const [testingDays, setTestingDays] = useState<ChipValue>(30);
+  const [mode, setMode] = useState<'walk-forward' | 'walk' | 'live-replay'>('walk-forward');
+  const [tpSlConfig, setTpSlConfig] = useState<'Fibonacci' | 'Hybrid' | 'Fixed'>('Fibonacci');
+  const [slAdjustment, setSlAdjustment] = useState<'Adaptive v2.0' | 'Static'>('Adaptive v2.0');
+  const [adaptivePreset, setAdaptivePreset] = useState<AdaptivePresetName>('Balanced');
+  const [delayStopLoss, setDelayStopLoss] = useState<boolean>(ADAPTIVE_PRESETS.Balanced.delayStopLoss);
+  const [marketStructureStop, setMarketStructureStop] = useState<boolean>(ADAPTIVE_PRESETS.Balanced.marketStructureStop);
+  const [stopLossDelay, setStopLossDelay] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.stopLossDelay);
+  const [emergency, setEmergency] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.emergency);
+  const [volatilityLookback, setVolatilityLookback] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.volatilityLookback);
+  const [volatilityMultiplier, setVolatilityMultiplier] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.volatilityMultiplier);
+  const [minStopLoss, setMinStopLoss] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.minStopLoss);
+  const [maxStopLoss, setMaxStopLoss] = useState<ChipValue>(ADAPTIVE_PRESETS.Balanced.maxStopLoss);
+  const [minRiskReward, setMinRiskReward] = useState<ChipValue>(1.2);
+  const [maxRisk, setMaxRisk] = useState<ChipValue>(10);
+  const [leverage, setLeverage] = useState<ChipValue>(10);
+  const [confluence, setConfluence] = useState<string>('Boost from Strategy');
+  const [minBarsHeld, setMinBarsHeld] = useState<ChipValue>(5);
+  const [maxBarsHeld, setMaxBarsHeld] = useState<ChipValue>(200);
+
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Seed timeframe from current strategy when dialog opens
@@ -1328,7 +1415,92 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
     setActiveTab('output');
 
     try {
-      await runBacktest({ ...config, strategyId: currentStrategy.id });
+      const fullConfig = {
+        // camelCase fields consumed by the store/API layer
+        strategyId: currentStrategy.id,
+        startDate: config.startDate,
+        endDate: config.endDate,
+        initialCapital: config.initialCapital,
+        commissionPercentage: config.commissionPercentage,
+        slippagePercentage: config.slippagePercentage,
+        maxConcurrentPositions: config.maxConcurrentPositions,
+        timeframe: config.timeframe,
+        // snake_case fields consumed by MulticoreBacktestEngine
+        starting_capital: config.initialCapital,
+        commission_pct: config.commissionPercentage,
+        slippage_pct: config.slippagePercentage,
+        lookback_days: Number(lookbackDays),
+        training_days: Number(trainingDays),
+        testing_days: Number(testingDays),
+        mode: mode === 'walk-forward' ? 1 : mode === 'walk' ? 2 : 3,
+        tpsl_mode: tpSlConfig,
+        sl_adjustment_mode: slAdjustment,
+        adaptive_sl_preset: adaptivePreset,
+        adaptive_sl: {
+          enabled: slAdjustment === 'Adaptive v2.0',
+          delay_enabled: delayStopLoss,
+          delay_bars: Number(stopLossDelay),
+          emergency_sl_pct: Number(emergency),
+          volatility_lookback: Number(volatilityLookback),
+          volatility_multiplier: Number(volatilityMultiplier),
+          min_sl_pct: Number(minStopLoss),
+          max_sl_pct: Number(maxStopLoss),
+          use_structure_sl: marketStructureStop,
+        },
+        risk_per_trade_pct: Number(maxRisk),
+        min_risk_reward: Number(minRiskReward),
+        max_bars_held: Number(maxBarsHeld),
+        min_bars_held: Number(minBarsHeld),
+        max_leverage: Number(leverage),
+        confluence_threshold: confluence,
+      };
+
+      // Start the backtest and get runId
+      const startResp = await runBacktest(fullConfig) as { runId: string };
+      const runId = startResp?.runId;
+      if (!runId) throw new Error('No runId returned from backtest start');
+
+      // Poll for results and logs until backtest is done
+      let attempts = 0;
+      const maxAttempts = 600; // 10 min at 1s intervals
+      const pollInterval = 1000;
+      let seenLogIds = new Set<string>();
+
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        attempts++;
+
+        try {
+          const result = await getBacktestResults(currentStrategy.id, runId) as {
+            status: string;
+            logs?: Array<{ message: string; level: string; timestamp: string }>;
+          };
+
+          if (result?.logs) {
+            result.logs.forEach((log, idx) => {
+              const logId = `${runId}-${idx}`;
+              if (!seenLogIds.has(logId)) {
+                seenLogIds.add(logId);
+                setOutputLogs(prev => [
+                  ...prev,
+                  {
+                    message: log.message,
+                    level: log.level as any,
+                    timestamp: log.timestamp,
+                  },
+                ]);
+              }
+            });
+          }
+
+          if (result?.status === 'done' || result?.status === 'error') {
+            break;
+          }
+        } catch (pollErr) {
+          console.warn('Poll error:', pollErr);
+        }
+      }
+
       setOutputLogs(prev => [
         ...prev,
         { message: 'Backtest completed.', level: 'SYSTEM', timestamp: new Date().toISOString() },
@@ -1342,7 +1514,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
         { message: `ERROR: ${msg}`, level: 'ERROR', timestamp: new Date().toISOString() },
       ]);
     }
-  }, [config, currentStrategy, runBacktest]);
+  }, [config, currentStrategy, runBacktest, lookbackDays, trainingDays, testingDays, mode, tpSlConfig, slAdjustment, adaptivePreset, delayStopLoss, stopLossDelay, emergency, volatilityLookback, volatilityMultiplier, minStopLoss, maxStopLoss, marketStructureStop, maxRisk, minRiskReward, maxBarsHeld, minBarsHeld, leverage, confluence]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape' && !backTestInProgress) onClose();
@@ -1541,6 +1713,48 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
               isRunning={backTestInProgress}
               fontScale={fontScale}
               onFontScaleChange={updateFontScale}
+              lookbackDays={lookbackDays}
+              setLookbackDays={setLookbackDays}
+              trainingDays={trainingDays}
+              setTrainingDays={setTrainingDays}
+              testingDays={testingDays}
+              setTestingDays={setTestingDays}
+              mode={mode}
+              setMode={setMode}
+              tpSlConfig={tpSlConfig}
+              setTpSlConfig={setTpSlConfig}
+              slAdjustment={slAdjustment}
+              setSlAdjustment={setSlAdjustment}
+              adaptivePreset={adaptivePreset}
+              setAdaptivePreset={setAdaptivePreset}
+              delayStopLoss={delayStopLoss}
+              setDelayStopLoss={setDelayStopLoss}
+              marketStructureStop={marketStructureStop}
+              setMarketStructureStop={setMarketStructureStop}
+              stopLossDelay={stopLossDelay}
+              setStopLossDelay={setStopLossDelay}
+              emergency={emergency}
+              setEmergency={setEmergency}
+              volatilityLookback={volatilityLookback}
+              setVolatilityLookback={setVolatilityLookback}
+              volatilityMultiplier={volatilityMultiplier}
+              setVolatilityMultiplier={setVolatilityMultiplier}
+              minStopLoss={minStopLoss}
+              setMinStopLoss={setMinStopLoss}
+              maxStopLoss={maxStopLoss}
+              setMaxStopLoss={setMaxStopLoss}
+              minRiskReward={minRiskReward}
+              setMinRiskReward={setMinRiskReward}
+              maxRisk={maxRisk}
+              setMaxRisk={setMaxRisk}
+              leverage={leverage}
+              setLeverage={setLeverage}
+              confluence={confluence}
+              setConfluence={setConfluence}
+              minBarsHeld={minBarsHeld}
+              setMinBarsHeld={setMinBarsHeld}
+              maxBarsHeld={maxBarsHeld}
+              setMaxBarsHeld={setMaxBarsHeld}
             />
           )}
           {activeTab === 'output' && (
