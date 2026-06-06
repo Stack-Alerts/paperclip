@@ -70,30 +70,29 @@ type BacktestFontSizes = {
   statusText: string;
   /** Status section "Status" header label. */
   statusLabel: string;
-  /** Max height of the Status scrolling block — Large needs more room per line. */
-  statusMaxHeight: number;
 };
 
+// BTCAAAAA-34924: cycle-21's per-scale `statusMaxHeight` (115/135/155) clamped
+// the Status block and forced an internal scroll bar even when the dialog had
+// room left. STATUS now flexes to fill whatever vertical space the dialog body
+// leaves over; the font-scale picker only adjusts text sizes here.
 const FONT_SCALES: Record<FontScale, BacktestFontSizes> = {
-  // Compact ≈ pre-cycle-19 statusText sizing (10px). Kept for power-users who
-  // want maximum density across the whole dialog.
+  // Compact ≈ pre-cycle-19 statusText sizing. Kept for power-users who want
+  // maximum density across the whole dialog.
   Compact: {
     statusText: '11px',
     statusLabel: '10px',
-    statusMaxHeight: 115,
   },
   // Normal = the bumped STATUS size the board actually asked for in cycle-19.
   // The rest of the dialog stays at the pre-cycle-19 sizes hard-coded inline.
   Normal: {
     statusText: '13px',
     statusLabel: '11px',
-    statusMaxHeight: 135,
   },
   // Large = one step bigger for accessibility / large monitors.
   Large: {
     statusText: '14px',
     statusLabel: '12px',
-    statusMaxHeight: 155,
   },
 };
 
@@ -494,9 +493,13 @@ function StatusColumn({
 }) {
   const fontSizes = useFontSizes();
   const showIdle = logs.length === 0 && !isRunning;
+  // BTCAAAAA-34924: outer is a flex column that fills the wrapper allocated by
+  // ConfigTab. The header row is auto-height; the monospace block grows with
+  // `flex-1 min-h-0` so it consumes all remaining vertical room before any
+  // internal scroll bar is shown.
   return (
-    <div className="space-y-0.5">
-      <div className="flex items-center justify-between gap-2">
+    <div className="flex flex-col h-full min-h-0 space-y-0.5">
+      <div className="flex items-center justify-between gap-2 flex-shrink-0">
         <div
           className="font-medium uppercase tracking-wider"
           style={{ color: 'var(--text-muted)', fontSize: fontSizes.statusLabel }}
@@ -506,8 +509,8 @@ function StatusColumn({
         {headerRight}
       </div>
       <div
-        className="font-mono leading-tight space-y-0 overflow-y-auto"
-        style={{ color: 'var(--text-secondary)', maxHeight: fontSizes.statusMaxHeight, fontSize: fontSizes.statusText }}
+        className="font-mono leading-tight space-y-0 overflow-y-auto flex-1 min-h-0"
+        style={{ color: 'var(--text-secondary)', fontSize: fontSizes.statusText }}
       >
         {showIdle
           ? STATUS_IDLE_LINES.map((line, idx) => (
@@ -631,13 +634,16 @@ function ConfigTab({
   }, [onChange]);
 
   return (
-    <div className="h-full pb-2">
+    // BTCAAAAA-34924: root is a flex column so the 3-column form grid keeps
+    // its natural height and the below-grid Status wrapper claims every
+    // remaining pixel of vertical space inside the dialog body.
+    <div className="h-full flex flex-col pb-2">
       {/* 3-Column Grid + below-grid Status section.
           Cycle-13b clarification 2026-06-03: the thick-client `📊 Status:`
           checklist belongs on the Config tab as a full-width text block
           **below** the 3-column grid — not as a 4th right-rail column.
           (Live Output handles a separate streaming role.) */}
-      <div className="grid grid-cols-[33fr_33fr_34fr] gap-3 px-2 py-2 items-stretch">
+      <div className="grid grid-cols-[33fr_33fr_34fr] gap-3 px-2 py-2 items-stretch flex-shrink-0">
 
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 1: CONFIGURATION (35%)
@@ -1147,8 +1153,15 @@ function ConfigTab({
           clarification 2026-06-03: "status is supposed to be below the
           Configuration Blocks"). Frameless monospace text block. The
           Candles/Trades/TP-SL counter row was relocated to the dialog
-          footer at the very bottom of the dialog (BTCAAAAA-34589). */}
-      <div className="px-2 pt-1">
+          footer at the very bottom of the dialog (BTCAAAAA-34589).
+
+          BTCAAAAA-34924: wrapper claims the remaining vertical space inside
+          the dialog body with `flex-1 min-h-0`. `flex flex-col` is set so the
+          inner StatusColumn (also a flex column with `h-full min-h-0`) can
+          stretch to fill this wrapper — cycle-21's fixed `statusMaxHeight`
+          clamp is gone, so the internal scroll bar now appears only when
+          content truly exceeds the available room. */}
+      <div className="px-2 pt-1 flex-1 min-h-0 flex flex-col">
         <StatusColumn
           logs={outputLogs}
           isRunning={isRunning}
