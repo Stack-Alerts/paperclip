@@ -275,7 +275,11 @@ export interface Trade {
   pnlPercentage: number;
   bars: number;
   exitType?: string;
-  status?: 'open' | 'closed';
+  // `side` is emitted by /api/backtest (src/api/app.py); thick-client colors LONG green, SHORT red.
+  side?: 'LONG' | 'SHORT' | string;
+  // Symbol traded; thick-client defaults to BTC.P/USDT when not present on the record.
+  symbol?: string;
+  status?: 'open' | 'closed' | 'OPEN' | 'CLOSED' | string;
 }
 
 // UI State for panels and modals
