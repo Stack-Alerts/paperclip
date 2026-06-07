@@ -283,6 +283,7 @@
       "src/optimizer_v3/validation/institutional_validator.py",
       "src/optimizer_v3/core/backtest_data_provider.py",
       "src/optimizer_v3/core/multicore_backtest_engine.py",
+      "src/detectors/building_blocks/registry.py",
       "src/itm/domain/events.py",
       "src/optimizer_v3/database/__init__.py"
     ],
@@ -4590,6 +4591,7 @@
       "scripts/analyze_signal_occurrences.py",
       "scripts/test_all_building_blocks.py",
       "src/ai_consultant/signal_catalog.py",
+      "src/api/app.py",
       "src/detectors/building_blocks/elliott_wave/elliott_wave_count.py",
       "src/detectors/building_blocks/elliott_wave/elliott_wave_oscillator.py",
       "src/detectors/building_blocks/fibonacci/fibonacci_retracements.py",
@@ -9103,6 +9105,6 @@
     "parsed_files": 1409,
     "error_files": 16,
     "parse_rate_pct": 98.88,
-    "edge_count": 2476
+    "edge_count": 2477
   }
 }
