@@ -262,6 +262,64 @@ class TestProcessIssue:
         assert action_type == "request_sha"
         assert success is True
 
+    @patch("closure_gate_routine.fetch_issue_comments")
+    @patch("closure_gate_routine.request_fix_sha_tag")
+    def test_process_issue_fix_sha_none_exempt(self, mock_request, mock_fetch_comments):
+        """Issues carrying `Fix-SHA: NONE` are exempt and never trigger a request."""
+        mock_fetch_comments.return_value = [
+            {"body": "Operational fix; no code commit.\n\nFix-SHA: NONE\n"}
+        ]
+
+        issue = {
+            "id": "issue-none",
+            "identifier": "BTCAAAAA-26048",
+            "status": "done",
+            "originKind": "manual",
+        }
+        state: dict = {}
+
+        action_type, success = process_issue(issue, state)
+        assert action_type == "verified"
+        assert success is True
+        mock_request.assert_not_called()
+        assert state == {}
+
+
+class TestFixShaNoneExemption:
+    """Cover the `Fix-SHA: NONE` exemption helper."""
+
+    def test_marker_anywhere_in_thread(self):
+        from closure_gate_routine import has_fix_sha_none_exemption
+
+        comments = [
+            {"body": "unrelated chatter"},
+            {"body": "Closing as resolved.\n\nFix-SHA: NONE - operational fix.\n"},
+        ]
+        assert has_fix_sha_none_exemption(comments) is True
+
+    def test_no_marker_returns_false(self):
+        from closure_gate_routine import has_fix_sha_none_exemption
+
+        assert has_fix_sha_none_exemption([{"body": "no marker here"}]) is False
+
+    def test_inline_mention_does_not_match(self):
+        from closure_gate_routine import has_fix_sha_none_exemption
+
+        # Marker is line-anchored - prose mentioning "Fix-SHA: NONE" mid-line
+        # must not match.
+        comments = [
+            {"body": "We could not provide Fix-SHA: NONE was acceptable here."}
+        ]
+        assert has_fix_sha_none_exemption(comments) is False
+
+    def test_lowercase_none_does_not_match(self):
+        from closure_gate_routine import has_fix_sha_none_exemption
+
+        # Marker is case-sensitive: lowercase `none` should not match - keeps
+        # the exemption deliberate.
+        comments = [{"body": "Fix-SHA: none"}]
+        assert has_fix_sha_none_exemption(comments) is False
+
 
 class TestSplitParagraphs:
     """Test paragraph splitting helper."""

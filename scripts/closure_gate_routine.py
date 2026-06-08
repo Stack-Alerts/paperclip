@@ -56,6 +56,11 @@ CLOSURE_GATE_STATE_FILE = REPO_ROOT / "data" / "closure_gate_actions.json"
 # Regex for Fix-SHA comment: line-anchored
 FIX_SHA_PATTERN = re.compile(r"^Fix-SHA: ([0-9a-f]{40})$", re.MULTILINE)
 
+# Line-anchored "no code commit" exemption marker for operational/non-code closures
+# (rclone reauth, routine pause/resume, manual rollback, etc.). Closure-gate
+# treats issues carrying this marker as verified and skips Fix-SHA requests.
+FIX_SHA_NONE_PATTERN = re.compile(r"^Fix-SHA: NONE\b", re.MULTILINE)
+
 # CEO mention for notifications
 CEO_MENTION = "@CEO"
 
@@ -209,6 +214,18 @@ def extract_fix_sha_from_comments(comments: list[dict[str, Any]]) -> str | None:
         if match:
             return match.group(1)
     return None
+
+
+def has_fix_sha_none_exemption(comments: list[dict[str, Any]]) -> bool:
+    """Return True if any comment carries the line-anchored `Fix-SHA: NONE` marker.
+
+    Used to exempt operational/non-code closures (manual OAuth reauth, routine
+    pause/resume, etc.) from Fix-SHA verification.
+    """
+    for comment in comments:
+        if FIX_SHA_NONE_PATTERN.search(comment.get("body", "") or ""):
+            return True
+    return False
 
 
 # === Fabrication Detection Functions (Phase 6c) ===
@@ -743,6 +760,17 @@ def process_issue(
                 issue_identifier,
                 exc,
             )
+
+    # Line-anchored `Fix-SHA: NONE` marker (BTCAAAAA-35382). Operational/non-code
+    # closures (manual OAuth reauth, routine pause/resume, rollback) cannot
+    # produce a verifiable commit SHA. The marker is the explicit assertion that
+    # this issue resolved without a code change and must be skipped by the gate.
+    if has_fix_sha_none_exemption(comments):
+        logger.info(
+            "Issue %s carries Fix-SHA: NONE exemption marker; skipping verification",
+            issue_identifier,
+        )
+        return "verified", True
 
     sha = extract_fix_sha_from_comments(comments)
 
