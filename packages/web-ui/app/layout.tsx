@@ -30,6 +30,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-theme="dark"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="h-full flex" style={{ background: 'var(--app-bg)', color: 'var(--text-primary)' }}>
