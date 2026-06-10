@@ -6,12 +6,13 @@ import { BacktestCountersRow } from './BacktestCountersRow';
 import {
   EVENT_DEFS,
   EVENT_GROUPS,
-  EVENT_BY_KEY,
-  BACKTEST_VISIBLE_KEYS,
-  type EventKey,
-  matchEvents,
+  LEVEL_DEFS_TC,
+  CATEGORY_DEFS_TC,
+  type LevelTag,
+  type CategoryTag,
+  detectLevel,
+  detectCategory,
   isContextLine,
-  colorForLine,
 } from './liveOutputEvents';
 
 export interface LiveOutputPanelProps {
@@ -26,43 +27,36 @@ export interface LiveOutputPanelProps {
   trades?: Trade[];
 }
 
-const FILTERS_STORAGE_KEY = 'backtest.liveOutput.filters.v1';
+const FILTERS_STORAGE_KEY = 'backtest.liveOutput.filters.v3';
 
-// Keys rendered as chips in the UI (from EVENT_GROUPS) — used for button-label logic.
-const ALL_RENDERED_CHIP_KEYS: readonly EventKey[] = EVENT_GROUPS.flatMap((g) => [...g.keys]);
-// Every key that can ever match a log line — used by toggleAll so hidden-filter
-// matches (PERFORMANCE, CONFIG_READ, etc.) are also cleared on Unselect All.
-const ALL_EVENT_KEYS: readonly EventKey[] = EVENT_DEFS.map((d) => d.key);
-
-function loadStoredFilters(): Set<EventKey> | null {
+function loadStoredFilters(): { levels: Set<LevelTag>; categories: Set<CategoryTag> } | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem(FILTERS_STORAGE_KEY);
     if (!raw) return null;
-    const arr = JSON.parse(raw) as unknown;
-    if (!Array.isArray(arr)) return null;
-    const keys = arr.filter((x): x is EventKey => typeof x === 'string' && x in EVENT_BY_KEY);
-    return new Set(keys);
+    const obj = JSON.parse(raw) as { levels?: string[]; categories?: string[] };
+    if (!Array.isArray(obj.levels) || !Array.isArray(obj.categories)) return null;
+    const validLevels = new Set(LEVEL_DEFS_TC.map(d => d.tag));
+    const validCats = new Set(CATEGORY_DEFS_TC.map(d => d.tag));
+    const levels = new Set<LevelTag>(obj.levels.filter((x): x is LevelTag => validLevels.has(x as LevelTag)));
+    const categories = new Set<CategoryTag>(obj.categories.filter((x): x is CategoryTag => validCats.has(x as CategoryTag)));
+    if (levels.size === 0 && categories.size === 0) return null;
+    return { levels, categories };
   } catch {
     return null;
   }
 }
 
-function defaultEnabledSet(): Set<EventKey> {
-  // Thick-client parity: `event_filters` defaults to all-24-on
-  // (log_viewer_window.py:469). Tab visibility only hides chips, it does
-  // not disable filters — so untagged-looking lines like
-  // "Loading bars from Binance…" (CONFIG_READ) still flow through.
-  return new Set(EVENT_DEFS.map((d) => d.key));
+function defaultLevels(): Set<LevelTag> {
+  return new Set(LEVEL_DEFS_TC.map(d => d.tag));
 }
 
-/** BTCAAAAA-33591 cycle-33: synthesize a dense per-trade log feed from a
- *  completed result. Mirrors the thick-client log_viewer_window output set:
- *  Order, Fill (Buy/Sell), Position, Performance. Every emitted line is
- *  derived from real Trade fields; no fabrication. Used as a client-side
- *  safety net so the web log has thick-client-equivalent density even when
- *  the backend's `messages` list is empty (e.g. multiprocessing pickling
- *  drop in multicore_backtest_engine). */
+function defaultCategories(): Set<CategoryTag> {
+  return new Set<CategoryTag>(['GLOBAL']);
+}
+
+/** BTCAAAAA-33591 cycle-33: synthesize dense per-trade log lines from a
+ *  completed result when the backend messages list is empty. */
 function synthesizeTradeLogLines(trades: Trade[]): BacktestStatusMessage[] {
   if (!trades || trades.length === 0) return [];
   const out: BacktestStatusMessage[] = [];
@@ -80,40 +74,17 @@ function synthesizeTradeLogLines(trades: Trade[]): BacktestStatusMessage[] {
     const exitReason = (t.exitType ?? 'Unknown').toString();
     const symbol = (t.symbol ?? 'BTC.P/USDT').toString();
     const outcome = pnl > 0 ? 'WIN' : pnl < 0 ? 'LOSS' : 'BREAKEVEN';
-    // Use real trade timestamps so the log column shows meaningful times.
-    // Fall back to a synthetic offset only when the trade has no time data.
     const fallbackBase = Date.now() - (trades.length - i) * 60_000;
     const entryTs = t.entryTime || new Date(fallbackBase).toISOString();
     const exitTs = t.exitTime || new Date(fallbackBase + 30_000).toISOString();
 
-    out.push({
-      message: `ORDER #${idx}: ${side} ${qty} ${symbol} ${isLong ? 'BUY' : 'SELL'} @ ${entry.toFixed(2)}`,
-      level: 'INFO',
-      timestamp: entryTs,
-    });
-    if (isLong) {
-      out.push({
-        message: `BUY FILL #${idx}: ${qty} ${symbol} @ ${entry.toFixed(2)}`,
-        level: 'INFO',
-        timestamp: entryTs,
-      });
-    } else {
-      out.push({
-        message: `SELL FILL #${idx}: ${qty} ${symbol} @ ${entry.toFixed(2)}`,
-        level: 'INFO',
-        timestamp: entryTs,
-      });
-    }
-    out.push({
-      message: `POSITION OPEN #${idx}: ${side} ${qty} ${symbol} @ ${entry.toFixed(2)} | bars=${bars}`,
-      level: 'INFO',
-      timestamp: entryTs,
-    });
-    out.push({
-      message: `PERFORMANCE #${idx}: ${outcome} | ${exitReason} @ ${exit.toFixed(2)} | Total PnL: $${pnl.toFixed(2)} (Realized ${pnlPct.toFixed(2)}%) | bars=${bars}`,
-      level: 'INFO',
-      timestamp: exitTs,
-    });
+    out.push({ message: `ORDER #${idx}: ${side} ${qty} ${symbol} ${isLong ? 'BUY' : 'SELL'} @ ${entry.toFixed(2)}`, level: 'INFO', timestamp: entryTs });
+    out.push({ message: isLong
+      ? `BUY FILL #${idx}: ${qty} ${symbol} @ ${entry.toFixed(2)}`
+      : `SELL FILL #${idx}: ${qty} ${symbol} @ ${entry.toFixed(2)}`,
+      level: 'INFO', timestamp: entryTs });
+    out.push({ message: `POSITION OPEN #${idx}: ${side} ${qty} ${symbol} @ ${entry.toFixed(2)} | bars=${bars}`, level: 'INFO', timestamp: entryTs });
+    out.push({ message: `PERFORMANCE #${idx}: ${outcome} | ${exitReason} @ ${exit.toFixed(2)} | Total PnL: $${pnl.toFixed(2)} (Realized ${pnlPct.toFixed(2)}%) | bars=${bars}`, level: 'INFO', timestamp: exitTs });
   }
   return out;
 }
@@ -121,21 +92,27 @@ function synthesizeTradeLogLines(trades: Trade[]): BacktestStatusMessage[] {
 export function LiveOutputPanel({ logs = [], isRunning = false, result = null, candles, trades }: LiveOutputPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
-  const [enabled, setEnabled] = useState<Set<EventKey>>(() => defaultEnabledSet());
+  const [enabledLevels, setEnabledLevels] = useState<Set<LevelTag>>(defaultLevels);
+  const [enabledCategories, setEnabledCategories] = useState<Set<CategoryTag>>(defaultCategories);
+  const [clearedBefore, setClearedBefore] = useState(0);
 
   useEffect(() => {
     const stored = loadStoredFilters();
-    if (stored && stored.size > 0) setEnabled(stored);
+    if (stored) {
+      if (stored.levels.size > 0) setEnabledLevels(stored.levels);
+      if (stored.categories.size > 0) setEnabledCategories(stored.categories);
+    }
   }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      window.localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(Array.from(enabled)));
-    } catch {
-      // localStorage may be unavailable (private mode / quota) — silent ignore.
-    }
-  }, [enabled]);
+      window.localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({
+        levels: Array.from(enabledLevels),
+        categories: Array.from(enabledCategories),
+      }));
+    } catch { /* quota/private-mode */ }
+  }, [enabledLevels, enabledCategories]);
 
   useEffect(() => {
     if (!isPaused && scrollRef.current) {
@@ -143,41 +120,39 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
     }
   }, [logs, isPaused, result]);
 
-  const toggleKey = useCallback((key: EventKey) => {
-    setEnabled((prev) => {
+  const toggleLevel = useCallback((tag: LevelTag) => {
+    setEnabledLevels(prev => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      if (next.has(tag)) next.delete(tag); else next.add(tag);
       return next;
     });
   }, []);
 
-  const toggleAll = useCallback(() => {
-    setEnabled((prev) => {
-      const allChipKeysOn = ALL_RENDERED_CHIP_KEYS.every((k) => prev.has(k));
-      if (allChipKeysOn) {
-        // Unselect All: wipe every key so hidden-filter matches (PERFORMANCE,
-        // CONFIG_READ, etc.) also stop appearing in the log.
-        return new Set<EventKey>();
-      }
-      // Select All: enable every event def so all line types are visible.
-      return new Set<EventKey>(ALL_EVENT_KEYS);
+  const toggleCategory = useCallback((tag: CategoryTag) => {
+    setEnabledCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(tag)) next.delete(tag); else next.add(tag);
+      return next;
     });
   }, []);
 
-  // BTCAAAAA-33591 cycle-33: append per-trade synthesis ONLY for trade ids
-  // not already present in `logs`. The backend may already have emitted its
-  // own fallback (Entry #N, Exit #N), so we avoid duplicating. We key on the
-  // trade id so two passes for the same trade don't double up.
-  // Prefer the explicit trades prop; fall back to result.trades (may be absent
-  // when the backend returns totalTrades without the full array).
+  const allOn = enabledLevels.size === LEVEL_DEFS_TC.length && enabledCategories.has('GLOBAL');
+
+  const toggleAll = useCallback(() => {
+    if (allOn) {
+      setEnabledLevels(new Set());
+      setEnabledCategories(new Set());
+    } else {
+      setEnabledLevels(defaultLevels());
+      setEnabledCategories(defaultCategories());
+    }
+  }, [allOn]);
+
   const effectiveTrades = useMemo(
     () => (trades?.length ? trades : (result?.trades ?? [])),
     [trades, result],
   );
 
-  // Merge trades into result so BacktestCountersRow gets the TP/SL tally even
-  // when result.trades is absent.
   const effectiveResult = useMemo(() => {
     if (!result) return null;
     if (result.trades?.length || !effectiveTrades.length) return result;
@@ -185,31 +160,24 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
   }, [result, effectiveTrades]);
 
   const effectiveLogs = useMemo(() => {
-    const trades = effectiveTrades;
-    if (trades.length === 0) return logs;
-    const synth = synthesizeTradeLogLines(trades);
+    const tradeList = effectiveTrades;
+    if (tradeList.length === 0) return logs;
+    const synth = synthesizeTradeLogLines(tradeList);
     if (synth.length === 0) return logs;
-    // The backend emits "Entry #N" / "Exit #N" (native format) or
-    // "ORDER #N" / "PERFORMANCE #N" (app.py synthesized fallback).
-    // Detect both so we never add duplicate lines on top of backend output.
     const backendTradeIdxCovered = new Set<number>();
-    const entryExitRe = /(?:Entry|Exit|ORDER|PERFORMANCE)\s+#(\d+):/i;
+    const re = /(?:Entry|Exit|ORDER|PERFORMANCE)\s+#(\d+):/i;
     for (const m of logs) {
-      const match = entryExitRe.exec(m.message ?? '');
+      const match = re.exec(m.message ?? '');
       if (match) backendTradeIdxCovered.add(parseInt(match[1], 10));
     }
-    // If backend covered all trades, skip synthesis entirely.
-    if (backendTradeIdxCovered.size >= trades.length) return logs;
-    // Otherwise append synthesis for the missing trade indices.
+    if (backendTradeIdxCovered.size >= tradeList.length) return logs;
     const missing: BacktestStatusMessage[] = [];
     for (let i = 0; i < synth.length; i++) {
-      // synth emits 4 lines per trade (ORDER, FILL, POSITION, PERFORMANCE).
       const tradeIdx = Math.floor(i / 4) + 1;
       if (backendTradeIdxCovered.has(tradeIdx)) continue;
       missing.push(synth[i]);
     }
     if (missing.length === 0) return logs;
-    // Sort merged by timestamp so the timeline stays ordered.
     return [...logs, ...missing].sort((a, b) => {
       const ta = Date.parse(a.timestamp ?? '') || 0;
       const tb = Date.parse(b.timestamp ?? '') || 0;
@@ -217,77 +185,107 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
     });
   }, [logs, effectiveTrades]);
 
-  // Mirrors ContentCache.filter (log_viewer_window.py:158-175): keep
-  // matched lines; carry context lines through while `inContext` is true.
-  const { rows, totalLines, displayedLines, eventCount } = useMemo(() => {
-    // When every event key is enabled (the default/unfiltered state), show all
-    // lines regardless of whether they match a known pattern. This prevents
-    // backend lifecycle messages that don't match any EVENT_DEF from being
-    // silently hidden when the user hasn't actually narrowed the filter set.
-    const showAll = enabled.size >= ALL_EVENT_KEYS.length;
+  const visibleLogs = useMemo(
+    () => effectiveLogs.slice(Math.min(clearedBefore, effectiveLogs.length)),
+    [effectiveLogs, clearedBefore],
+  );
 
+  const categoryFilterActive = enabledCategories.size > 0 && !enabledCategories.has('GLOBAL');
+  const showAll = enabledLevels.size === LEVEL_DEFS_TC.length && !categoryFilterActive;
+
+  const { rows, displayedLines } = useMemo(() => {
     let inContext = false;
     let displayed = 0;
-    let events = 0;
-    const built: Array<{ key: string; text: string; color: string; isContext: boolean; ts?: string; level: string }> = [];
+    const built: Array<{
+      key: string; text: string; lvl: LevelTag; cat: CategoryTag; isContext: boolean; ts?: string;
+    }> = [];
 
-    for (let i = 0; i < effectiveLogs.length; i++) {
-      const msg = effectiveLogs[i];
+    for (let i = 0; i < visibleLogs.length; i++) {
+      const msg = visibleLogs[i];
       const text = msg.message ?? '';
-      const matched = matchEvents(text);
-      const matchedEnabled = Array.from(matched).some((k) => enabled.has(k));
-
       const isCtx = isContextLine(text);
-      let keep = false;
+      const lvl = detectLevel(text);
+      const cat = detectCategory(text);
 
-      if (matchedEnabled) {
-        keep = true;
-        inContext = true;
-        events += 1;
-      } else if (showAll) {
-        keep = true;
-        inContext = true;
-      } else if (inContext && (isCtx || text.trim() === '')) {
-        keep = true;
+      let keep = false;
+      if (showAll) {
+        keep = true; inContext = true;
       } else {
-        inContext = false;
+        const levelOk = enabledLevels.has(lvl);
+        const catOk = !categoryFilterActive || enabledCategories.has(cat);
+        if (levelOk && catOk) {
+          keep = true; inContext = true;
+        } else if (inContext && (isCtx || text.trim() === '')) {
+          keep = true;
+        } else {
+          inContext = false;
+        }
       }
 
       if (keep) {
-        displayed += 1;
-        const c = colorForLine(text) ?? levelFallbackColor(msg.level);
-        built.push({
-          key: `${i}`,
-          text,
-          color: c,
-          isContext: isCtx,
-          ts: msg.timestamp,
-          level: msg.level,
-        });
+        displayed++;
+        built.push({ key: `${i}`, text, lvl, cat, isContext: isCtx, ts: msg.timestamp });
       }
     }
+    return { rows: built, displayedLines: displayed };
+  }, [visibleLogs, showAll, enabledLevels, enabledCategories, categoryFilterActive]);
 
+  // Bottom-bar stats: count from ALL effective logs (mirrors thick-client counters).
+  const { decisions, winners, losses, stopLoss, tradeCount } = useMemo(() => {
+    let dec = 0, win = 0, loss = 0, sl = 0;
+    for (const msg of effectiveLogs) {
+      const lvl = detectLevel(msg.message ?? '');
+      if (lvl === 'DECISION') dec++;
+      else if (lvl === 'WIN') win++;
+      else if (lvl === 'LOSS') loss++;
+      else if (lvl === 'STOP_LOSS') sl++;
+    }
     return {
-      rows: built,
-      totalLines: effectiveLogs.length,
-      displayedLines: displayed,
-      eventCount: events,
+      decisions: dec, winners: win, losses: loss, stopLoss: sl,
+      tradeCount: result?.totalTrades ?? result?.trades?.length ?? effectiveTrades.length,
     };
-  }, [effectiveLogs, enabled]);
+  }, [effectiveLogs, result, effectiveTrades]);
 
-  const allChipsOn = ALL_RENDERED_CHIP_KEYS.every((k) => enabled.has(k));
+  const handleCopy = useCallback(() => {
+    const text = rows.map(r => {
+      const ts = r.ts ? formatTime(r.ts) : '';
+      const lLabel = LEVEL_DEFS_TC.find(d => d.tag === r.lvl)?.label ?? r.lvl;
+      const cLabel = CATEGORY_DEFS_TC.find(d => d.tag === r.cat)?.label ?? r.cat;
+      return `${ts} [${lLabel}] [${cLabel}] ${r.text}`;
+    }).join('\n');
+    navigator.clipboard.writeText(text).catch(() => {});
+  }, [rows]);
+
+  const handleExport = useCallback(() => {
+    const text = rows.map(r => {
+      const ts = r.ts ? formatTime(r.ts) : '';
+      const lLabel = LEVEL_DEFS_TC.find(d => d.tag === r.lvl)?.label ?? r.lvl;
+      const cLabel = CATEGORY_DEFS_TC.find(d => d.tag === r.cat)?.label ?? r.cat;
+      return `${ts} [${lLabel}] [${cLabel}] ${r.text}`;
+    }).join('\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'backtest-log.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [rows]);
+
+  const handleClear = useCallback(() => {
+    setClearedBefore(effectiveLogs.length);
+  }, [effectiveLogs.length]);
 
   return (
     <div className="flex flex-col h-full" style={{ minHeight: 300 }}>
+      {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
           Live Output
         </p>
         <div className="flex items-center gap-2">
           {isRunning && (
-            <span className="text-xs" style={{ color: 'var(--accent-green)' }}>
-              ● RUNNING
-            </span>
+            <span className="text-xs" style={{ color: 'var(--accent-green)' }}>● RUNNING</span>
           )}
           <button
             onMouseEnter={() => setIsPaused(true)}
@@ -305,95 +303,82 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
         </div>
       </div>
 
-      {/* Run counters row — shared with the Config tab STATUS section
-          (BTCAAAAA-34582). Both surfaces read from the same `result` so the
-          values always agree. */}
+      {/* TP/SL + candles counters row */}
       <BacktestCountersRow result={effectiveResult} candles={candles} className="mb-2" />
 
-      {/* Event-filter groups — neutral chrome (BTCAAAAA-33591 cycle-33). The
-          per-chip accent (def.color) carries the event identity; the group
-          border + label color is the dialog's neutral `--border` / muted
-          text variable. This drops the bright thick-client hex frames the
-          board flagged. */}
-      <div className="mb-2 flex flex-wrap items-stretch gap-2" data-testid="live-output-filters">
-        {EVENT_GROUPS.map((group) => (
-          <div
-            key={group.title}
-            className="flex flex-col rounded px-2 py-1.5"
+      {/* ── Thick-client filter bar ─────────────────────────────────────────── */}
+      <div className="mb-1 flex flex-col gap-1" data-testid="live-output-filters">
+        {/* Level filter row: INFO | DECISION | WIN | LOSS | STOP/LOSS */}
+        <div className="flex items-center flex-wrap gap-1">
+          {LEVEL_DEFS_TC.map(def => {
+            const on = enabledLevels.has(def.tag);
+            return (
+              <button
+                key={def.tag}
+                type="button"
+                aria-label={def.label}
+                aria-pressed={on}
+                onClick={() => toggleLevel(def.tag)}
+                className="text-[11px] font-semibold px-2 py-0.5 rounded"
+                style={{
+                  background: on ? `${def.color}22` : 'var(--bg-deep)',
+                  color: on ? def.color : 'var(--text-muted)',
+                  border: `1px solid ${on ? def.color : 'var(--border)'}`,
+                  cursor: 'pointer',
+                }}
+              >
+                {def.label}
+              </button>
+            );
+          })}
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={toggleAll}
+            title="Toggle all event filters"
+            className="text-[11px] px-3 py-0.5 rounded"
             style={{
-              border: `1px solid var(--border)`,
               background: 'var(--bg-deep)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border)',
+              cursor: 'pointer',
             }}
           >
-            <span
-              className="text-[10px] uppercase tracking-wider mb-1 font-semibold"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              {group.title}
-            </span>
-            <div className="flex flex-wrap gap-x-2 gap-y-1">
-              {group.keys.map((k) => {
-                const def = EVENT_BY_KEY[k];
-                if (!def) return null;
-                const on = enabled.has(k);
-                return (
-                  <label
-                    key={k}
-                    className="flex items-center gap-1 cursor-pointer select-none text-[11px]"
-                    style={{ color: def.color, opacity: on ? 1 : 0.4 }}
-                    title={`Filter: ${def.label}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={on}
-                      onChange={() => toggleKey(k)}
-                      aria-label={def.label}
-                      style={{ accentColor: '#555', width: 10, height: 10, flexShrink: 0 }}
-                    />
-                    <span>{def.label}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+            {allOn ? 'Unselect All' : 'Select All'}
+          </button>
+        </div>
 
-        <button
-          type="button"
-          onClick={toggleAll}
-          className="text-[11px] px-3 rounded self-stretch"
-          style={{
-            background: 'var(--bg-deep)',
-            color: 'var(--text-secondary)',
-            border: '1px solid var(--border)',
-          }}
-          title="Toggle all event filters"
-        >
-          {allChipsOn ? 'Unselect All' : 'Select All'}
-        </button>
+        {/* Category filter row: Global | TRADE | RISK | SYSTEM | OPTIMIZER | SERVICE */}
+        <div className="flex items-center flex-wrap gap-1">
+          <span className="text-[10px] uppercase tracking-wider mr-1" style={{ color: 'var(--text-muted)' }}>
+            Categories:
+          </span>
+          {CATEGORY_DEFS_TC.map(def => {
+            const on = enabledCategories.has(def.tag);
+            const isHexColor = def.color.startsWith('#');
+            return (
+              <button
+                key={def.tag}
+                type="button"
+                aria-label={def.label}
+                aria-pressed={on}
+                onClick={() => toggleCategory(def.tag)}
+                className="text-[11px] font-semibold px-2 py-0.5 rounded"
+                style={{
+                  background: on ? (isHexColor ? `${def.color}22` : 'var(--bg-hover)') : 'var(--bg-deep)',
+                  color: on ? (isHexColor ? def.color : 'var(--text-secondary)') : 'var(--text-muted)',
+                  border: `1px solid ${on && isHexColor ? def.color : 'var(--border)'}`,
+                  cursor: 'pointer',
+                }}
+              >
+                {def.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Stat counters (Total / Displayed / Events) — mirrors thick-client
-          bottom-bar (`_create_bottom_bar` log_viewer_window.py:647). Events
-          counter uses the warning color (#FFA500) per
-          `get_label_style("warning")`. */}
-      <div className="mb-1 flex items-center gap-4 text-[11px]" data-testid="live-output-stats">
-        <span style={{ color: 'var(--text-muted)' }}>
-          Total Lines: <b>{totalLines.toLocaleString()}</b>
-        </span>
-        <span style={{ color: 'var(--text-muted)' }}>
-          Displayed: <b>{displayedLines.toLocaleString()}</b>
-        </span>
-        <span style={{ color: '#FFA500' }}>
-          Events: <b>{eventCount.toLocaleString()}</b>
-        </span>
-      </div>
-
-      {/* Dense log grid — thick-client parity. Each line renders as a
-          monospace 4-column row: HH:MM:SS | Level | Category | Message.
-          Tighter line-height + smaller font match the thick-client's
-          log_viewer_window visual density. Hover affordance for level
-          badge so the level column is always greppable. */}
+      {/* ── Log output ─────────────────────────────────────────────────────── */}
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto rounded font-mono text-[11px]"
@@ -405,62 +390,35 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
         }}
         data-testid="live-output-log"
       >
-        {effectiveLogs.length === 0 ? (
+        {visibleLogs.length === 0 ? (
           <p style={{ color: 'var(--text-faint)' }}>
             {isRunning ? 'Waiting for output…' : 'No output yet. Start a backtest to see live output.'}
           </p>
         ) : rows.length === 0 ? (
-          <p style={{ color: 'var(--text-faint)' }}>
-            No lines match the active filters.
-          </p>
+          <p style={{ color: 'var(--text-faint)' }}>No lines match the active filters.</p>
         ) : (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '70px 64px 90px 1fr',
-              columnGap: '0.5rem',
-              rowGap: '1px',
-              alignItems: 'baseline',
-            }}
-          >
-            {rows.map((row) => {
-              const ts = row.ts ? new Date(row.ts) : null;
-              const time = ts
-                ? `${pad2(ts.getHours())}:${pad2(ts.getMinutes())}:${pad2(ts.getSeconds())}`
-                : '';
-              const level = (row.level ?? 'INFO').toString().toUpperCase();
-              const category = pickCategoryBadge(row.text);
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {rows.map(row => {
+              const time = row.ts ? formatTime(row.ts) : '';
+              const lDef = LEVEL_DEFS_TC.find(d => d.tag === row.lvl);
+              const cDef = CATEGORY_DEFS_TC.find(d => d.tag === row.cat);
+              const lColor = lDef?.color ?? '#9AA0A6';
+              const cColor = cDef?.color ?? '#9AA0A6';
               return (
-                <div key={row.key} className="contents" data-testid="log-row">
-                  <span style={{ color: 'var(--text-faint)', whiteSpace: 'nowrap' }}>{time}</span>
-                  <span
-                    style={{
-                      color: row.color,
-                      whiteSpace: 'nowrap',
-                      fontWeight: 600,
-                      paddingLeft: row.isContext ? 12 : 0,
-                    }}
-                    title={level}
-                  >
-                    {level}
+                <div
+                  key={row.key}
+                  className="flex items-baseline gap-1.5 leading-[1.4]"
+                  data-testid="log-row"
+                  style={{ paddingLeft: row.isContext ? 12 : 0 }}
+                >
+                  <span style={{ color: 'var(--text-faint)', whiteSpace: 'nowrap', flexShrink: 0 }}>{time}</span>
+                  <span style={{ color: lColor, whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 700 }}>
+                    [{lDef?.label ?? row.lvl}]
                   </span>
-                  <span
-                    style={{
-                      color: 'var(--text-muted)',
-                      whiteSpace: 'nowrap',
-                      paddingLeft: row.isContext ? 12 : 0,
-                    }}
-                    title={category}
-                  >
-                    {category}
+                  <span style={{ color: cColor, whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 600 }}>
+                    [{cDef?.label ?? row.cat}]
                   </span>
-                  <span
-                    style={{
-                      color: row.color,
-                      paddingLeft: row.isContext ? 12 : 0,
-                      wordBreak: 'break-word',
-                    }}
-                  >
+                  <span style={{ color: lColor, wordBreak: 'break-word', opacity: 0.9 }}>
                     {row.text}
                   </span>
                 </div>
@@ -469,54 +427,52 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
           </div>
         )}
       </div>
+
+      {/* ── Bottom stats bar (mirrors thick-client _create_bottom_bar) ──────── */}
+      <div
+        className="mt-1 flex items-center gap-3 text-[11px] flex-wrap"
+        data-testid="live-output-stats"
+        style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}
+      >
+        <span>Messages: <b style={{ color: 'var(--text-secondary)' }}>{effectiveLogs.length.toLocaleString()}</b></span>
+        <span>Displayed: <b style={{ color: 'var(--text-secondary)' }}>{displayedLines.toLocaleString()}</b></span>
+        <span>Decisions: <b style={{ color: '#FF8C00' }}>{decisions.toLocaleString()}</b></span>
+        <span>Winners: <b style={{ color: '#10B981' }}>{winners.toLocaleString()}</b></span>
+        <span>Losses: <b style={{ color: '#C35252' }}>{losses.toLocaleString()}</b></span>
+        <span>Stop Loss: <b style={{ color: '#FF4040' }}>{stopLoss.toLocaleString()}</b></span>
+        <span>Trades: <b style={{ color: 'var(--text-secondary)' }}>{tradeCount.toLocaleString()}</b></span>
+        <div className="flex-1" />
+        <button
+          type="button" onClick={handleCopy}
+          className="text-[11px] px-2 py-0.5 rounded"
+          style={{ background: 'var(--bg-deep)', color: 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
+          title="Copy displayed log to clipboard"
+        >Copy</button>
+        <button
+          type="button" onClick={handleClear}
+          className="text-[11px] px-2 py-0.5 rounded"
+          style={{ background: 'var(--bg-deep)', color: 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
+          title="Clear log display"
+        >Clear</button>
+        <button
+          type="button" onClick={handleExport}
+          className="text-[11px] px-2 py-0.5 rounded"
+          style={{ background: 'var(--bg-deep)', color: 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'pointer' }}
+          title="Export log as text file"
+        >Export</button>
+      </div>
     </div>
   );
 }
 
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}.${d.getMilliseconds().toString().padStart(3, '0')}`;
+}
+
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
-}
-
-/** Map a log line to a thick-client-style category badge text. Mirrors the
- *  PyQt5 log_viewer_window chip vocabulary: ORDER / BUY / SELL / BUY_FILL
- *  / SELL_FILL / POSITION / PERFORMANCE / SYSTEM / ERROR / WARNING. The
- *  match order follows EVENT_DEFS (which mirrors PyQt5 EVENT_PATTERNS), so
- *  category labels are deterministic across renders. */
-function pickCategoryBadge(text: string): string {
-  const t = text.toUpperCase();
-  if (/ORDER.*#\d+/.test(t)) return 'ORDER';
-  if (/BUY\s*FILL|BUY FILL/.test(t)) return 'BUY_FILL';
-  if (/SELL\s*FILL|SELL FILL/.test(t)) return 'SELL_FILL';
-  if (/POSITION\s+(OPEN|CLOSE|UPDATE)/.test(t)) return 'POSITION';
-  if (/PERFORMANCE/.test(t)) return 'PERFORMANCE';
-  if (/^ENTRY\s*#\d+:\s*LONG/.test(t)) return 'BUY';
-  if (/^ENTRY\s*#\d+:\s*SHORT/.test(t)) return 'SELL';
-  if (/^EXIT\s*#\d+:\s*WIN/.test(t)) return 'BUY_FILL';
-  if (/^EXIT\s*#\d+:\s*LOSS/.test(t)) return 'SELL_FILL';
-  if (/TRADE\s+OPENED|TRADE OPENED/.test(t)) return 'BUY';
-  if (/TRADE\s+CLOSED|TRADE CLOSED/.test(t)) return 'POSITION';
-  if (/STARTING|STARTED|BACKTEST.*START/.test(t)) return 'SYSTEM';
-  if (/LOADING|LOADED|PROCESSING|RUNNING/.test(t)) return 'SYSTEM';
-  if (/COMPLETED|FINISHED|SUCCESS/.test(t)) return 'SYSTEM';
-  if (/STOPPED|STOPPING|SHUTDOWN/.test(t)) return 'SYSTEM';
-  if (/ERROR|EXCEPTION|FAILED/.test(t)) return 'ERROR';
-  if (/WARN(ING)?/.test(t)) return 'WARNING';
-  if (/CRITICAL|FATAL/.test(t)) return 'CRITICAL';
-  if (/ALERT/.test(t)) return 'ALERT';
-  return 'INFO';
-}
-
-function levelFallbackColor(level: BacktestStatusMessage['level']): string {
-  // Only consulted when no EVENT_PATTERN matches. Keeps prior coarse
-  // INFO/SYSTEM/ERROR coloring as a graceful fallback.
-  switch (level) {
-    case 'ERROR':
-      return 'var(--accent-red)';
-    case 'SYSTEM':
-      return 'var(--accent-orange)';
-    default:
-      return 'var(--text-secondary)';
-  }
 }
 
 export { EVENT_DEFS, EVENT_GROUPS };

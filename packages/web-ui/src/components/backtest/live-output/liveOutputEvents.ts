@@ -4,6 +4,70 @@
 // BTCAAAAA-34925 — Step 1 audit comment. Do not change hex values without
 // updating the audit and the corresponding PyQt5 source.
 
+// ─── Thick-client level/category filter types (BTCAAAAA-35662) ───────────────
+// Mirrors the log_viewer_window.py filter bar: level row (INFO/DECISION/WIN/
+// LOSS/STOP_LOSS) + category row (GLOBAL/TRADE/RISK/SYSTEM/OPTIMIZER/SERVICE).
+
+export type LevelTag = 'INFO' | 'DECISION' | 'WIN' | 'LOSS' | 'STOP_LOSS';
+export type CategoryTag = 'GLOBAL' | 'TRADE' | 'RISK' | 'SYSTEM' | 'OPTIMIZER' | 'SERVICE';
+
+export interface LevelDef {
+  tag: LevelTag;
+  label: string;
+  color: string;
+}
+
+export interface CategoryDef {
+  tag: CategoryTag;
+  label: string;
+  color: string;
+}
+
+export const LEVEL_DEFS_TC: readonly LevelDef[] = [
+  { tag: 'INFO',      label: 'INFO',      color: '#2070FF' },
+  { tag: 'DECISION',  label: 'DECISION',  color: '#FF8C00' },
+  { tag: 'WIN',       label: 'WIN',       color: '#10B981' },
+  { tag: 'LOSS',      label: 'LOSS',      color: '#C35252' },
+  { tag: 'STOP_LOSS', label: 'STOP/LOSS', color: '#FF4040' },
+];
+
+export const CATEGORY_DEFS_TC: readonly CategoryDef[] = [
+  { tag: 'GLOBAL',    label: 'Global',    color: 'var(--text-secondary)' },
+  { tag: 'TRADE',     label: 'TRADE',     color: '#FFD700' },
+  { tag: 'RISK',      label: 'RISK',      color: '#FFD700' },
+  { tag: 'SYSTEM',    label: 'SYSTEM',    color: '#9AA0A6' },
+  { tag: 'OPTIMIZER', label: 'OPTIMIZER', color: '#8B5CF6' },
+  { tag: 'SERVICE',   label: 'SERVICE',   color: '#9AA0A6' },
+];
+
+export function detectLevel(text: string): LevelTag {
+  const t = text.toUpperCase();
+  if (/STOP.{0,2}LOSS|REASON:\s*STOP|SL\s*@\s*\d/.test(t)) return 'STOP_LOSS';
+  if (/\bLOSS\b|SELL.{0,2}FILL|EXIT.*:\s*LOSS/.test(t)) return 'LOSS';
+  if (/\bWIN\b|BUY.{0,2}FILL|EXIT.*:\s*WIN/.test(t)) return 'WIN';
+  if (/\bDECISION\b|\bCONDITION\s+MET\b|\bSIGNAL\s+DETECT/.test(t)) return 'DECISION';
+  return 'INFO';
+}
+
+export function detectCategory(text: string): CategoryTag {
+  const t = text.toUpperCase();
+  if (/\bORDER\b|\bTRADE\s*(OPEN|CLOS|UPDAT)|\bBUY\b|\bSELL\b|\bPOSITION\b|\bENTRY\s*#|\bEXIT\s*#/.test(t)) return 'TRADE';
+  if (/\bRISK\b|\bPERFORMANCE\b|\bMAX\s*LOSS\b|\bPNL\b|\bSTOP\s*LOSS\b/.test(t)) return 'RISK';
+  if (/\bOPTIMIZER\b|\bDECISION\b|\bSIGNAL\b|\bCONDITION\b|\bBLOCK\b|\bSEARCH\b/.test(t)) return 'OPTIMIZER';
+  if (/\bCONFIG\b|\bREADING\b|\bRETRIEV\b/.test(t)) return 'SERVICE';
+  return 'SYSTEM';
+}
+
+export function levelColor(tag: LevelTag): string {
+  return LEVEL_DEFS_TC.find(d => d.tag === tag)?.color ?? '#9AA0A6';
+}
+
+export function categoryColor(tag: CategoryTag): string {
+  return CATEGORY_DEFS_TC.find(d => d.tag === tag)?.color ?? '#9AA0A6';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type EventKey =
   | 'TRADE_OPENED'
   | 'TRADE_CLOSED'

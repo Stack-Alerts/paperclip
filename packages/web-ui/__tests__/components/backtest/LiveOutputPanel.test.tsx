@@ -38,8 +38,6 @@ describe('LiveOutputPanel — streaming output + run counters (cycle-13)', () =>
   it('shows the natural "no output yet" placeholder when idle (no idle checklist)', () => {
     render(<LiveOutputPanel logs={[]} isRunning={false} />);
     expect(screen.getByText(/No output yet/)).toBeInTheDocument();
-    // The thick-client checklist must NOT render here — it now lives on the
-    // Config tab as the StatusColumn right rail.
     expect(screen.queryByText(/Status updates will appear here when backtest starts/)).toBeNull();
     expect(screen.queryByText(/Data loading progress from Unified Data Manager/)).toBeNull();
   });
@@ -69,12 +67,6 @@ describe('LiveOutputPanel — streaming output + run counters (cycle-13)', () =>
 });
 
 // BTCAAAAA-33591 cycle-33: per-trade synthesis safety net (frontend side).
-// The backend now emits ORDER / FILL / POSITION / PERFORMANCE lines for each
-// trade (src/api/app.py), but when the panel is fed a result whose trades
-// are not yet represented in `logs` (e.g. result arrived via a separate
-// poll and the engine's messages list was empty for that pass), the panel
-// synthesizes the thick-client-equivalent line set locally so the web log
-// has the same density the board is asking for.
 describe('LiveOutputPanel — per-trade synthesis (cycle-33, BTCAAAAA-33591)', () => {
   it('synthesizes ORDER / FILL / POSITION / PERFORMANCE lines from a result with trades', () => {
     const result = makeResult({
@@ -97,13 +89,9 @@ describe('LiveOutputPanel — per-trade synthesis (cycle-33, BTCAAAAA-33591)', (
       ],
     });
     render(<LiveOutputPanel logs={[]} isRunning={false} result={result} />);
-    // ORDER line for trade #1
     expect(screen.getByText(/ORDER #1:.*LONG.*1.*BTC\.P\/USDT.*BUY @ 100\.00/)).toBeInTheDocument();
-    // BUY FILL line
     expect(screen.getByText(/BUY FILL #1:.*1.*BTC\.P\/USDT @ 100\.00/)).toBeInTheDocument();
-    // POSITION OPEN line
     expect(screen.getByText(/POSITION OPEN #1:.*LONG.*1.*BTC\.P\/USDT @ 100\.00 \| bars=4/)).toBeInTheDocument();
-    // PERFORMANCE line
     expect(screen.getByText(/PERFORMANCE #1:.*WIN.*TP1.*110\.00.*Total PnL: \$10\.00.*10\.00%.*bars=4/)).toBeInTheDocument();
   });
 
@@ -129,7 +117,6 @@ describe('LiveOutputPanel — per-trade synthesis (cycle-33, BTCAAAAA-33591)', (
     });
     render(<LiveOutputPanel logs={[]} isRunning={false} result={result} />);
     expect(screen.getByText(/SELL FILL #1:.*1.*BTC\.P\/USDT @ 100\.00/)).toBeInTheDocument();
-    // BUY FILL must NOT be present for a SHORT
     expect(screen.queryByText(/BUY FILL #1:/)).toBeNull();
     expect(screen.getByText(/PERFORMANCE #1:.*LOSS/)).toBeInTheDocument();
   });
@@ -154,8 +141,6 @@ describe('LiveOutputPanel — per-trade synthesis (cycle-33, BTCAAAAA-33591)', (
         },
       ],
     });
-    // Backend already emitted ORDER / PERFORMANCE lines (app.py synthesized
-    // fallback). Panel must NOT add a second set → no double-accounting.
     const logs: BacktestStatusMessage[] = [
       { message: 'ORDER #1: LONG 1 BTC.P/USDT BUY @ 100.00', level: 'INFO', timestamp: '2026-01-01T10:00:00Z' },
       { message: 'BUY FILL #1: 1 BTC.P/USDT @ 100.00', level: 'INFO', timestamp: '2026-01-01T10:00:01Z' },
@@ -163,7 +148,6 @@ describe('LiveOutputPanel — per-trade synthesis (cycle-33, BTCAAAAA-33591)', (
       { message: 'PERFORMANCE #1: WIN | TP1 @ 110.00 | Total PnL: $10.00 (10.00%) | bars=4', level: 'INFO', timestamp: '2026-01-01T11:00:00Z' },
     ];
     render(<LiveOutputPanel logs={logs} isRunning={false} result={result} />);
-    // Backend lines are present exactly once — no duplicates from synthesis.
     expect(screen.getAllByText(/ORDER #1:/).length).toBe(1);
     expect(screen.getAllByText(/PERFORMANCE #1:/).length).toBe(1);
   });
@@ -188,8 +172,6 @@ describe('LiveOutputPanel — per-trade synthesis (cycle-33, BTCAAAAA-33591)', (
         },
       ],
     });
-    // Backend log already has Entry #1 / Exit #1 — the panel should NOT
-    // append synthesized ORDER / FILL / POSITION / PERFORMANCE lines.
     const logs: BacktestStatusMessage[] = [
       { message: 'Entry #1: LONG @ 100.00', level: 'INFO', timestamp: '2026-01-01T10:00:00Z' },
       { message: 'Exit #1: WIN | TP1 @ 110.00 | PnL: $10.00 (10.00%) | Bars: 4', level: 'INFO', timestamp: '2026-01-01T11:00:00Z' },
@@ -202,9 +184,9 @@ describe('LiveOutputPanel — per-trade synthesis (cycle-33, BTCAAAAA-33591)', (
   });
 });
 
-// BTCAAAAA-35662: verify every visible chip filter works and that Unselect All
-// truly hides all lines including hidden-filter matches (PERFORMANCE, CONFIG_READ).
-describe('LiveOutputPanel — filter wiring (BTCAAAAA-35662)', () => {
+// BTCAAAAA-35662: thick-client filter bar — level + category toggle buttons,
+// Unselect All, bottom stats bar, and [TAG] bracket display.
+describe('LiveOutputPanel — thick-client filter bar (BTCAAAAA-35662)', () => {
   const ts = (n: number) => `2026-01-01T00:00:0${n}Z`;
   const log = (message: string, n = 0): BacktestStatusMessage => ({ message, level: 'INFO', timestamp: ts(n) });
   const NOMATCH = 'xyzzy_unique_no_match_999';
@@ -217,7 +199,7 @@ describe('LiveOutputPanel — filter wiring (BTCAAAAA-35662)', () => {
     const logs = [
       log('TRADE OPENED: BTC long'),
       log('PERFORMANCE #1: WIN | TP1 | Total PnL: $10.00', 1),
-      log('Loading bars from Binance...', 2),          // matches hidden CONFIG_READ
+      log('Loading bars from Binance...', 2),
     ];
     render(<LiveOutputPanel logs={logs} />);
     fireEvent.click(screen.getByTitle('Toggle all event filters')); // Unselect All
@@ -237,62 +219,102 @@ describe('LiveOutputPanel — filter wiring (BTCAAAAA-35662)', () => {
     expect(screen.getByText(/PERFORMANCE #1/)).toBeInTheDocument();
   });
 
-  // ── Per-chip filter: each chip shows its match and hides non-matches ────────
+  // ── Level filter buttons ────────────────────────────────────────────────────
+  // Each pair: [label, matchMsg (classifies to that level), otherMsg (different level)]
+  // - Messages avoid `|` in first 15 chars to prevent regex-OR issues.
+  // - LOSS message avoids 'SL @' pattern which would trigger STOP_LOSS instead.
 
   it.each([
-    // Trade Activity (thick-client keys)
-    ['Trade Opened',  'TRADE OPENED: BTC long'],
-    ['Trade Closed',  'TRADE CLOSED: BTC exit'],
-    ['Trade Updated', 'TRADE UPDATED: stop moved'],
-    // Cycle-33 additions — non-overlapping patterns, all work
-    ['Order',         'ORDER #5: LONG 1 BTC @ 100.00'],
-    ['Buy',           'BUY #5: 1 BTC @ 100.00'],
-    ['Sell',          'SELL #5: 1 BTC @ 100.00'],
-    ['Buy Fill',      'BUY FILL #5: 1 BTC @ 100.00'],
-    ['Sell Fill',     'SELL FILL #5: 1 BTC @ 100.00'],
-    ['Position',      'POSITION OPEN #5: LONG 1 BTC'],
-    ['Performance',   'PERFORMANCE #5: WIN | TP1 | Total PnL: $50.00'],
-    // Lifecycle (thick-client keys)
-    ['▶ Started',     'Starting backtest engine'],
-    ['⏳ Progress',   'Processing candle 500'],
-    ['✓ Completed',   'Successfully finished all trades'],
-    ['■ Stopped',     'Stopped by user request'],
-    // Severity (thick-client keys)
-    ['Critical',      'CRITICAL: fatal error occurred'],
-    ['✗ Error',       'ERROR: network timeout occurred'],
-    ['⚠ Warning',     'WARNING: high slippage detected'],
-  ])('chip "%s": shows matching line when enabled, hides it when disabled', (label, matchMsg) => {
-    render(<LiveOutputPanel logs={[log(matchMsg), log(NOMATCH, 1)]} />);
+    ['INFO',      'Loading bars from Binance',    'Exit #1: WIN from TP1'],
+    ['WIN',       'Exit #1: WIN from TP1 110',    'Loading bars from Binance'],
+    ['LOSS',      'Exit #2: LOSS cutoff hit',      'Loading bars from Binance'],
+    ['DECISION',  'Decision: entry evaluated',     'Loading bars from Binance'],
+    ['STOP/LOSS', 'Exit #1: Stop Loss Hit',        'Loading bars from Binance'],
+  ])('level filter "%s": shows matching line when enabled, hides when disabled', (label, matchMsg, otherMsg) => {
+    render(<LiveOutputPanel logs={[log(matchMsg), log(otherMsg, 1)]} />);
     const toggleBtn = screen.getByTitle('Toggle all event filters');
 
-    // All off → nothing visible
+    // All filters off
     fireEvent.click(toggleBtn);
-    expect(screen.queryByText(new RegExp(matchMsg.slice(0, 15)))).toBeNull();
+    expect(screen.queryByText(new RegExp(matchMsg.slice(0, 12)))).toBeNull();
 
-    // Enable only this chip
-    fireEvent.click(screen.getByLabelText(label));
-    expect(screen.getByText(new RegExp(matchMsg.slice(0, 15)))).toBeInTheDocument();
-    expect(screen.queryByText(NOMATCH)).toBeNull();
+    // Enable only this level — match shows, other level is hidden
+    fireEvent.click(screen.getByRole('button', { name: label }));
+    expect(screen.getByText(new RegExp(matchMsg.slice(0, 12)))).toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(otherMsg.slice(0, 12)))).toBeNull();
 
-    // Disable the chip again — line disappears
-    fireEvent.click(screen.getByLabelText(label));
-    expect(screen.queryByText(new RegExp(matchMsg.slice(0, 15)))).toBeNull();
+    // Disable again → match disappears
+    fireEvent.click(screen.getByRole('button', { name: label }));
+    expect(screen.queryByText(new RegExp(matchMsg.slice(0, 12)))).toBeNull();
   });
 
-  // ── Stacking: two enabled filters show lines matching either ───────────────
+  // ── Category filter buttons ─────────────────────────────────────────────────
 
-  it('stacks filters (OR): lines matching either enabled chip both appear', () => {
-    const logs = [
-      log('TRADE OPENED: BTC long'),
-      log('ERROR: network timeout', 1),
-      log('SELL #5: 1 BTC @ 100.00', 2),  // not enabled
-    ];
-    render(<LiveOutputPanel logs={logs} />);
+  it('category filter TRADE shows trade lines; SYSTEM lines hidden when only TRADE category is active', () => {
+    const tradeLine = 'ORDER #1: LONG 1 BTC @ 100.00';
+    const systemLine = 'Starting backtest engine now';
+    render(<LiveOutputPanel logs={[log(tradeLine), log(systemLine, 1)]} />);
+
     fireEvent.click(screen.getByTitle('Toggle all event filters')); // Unselect All
-    fireEvent.click(screen.getByLabelText('Trade Opened'));
-    fireEvent.click(screen.getByLabelText('✗ Error'));
-    expect(screen.getByText(/TRADE OPENED/)).toBeInTheDocument();
-    expect(screen.getByText(/ERROR: network timeout/)).toBeInTheDocument();
-    expect(screen.queryByText(/SELL #5/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'INFO' }));  // enable INFO level
+    fireEvent.click(screen.getByRole('button', { name: 'TRADE' })); // enable TRADE category
+
+    expect(screen.getByText(/ORDER #1: LONG/)).toBeInTheDocument();
+    expect(screen.queryByText(/Starting backtest/)).toBeNull();
+  });
+
+  // ── Stacking level filters (OR logic) ──────────────────────────────────────
+
+  it('stacks level filters (OR): lines matching either enabled level both appear', () => {
+    const winLine = 'Exit #1: WIN from TP1 @ 110.00';
+    const lossLine = 'Exit #2: LOSS cutoff hit @ 90.00';
+    const infoLine = 'Starting backtest engine';
+    render(<LiveOutputPanel logs={[log(winLine), log(lossLine, 1), log(infoLine, 2)]} />);
+
+    fireEvent.click(screen.getByTitle('Toggle all event filters')); // Unselect All
+    fireEvent.click(screen.getByRole('button', { name: 'WIN' }));
+    fireEvent.click(screen.getByRole('button', { name: 'LOSS' }));
+
+    expect(screen.getByText(/Exit #1: WIN/)).toBeInTheDocument();
+    expect(screen.getByText(/Exit #2: LOSS/)).toBeInTheDocument();
+    expect(screen.queryByText(/Starting backtest/)).toBeNull();
+  });
+
+  // ── Bottom stats bar ────────────────────────────────────────────────────────
+
+  it('shows bottom stats bar with Messages / Displayed / Decisions / Winners / Losses / Stop Loss / Trades', () => {
+    const result = makeResult({ totalTrades: 3 });
+    const logs: BacktestStatusMessage[] = [
+      log('Exit #1: WIN | TP1 @ 110.00'),
+      log('Exit #2: LOSS | SL @ 90.00', 1),
+      log('Decision: trade entry evaluated', 2),
+    ];
+    render(<LiveOutputPanel logs={logs} result={result} />);
+    const stats = screen.getByTestId('live-output-stats');
+    expect(stats).toHaveTextContent('Messages:');
+    expect(stats).toHaveTextContent('Displayed:');
+    expect(stats).toHaveTextContent('Decisions:');
+    expect(stats).toHaveTextContent('Winners:');
+    expect(stats).toHaveTextContent('Losses:');
+    expect(stats).toHaveTextContent('Stop Loss:');
+    expect(stats).toHaveTextContent('Trades:');
+  });
+
+  // ── [TAG] bracket display in log rows ──────────────────────────────────────
+
+  it('renders [INFO] and [SYSTEM] bracket tags for a system log line', () => {
+    render(<LiveOutputPanel logs={[log('Starting backtest engine')]} />);
+    expect(screen.getByText('[INFO]')).toBeInTheDocument();
+    expect(screen.getByText('[SYSTEM]')).toBeInTheDocument();
+  });
+
+  it('renders [WIN] bracket tag for WIN-level lines', () => {
+    render(<LiveOutputPanel logs={[log('Exit #1: WIN | TP1 @ 110.00')]} />);
+    expect(screen.getByText('[WIN]')).toBeInTheDocument();
+  });
+
+  it('renders [LOSS] bracket tag for LOSS-level lines', () => {
+    render(<LiveOutputPanel logs={[log('Exit #1: LOSS cutoff hit')]} />);
+    expect(screen.getByText('[LOSS]')).toBeInTheDocument();
   });
 });
