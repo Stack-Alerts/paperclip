@@ -32,6 +32,11 @@ export interface LiveOutputPanelProps {
 
 const FILTERS_STORAGE_KEY = 'backtest.liveOutput.filters.v1';
 
+// All keys actually rendered as chips — derived from EVENT_GROUPS so Select/Unselect
+// All stays in sync automatically. BACKTEST_VISIBLE_KEYS is the original pre-cycle-33
+// subset and no longer reflects the full rendered set.
+const ALL_RENDERED_CHIP_KEYS: readonly EventKey[] = EVENT_GROUPS.flatMap((g) => [...g.keys]);
+
 function loadStoredFilters(): Set<EventKey> | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -153,17 +158,14 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
     });
   }, []);
 
-  // Visible chip keys come from the Backtest tab subset
-  // (log_viewer_window.py:847-850). Hidden filters stay always-on, matching
-  // thick-client behavior where tab visibility limits chips but not filters.
   const toggleAll = useCallback(() => {
     setEnabled((prev) => {
-      const allChipsOn = BACKTEST_VISIBLE_KEYS.every((k) => prev.has(k));
+      const allOn = ALL_RENDERED_CHIP_KEYS.every((k) => prev.has(k));
       const next = new Set(prev);
-      if (allChipsOn) {
-        for (const k of BACKTEST_VISIBLE_KEYS) next.delete(k);
+      if (allOn) {
+        for (const k of ALL_RENDERED_CHIP_KEYS) next.delete(k);
       } else {
-        for (const k of BACKTEST_VISIBLE_KEYS) next.add(k);
+        for (const k of ALL_RENDERED_CHIP_KEYS) next.add(k);
       }
       return next;
     });
@@ -256,7 +258,7 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
     };
   }, [effectiveLogs, enabled]);
 
-  const allChipsOn = BACKTEST_VISIBLE_KEYS.every((k) => enabled.has(k));
+  const allChipsOn = ALL_RENDERED_CHIP_KEYS.every((k) => enabled.has(k));
 
   return (
     <div className="flex flex-col h-full" style={{ minHeight: 300 }}>
@@ -329,27 +331,8 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
                       checked={on}
                       onChange={() => toggleKey(k)}
                       aria-label={def.label}
-                      className="sr-only"
+                      style={{ accentColor: '#555', width: 10, height: 10, flexShrink: 0 }}
                     />
-                    {/* Custom muted checkbox — avoids the browser's default bright-blue accent */}
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 10,
-                        height: 10,
-                        border: `1px solid ${on ? def.color : '#555'}`,
-                        borderRadius: 2,
-                        flexShrink: 0,
-                        fontSize: 8,
-                        lineHeight: 1,
-                        color: def.color,
-                      }}
-                    >
-                      {on ? '✓' : ''}
-                    </span>
                     <span>{def.label}</span>
                   </label>
                 );
