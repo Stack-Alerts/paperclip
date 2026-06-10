@@ -65,14 +65,12 @@ function defaultEnabledSet(): Set<EventKey> {
  *  drop in multicore_backtest_engine). */
 function synthesizeTradeLogLines(trades: Trade[]): BacktestStatusMessage[] {
   if (!trades || trades.length === 0) return [];
-  const base = Date.now() - trades.length * 1000;
   const out: BacktestStatusMessage[] = [];
   for (let i = 0; i < trades.length; i++) {
     const t = trades[i];
     const idx = i + 1;
     const side = (t.side ?? 'LONG').toString().toUpperCase();
     const isLong = side === 'LONG';
-    const ts = (offsetMs: number) => new Date(base + i * 1000 + offsetMs).toISOString();
     const entry = Number(t.entryPrice ?? 0);
     const exit = Number(t.exitPrice ?? 0);
     const qty = Number(t.quantity ?? 0);
@@ -82,40 +80,39 @@ function synthesizeTradeLogLines(trades: Trade[]): BacktestStatusMessage[] {
     const exitReason = (t.exitType ?? 'Unknown').toString();
     const symbol = (t.symbol ?? 'BTC.P/USDT').toString();
     const outcome = pnl > 0 ? 'WIN' : pnl < 0 ? 'LOSS' : 'BREAKEVEN';
+    // Use real trade timestamps so the log column shows meaningful times.
+    // Fall back to a synthetic offset only when the trade has no time data.
+    const fallbackBase = Date.now() - (trades.length - i) * 60_000;
+    const entryTs = t.entryTime || new Date(fallbackBase).toISOString();
+    const exitTs = t.exitTime || new Date(fallbackBase + 30_000).toISOString();
 
-    // ORDER — emitted at i*1000+0
     out.push({
       message: `ORDER #${idx}: ${side} ${qty} ${symbol} ${isLong ? 'BUY' : 'SELL'} @ ${entry.toFixed(2)}`,
       level: 'INFO',
-      timestamp: ts(0),
+      timestamp: entryTs,
     });
-    // Fill line
     if (isLong) {
       out.push({
         message: `BUY FILL #${idx}: ${qty} ${symbol} @ ${entry.toFixed(2)}`,
         level: 'INFO',
-        timestamp: ts(20),
+        timestamp: entryTs,
       });
     } else {
       out.push({
         message: `SELL FILL #${idx}: ${qty} ${symbol} @ ${entry.toFixed(2)}`,
         level: 'INFO',
-        timestamp: ts(20),
+        timestamp: entryTs,
       });
     }
-    // Position Open
     out.push({
       message: `POSITION OPEN #${idx}: ${side} ${qty} ${symbol} @ ${entry.toFixed(2)} | bars=${bars}`,
       level: 'INFO',
-      timestamp: ts(40),
+      timestamp: entryTs,
     });
-    // Performance summary line — format mirrors the backend fallback in
-    // src/api/app.py::_run_backtest_in_thread so the two paths produce
-    // identical log lines.
     out.push({
       message: `PERFORMANCE #${idx}: ${outcome} | ${exitReason} @ ${exit.toFixed(2)} | Total PnL: $${pnl.toFixed(2)} (Realized ${pnlPct.toFixed(2)}%) | bars=${bars}`,
       level: 'INFO',
-      timestamp: ts(60),
+      timestamp: exitTs,
     });
   }
   return out;
@@ -192,12 +189,11 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
     if (trades.length === 0) return logs;
     const synth = synthesizeTradeLogLines(trades);
     if (synth.length === 0) return logs;
-    // The backend already emits "Entry #N" and "Exit #N" lines; if we see
-    // them in `logs`, skip synthesis for that index. Each backend line covers
-    // one trade, so count of distinct trade indexes in the backend log =
-    // count of trades already represented.
+    // The backend emits "Entry #N" / "Exit #N" (native format) or
+    // "ORDER #N" / "PERFORMANCE #N" (app.py synthesized fallback).
+    // Detect both so we never add duplicate lines on top of backend output.
     const backendTradeIdxCovered = new Set<number>();
-    const entryExitRe = /(?:Entry|Exit)\s+#(\d+):/i;
+    const entryExitRe = /(?:Entry|Exit|ORDER|PERFORMANCE)\s+#(\d+):/i;
     for (const m of logs) {
       const match = entryExitRe.exec(m.message ?? '');
       if (match) backendTradeIdxCovered.add(parseInt(match[1], 10));

@@ -134,6 +134,40 @@ describe('LiveOutputPanel — per-trade synthesis (cycle-33, BTCAAAAA-33591)', (
     expect(screen.getByText(/PERFORMANCE #1:.*LOSS/)).toBeInTheDocument();
   });
 
+  it('skips synthesis when the backend log uses ORDER/PERFORMANCE format (no double-accounting)', () => {
+    const result = makeResult({
+      totalTrades: 1,
+      trades: [
+        {
+          id: 't_order',
+          entryTime: '2026-01-01T10:00:00Z',
+          exitTime: '2026-01-01T11:00:00Z',
+          entryPrice: 100,
+          exitPrice: 110,
+          quantity: 1,
+          pnl: 10,
+          pnlPercentage: 10,
+          bars: 4,
+          exitType: 'TP1',
+          side: 'LONG',
+          symbol: 'BTC.P/USDT',
+        },
+      ],
+    });
+    // Backend already emitted ORDER / PERFORMANCE lines (app.py synthesized
+    // fallback). Panel must NOT add a second set → no double-accounting.
+    const logs: BacktestStatusMessage[] = [
+      { message: 'ORDER #1: LONG 1 BTC.P/USDT BUY @ 100.00', level: 'INFO', timestamp: '2026-01-01T10:00:00Z' },
+      { message: 'BUY FILL #1: 1 BTC.P/USDT @ 100.00', level: 'INFO', timestamp: '2026-01-01T10:00:01Z' },
+      { message: 'POSITION OPEN #1: LONG 1 BTC.P/USDT @ 100.00 | bars=4', level: 'INFO', timestamp: '2026-01-01T10:00:02Z' },
+      { message: 'PERFORMANCE #1: WIN | TP1 @ 110.00 | Total PnL: $10.00 (10.00%) | bars=4', level: 'INFO', timestamp: '2026-01-01T11:00:00Z' },
+    ];
+    render(<LiveOutputPanel logs={logs} isRunning={false} result={result} />);
+    // Backend lines are present exactly once — no duplicates from synthesis.
+    expect(screen.getAllByText(/ORDER #1:/).length).toBe(1);
+    expect(screen.getAllByText(/PERFORMANCE #1:/).length).toBe(1);
+  });
+
   it('skips synthesis when the backend log already covers each trade (Entry/Exit present)', () => {
     const result = makeResult({
       totalTrades: 1,
