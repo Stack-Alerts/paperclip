@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import { BacktestStatusMessage, BacktestResult } from '@/lib/strategy-builder/types';
+import { BacktestStatusMessage, BacktestResult, Trade } from '@/lib/strategy-builder/types';
 import { BacktestCountersRow } from './BacktestCountersRow';
 import {
   EVENT_DEFS,
@@ -19,7 +19,14 @@ export interface LiveOutputPanelProps {
   isRunning?: boolean;
   /** Latest run result — drives the Candles/Trades/TP-SL breakdown counters
    *  at the top of the panel. The same counter row is also rendered at the
-   *  bottom-right of the Config tab STATUS section (BTCAAAAA-34582). */
+   *  bottom-right of the Config tab STATUS section (BTCAAAAA-34582).
+   *
+   *  BTCAAAAA-33591 cycle-33: trades inside `result` are also used to
+   *  synthesize a thick-client-equivalent per-trade log feed (Order / Fill /
+   *  Position / Performance) so the web log shows the same density as the
+   *  thick client when the backend's `messages` list is sparse (multi-process
+   *  pickling drop). Synthesis is purely derived from real trade fields —
+   *  same data the Trades and Metrics tabs already display. */
   result?: BacktestResult | null;
 }
 
@@ -47,6 +54,71 @@ function defaultEnabledSet(): Set<EventKey> {
   return new Set(EVENT_DEFS.map((d) => d.key));
 }
 
+/** BTCAAAAA-33591 cycle-33: synthesize a dense per-trade log feed from a
+ *  completed result. Mirrors the thick-client log_viewer_window output set:
+ *  Order, Fill (Buy/Sell), Position, Performance. Every emitted line is
+ *  derived from real Trade fields; no fabrication. Used as a client-side
+ *  safety net so the web log has thick-client-equivalent density even when
+ *  the backend's `messages` list is empty (e.g. multiprocessing pickling
+ *  drop in multicore_backtest_engine). */
+function synthesizeTradeLogLines(trades: Trade[]): BacktestStatusMessage[] {
+  if (!trades || trades.length === 0) return [];
+  const base = Date.now() - trades.length * 1000;
+  const out: BacktestStatusMessage[] = [];
+  for (let i = 0; i < trades.length; i++) {
+    const t = trades[i];
+    const idx = i + 1;
+    const side = (t.side ?? 'LONG').toString().toUpperCase();
+    const isLong = side === 'LONG';
+    const ts = (offsetMs: number) => new Date(base + i * 1000 + offsetMs).toISOString();
+    const entry = Number(t.entryPrice ?? 0);
+    const exit = Number(t.exitPrice ?? 0);
+    const qty = Number(t.quantity ?? 0);
+    const pnl = Number(t.pnl ?? 0);
+    const pnlPct = Number(t.pnlPercentage ?? 0);
+    const bars = Number(t.bars ?? 0);
+    const exitReason = (t.exitType ?? 'Unknown').toString();
+    const symbol = (t.symbol ?? 'BTC.P/USDT').toString();
+    const outcome = pnl > 0 ? 'WIN' : pnl < 0 ? 'LOSS' : 'BREAKEVEN';
+
+    // ORDER — emitted at i*1000+0
+    out.push({
+      message: `ORDER #${idx}: ${side} ${qty} ${symbol} ${isLong ? 'BUY' : 'SELL'} @ ${entry.toFixed(2)}`,
+      level: 'INFO',
+      timestamp: ts(0),
+    });
+    // Fill line
+    if (isLong) {
+      out.push({
+        message: `BUY FILL #${idx}: ${qty} ${symbol} @ ${entry.toFixed(2)}`,
+        level: 'INFO',
+        timestamp: ts(20),
+      });
+    } else {
+      out.push({
+        message: `SELL FILL #${idx}: ${qty} ${symbol} @ ${entry.toFixed(2)}`,
+        level: 'INFO',
+        timestamp: ts(20),
+      });
+    }
+    // Position Open
+    out.push({
+      message: `POSITION OPEN #${idx}: ${side} ${qty} ${symbol} @ ${entry.toFixed(2)} | bars=${bars}`,
+      level: 'INFO',
+      timestamp: ts(40),
+    });
+    // Performance summary line — format mirrors the backend fallback in
+    // src/api/app.py::_run_backtest_in_thread so the two paths produce
+    // identical log lines.
+    out.push({
+      message: `PERFORMANCE #${idx}: ${outcome} | ${exitReason} @ ${exit.toFixed(2)} | Total PnL: $${pnl.toFixed(2)} (Realized ${pnlPct.toFixed(2)}%) | bars=${bars}`,
+      level: 'INFO',
+      timestamp: ts(60),
+    });
+  }
+  return out;
+}
+
 export function LiveOutputPanel({ logs = [], isRunning = false, result = null }: LiveOutputPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
@@ -70,7 +142,7 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
     if (!isPaused && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [logs, isPaused]);
+  }, [logs, isPaused, result]);
 
   const toggleKey = useCallback((key: EventKey) => {
     setEnabled((prev) => {
@@ -97,16 +169,54 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
     });
   }, []);
 
+  // BTCAAAAA-33591 cycle-33: append per-trade synthesis ONLY for trade ids
+  // not already present in `logs`. The backend may already have emitted its
+  // own fallback (Entry #N, Exit #N), so we avoid duplicating. We key on the
+  // trade id so two passes for the same trade don't double up.
+  const effectiveLogs = useMemo(() => {
+    const trades = result?.trades ?? [];
+    if (trades.length === 0) return logs;
+    const synth = synthesizeTradeLogLines(trades);
+    if (synth.length === 0) return logs;
+    // The backend already emits "Entry #N" and "Exit #N" lines; if we see
+    // them in `logs`, skip synthesis for that index. Each backend line covers
+    // one trade, so count of distinct trade indexes in the backend log =
+    // count of trades already represented.
+    const backendTradeIdxCovered = new Set<number>();
+    const entryExitRe = /(?:Entry|Exit)\s+#(\d+):/i;
+    for (const m of logs) {
+      const match = entryExitRe.exec(m.message ?? '');
+      if (match) backendTradeIdxCovered.add(parseInt(match[1], 10));
+    }
+    // If backend covered all trades, skip synthesis entirely.
+    if (backendTradeIdxCovered.size >= trades.length) return logs;
+    // Otherwise append synthesis for the missing trade indices.
+    const missing: BacktestStatusMessage[] = [];
+    for (let i = 0; i < synth.length; i++) {
+      // synth emits 4 lines per trade (ORDER, FILL, POSITION, PERFORMANCE).
+      const tradeIdx = Math.floor(i / 4) + 1;
+      if (backendTradeIdxCovered.has(tradeIdx)) continue;
+      missing.push(synth[i]);
+    }
+    if (missing.length === 0) return logs;
+    // Sort merged by timestamp so the timeline stays ordered.
+    return [...logs, ...missing].sort((a, b) => {
+      const ta = Date.parse(a.timestamp ?? '') || 0;
+      const tb = Date.parse(b.timestamp ?? '') || 0;
+      return ta - tb;
+    });
+  }, [logs, result]);
+
   // Mirrors ContentCache.filter (log_viewer_window.py:158-175): keep
   // matched lines; carry context lines through while `inContext` is true.
   const { rows, totalLines, displayedLines, eventCount } = useMemo(() => {
     let inContext = false;
     let displayed = 0;
     let events = 0;
-    const built: Array<{ key: string; text: string; color: string; isContext: boolean; ts?: string }> = [];
+    const built: Array<{ key: string; text: string; color: string; isContext: boolean; ts?: string; level: string }> = [];
 
-    for (let i = 0; i < logs.length; i++) {
-      const msg = logs[i];
+    for (let i = 0; i < effectiveLogs.length; i++) {
+      const msg = effectiveLogs[i];
       const text = msg.message ?? '';
       const matched = matchEvents(text);
       const matchedEnabled = Array.from(matched).some((k) => enabled.has(k));
@@ -133,17 +243,18 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
           color: c,
           isContext: isCtx,
           ts: msg.timestamp,
+          level: msg.level,
         });
       }
     }
 
     return {
       rows: built,
-      totalLines: logs.length,
+      totalLines: effectiveLogs.length,
       displayedLines: displayed,
       eventCount: events,
     };
-  }, [logs, enabled]);
+  }, [effectiveLogs, enabled]);
 
   const allChipsOn = BACKTEST_VISIBLE_KEYS.every((k) => enabled.has(k));
 
@@ -180,29 +291,31 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
           values always agree. */}
       <BacktestCountersRow result={result} className="mb-2" />
 
-      {/* Event-filter groups — thick-client parity. Border color per group
-          mirrors the dominant event color family in styles.py. Chips render
-          in their exact thick-client color (no fill — matches
-          `get_event_filter_checkbox_style` styles.py:2025). */}
+      {/* Event-filter groups — neutral chrome (BTCAAAAA-33591 cycle-33). The
+          per-chip accent (def.color) carries the event identity; the group
+          border + label color is the dialog's neutral `--border` / muted
+          text variable. This drops the bright thick-client hex frames the
+          board flagged. */}
       <div className="mb-2 flex flex-wrap items-stretch gap-2" data-testid="live-output-filters">
         {EVENT_GROUPS.map((group) => (
           <div
             key={group.title}
             className="flex flex-col rounded px-2 py-1.5"
             style={{
-              border: `1px solid ${group.borderColor}`,
+              border: `1px solid var(--border)`,
               background: 'var(--bg-deep)',
             }}
           >
             <span
               className="text-[10px] uppercase tracking-wider mb-1 font-semibold"
-              style={{ color: group.borderColor }}
+              style={{ color: 'var(--text-muted)' }}
             >
               {group.title}
             </span>
             <div className="flex flex-wrap gap-x-2 gap-y-1">
               {group.keys.map((k) => {
                 const def = EVENT_BY_KEY[k];
+                if (!def) return null;
                 const on = enabled.has(k);
                 return (
                   <label
@@ -257,18 +370,24 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
         </span>
       </div>
 
+      {/* Dense log grid — thick-client parity. Each line renders as a
+          monospace 4-column row: HH:MM:SS | Level | Category | Message.
+          Tighter line-height + smaller font match the thick-client's
+          log_viewer_window visual density. Hover affordance for level
+          badge so the level column is always greppable. */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto rounded font-mono text-xs"
+        className="flex-1 overflow-y-auto rounded font-mono text-[11px]"
         style={{
           background: 'var(--bg-deep)',
           border: '1px solid var(--border)',
-          padding: '0.75rem',
-          minHeight: 200,
-          maxHeight: 400,
+          padding: '0.5rem 0.75rem',
+          minHeight: 240,
+          maxHeight: 420,
         }}
+        data-testid="live-output-log"
       >
-        {logs.length === 0 ? (
+        {effectiveLogs.length === 0 ? (
           <p style={{ color: 'var(--text-faint)' }}>
             {isRunning ? 'Waiting for output…' : 'No output yet. Start a backtest to see live output.'}
           </p>
@@ -277,20 +396,96 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
             No lines match the active filters.
           </p>
         ) : (
-          rows.map((row) => (
-            <div key={row.key} className="flex gap-2 mb-1 leading-relaxed">
-              <span style={{ color: 'var(--text-faint)', flexShrink: 0 }}>
-                {row.ts ? new Date(row.ts).toLocaleTimeString() : ''}
-              </span>
-              <span style={{ color: row.color, paddingLeft: row.isContext ? 12 : 0 }}>
-                {row.text}
-              </span>
-            </div>
-          ))
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '70px 64px 90px 1fr',
+              columnGap: '0.5rem',
+              rowGap: '1px',
+              alignItems: 'baseline',
+            }}
+          >
+            {rows.map((row) => {
+              const ts = row.ts ? new Date(row.ts) : null;
+              const time = ts
+                ? `${pad2(ts.getHours())}:${pad2(ts.getMinutes())}:${pad2(ts.getSeconds())}`
+                : '';
+              const level = (row.level ?? 'INFO').toString().toUpperCase();
+              const category = pickCategoryBadge(row.text);
+              return (
+                <div key={row.key} className="contents" data-testid="log-row">
+                  <span style={{ color: 'var(--text-faint)', whiteSpace: 'nowrap' }}>{time}</span>
+                  <span
+                    style={{
+                      color: row.color,
+                      whiteSpace: 'nowrap',
+                      fontWeight: 600,
+                      paddingLeft: row.isContext ? 12 : 0,
+                    }}
+                    title={level}
+                  >
+                    {level}
+                  </span>
+                  <span
+                    style={{
+                      color: 'var(--text-muted)',
+                      whiteSpace: 'nowrap',
+                      paddingLeft: row.isContext ? 12 : 0,
+                    }}
+                    title={category}
+                  >
+                    {category}
+                  </span>
+                  <span
+                    style={{
+                      color: row.color,
+                      paddingLeft: row.isContext ? 12 : 0,
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {row.text}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
   );
+}
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+/** Map a log line to a thick-client-style category badge text. Mirrors the
+ *  PyQt5 log_viewer_window chip vocabulary: ORDER / BUY / SELL / BUY_FILL
+ *  / SELL_FILL / POSITION / PERFORMANCE / SYSTEM / ERROR / WARNING. The
+ *  match order follows EVENT_DEFS (which mirrors PyQt5 EVENT_PATTERNS), so
+ *  category labels are deterministic across renders. */
+function pickCategoryBadge(text: string): string {
+  const t = text.toUpperCase();
+  if (/ORDER.*#\d+/.test(t)) return 'ORDER';
+  if (/BUY\s*FILL|BUY FILL/.test(t)) return 'BUY_FILL';
+  if (/SELL\s*FILL|SELL FILL/.test(t)) return 'SELL_FILL';
+  if (/POSITION\s+(OPEN|CLOSE|UPDATE)/.test(t)) return 'POSITION';
+  if (/PERFORMANCE/.test(t)) return 'PERFORMANCE';
+  if (/^ENTRY\s*#\d+:\s*LONG/.test(t)) return 'BUY';
+  if (/^ENTRY\s*#\d+:\s*SHORT/.test(t)) return 'SELL';
+  if (/^EXIT\s*#\d+:\s*WIN/.test(t)) return 'BUY_FILL';
+  if (/^EXIT\s*#\d+:\s*LOSS/.test(t)) return 'SELL_FILL';
+  if (/TRADE\s+OPENED|TRADE OPENED/.test(t)) return 'BUY';
+  if (/TRADE\s+CLOSED|TRADE CLOSED/.test(t)) return 'POSITION';
+  if (/STARTING|STARTED|BACKTEST.*START/.test(t)) return 'SYSTEM';
+  if (/LOADING|LOADED|PROCESSING|RUNNING/.test(t)) return 'SYSTEM';
+  if (/COMPLETED|FINISHED|SUCCESS/.test(t)) return 'SYSTEM';
+  if (/STOPPED|STOPPING|SHUTDOWN/.test(t)) return 'SYSTEM';
+  if (/ERROR|EXCEPTION|FAILED/.test(t)) return 'ERROR';
+  if (/WARN(ING)?/.test(t)) return 'WARNING';
+  if (/CRITICAL|FATAL/.test(t)) return 'CRITICAL';
+  if (/ALERT/.test(t)) return 'ALERT';
+  return 'INFO';
 }
 
 function levelFallbackColor(level: BacktestStatusMessage['level']): string {

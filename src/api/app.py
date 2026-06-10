@@ -1905,24 +1905,75 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
 
         # Fallback: synthesize trade decision trace from trade data when engine
         # messages are unavailable (multiprocessing pickling drops ChunkResult.messages).
+        # BTCAAAAA-33591 cycle-33: synthesize the full thick-client line set per
+        # trade (ORDER, FILL, POSITION, PERFORMANCE) so the web Live Output has
+        # the same density as the thick-client log_viewer_window. Every emitted
+        # line is derived from real Trade fields — same data the Trades and
+        # Metrics tabs already display. Lines use the category vocabulary
+        # (ORDER/BUY FILL/SELL FILL/POSITION/PERFORMANCE) so the web UI's
+        # category filters (liveOutputEvents.ts) can route them to the right
+        # thick-client chip.
         if not messages and trades:
             for idx, t in enumerate(trades, start=1):
                 entry_price = t.get("entry_price") or t.get("entryPrice") or 0
                 exit_price = t.get("exit_price") or t.get("exitPrice") or 0
-                side = t.get("side") or t.get("direction") or "LONG"
+                side = (t.get("side") or t.get("direction") or "LONG")
+                side_upper = str(side).upper()
+                is_long = side_upper == "LONG"
                 pnl = float(t.get("pnl") or 0)
                 pnl_pct = float(t.get("pnl_pct") or t.get("pnl_percent") or 0)
                 exit_reason = t.get("exit_reason") or t.get("exitReason") or "Unknown"
                 bars_held = int(t.get("bars_held") or t.get("barsHeld") or t.get("bars") or 0)
-                outcome = "WIN" if pnl > 0 else "LOSS"
+                quantity = float(t.get("quantity") or t.get("size") or 0)
+                symbol = t.get("symbol") or "BTC.P/USDT"
+                outcome = "WIN" if pnl > 0 else "LOSS" if pnl < 0 else "BREAKEVEN"
+                # ORDER (always first)
                 _append_backtest_log(
                     run_id,
-                    f"Entry #{idx}: {side} @ {entry_price:.2f}",
+                    f"ORDER #{idx}: {side_upper} {quantity} {symbol} "
+                    f"{'BUY' if is_long else 'SELL'} @ {entry_price:.2f}",
+                    level="INFO",
+                )
+                # FILL line — BUY FILL or SELL FILL
+                if is_long:
+                    _append_backtest_log(
+                        run_id,
+                        f"BUY FILL #{idx}: {quantity} {symbol} @ {entry_price:.2f}",
+                        level="INFO",
+                    )
+                else:
+                    _append_backtest_log(
+                        run_id,
+                        f"SELL FILL #{idx}: {quantity} {symbol} @ {entry_price:.2f}",
+                        level="INFO",
+                    )
+                # POSITION line (open)
+                _append_backtest_log(
+                    run_id,
+                    f"POSITION OPEN #{idx}: {side_upper} {quantity} {symbol} "
+                    f"@ {entry_price:.2f} | bars={bars_held}",
+                    level="INFO",
+                )
+                # Original Entry/Exit lines (kept for legacy webui parsing)
+                _append_backtest_log(
+                    run_id,
+                    f"Entry #{idx}: {side_upper} @ {entry_price:.2f}",
                     level="INFO",
                 )
                 _append_backtest_log(
                     run_id,
-                    f"Exit #{idx}: {outcome} | {exit_reason} @ {exit_price:.2f} | PnL: ${pnl:.2f} ({pnl_pct:.2f}%) | Bars: {bars_held}",
+                    f"Exit #{idx}: {outcome} | {exit_reason} @ {exit_price:.2f} | "
+                    f"PnL: ${pnl:.2f} ({pnl_pct:.2f}%) | Bars: {bars_held}",
+                    level="INFO",
+                )
+                # PERFORMANCE line (matches thick-client
+                # log_viewer_window.py PERFORMANCE chip; used by web category
+                # filter in liveOutputEvents.ts).
+                _append_backtest_log(
+                    run_id,
+                    f"PERFORMANCE #{idx}: {outcome} | {exit_reason} @ "
+                    f"{exit_price:.2f} | Total PnL: ${pnl:.2f} (Realized "
+                    f"{pnl_pct:.2f}%) | bars={bars_held}",
                     level="INFO",
                 )
 

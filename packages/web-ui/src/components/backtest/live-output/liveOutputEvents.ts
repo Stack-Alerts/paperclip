@@ -28,7 +28,17 @@ export type EventKey =
   | 'SEARCH_RESULTS'
   | 'DECISION'
   | 'CONDITION_MET'
-  | 'SIGNAL_DETECTED';
+  | 'SIGNAL_DETECTED'
+  // Thick-client log_viewer_window categories (BTCAAAAA-33591 cycle-33).
+  // Added so the web Live Output matches the dense per-trade line set the
+  // thick client renders (Order / Buy / Sell / Fill / Position / Performance).
+  | 'ORDER'
+  | 'BUY'
+  | 'SELL'
+  | 'BUY_FILL'
+  | 'SELL_FILL'
+  | 'POSITION'
+  | 'PERFORMANCE';
 
 export interface EventDef {
   key: EventKey;
@@ -69,6 +79,17 @@ export const EVENT_DEFS: readonly EventDef[] = [
   make('DECISION', '🎯 Decision', '#FFD700', 'decision|deciding|evaluate|Decision:'),
   make('CONDITION_MET', '✓ Condition', '#10B981', 'Condition.*met|Threshold.*met|Criteria.*met'),
   make('SIGNAL_DETECTED', '📡 Signal', '#10B981', 'Signal.*detect|Pattern.*found|Signal.*found|Detected:'),
+  // Thick-client log_viewer_window order/fill/position/performance categories
+  // (BTCAAAAA-33591 cycle-33). Patterns match the synthesized log lines that
+  // `_run_backtest_in_thread` (src/api/app.py) emits as a per-trade fallback
+  // when the engine's `messages` list is empty (multiprocessing pickling drop).
+  make('ORDER', '🧾 Order', '#9AA0A6', 'ORDER .*#\\d+|Order .*#\\d+|Order sent|Order placed'),
+  make('BUY', '🟢 Buy', '#10B981', 'BUY .*#\\d+|Buy signal|ENTRY .*#\\d+|^Entry #\\d+: LONG'),
+  make('SELL', '🔴 Sell', '#C35252', 'SELL .*#\\d+|Sell signal|EXIT .*#\\d+|^Entry #\\d+: SHORT'),
+  make('BUY_FILL', '✅ Buy Fill', '#10B981', 'BUY FILL|BUY_FILLED|Buy filled|^Exit #\\d+: WIN'),
+  make('SELL_FILL', '✅ Sell Fill', '#FF8C00', 'SELL FILL|SELL_FILLED|Sell filled|^Exit #\\d+: LOSS'),
+  make('POSITION', '📍 Position', '#8B5CF6', 'POSITION|POSITION OPEN|POSITION CLOSED|Position opened|Position closed'),
+  make('PERFORMANCE', '📈 Performance', '#FFD700', 'PERFORMANCE|Performance Summary|Results saved|Total PnL|Realized.*PnL'),
 ] as const;
 
 export const EVENT_BY_KEY: Readonly<Record<EventKey, EventDef>> = Object.fromEntries(
@@ -97,22 +118,36 @@ export interface EventGroup {
   keys: readonly EventKey[];
 }
 
-// Visual chrome groups borrow the dominant event color from each family so
-// the "structure (grouping)" callout from the board lands visually.
+// Group chrome (border + label color) is now neutral — the per-chip accent
+// (EVENT_DEFS[i].color) carries the event identity. BTCAAAAA-33591
+// cycle-33: board's "colored frames need to be removed or toned down".
+// The thick-client log_viewer_window itself has no per-group color chrome;
+// it just renders chips in their own event color. We match that.
 export const EVENT_GROUPS: readonly EventGroup[] = [
   {
-    title: 'Trade Events',
-    borderColor: '#10B981',
-    keys: ['TRADE_OPENED', 'TRADE_CLOSED', 'TRADE_UPDATED'],
+    title: 'Trade Activity',
+    borderColor: 'var(--border)',
+    keys: [
+      'TRADE_OPENED',
+      'TRADE_CLOSED',
+      'TRADE_UPDATED',
+      'POSITIONS_SNAPSHOT',
+      'ORDER',
+      'BUY',
+      'SELL',
+      'BUY_FILL',
+      'SELL_FILL',
+      'POSITION',
+    ],
   },
   {
     title: 'Lifecycle',
-    borderColor: '#2070FF',
-    keys: ['STARTED', 'PROGRESS', 'COMPLETED', 'STOPPED'],
+    borderColor: 'var(--border)',
+    keys: ['STARTED', 'PROGRESS', 'COMPLETED', 'STOPPED', 'BLOCK_LOADED', 'BLOCK_ADDED'],
   },
   {
     title: 'Severity',
-    borderColor: '#C35252',
+    borderColor: 'var(--border)',
     keys: ['CRITICAL', 'ERROR', 'WARNING'],
   },
 ];
