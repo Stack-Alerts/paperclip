@@ -17,17 +17,13 @@ import {
 export interface LiveOutputPanelProps {
   logs?: BacktestStatusMessage[];
   isRunning?: boolean;
-  /** Latest run result — drives the Candles/Trades/TP-SL breakdown counters
-   *  at the top of the panel. The same counter row is also rendered at the
-   *  bottom-right of the Config tab STATUS section (BTCAAAAA-34582).
-   *
-   *  BTCAAAAA-33591 cycle-33: trades inside `result` are also used to
-   *  synthesize a thick-client-equivalent per-trade log feed (Order / Fill /
-   *  Position / Performance) so the web log shows the same density as the
-   *  thick client when the backend's `messages` list is sparse (multi-process
-   *  pickling drop). Synthesis is purely derived from real trade fields —
-   *  same data the Trades and Metrics tabs already display. */
   result?: BacktestResult | null;
+  /** Candle progress from the live run — passed through to BacktestCountersRow. */
+  candles?: { current: number; total: number };
+  /** Full trades array from BacktestWindow — result.trades may be absent when
+   *  the backend returns totalTrades without the trade list. Used for TP/SL
+   *  tally and log synthesis. */
+  trades?: Trade[];
 }
 
 const FILTERS_STORAGE_KEY = 'backtest.liveOutput.filters.v1';
@@ -125,7 +121,7 @@ function synthesizeTradeLogLines(trades: Trade[]): BacktestStatusMessage[] {
   return out;
 }
 
-export function LiveOutputPanel({ logs = [], isRunning = false, result = null }: LiveOutputPanelProps) {
+export function LiveOutputPanel({ logs = [], isRunning = false, result = null, candles, trades }: LiveOutputPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [enabled, setEnabled] = useState<Set<EventKey>>(() => defaultEnabledSet());
@@ -176,8 +172,20 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
   // not already present in `logs`. The backend may already have emitted its
   // own fallback (Entry #N, Exit #N), so we avoid duplicating. We key on the
   // trade id so two passes for the same trade don't double up.
+  // Prefer the explicit trades prop; fall back to result.trades (may be absent
+  // when the backend returns totalTrades without the full array).
+  const effectiveTrades = trades?.length ? trades : (result?.trades ?? []);
+
+  // Merge trades into result so BacktestCountersRow gets the TP/SL tally even
+  // when result.trades is absent.
+  const effectiveResult = useMemo(() => {
+    if (!result) return null;
+    if (result.trades?.length || !effectiveTrades.length) return result;
+    return { ...result, trades: effectiveTrades };
+  }, [result, effectiveTrades]);
+
   const effectiveLogs = useMemo(() => {
-    const trades = result?.trades ?? [];
+    const trades = effectiveTrades;
     if (trades.length === 0) return logs;
     const synth = synthesizeTradeLogLines(trades);
     if (synth.length === 0) return logs;
@@ -292,7 +300,7 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
       {/* Run counters row — shared with the Config tab STATUS section
           (BTCAAAAA-34582). Both surfaces read from the same `result` so the
           values always agree. */}
-      <BacktestCountersRow result={result} className="mb-2" />
+      <BacktestCountersRow result={effectiveResult} candles={candles} className="mb-2" />
 
       {/* Event-filter groups — neutral chrome (BTCAAAAA-33591 cycle-33). The
           per-chip accent (def.color) carries the event identity; the group
@@ -386,7 +394,6 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
           border: '1px solid var(--border)',
           padding: '0.5rem 0.75rem',
           minHeight: 240,
-          maxHeight: 420,
         }}
         data-testid="live-output-log"
       >

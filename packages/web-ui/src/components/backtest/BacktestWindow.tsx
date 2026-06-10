@@ -193,7 +193,7 @@ export function BacktestWindow({
         result={result ?? null}
         candles={candles}
       />
-      <LiveOutputPanel logs={logs} isRunning={isRunning} result={result ?? null} />
+      <LiveOutputPanel logs={logs} isRunning={isRunning} result={result ?? null} candles={candles} trades={trades} />
     </div>
   );
 
@@ -316,7 +316,7 @@ export function BacktestWindow({
         {currentTab === 'progress' && progressContent}
         {currentTab === 'results' && resultsContent}
         {currentTab === 'trades' && <TradesPanel trades={trades} />}
-        {currentTab === 'live-output' && <LiveOutputPanel logs={logs} isRunning={isRunning} result={result ?? null} />}
+        {currentTab === 'live-output' && <LiveOutputPanel logs={logs} isRunning={isRunning} result={result ?? null} candles={candles} trades={trades} />}
       </div>
     </div>
   );

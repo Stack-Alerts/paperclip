@@ -55,8 +55,8 @@ const make = (key: EventKey, label: string, color: string, source: string): Even
 });
 
 export const EVENT_DEFS: readonly EventDef[] = [
-  make('TRADE_OPENED', 'Trade Opened', '#10B981', 'TRADE OPENED|trade.*opened|Opening trade|🟢.*TRADE'),
-  make('TRADE_CLOSED', 'Trade Closed', '#2070FF', 'TRADE CLOSED|trade.*closed|Position closed|Closing trade|😘.*TRADE'),
+  make('TRADE_OPENED', 'Trade Opened', '#10B981', 'TRADE OPENED|trade.*opened|Opening trade|🟢.*TRADE|ORDER .*#\\d+|^Entry #\\d+:'),
+  make('TRADE_CLOSED', 'Trade Closed', '#2070FF', 'TRADE CLOSED|trade.*closed|Position closed|Closing trade|😘.*TRADE|PERFORMANCE.*#\\d+|^Exit #\\d+'),
   make('TRADE_UPDATED', 'Trade Updated', '#FFD700', 'TRADE UPDATED|trade.*updated|Update.*trade|🔄.*TRADE'),
   make('POSITIONS_SNAPSHOT', 'Positions', '#8B5CF6', 'POSITIONS SNAPSHOT|OPEN POSITIONS|Position.*snapshot|📊'),
   make('TRADE_NOT_FOUND', 'Not Found', '#C35252', 'TRADE.*NOT FOUND|Trade.*not found|❌.*TRADE'),
