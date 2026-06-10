@@ -795,7 +795,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
             initialCapital: (config as BacktestConfig).initialCapital ?? 10000,
             finalCapital: ((config as BacktestConfig).initialCapital ?? 10000) *
               (1 + Number(m.returnPercentage ?? 0) / 100),
-            totalTrades: Number(m.totalTrades ?? 0),
+            totalTrades: Number(m.totalTrades ?? (status.trades as unknown[])?.length ?? 0),
             winningTrades: Number(m.winningTrades ?? 0),
             losingTrades: Number(m.losingTrades ?? 0),
             winRate: Number(m.winRate ?? 0),
