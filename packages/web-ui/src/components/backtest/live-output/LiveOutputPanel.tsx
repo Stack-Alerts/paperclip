@@ -329,7 +329,6 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
                       checked={on}
                       onChange={() => toggleKey(k)}
                       aria-label={def.label}
-                      style={{ accentColor: def.color }}
                     />
                     <span>{def.label}</span>
                   </label>
