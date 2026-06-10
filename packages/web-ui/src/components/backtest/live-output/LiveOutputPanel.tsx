@@ -220,6 +220,12 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
   // Mirrors ContentCache.filter (log_viewer_window.py:158-175): keep
   // matched lines; carry context lines through while `inContext` is true.
   const { rows, totalLines, displayedLines, eventCount } = useMemo(() => {
+    // When every event key is enabled (the default/unfiltered state), show all
+    // lines regardless of whether they match a known pattern. This prevents
+    // backend lifecycle messages that don't match any EVENT_DEF from being
+    // silently hidden when the user hasn't actually narrowed the filter set.
+    const showAll = enabled.size >= ALL_EVENT_KEYS.length;
+
     let inContext = false;
     let displayed = 0;
     let events = 0;
@@ -238,6 +244,9 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
         keep = true;
         inContext = true;
         events += 1;
+      } else if (showAll) {
+        keep = true;
+        inContext = true;
       } else if (inContext && (isCtx || text.trim() === '')) {
         keep = true;
       } else {
