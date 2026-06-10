@@ -411,14 +411,14 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
                   data-testid="log-row"
                   style={{ paddingLeft: row.isContext ? 12 : 0 }}
                 >
-                  <span style={{ color: 'var(--text-faint)', whiteSpace: 'nowrap', flexShrink: 0 }}>{time}</span>
+                  <span style={{ color: 'var(--text-faint)', whiteSpace: 'nowrap', flexShrink: 0, minWidth: '12ch', display: 'inline-block' }}>{time}</span>
                   <span style={{ color: lColor, whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 700, minWidth: '11ch', display: 'inline-block' }}>
                     [{lDef?.label ?? row.lvl}]
                   </span>
                   <span style={{ color: cColor, whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 600, minWidth: '11ch', display: 'inline-block' }}>
                     [{cDef?.label ?? row.cat}]
                   </span>
-                  <span style={{ color: lColor, wordBreak: 'break-word', opacity: 0.9 }}>
+                  <span style={{ color: 'var(--text-secondary)', wordBreak: 'break-word' }}>
                     {row.text}
                   </span>
                 </div>
