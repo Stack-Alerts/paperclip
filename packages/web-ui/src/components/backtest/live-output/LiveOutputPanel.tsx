@@ -329,7 +329,27 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
                       checked={on}
                       onChange={() => toggleKey(k)}
                       aria-label={def.label}
+                      className="sr-only"
                     />
+                    {/* Custom muted checkbox — avoids the browser's default bright-blue accent */}
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 10,
+                        height: 10,
+                        border: `1px solid ${on ? def.color : '#555'}`,
+                        borderRadius: 2,
+                        flexShrink: 0,
+                        fontSize: 8,
+                        lineHeight: 1,
+                        color: def.color,
+                      }}
+                    >
+                      {on ? '✓' : ''}
+                    </span>
                     <span>{def.label}</span>
                   </label>
                 );
