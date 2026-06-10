@@ -174,7 +174,10 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
   // trade id so two passes for the same trade don't double up.
   // Prefer the explicit trades prop; fall back to result.trades (may be absent
   // when the backend returns totalTrades without the full array).
-  const effectiveTrades = trades?.length ? trades : (result?.trades ?? []);
+  const effectiveTrades = useMemo(
+    () => (trades?.length ? trades : (result?.trades ?? [])),
+    [trades, result],
+  );
 
   // Merge trades into result so BacktestCountersRow gets the TP/SL tally even
   // when result.trades is absent.
@@ -216,7 +219,7 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
       const tb = Date.parse(b.timestamp ?? '') || 0;
       return ta - tb;
     });
-  }, [logs, result]);
+  }, [logs, effectiveTrades]);
 
   // Mirrors ContentCache.filter (log_viewer_window.py:158-175): keep
   // matched lines; carry context lines through while `inContext` is true.

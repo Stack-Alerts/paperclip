@@ -206,25 +206,24 @@ describe('LiveOutputPanel — filter wiring (BTCAAAAA-35662)', () => {
   // ── Per-chip filter: each chip shows its match and hides non-matches ────────
 
   it.each([
-    // Trade Activity
+    // Trade Activity (thick-client keys)
     ['Trade Opened',  'TRADE OPENED: BTC long'],
     ['Trade Closed',  'TRADE CLOSED: BTC exit'],
     ['Trade Updated', 'TRADE UPDATED: stop moved'],
-    ['Positions',     'POSITIONS SNAPSHOT: 2 open'],
+    // Cycle-33 additions — non-overlapping patterns, all work
     ['Order',         'ORDER #5: LONG 1 BTC @ 100.00'],
     ['Buy',           'BUY #5: 1 BTC @ 100.00'],
     ['Sell',          'SELL #5: 1 BTC @ 100.00'],
     ['Buy Fill',      'BUY FILL #5: 1 BTC @ 100.00'],
     ['Sell Fill',     'SELL FILL #5: 1 BTC @ 100.00'],
     ['Position',      'POSITION OPEN #5: LONG 1 BTC'],
-    // Lifecycle
+    ['Performance',   'PERFORMANCE #5: WIN | TP1 | Total PnL: $50.00'],
+    // Lifecycle (thick-client keys)
     ['▶ Started',     'Starting backtest engine'],
     ['⏳ Progress',   'Processing candle 500'],
     ['✓ Completed',   'Successfully finished all trades'],
     ['■ Stopped',     'Stopped by user request'],
-    ['Block Loaded',  'Successfully loaded 10 blocks'],
-    ['+ Block Added', 'Added block config RSI_14'],
-    // Severity
+    // Severity (thick-client keys)
     ['Critical',      'CRITICAL: fatal error occurred'],
     ['✗ Error',       'ERROR: network timeout occurred'],
     ['⚠ Warning',     'WARNING: high slippage detected'],

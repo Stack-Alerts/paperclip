@@ -55,8 +55,8 @@ const make = (key: EventKey, label: string, color: string, source: string): Even
 });
 
 export const EVENT_DEFS: readonly EventDef[] = [
-  make('TRADE_OPENED', 'Trade Opened', '#10B981', 'TRADE OPENED|trade.*opened|Opening trade|🟢.*TRADE|ORDER .*#\\d+|^Entry #\\d+:'),
-  make('TRADE_CLOSED', 'Trade Closed', '#2070FF', 'TRADE CLOSED|trade.*closed|Position closed|Closing trade|😘.*TRADE|PERFORMANCE.*#\\d+|^Exit #\\d+'),
+  make('TRADE_OPENED', 'Trade Opened', '#10B981', 'TRADE OPENED|trade.*opened|Opening trade|🟢.*TRADE'),
+  make('TRADE_CLOSED', 'Trade Closed', '#2070FF', 'TRADE CLOSED|trade.*closed|Position closed|Closing trade|😘.*TRADE'),
   make('TRADE_UPDATED', 'Trade Updated', '#FFD700', 'TRADE UPDATED|trade.*updated|Update.*trade|🔄.*TRADE'),
   make('POSITIONS_SNAPSHOT', 'Positions', '#8B5CF6', 'POSITIONS SNAPSHOT|OPEN POSITIONS|Position.*snapshot|📊'),
   make('TRADE_NOT_FOUND', 'Not Found', '#C35252', 'TRADE.*NOT FOUND|Trade.*not found|❌.*TRADE'),
@@ -123,6 +123,14 @@ export interface EventGroup {
 // cycle-33: board's "colored frames need to be removed or toned down".
 // The thick-client log_viewer_window itself has no per-group color chrome;
 // it just renders chips in their own event color. We match that.
+// Chip groups mirror thick-client _update_filter_visibility (backtest tab).
+// Thick-client keys: TRADE_OPENED, TRADE_CLOSED, TRADE_UPDATED, STARTED,
+// STOPPED, PROGRESS, COMPLETED, CRITICAL, ERROR, WARNING.
+// Cycle-33 additions kept because they have clear, non-overlapping patterns
+// and match real backend log lines: ORDER, BUY, SELL, BUY_FILL, SELL_FILL,
+// POSITION, PERFORMANCE.
+// Removed: POSITIONS_SNAPSHOT (never fires in backtest),
+//          BLOCK_LOADED/BLOCK_ADDED (startup noise, not in thick client).
 export const EVENT_GROUPS: readonly EventGroup[] = [
   {
     title: 'Trade Activity',
@@ -131,19 +139,19 @@ export const EVENT_GROUPS: readonly EventGroup[] = [
       'TRADE_OPENED',
       'TRADE_CLOSED',
       'TRADE_UPDATED',
-      'POSITIONS_SNAPSHOT',
       'ORDER',
       'BUY',
       'SELL',
       'BUY_FILL',
       'SELL_FILL',
       'POSITION',
+      'PERFORMANCE',
     ],
   },
   {
     title: 'Lifecycle',
     borderColor: 'var(--border)',
-    keys: ['STARTED', 'PROGRESS', 'COMPLETED', 'STOPPED', 'BLOCK_LOADED', 'BLOCK_ADDED'],
+    keys: ['STARTED', 'PROGRESS', 'COMPLETED', 'STOPPED'],
   },
   {
     title: 'Severity',
