@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { LiveOutputPanel } from '@/components/backtest/live-output/LiveOutputPanel';
 import type { BacktestResult, BacktestStatusMessage } from '@/lib/strategy-builder/types';
 
@@ -165,5 +165,101 @@ describe('LiveOutputPanel — per-trade synthesis (cycle-33, BTCAAAAA-33591)', (
     expect(screen.queryByText(/BUY FILL #1:/)).toBeNull();
     expect(screen.queryByText(/POSITION OPEN #1:/)).toBeNull();
     expect(screen.queryByText(/PERFORMANCE #1:/)).toBeNull();
+  });
+});
+
+// BTCAAAAA-35662: verify every visible chip filter works and that Unselect All
+// truly hides all lines including hidden-filter matches (PERFORMANCE, CONFIG_READ).
+describe('LiveOutputPanel — filter wiring (BTCAAAAA-35662)', () => {
+  const ts = (n: number) => `2026-01-01T00:00:0${n}Z`;
+  const log = (message: string, n = 0): BacktestStatusMessage => ({ message, level: 'INFO', timestamp: ts(n) });
+  const NOMATCH = 'xyzzy_unique_no_match_999';
+
+  beforeEach(() => { localStorage.clear(); });
+
+  // ── Select / Unselect All ───────────────────────────────────────────────────
+
+  it('Unselect All hides every line including hidden-filter matches (PERFORMANCE, CONFIG_READ)', () => {
+    const logs = [
+      log('TRADE OPENED: BTC long'),
+      log('PERFORMANCE #1: WIN | TP1 | Total PnL: $10.00', 1),
+      log('Loading bars from Binance...', 2),          // matches hidden CONFIG_READ
+    ];
+    render(<LiveOutputPanel logs={logs} />);
+    fireEvent.click(screen.getByTitle('Toggle all event filters')); // Unselect All
+    expect(screen.getByText(/No lines match the active filters/)).toBeInTheDocument();
+    expect(screen.queryByText(/TRADE OPENED/)).toBeNull();
+    expect(screen.queryByText(/PERFORMANCE #1/)).toBeNull();
+    expect(screen.queryByText(/Loading bars/)).toBeNull();
+  });
+
+  it('Select All after Unselect All restores all lines', () => {
+    const logs = [log('TRADE OPENED: BTC long'), log('PERFORMANCE #1: WIN | Total PnL: $10.00', 1)];
+    render(<LiveOutputPanel logs={logs} />);
+    const btn = screen.getByTitle('Toggle all event filters');
+    fireEvent.click(btn); // Unselect All
+    fireEvent.click(btn); // Select All
+    expect(screen.getByText(/TRADE OPENED/)).toBeInTheDocument();
+    expect(screen.getByText(/PERFORMANCE #1/)).toBeInTheDocument();
+  });
+
+  // ── Per-chip filter: each chip shows its match and hides non-matches ────────
+
+  it.each([
+    // Trade Activity
+    ['Trade Opened',  'TRADE OPENED: BTC long'],
+    ['Trade Closed',  'TRADE CLOSED: BTC exit'],
+    ['Trade Updated', 'TRADE UPDATED: stop moved'],
+    ['Positions',     'POSITIONS SNAPSHOT: 2 open'],
+    ['Order',         'ORDER #5: LONG 1 BTC @ 100.00'],
+    ['Buy',           'BUY #5: 1 BTC @ 100.00'],
+    ['Sell',          'SELL #5: 1 BTC @ 100.00'],
+    ['Buy Fill',      'BUY FILL #5: 1 BTC @ 100.00'],
+    ['Sell Fill',     'SELL FILL #5: 1 BTC @ 100.00'],
+    ['Position',      'POSITION OPEN #5: LONG 1 BTC'],
+    // Lifecycle
+    ['▶ Started',     'Starting backtest engine'],
+    ['⏳ Progress',   'Processing candle 500'],
+    ['✓ Completed',   'Successfully finished all trades'],
+    ['■ Stopped',     'Stopped by user request'],
+    ['Block Loaded',  'Successfully loaded 10 blocks'],
+    ['+ Block Added', 'Added block config RSI_14'],
+    // Severity
+    ['Critical',      'CRITICAL: fatal error occurred'],
+    ['✗ Error',       'ERROR: network timeout occurred'],
+    ['⚠ Warning',     'WARNING: high slippage detected'],
+  ])('chip "%s": shows matching line when enabled, hides it when disabled', (label, matchMsg) => {
+    render(<LiveOutputPanel logs={[log(matchMsg), log(NOMATCH, 1)]} />);
+    const toggleBtn = screen.getByTitle('Toggle all event filters');
+
+    // All off → nothing visible
+    fireEvent.click(toggleBtn);
+    expect(screen.queryByText(new RegExp(matchMsg.slice(0, 15)))).toBeNull();
+
+    // Enable only this chip
+    fireEvent.click(screen.getByLabelText(label));
+    expect(screen.getByText(new RegExp(matchMsg.slice(0, 15)))).toBeInTheDocument();
+    expect(screen.queryByText(NOMATCH)).toBeNull();
+
+    // Disable the chip again — line disappears
+    fireEvent.click(screen.getByLabelText(label));
+    expect(screen.queryByText(new RegExp(matchMsg.slice(0, 15)))).toBeNull();
+  });
+
+  // ── Stacking: two enabled filters show lines matching either ───────────────
+
+  it('stacks filters (OR): lines matching either enabled chip both appear', () => {
+    const logs = [
+      log('TRADE OPENED: BTC long'),
+      log('ERROR: network timeout', 1),
+      log('SELL #5: 1 BTC @ 100.00', 2),  // not enabled
+    ];
+    render(<LiveOutputPanel logs={logs} />);
+    fireEvent.click(screen.getByTitle('Toggle all event filters')); // Unselect All
+    fireEvent.click(screen.getByLabelText('Trade Opened'));
+    fireEvent.click(screen.getByLabelText('✗ Error'));
+    expect(screen.getByText(/TRADE OPENED/)).toBeInTheDocument();
+    expect(screen.getByText(/ERROR: network timeout/)).toBeInTheDocument();
+    expect(screen.queryByText(/SELL #5/)).toBeNull();
   });
 });

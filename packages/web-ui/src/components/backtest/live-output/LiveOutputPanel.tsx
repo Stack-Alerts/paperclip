@@ -32,10 +32,11 @@ export interface LiveOutputPanelProps {
 
 const FILTERS_STORAGE_KEY = 'backtest.liveOutput.filters.v1';
 
-// All keys actually rendered as chips — derived from EVENT_GROUPS so Select/Unselect
-// All stays in sync automatically. BACKTEST_VISIBLE_KEYS is the original pre-cycle-33
-// subset and no longer reflects the full rendered set.
+// Keys rendered as chips in the UI (from EVENT_GROUPS) — used for button-label logic.
 const ALL_RENDERED_CHIP_KEYS: readonly EventKey[] = EVENT_GROUPS.flatMap((g) => [...g.keys]);
+// Every key that can ever match a log line — used by toggleAll so hidden-filter
+// matches (PERFORMANCE, CONFIG_READ, etc.) are also cleared on Unselect All.
+const ALL_EVENT_KEYS: readonly EventKey[] = EVENT_DEFS.map((d) => d.key);
 
 function loadStoredFilters(): Set<EventKey> | null {
   if (typeof window === 'undefined') return null;
@@ -160,14 +161,14 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null }:
 
   const toggleAll = useCallback(() => {
     setEnabled((prev) => {
-      const allOn = ALL_RENDERED_CHIP_KEYS.every((k) => prev.has(k));
-      const next = new Set(prev);
-      if (allOn) {
-        for (const k of ALL_RENDERED_CHIP_KEYS) next.delete(k);
-      } else {
-        for (const k of ALL_RENDERED_CHIP_KEYS) next.add(k);
+      const allChipKeysOn = ALL_RENDERED_CHIP_KEYS.every((k) => prev.has(k));
+      if (allChipKeysOn) {
+        // Unselect All: wipe every key so hidden-filter matches (PERFORMANCE,
+        // CONFIG_READ, etc.) also stop appearing in the log.
+        return new Set<EventKey>();
       }
-      return next;
+      // Select All: enable every event def so all line types are visible.
+      return new Set<EventKey>(ALL_EVENT_KEYS);
     });
   }, []);
 
