@@ -165,6 +165,9 @@ ERRORS=()
 while IFS= read -r branch; do
   [[ "$branch" == "HEAD" || "$branch" == "main" ]] && continue
 
+  # Skip already-archived refs (avoid archive/archive/... recursion)
+  [[ "$branch" == ${ARCHIVE_PREFIX}* ]] && continue
+
   if [[ "$branch" == ${LOCK_PREFIX}* ]]; then
     EXCLUDED+=("$branch")
     continue
