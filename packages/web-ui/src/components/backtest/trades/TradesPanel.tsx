@@ -44,8 +44,8 @@ const COLUMNS: Column[] = [
   { key: 'pnl',      label: 'P&L',       width: 110, sortable: true  },
   { key: 'pnlPct',   label: 'P&L %',     width: 100, sortable: true  },
   { key: 'status',   label: 'Status',    width: 90,  sortable: true  },
-  { key: 'partial',  label: 'Partial %', width: 240, sortable: false },
-  { key: 'notes',    label: 'Notes',     width: 280, sortable: false },
+  { key: 'partial',  label: 'Partial %', width: 160, sortable: false },
+  { key: 'notes',    label: 'Notes',     width: 380, sortable: false },
 ];
 
 function formatDuration(bars: number): string {
@@ -208,7 +208,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
             <colgroup>
               {COLUMNS.map(c => (<col key={c.key} style={{ width: c.width }} />))}
             </colgroup>
-            <thead>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr>
                 {COLUMNS.map(col => {
                   const isSorted = col.sortable && sortKey === col.key;
@@ -218,14 +218,14 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
                       onClick={() => handleHeaderClick(col)}
                       onMouseEnter={e => {
                         if (col.sortable) {
-                          (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.03)';
+                          (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)';
                         }
                       }}
                       onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.background = 'transparent';
+                        (e.currentTarget as HTMLElement).style.background = 'var(--bg-deep)';
                       }}
                       style={{
-                        background: 'transparent',
+                        background: 'var(--bg-deep)',
                         color: 'var(--text-muted)',
                         padding: '10px 12px',
                         borderBottom: '1px solid var(--border)',
@@ -391,8 +391,8 @@ function TradeRow({ trade, rowBg }: { trade: Trade; rowBg: string }) {
         {`${trade.pnlPercentage.toFixed(2)}%`}
       </td>
       <td style={{ ...cellStyle, color: statusColor, fontWeight: 600 }}>{status}</td>
-      <td style={{ ...cellStyle, color: pnlColor, textAlign: 'left' }}>{partial}</td>
-      <td style={{ ...cellStyle, textAlign: 'left' }}>{notesDisplay(trade)}</td>
+      <td style={{ ...cellStyle, color: pnlColor }}>{partial}</td>
+      <td style={{ ...cellStyle }}>{notesDisplay(trade)}</td>
     </tr>
   );
 }
