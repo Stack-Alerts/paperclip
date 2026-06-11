@@ -532,8 +532,9 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
   );
 }
 
-/** Highlight PnL dollar + pct pairs green (positive) or red (negative).
- *  Only "PnL: $X.XX (Y.YY%)" patterns are colored — price context stays neutral. */
+/** Subtle PnL tint: leave "PnL:" label in base color, tint only the
+ *  numeric value + pct at reduced opacity so the highlight is readable
+ *  without being distracting. */
 function colorizeMessage(text: string): React.ReactNode {
   const re = /(PnL:\s*)(-?\$[\d,]+\.?\d*)\s*\((-?[\d,]+\.?\d*%)\)/g;
   const nodes: React.ReactNode[] = [];
@@ -543,8 +544,13 @@ function colorizeMessage(text: string): React.ReactNode {
   while ((m = re.exec(text)) !== null) {
     if (m.index > cursor) nodes.push(text.slice(cursor, m.index));
     const neg = m[2].startsWith('-') || m[3].startsWith('-');
-    const color = neg ? '#C35252' : '#10B981';
-    nodes.push(<span key={idx++} style={{ color }}>{m[1]}{m[2]} ({m[3]})</span>);
+    const color = neg ? 'rgba(195,82,82,0.75)' : 'rgba(16,185,129,0.75)';
+    // Keep "PnL:" label in base text color; only tint the numbers.
+    nodes.push(
+      <span key={idx++}>
+        {m[1]}<span style={{ color }}>{m[2]} ({m[3]})</span>
+      </span>
+    );
     cursor = m.index + m[0].length;
   }
   if (cursor < text.length) nodes.push(text.slice(cursor));
