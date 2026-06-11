@@ -17,18 +17,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ADMIN_PAT || secrets.GITHUB_TOKEN }}
         run: |
-          PROTECTION=$(gh api "repos/${{ github.repository }}/branches/main/protection" 2>&1)
-          STATUS=$?
+          # GITHUB_TOKEN cannot read/write branch protection (requires admin PAT).
+          # When ADMIN_PAT is absent, workflow exits 0 with an informational warning.
+          # Add ADMIN_PAT secret (repo + administration scope) to enable full drift detection.
 
-          if [ $STATUS -ne 0 ]; then
-            # GITHUB_TOKEN cannot read/write branch protection (requires admin PAT).
-            # Branch protection was applied manually and persists independently.
-            # Add ADMIN_PAT secret (repo + administration scope) to enable monitoring.
-            echo "::warning::Branch protection monitoring unavailable — add ADMIN_PAT secret for full drift detection."
-            echo "## ⚠️ Branch Protection Monitoring" >> "$GITHUB_STEP_SUMMARY"
-            echo "GITHUB_TOKEN cannot read branch protection rules (requires admin access)." >> "$GITHUB_STEP_SUMMARY"
-            echo "Branch protection was applied manually and remains in effect." >> "$GITHUB_STEP_SUMMARY"
-            echo "Add \`ADMIN_PAT\` secret (repo + administration scope) to enable automatic drift detection." >> "$GITHUB_STEP_SUMMARY"
+          if ! PROTECTION=$(gh api "repos/${{ github.repository }}/branches/main/protection" 2>&1); then
+            echo "::warning::Branch protection monitoring unavailable — add ADMIN_PAT secret for drift detection."
+            echo "## ⚠️ Branch Protection Monitoring Unavailable" >> "$GITHUB_STEP_SUMMARY"
+            echo "GITHUB_TOKEN cannot read branch protection (requires admin PAT)." >> "$GITHUB_STEP_SUMMARY"
+            echo "Protection was applied manually and persists. Add \`ADMIN_PAT\` secret to enable drift detection." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
@@ -39,11 +36,11 @@ jobs:
           DELETES=$(echo "$PROTECTION" | jq '.allow_deletions.enabled')
 
           DRIFT=0
-          [ "$REVIEWS" != "1" ]    && echo "::error::DRIFT: required_approving_review_count=$REVIEWS (expected 1)" && DRIFT=1
-          [ "$DISMISS" != "true" ] && echo "::error::DRIFT: dismiss_stale_reviews=$DISMISS (expected true)" && DRIFT=1
-          [ "$STRICT" != "true" ]  && echo "::error::DRIFT: status_checks.strict=$STRICT (expected true)" && DRIFT=1
-          [ "$FORCE" != "false" ]  && echo "::error::DRIFT: allow_force_pushes=$FORCE (expected false)" && DRIFT=1
-          [ "$DELETES" != "false" ] && echo "::error::DRIFT: allow_deletions=$DELETES (expected false)" && DRIFT=1
+          [ "$REVIEWS" != "1" ]     && echo "::error::DRIFT: required_approving_review_count=$REVIEWS (expected 1)" && DRIFT=1
+          [ "$DISMISS" != "true" ]  && echo "::error::DRIFT: dismiss_stale_reviews=$DISMISS (expected true)"        && DRIFT=1
+          [ "$STRICT"  != "true" ]  && echo "::error::DRIFT: status_checks.strict=$STRICT (expected true)"          && DRIFT=1
+          [ "$FORCE"   != "false" ] && echo "::error::DRIFT: allow_force_pushes=$FORCE (expected false)"            && DRIFT=1
+          [ "$DELETES" != "false" ] && echo "::error::DRIFT: allow_deletions=$DELETES (expected false)"             && DRIFT=1
 
           if [ "$DRIFT" -eq 1 ]; then
             echo "::error::Branch protection has drifted from policy. Manual re-apply required."
