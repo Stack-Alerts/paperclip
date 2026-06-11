@@ -102,19 +102,29 @@ function partialDisplay(t: Trade): string {
 const EXIT_TYPE_CODES = new Set(['TP1','TP2','TP3','TP4','TP5','SL','STOP_LOSS','MAX_BARS','TIME_LIMIT']);
 
 function notesDisplay(t: Trade): string {
-  // Use raw notes only when they are a real descriptive string, not just a
-  // bare exit-type abbreviation that the backend copies from exit_condition_name.
   const rawNotes = (t.notes ?? '').trim();
   const isAbbrev = rawNotes === '' || EXIT_TYPE_CODES.has(rawNotes.toUpperCase());
 
-  if (!isAbbrev) return rawNotes;
+  let exitNote: string;
+  if (!isAbbrev) {
+    exitNote = rawNotes;
+  } else {
+    const u = ((t.exitType ?? rawNotes) as string).toUpperCase().trim();
+    if (/^TP[0-9]+$/.test(u)) exitNote = `${u} Hit`;
+    else if (u === 'SL' || u === 'STOP_LOSS') exitNote = 'Stop Loss Hit';
+    else if (u === 'MAX_BARS' || u === 'TIME_LIMIT') exitNote = `Max Hold Time (${t.bars ?? 0} bars)`;
+    else if (u) exitNote = u;
+    else exitNote = '—';
+  }
 
-  const u = ((t.exitType ?? rawNotes) as string).toUpperCase().trim();
-  if (/^TP[0-9]+$/.test(u)) return `${u} Hit`;
-  if (u === 'SL' || u === 'STOP_LOSS') return 'Stop Loss Hit (1 exits)';
-  if (u === 'MAX_BARS' || u === 'TIME_LIMIT') return `Max Hold Time (${t.bars ?? 0} bars)`;
-  if (u) return u;
-  return '—';
+  // Append entry signals (e.g. "SIGNAL(BULLISH_BREAK)") when present — mirrors
+  // thick-client "STRATEGY: X" / "SIGNAL(X)" note format from exit_hierarchy_evaluator.
+  const sigs = t.entrySignals;
+  if (sigs && sigs.length > 0) {
+    const sigStr = sigs.map(s => `SIGNAL(${s})`).join(', ');
+    return exitNote !== '—' ? `${exitNote} | ${sigStr}` : sigStr;
+  }
+  return exitNote;
 }
 
 // Mirrors trades_panel.py:_aggregate_exits (lines 649-727).

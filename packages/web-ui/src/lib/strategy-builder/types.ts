@@ -281,8 +281,10 @@ export interface Trade {
   // Symbol traded; thick-client defaults to BTC.P/USDT when not present on the record.
   symbol?: string;
   status?: 'open' | 'closed' | 'OPEN' | 'CLOSED' | 'PARTIAL' | string;
-  // Aggregated notes from thick-client _format_notes / _aggregate_exits (e.g. "ALL TP Exits").
+  // Exit notes from thick-client _format_notes (e.g. "TP1 Hit", "Stop Loss Hit").
   notes?: string;
+  // Entry signal names that fired at trade open (e.g. ["BULLISH_BREAK"]).
+  entrySignals?: string[];
   // Partial exit breakdown from thick-client _aggregate_exits (e.g. "TP1: $X | TP2: $Y").
   partialBreakdown?: string;
 }
