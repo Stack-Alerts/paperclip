@@ -9,6 +9,7 @@ import { LiveOutputPanel } from './live-output/LiveOutputPanel';
 import { MetricsPanel } from './metrics/MetricsPanel';
 import { TradesPanel } from './trades/TradesPanel';
 import { BacktestProgressMeter } from './progress-meter';
+import { useTooltipSettings } from '@/components/strategy-builder/TooltipSettingsContext';
 
 export interface BacktestWindowProps {
   progress?: BacktestProgress;
@@ -32,6 +33,7 @@ export function BacktestWindow({
   disabled = false,
 }: BacktestWindowProps) {
   const [currentTab, setCurrentTab] = useState<'config' | 'progress' | 'results' | 'trades' | 'live-output'>('config');
+  const { settings: tooltipSettings, update: updateTooltipSettings } = useTooltipSettings();
   const [config, setConfig] = useState<BacktestConfig>({
     lookbackDays: 180,
     trainingWindow: 30,
@@ -275,6 +277,34 @@ export function BacktestWindow({
           <AppBrand size={24} />
           <span>Backtest Engine</span>
         </h2>
+        {/* Tooltip settings — shared singleton with strategy builder */}
+        <div className="flex items-center gap-3 flex-shrink-0 text-xs" style={{ color: 'var(--text-faint)' }}>
+          <label className="flex items-center gap-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={tooltipSettings.enabled}
+              onChange={e => updateTooltipSettings({ enabled: e.target.checked })}
+              style={{ accentColor: 'var(--toolbar-accent)', width: 11, height: 11 }}
+            />
+            Tooltips
+          </label>
+          {tooltipSettings.enabled && (
+            <>
+              <input
+                type="range"
+                min={300}
+                max={3000}
+                step={100}
+                value={tooltipSettings.delayMs}
+                onChange={e => updateTooltipSettings({ delayMs: Number(e.target.value) })}
+                style={{ width: 54, accentColor: 'var(--toolbar-accent)', cursor: 'pointer', opacity: 0.75 }}
+              />
+              <span style={{ minWidth: 24, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                {(tooltipSettings.delayMs / 1000).toFixed(1)}s
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
