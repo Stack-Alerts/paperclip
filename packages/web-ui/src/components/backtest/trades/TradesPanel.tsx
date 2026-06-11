@@ -93,7 +93,7 @@ function partialDisplay(t: Trade): string {
   if (u === 'MAX_BARS' || u === 'TIME_LIMIT') return `Max Bars: ${formatMoney(t.pnl)}`;
   if (u === 'SL') return `SL: ${formatMoney(t.pnl)}`;
   if (/^TP[0-9]+$/.test(u)) return `${u}: ${formatMoney(t.pnl)}`;
-  return t.exitType;
+  return '—';
 }
 
 // Short exit-type codes the backend sends via exit_condition_name — these need
@@ -116,6 +116,92 @@ function notesDisplay(t: Trade): string {
   return '—';
 }
 
+// Mirrors trades_panel.py:_aggregate_exits (lines 649-727).
+// The web API sends individual partial-exit records; we group them here so
+// each logical trade shows one row with combined partial_exit_breakdown/notes.
+function aggregateTrades(raw: Trade[]): Trade[] {
+  // Strip trailing _N suffix to get base trade ID (e.g. "5_1" → "5").
+  const baseId = (id: string) => id.replace(/_\d+$/, '');
+
+  // Preserve insertion order of first-seen base IDs.
+  const order: string[] = [];
+  const groups = new Map<string, Trade[]>();
+  for (const t of raw) {
+    const b = baseId(String(t.id));
+    if (!groups.has(b)) { groups.set(b, []); order.push(b); }
+    groups.get(b)!.push(t);
+  }
+
+  return order.map(b => {
+    const exits = groups.get(b)!;
+    if (exits.length === 1) {
+      // Single exit — still run through partialDisplay/notesDisplay at render.
+      return exits[0];
+    }
+
+    const base = { ...exits[0] };
+
+    // Aggregate PnL.
+    base.pnl = exits.reduce((s, e) => s + e.pnl, 0);
+    base.pnlPercentage = exits.reduce((s, e) => s + e.pnlPercentage, 0);
+
+    // Build breakdown tracking (mirrors tp_counts dict in Python).
+    const tpCounts: Record<string, number> = { TP1: 0, TP2: 0, TP3: 0, SL: 0, MAX_BARS: 0 };
+    const breakdown: string[] = [];
+    let maxBarsPnl = 0;
+
+    for (const e of exits) {
+      const ec = (e.exitType ?? '').toUpperCase().trim();
+      const pnl = e.pnl;
+      if (ec === 'TP1' || ec === 'TP2' || ec === 'TP3') {
+        breakdown.push(`${ec}: $${pnl.toFixed(2)}`);
+        tpCounts[ec] = (tpCounts[ec] ?? 0) + 1;
+      } else if (ec === 'SL' || ec === 'STOP_LOSS') {
+        breakdown.push(`SL: $${pnl.toFixed(2)}`);
+        tpCounts['SL'] += 1;
+      } else if (ec === 'MAX_BARS' || ec === 'TIME_LIMIT') {
+        if (tpCounts['MAX_BARS'] === 0) {
+          maxBarsPnl = pnl;
+          breakdown.push(`Max Bars: $${pnl.toFixed(2)}`);
+          tpCounts['MAX_BARS'] = 1;
+        }
+      }
+    }
+
+    let partialBreakdown: string;
+    let notes: string;
+
+    if (tpCounts['MAX_BARS'] > 0) {
+      partialBreakdown = `Max Bars: $${maxBarsPnl.toFixed(2)}`;
+      notes = 'Max Bars Exit';
+    } else if (tpCounts['SL'] > 0) {
+      partialBreakdown = breakdown.filter(s => s.startsWith('SL:')).join(' | ');
+      notes = `Stop Loss Hit (${tpCounts['SL']} exits)`;
+    } else {
+      partialBreakdown = breakdown.length > 0 ? breakdown.join(' | ') : '-';
+      if (tpCounts['TP1'] > 0 && tpCounts['TP2'] > 0 && tpCounts['TP3'] > 0) {
+        notes = 'ALL TP Exits';
+      } else if (exits.length > 1) {
+        const hitTps = ['TP1','TP2','TP3'].filter(tp => tpCounts[tp] > 0);
+        notes = hitTps.length > 0 ? `Partial Exits: ${hitTps.join(', ')}` : (exits[0].notes ?? '');
+      } else {
+        notes = exits[0].notes ?? '';
+      }
+    }
+
+    base.partialBreakdown = partialBreakdown;
+    base.notes = notes;
+
+    // Use last exit's exit price, bars, status.
+    const last = exits[exits.length - 1];
+    base.exitPrice = last.exitPrice;
+    base.bars = last.bars;
+    base.status = last.status;
+
+    return base;
+  });
+}
+
 function sortValue(t: Trade, key: ColumnKey): number | string {
   switch (key) {
     case 'id':     return Number(t.id) || 0;
@@ -135,20 +221,23 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
   const [sortKey, setSortKey] = useState<ColumnKey>('id');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
+  // Aggregate partial exits into single rows (mirrors thick-client _aggregate_exits).
+  const aggregated = useMemo(() => aggregateTrades(trades), [trades]);
+
   const summary = useMemo(() => {
-    const total = trades.length;
-    const wins = trades.filter(t => t.pnl > 0).length;
-    const losses = trades.filter(t => t.pnl < 0).length;
-    const longs = trades.filter(t => normalizeSide(t.side) === 'LONG').length;
-    const shorts = trades.filter(t => normalizeSide(t.side) === 'SHORT').length;
-    const totalPnl = trades.reduce((s, t) => s + t.pnl, 0);
+    const total = aggregated.length;
+    const wins = aggregated.filter(t => t.pnl > 0).length;
+    const losses = aggregated.filter(t => t.pnl < 0).length;
+    const longs = aggregated.filter(t => normalizeSide(t.side) === 'LONG').length;
+    const shorts = aggregated.filter(t => normalizeSide(t.side) === 'SHORT').length;
+    const totalPnl = aggregated.reduce((s, t) => s + t.pnl, 0);
     const winRate = total > 0 ? (wins / total) * 100 : 0;
     return { total, wins, losses, longs, shorts, totalPnl, winRate };
-  }, [trades]);
+  }, [aggregated]);
 
   const sortedTrades = useMemo(() => {
-    if (trades.length === 0) return trades;
-    const arr = [...trades];
+    if (aggregated.length === 0) return aggregated;
+    const arr = [...aggregated];
     arr.sort((a, b) => {
       const av = sortValue(a, sortKey);
       const bv = sortValue(b, sortKey);
@@ -158,7 +247,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return arr;
-  }, [trades, sortKey, sortDir]);
+  }, [aggregated, sortKey, sortDir]);
 
   const handleHeaderClick = (col: Column) => {
     if (!col.sortable) return;
@@ -268,7 +357,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
             fontSize: 12,
           }}
         >
-          Showing: <b style={{ color: 'var(--text-secondary)' }}>All Trades ({trades.length})</b>
+          Showing: <b style={{ color: 'var(--text-secondary)' }}>All Trades ({aggregated.length})</b>
         </div>
       </SectionShell>
     </div>
