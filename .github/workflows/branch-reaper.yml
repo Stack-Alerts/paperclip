@@ -5,8 +5,49 @@ on:
     # Run daily at 3 AM UTC
     - cron: '0 3 * * *'
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run — log only, do not create Paperclip alerts or delete branches'
+        required: false
+        default: 'false'
 
 jobs:
+  alert-stale-branches:
+    name: Alert on stale unmerged branches (>7 days, no open PR)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Python dependencies
+        run: pip install --quiet requests
+
+      - name: Alert on stale branches
+        run: |
+          FLAGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            FLAGS="--dry-run"
+          fi
+          python scripts/stale_branch_alert.py $FLAGS || STATUS=$?
+          # Exit code 2 means clean state (nothing to alert) — treat as success
+          if [ "${STATUS:-0}" -eq 2 ]; then
+            echo "No stale branches to alert on."
+            exit 0
+          fi
+          exit "${STATUS:-0}"
+
   cleanup-stale-branches:
     runs-on: ubuntu-latest
     permissions:
@@ -22,6 +63,7 @@ jobs:
       - name: Clean up stale branches
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
           set -e
 
@@ -31,6 +73,7 @@ jobs:
 
           echo "🧹 Branch Reaper: Cleaning branches not updated in $STALE_DAYS days"
           echo "Cutoff date: $(date -d @$CUTOFF_DATE)"
+          [ "${DRY_RUN}" = "true" ] && echo "DRY RUN — no branches will be deleted"
           echo ""
 
           DELETED_COUNT=0
@@ -60,8 +103,12 @@ jobs:
             if [ "$LAST_COMMIT_TIMESTAMP" -lt "$CUTOFF_DATE" ]; then
               # Check if branch is already merged to main
               if git merge-base --is-ancestor "origin/$branch" "origin/main" 2>/dev/null; then
-                echo "🗑️  Deleting $branch (last updated: $LAST_COMMIT_DATE)"
-                git push origin --delete "$branch" 2>/dev/null || echo "⚠️  Failed to delete $branch"
+                if [ "${DRY_RUN}" = "true" ]; then
+                  echo "🗑️  DRY RUN: would delete $branch (last updated: $LAST_COMMIT_DATE)"
+                else
+                  echo "🗑️  Deleting $branch (last updated: $LAST_COMMIT_DATE)"
+                  git push origin --delete "$branch" 2>/dev/null || echo "⚠️  Failed to delete $branch"
+                fi
                 DELETED_COUNT=$((DELETED_COUNT + 1))
               else
                 echo "⏸️  Keeping $branch (not merged to main, last updated: $LAST_COMMIT_DATE)"
