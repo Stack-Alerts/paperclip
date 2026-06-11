@@ -146,7 +146,7 @@ a SHA that is not reachable on the issue's configured remote branch.
 |-------------|-------------------------------------------|-------------------------------------------|-------------------|
 | `off`       | Allowed (no gate)                         | Allowed (no gate)                         | Allowed           |
 | `advisory`  | Allowed; warning logged with `reason`     | Allowed; warning logged with `reason`     | Allowed           |
-| `enforce`   | 422 (`reason: "missing_fix_sha"`)         | 422 (`reason: "unreachable_sha"`)         | Allowed           |
+| `enforce`   | 422 (`reason: "missing_fix_sha"`)         | 422 (`reason: "unreachable_sha"` or `"git_error"` if the override `Fix-Repo:` URL is malformed/unreachable) | Allowed           |
 
 Defaults to `off` for new companies. The gate applies to **all** agent
 roles on the company (engineer, manager, …) when set to `enforce`, not

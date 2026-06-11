@@ -2,12 +2,37 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import {
   CLOSURE_GATE_FIX_SHA_LINE_REGEX,
+  CLOSURE_GATE_FIX_REPO_LINE_REGEX,
   CLOSURE_GATE_VERIFY_CACHE_TTL_MS,
   type ClosureGateFixShaMode,
 } from "@paperclipai/shared";
 import { unprocessable } from "../errors.js";
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * Closure-gate service.
+ *
+ * When a company has `closure_gate_fix_sha = "enforce"`, an agent PATCH that
+ * sets an issue to `status: "done"` must include three contract elements in
+ * the closure comment (or in a fallback comment when both are scanned):
+ *
+ *   1. `Fix-SHA: <40-hex-sha>` — the commit the agent is closing on.
+ *   2. `Fix-Target: <branch>` (optional, defaults to `main`) — the ref
+ *      `git ls-remote` should consult to confirm the SHA is reachable.
+ *   3. `Fix-Repo: <url>` (optional) — overrides the `executionWorkspaces`
+ *      `repoUrl` for the verification `git ls-remote` call. Use this when
+ *      the issue inherits a workspace whose repo is not where the fix
+ *      landed (e.g. Paperclip-side rollout decisions on a different fork).
+ *      If `Fix-Repo:` is present but malformed or unreachable, the gate
+ *      returns the same 422 it would for an unreachable SHA on the
+ *      default repo (surfaced as a `git_error`).
+ *
+ * If any required element is missing in `enforce` mode the gate rejects
+ * the closure with HTTP 422. In `advisory` mode the same checks run but
+ * the gate logs a warning and allows the closure. In `off` mode the gate
+ * is a no-op.
+ */
 
 export const CLOSURE_GATE_DEFAULT_TARGET = "main";
 export const CLOSURE_GATE_LS_REMOTE_TIMEOUT_MS = 10_000;
@@ -59,6 +84,25 @@ export function extractFixSha(body: string | null | undefined): ClosureGateFixSh
   const rawTarget = match[2]?.trim();
   const target = rawTarget && rawTarget.length > 0 ? rawTarget : CLOSURE_GATE_DEFAULT_TARGET;
   return { sha, target };
+}
+
+/**
+ * Extracts a `Fix-Repo: <url>` override from a closure comment, if present.
+ *
+ * When the closing agent's issue inherits an `executionWorkspaces` repo that
+ * is *not* the repo where the fix actually landed (e.g. Paperclip-side
+ * rollout decisions on a different fork), the closure comment can declare
+ * the correct `git ls-remote` target via a `Fix-Repo:` line. This is the
+ * per-closure companion to `executionWorkspaces.repoUrl`, not a replacement
+ * for it: absent the line, the gate falls back to the workspace's
+ * configured repo URL.
+ */
+export function extractFixRepo(body: string | null | undefined): string | null {
+  if (!body) return null;
+  const match = CLOSURE_GATE_FIX_REPO_LINE_REGEX.exec(body);
+  if (!match) return null;
+  const url = match[1]?.trim();
+  return url && url.length > 0 ? url : null;
 }
 
 export function createClosureGateCache(ttlMs: number = CLOSURE_GATE_VERIFY_CACHE_TTL_MS) {
@@ -227,7 +271,9 @@ export function createClosureGate(
     }
 
     const target = fixSha.target || defaultTarget;
-    const repoUrl = await input.resolveRepoUrl();
+    const fixRepoOverride = extractFixRepo(combinedBody);
+    const resolvedRepoUrl = await input.resolveRepoUrl();
+    const repoUrl = fixRepoOverride ?? resolvedRepoUrl;
     if (!repoUrl) {
       if (mode === "advisory") {
         logger?.warn(

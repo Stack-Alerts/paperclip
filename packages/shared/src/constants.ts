@@ -155,6 +155,7 @@ export const CLOSURE_GATE_FIX_SHA_MODES = ["off", "advisory", "enforce"] as cons
 export type ClosureGateFixShaMode = (typeof CLOSURE_GATE_FIX_SHA_MODES)[number];
 export const DEFAULT_CLOSURE_GATE_FIX_SHA_MODE: ClosureGateFixShaMode = "off";
 export const CLOSURE_GATE_FIX_SHA_LINE_REGEX = /^Fix-SHA:[ \t]*([0-9a-f]{40})[ \t]*(?:\nFix-Target:[ \t]*([^\n]+))?/im;
+export const CLOSURE_GATE_FIX_REPO_LINE_REGEX = /^[ \t]*Fix-Repo:[ \t]*(\S+)[ \t]*$/im;
 export const CLOSURE_GATE_VERIFY_CACHE_TTL_MS = 60_000;
 
 export const ISSUE_COMMENT_AUTHOR_TYPES = ["user", "agent", "system"] as const;
