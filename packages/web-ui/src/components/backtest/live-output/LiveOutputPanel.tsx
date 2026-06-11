@@ -418,7 +418,7 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
                   <span style={{ color: cColor, whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 600, minWidth: '11ch', display: 'inline-block' }}>
                     [{cDef?.label ?? row.cat}]
                   </span>
-                  <span style={{ color: '#9AA0A6', wordBreak: 'break-word' }}>
+                  <span style={{ color: '#E8EAED', wordBreak: 'break-word' }}>
                     {row.text}
                   </span>
                 </div>
@@ -436,10 +436,10 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
       >
         <span>Messages: <b style={{ color: 'var(--text-secondary)' }}>{effectiveLogs.length.toLocaleString()}</b></span>
         <span>Displayed: <b style={{ color: 'var(--text-secondary)' }}>{displayedLines.toLocaleString()}</b></span>
-        <span>Decisions: <b style={{ color: '#FF8C00' }}>{decisions.toLocaleString()}</b></span>
+        <span>Decisions: <b style={{ color: '#FFD700' }}>{decisions.toLocaleString()}</b></span>
         <span>Winners: <b style={{ color: '#10B981' }}>{winners.toLocaleString()}</b></span>
-        <span>Losses: <b style={{ color: '#C35252' }}>{losses.toLocaleString()}</b></span>
-        <span>Stop Loss: <b style={{ color: '#FF4040' }}>{stopLoss.toLocaleString()}</b></span>
+        <span>Losses: <b style={{ color: '#FF8C00' }}>{losses.toLocaleString()}</b></span>
+        <span>Stop Loss: <b style={{ color: '#C35252' }}>{stopLoss.toLocaleString()}</b></span>
         <span>Trades: <b style={{ color: 'var(--text-secondary)' }}>{tradeCount.toLocaleString()}</b></span>
         <div className="flex-1" />
         <button

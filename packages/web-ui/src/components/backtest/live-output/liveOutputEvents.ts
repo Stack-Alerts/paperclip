@@ -25,18 +25,18 @@ export interface CategoryDef {
 
 export const LEVEL_DEFS_TC: readonly LevelDef[] = [
   { tag: 'INFO',      label: 'INFO',      color: '#2070FF' },
-  { tag: 'DECISION',  label: 'DECISION',  color: '#FF8C00' },
+  { tag: 'DECISION',  label: 'DECISION',  color: '#FFD700' },
   { tag: 'WIN',       label: 'WIN',       color: '#10B981' },
-  { tag: 'LOSS',      label: 'LOSS',      color: '#C35252' },
-  { tag: 'STOP_LOSS', label: 'STOP/LOSS', color: '#FF4040' },
+  { tag: 'LOSS',      label: 'LOSS',      color: '#FF8C00' },
+  { tag: 'STOP_LOSS', label: 'STOP/LOSS', color: '#C35252' },
 ];
 
 export const CATEGORY_DEFS_TC: readonly CategoryDef[] = [
-  { tag: 'GLOBAL',    label: 'Global',    color: 'var(--text-secondary)' },
-  { tag: 'TRADE',     label: 'TRADE',     color: '#FFD700' },
-  { tag: 'RISK',      label: 'RISK',      color: '#FFD700' },
+  { tag: 'GLOBAL',    label: 'Global',    color: '#9AA0A6' },
+  { tag: 'TRADE',     label: 'TRADE',     color: '#8B5CF6' },
+  { tag: 'RISK',      label: 'RISK',      color: '#C35252' },
   { tag: 'SYSTEM',    label: 'SYSTEM',    color: '#9AA0A6' },
-  { tag: 'OPTIMIZER', label: 'OPTIMIZER', color: '#8B5CF6' },
+  { tag: 'OPTIMIZER', label: 'OPTIMIZER', color: '#FFA500' },
   { tag: 'SERVICE',   label: 'SERVICE',   color: '#9AA0A6' },
 ];
 
