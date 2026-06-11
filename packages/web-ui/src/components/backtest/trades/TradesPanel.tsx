@@ -374,7 +374,7 @@ function SectionShell({ title, children }: { title: string; children: React.Reac
       className="rounded-[4px]"
       style={{
         border: '1px solid var(--border)',
-        background: 'rgba(255, 255, 255, 0.02)',
+        background: 'rgb(28 61 76 / 2%)',
       }}
     >
       <h3
