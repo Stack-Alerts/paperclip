@@ -525,26 +525,31 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
   );
 }
 
-/** Subtle PnL tint: leave "PnL:" label in base color, tint only the
- *  numeric value + pct at reduced opacity so the highlight is readable
- *  without being distracting. */
+/** Two-tier colorization (single regex pass, left-alternative wins):
+ *  1. PnL amount+pct  → green (positive) / red (negative)
+ *  2. Standalone $price → muted blue (not green/red — purely informational)
+ *  PnL pattern takes precedence so amounts inside PnL segments aren't double-colored. */
 function colorizeMessage(text: string): React.ReactNode {
-  // Handles both "-$83.06" and "$-83.06" sign placements; optional "Realized" prefix in pct group.
-  const re = /(PnL:\s*)(-?\$-?[\d,]+\.?\d*)\s*\(\s*(?:Realized\s+)?(-?[\d,]+\.?\d*%)\s*\)/g;
+  const re = /(PnL:\s*)(-?\$-?[\d,]+\.?\d*)\s*\(\s*(?:Realized\s+)?(-?[\d,]+\.?\d*%)\s*\)|(\$[\d,]+\.?\d*)/g;
   const nodes: React.ReactNode[] = [];
   let cursor = 0;
   let m: RegExpExecArray | null;
   let idx = 0;
   while ((m = re.exec(text)) !== null) {
     if (m.index > cursor) nodes.push(text.slice(cursor, m.index));
-    const neg = m[2].includes('-') || m[3].startsWith('-');
-    const color = neg ? 'rgba(195,82,82,0.75)' : 'rgba(16,185,129,0.75)';
-    // Keep "PnL:" label in base text color; only tint the numbers.
-    nodes.push(
-      <span key={idx++}>
-        {m[1]}<span style={{ color }}>{m[2]} ({m[3]})</span>
-      </span>
-    );
+    if (m[2]) {
+      // PnL pair — green/red tint on numbers only, label stays neutral.
+      const neg = m[2].includes('-') || m[3].startsWith('-');
+      const color = neg ? 'rgba(195,82,82,0.75)' : 'rgba(16,185,129,0.75)';
+      nodes.push(
+        <span key={idx++}>
+          {m[1]}<span style={{ color }}>{m[2]} ({m[3]})</span>
+        </span>
+      );
+    } else if (m[4]) {
+      // Standalone price — muted sky-blue, clearly distinct from PnL colors.
+      nodes.push(<span key={idx++} style={{ color: 'rgba(100,180,220,0.8)' }}>{m[4]}</span>);
+    }
     cursor = m.index + m[0].length;
   }
   if (cursor < text.length) nodes.push(text.slice(cursor));
