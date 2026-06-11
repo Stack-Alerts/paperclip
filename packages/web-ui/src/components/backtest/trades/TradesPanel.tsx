@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, Fragment } from 'react';
 import { Trade } from '@/lib/strategy-builder/types';
 
 export interface TradesPanelProps {
@@ -131,104 +131,51 @@ function notesDisplay(t: Trade): string {
   return exitNote;
 }
 
-// Mirrors trades_panel.py:_aggregate_exits (lines 649-727).
-// The web API sends individual partial-exit records; we group them here so
-// each logical trade shows one row with combined partial_exit_breakdown/notes.
-function aggregateTrades(raw: Trade[]): Trade[] {
-  // Strip trailing .N or _N suffix to get base trade ID (e.g. "5.1" → "5", "5_1" → "5").
-  // The registry assigns dot notation ("5.1"), so the regex must accept both separators.
-  const baseId = (id: string) => id.replace(/[._]\d+$/, '');
-
-  // Preserve insertion order of first-seen base IDs.
-  const order: string[] = [];
-  const groups = new Map<string, Trade[]>();
-  for (const t of raw) {
-    const b = baseId(String(t.id));
-    if (!groups.has(b)) { groups.set(b, []); order.push(b); }
-    groups.get(b)!.push(t);
-  }
-
-  return order.map(b => {
-    const exits = groups.get(b)!;
-    if (exits.length === 1) {
-      // Single exit — still run through partialDisplay/notesDisplay at render.
-      return exits[0];
-    }
-
-    const base = { ...exits[0] };
-
-    // Aggregate PnL.
-    base.pnl = exits.reduce((s, e) => s + e.pnl, 0);
-    base.pnlPercentage = exits.reduce((s, e) => s + e.pnlPercentage, 0);
-
-    // Build breakdown tracking (mirrors tp_counts dict in Python).
-    const tpCounts: Record<string, number> = { TP1: 0, TP2: 0, TP3: 0, SL: 0, MAX_BARS: 0 };
-    const breakdown: string[] = [];
-    let maxBarsPnl = 0;
-
-    for (const e of exits) {
-      const ec = (e.exitType ?? '').toUpperCase().trim();
-      const pnl = e.pnl;
-      if (ec === 'TP1' || ec === 'TP2' || ec === 'TP3') {
-        breakdown.push(`${ec}: $${pnl.toFixed(2)}`);
-        tpCounts[ec] = (tpCounts[ec] ?? 0) + 1;
-      } else if (ec === 'SL' || ec === 'STOP_LOSS') {
-        breakdown.push(`SL: $${pnl.toFixed(2)}`);
-        tpCounts['SL'] += 1;
-      } else if (ec === 'MAX_BARS' || ec === 'TIME_LIMIT') {
-        if (tpCounts['MAX_BARS'] === 0) {
-          maxBarsPnl = pnl;
-          breakdown.push(`Max Bars: $${pnl.toFixed(2)}`);
-          tpCounts['MAX_BARS'] = 1;
-        }
-      }
-    }
-
-    let partialBreakdown: string;
-    let notes: string;
-
-    if (tpCounts['MAX_BARS'] > 0) {
-      partialBreakdown = `Max Bars: $${maxBarsPnl.toFixed(2)}`;
-      notes = 'Max Bars Exit';
-    } else if (tpCounts['SL'] > 0) {
-      partialBreakdown = breakdown.filter(s => s.startsWith('SL:')).join(' | ');
-      notes = `Stop Loss Hit (${tpCounts['SL']} exits)`;
-    } else {
-      partialBreakdown = breakdown.length > 0 ? breakdown.join(' | ') : '-';
-      if (tpCounts['TP1'] > 0 && tpCounts['TP2'] > 0 && tpCounts['TP3'] > 0) {
-        notes = 'ALL TP Exits';
-      } else if (exits.length > 1) {
-        const hitTps = ['TP1','TP2','TP3'].filter(tp => tpCounts[tp] > 0);
-        notes = hitTps.length > 0 ? `Partial Exits: ${hitTps.join(', ')}` : (exits[0].notes ?? '');
-      } else {
-        notes = exits[0].notes ?? '';
-      }
-    }
-
-    base.partialBreakdown = partialBreakdown;
-    base.notes = notes;
-
-    // Use last exit's exit price, bars, status.
-    const last = exits[exits.length - 1];
-    base.exitPrice = last.exitPrice;
-    base.bars = last.bars;
-    base.status = last.status;
-
-    return base;
-  });
+// Strip trailing .N or _N suffix to get base trade ID (e.g. "5.1" → "5").
+// The registry assigns dot notation ("5.1"), so the regex accepts both separators.
+function baseTradeId(id: string): string {
+  return String(id).replace(/[._]\d+$/, '');
 }
 
-function sortValue(t: Trade, key: ColumnKey): number | string {
+interface TradeGroup {
+  baseId: string;
+  trades: Trade[];
+  totalPnl: number;
+  totalPnlPct: number;
+}
+
+// Group individual partial-exit records by base trade ID.
+// Preserves insertion order so Trade 5 (with partials 5.1, 5.2, 5.3) stays together.
+function groupTradesById(raw: Trade[]): TradeGroup[] {
+  const map = new Map<string, TradeGroup>();
+  const order: string[] = [];
+  for (const t of raw) {
+    const b = baseTradeId(String(t.id));
+    if (!map.has(b)) {
+      map.set(b, { baseId: b, trades: [], totalPnl: 0, totalPnlPct: 0 });
+      order.push(b);
+    }
+    const g = map.get(b)!;
+    g.trades.push(t);
+    g.totalPnl += t.pnl;
+    g.totalPnlPct += t.pnlPercentage;
+  }
+  return order.map(b => map.get(b)!);
+}
+
+function sortGroupValue(g: TradeGroup, key: ColumnKey): number | string {
+  const first = g.trades[0];
   switch (key) {
-    case 'id':     return Number(t.id) || 0;
-    case 'time':   return new Date(t.entryTime).getTime() || 0;
-    case 'side':   return normalizeSide(t.side);
-    case 'size':   return t.quantity;
-    case 'entry':  return t.entryPrice;
-    case 'exit':   return t.exitPrice;
-    case 'pnl':    return t.pnl;
-    case 'pnlPct': return t.pnlPercentage;
-    case 'status': return normalizeStatus(t.status);
+    case 'id':     return Number(g.baseId) || 0;
+    case 'time':   return new Date(first.entryTime).getTime() || 0;
+    case 'side':   return normalizeSide(first.side);
+    case 'size':   return first.quantity;
+    case 'entry':  return first.entryPrice;
+    case 'exit':   return first.exitPrice;
+    // Sort by group totals so ordering reflects the complete trade outcome.
+    case 'pnl':    return g.totalPnl;
+    case 'pnlPct': return g.totalPnlPct;
+    case 'status': return normalizeStatus(g.trades[g.trades.length - 1].status);
     default:       return 0;
   }
 }
@@ -249,18 +196,18 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
     return { total, wins, losses, longs, shorts, totalPnl, winRate };
   }, [trades]);
 
-  const sortedTrades = useMemo(() => {
-    if (trades.length === 0) return trades;
-    const arr = [...trades];
-    arr.sort((a, b) => {
-      const av = sortValue(a, sortKey);
-      const bv = sortValue(b, sortKey);
+  const sortedGroups = useMemo(() => {
+    const groups = groupTradesById(trades);
+    if (groups.length === 0) return groups;
+    groups.sort((a, b) => {
+      const av = sortGroupValue(a, sortKey);
+      const bv = sortGroupValue(b, sortKey);
       const cmp = typeof av === 'number' && typeof bv === 'number'
         ? av - bv
         : String(av).localeCompare(String(bv));
       return sortDir === 'asc' ? cmp : -cmp;
     });
-    return arr;
+    return groups;
   }, [trades, sortKey, sortDir]);
 
   const handleHeaderClick = (col: Column) => {
@@ -354,11 +301,18 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
               </tr>
             </thead>
             <tbody>
-              {sortedTrades.map((trade, i) => {
-                // Alternate row dimming preserved from cycle 29C — softened to a
-                // subtle white tint so the panel reads as part of the dialog.
-                const rowBg = i % 2 === 0 ? 'transparent' : 'rgb(81 126 227 / 4%)';
-                return <TradeRow key={`${trade.id}-${i}`} trade={trade} rowBg={rowBg} />;
+              {sortedGroups.map((group, gi) => {
+                const rowBg = gi % 2 === 0 ? 'transparent' : 'rgb(81 126 227 / 4%)';
+                return (
+                  <Fragment key={group.baseId}>
+                    {group.trades.map((trade, ti) => (
+                      <TradeRow key={`${trade.id}-${ti}`} trade={trade} rowBg={rowBg} />
+                    ))}
+                    {group.trades.length > 1 && (
+                      <TotalRow group={group} rowBg={rowBg} />
+                    )}
+                  </Fragment>
+                );
               })}
             </tbody>
           </table>
@@ -454,6 +408,41 @@ function SummaryItem({ label, value, valueColor }: { label: string; value: strin
       {label}:{' '}
       <b style={{ color: valueColor ?? 'var(--text-secondary)' }}>{value}</b>
     </span>
+  );
+}
+
+function TotalRow({ group, rowBg }: { group: TradeGroup; rowBg: string }) {
+  const [hovered, setHovered] = useState(false);
+  const bg = hovered ? 'rgb(81 126 227 / 7%)' : rowBg;
+  const pnlColor = group.totalPnl > 0 ? ACCENT.success : group.totalPnl < 0 ? ACCENT.error : 'var(--text-muted)';
+  const pctColor = group.totalPnlPct > 0 ? ACCENT.success : group.totalPnlPct < 0 ? ACCENT.error : 'var(--text-muted)';
+
+  const cellStyle: React.CSSProperties = {
+    padding: '6px 8px',
+    borderBottom: '2px solid var(--border)',
+    textAlign: 'center',
+    whiteSpace: 'nowrap',
+    fontSize: 11,
+  };
+
+  return (
+    <tr
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ background: bg, borderTop: '1px solid var(--border)' }}
+    >
+      <td style={{ ...cellStyle, color: 'var(--text-secondary)', fontWeight: 700, fontStyle: 'italic' }}>
+        #{group.baseId} Total
+      </td>
+      <td colSpan={7} style={{ ...cellStyle, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+        {group.trades.length} partial exits
+      </td>
+      <td style={{ ...cellStyle, color: pnlColor, fontWeight: 700 }}>{formatMoney(group.totalPnl)}</td>
+      <td style={{ ...cellStyle, color: pctColor, fontWeight: 700 }}>{`${group.totalPnlPct.toFixed(2)}%`}</td>
+      <td style={{ ...cellStyle, color: 'var(--text-muted)', fontStyle: 'italic' }}>—</td>
+      <td style={{ ...cellStyle, color: 'var(--text-muted)', fontStyle: 'italic' }}>—</td>
+      <td style={{ ...cellStyle, color: 'var(--text-muted)', fontStyle: 'italic' }}>—</td>
+    </tr>
   );
 }
 

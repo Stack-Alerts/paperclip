@@ -1894,19 +1894,31 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
         # Also back-fill signal weights from BlockRegistry base_points when weight is None —
         # the DB stores None for weights saved via web UI, causing all signals to default
         # to 10 pts and sum below the confluence threshold of 40.
-        # The thick client never hits either gap because it uses live Python objects.
+        # Fix: use StrategyPersistence._dict_to_config() which resolves weights via the
+        # BlockRegistry (same path as the thick client), then merge resolved blocks back.
+        # Falls back to the original inline normalisation if anything raises.
         import copy as _copy
         from src.detectors.building_blocks.registry import BlockRegistry as _BR
         strategy_normalized = _copy.deepcopy(strategy)
-        for blk in strategy_normalized.get("blocks") or []:
-            raw = blk.get("name", "")
-            blk["name"] = raw.lower().replace(" ", "_")
-            block_meta = _BR.get_block(blk["name"])
-            for sig in blk.get("signals") or []:
-                if sig.get("weight") is None and block_meta:
-                    tier = (block_meta.signal_tiers or {}).get(sig.get("name", ""))
-                    if tier:
-                        sig["weight"] = tier.get("base_points", 10)
+        try:
+            from src.strategy_builder.persistence.strategy_persistence import StrategyPersistence as _SP
+            import dataclasses as _dc
+            _sp = _SP()
+            _cfg = _sp._dict_to_config(strategy_normalized)
+            _norm = _dc.asdict(_cfg) if _dc.is_dataclass(_cfg) else vars(_cfg)
+            if _norm.get("blocks"):
+                strategy_normalized["blocks"] = _norm["blocks"]
+        except Exception:
+            # Fallback: original inline block-name + weight back-fill
+            for blk in strategy_normalized.get("blocks") or []:
+                raw = blk.get("name", "")
+                blk["name"] = raw.lower().replace(" ", "_")
+                block_meta = _BR.get_block(blk["name"])
+                for sig in blk.get("signals") or []:
+                    if sig.get("weight") is None and block_meta:
+                        tier = (block_meta.signal_tiers or {}).get(sig.get("name", ""))
+                        if tier:
+                            sig["weight"] = tier.get("base_points", 10)
 
         engine = MulticoreBacktestEngine()
         result = engine.run_backtest(

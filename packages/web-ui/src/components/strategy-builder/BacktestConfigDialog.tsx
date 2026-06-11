@@ -1838,7 +1838,26 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
             <MetricsPanel result={backTestResult} />
           )}
           {activeTab === 'ai' && (
-            <AiRecommendationsPanel />
+            <AiRecommendationsPanel
+              result={backTestResult}
+              strategy={currentStrategy}
+              backtestConfig={{
+                startDate: config.startDate,
+                endDate: config.endDate,
+                initialCapital: config.initialCapital,
+                commissionPercentage: config.commissionPercentage,
+                slippagePercentage: config.slippagePercentage,
+                maxConcurrentPositions: config.maxConcurrentPositions,
+                timeframe: config.timeframe,
+                mode,
+                tpSlConfig,
+                slAdjustment,
+                adaptivePreset,
+                lookbackDays,
+                trainingDays,
+                testingDays,
+              }}
+            />
           )}
           {activeTab === 'compare' && (
             <ComparePanel />

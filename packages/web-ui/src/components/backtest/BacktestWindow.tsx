@@ -234,7 +234,7 @@ export function BacktestWindow({
 
       {/* All Metrics via MetricsPanel */}
       <div className="rounded border p-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-        <MetricsPanel result={result} />
+        <MetricsPanel result={result} trades={trades} />
       </div>
     </div>
   ) : (

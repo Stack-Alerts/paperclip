@@ -145,6 +145,13 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
   const toggleCategory = useCallback((tag: CategoryTag) => {
     setEnabledCategories(prev => {
       const next = new Set(prev);
+      // If Global is on and the user picks a specific category, switch to that
+      // category exclusively (turn Global off, turn the chosen one on).
+      if (tag !== 'GLOBAL' && next.has('GLOBAL') && !next.has(tag)) {
+        next.delete('GLOBAL');
+        next.add(tag);
+        return next;
+      }
       if (next.has(tag)) next.delete(tag); else next.add(tag);
       return next;
     });
@@ -368,8 +375,8 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
               className="text-[10px] font-semibold px-1.5 py-0 rounded whitespace-nowrap"
               style={{
                 background: on ? `${def.color}22` : 'var(--bg-deep)',
-                color: on ? def.color : 'var(--text-muted)',
-                border: `1px solid ${on ? def.color : 'var(--border)'}`,
+                color: on ? `${def.color}CC` : 'var(--text-muted)',
+                border: `1px solid ${on ? `${def.color}99` : 'var(--border)'}`,
                 cursor: 'pointer',
                 lineHeight: '18px',
               }}
@@ -396,12 +403,13 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
               aria-label={def.label}
               aria-pressed={on}
               onClick={() => toggleCategory(def.tag)}
-              className="text-[11px] font-semibold px-2 py-0.5 rounded"
+              className="text-[10px] font-semibold px-1.5 py-0 rounded whitespace-nowrap"
               style={{
                 background: on && !dimmed ? (isHexColor ? `${def.color}22` : 'var(--bg-hover)') : 'var(--bg-deep)',
-                color: dimmed ? 'var(--text-faint)' : on ? (isHexColor ? def.color : 'var(--text-secondary)') : 'var(--text-muted)',
-                border: `1px solid ${on && !dimmed && isHexColor ? def.color : 'var(--border)'}`,
+                color: dimmed ? 'var(--text-faint)' : on ? (isHexColor ? `${def.color}CC` : 'var(--text-secondary)') : 'var(--text-muted)',
+                border: `1px solid ${on && !dimmed && isHexColor ? `${def.color}99` : 'var(--border)'}`,
                 cursor: 'pointer',
+                lineHeight: '18px',
                 opacity: dimmed ? 0.4 : 1,
               }}
             >
