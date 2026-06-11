@@ -344,7 +344,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
               {sortedTrades.map((trade, i) => {
                 // Alternate row dimming preserved from cycle 29C — softened to a
                 // subtle white tint so the panel reads as part of the dialog.
-                const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.04)';
+                const rowBg = i % 2 === 0 ? 'transparent' : 'rgb(81 126 227 / 4%)';
                 return <TradeRow key={`${trade.id}-${i}`} trade={trade} rowBg={rowBg} />;
               })}
             </tbody>
