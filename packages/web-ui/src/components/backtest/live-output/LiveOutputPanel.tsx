@@ -304,39 +304,32 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
           {isRunning && (
             <span className="text-xs" style={{ color: 'var(--accent-green)' }}>● RUNNING</span>
           )}
-          {/* Aa−/Aa+ font scale — mirrors BacktestConfigDialog header control */}
+          {/* Aa−/Aa+ font scale — compact, low-contrast version */}
           <div
             role="group"
             aria-label="Log font size"
-            className="flex items-center rounded-[4px] overflow-hidden"
-            style={{ border: '1px solid var(--border)', background: 'var(--bg-deep)' }}
+            className="flex items-center rounded-[3px] overflow-hidden"
+            style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'transparent' }}
           >
             <button
               onClick={() => setFontScaleIdx(i => Math.max(0, i - 1) as LogFontScaleIdx)}
               disabled={fontScaleIdx === 0}
               aria-label="Decrease font size"
-              title="Decrease font size"
-              className="px-2 py-1 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              <span style={{ fontSize: '11px' }}>A</span><span style={{ fontSize: '13px' }}>a</span><span style={{ marginLeft: 2 }}>−</span>
-            </button>
-            <span
-              aria-live="polite"
-              className="px-2 text-[10px] font-medium uppercase tracking-wider whitespace-nowrap select-none"
+              title={`Font: ${LOG_FONT_LABELS[fontScaleIdx]} — click to shrink`}
+              className="px-1 py-0.5 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
               style={{ color: 'var(--text-muted)' }}
             >
-              {LOG_FONT_LABELS[fontScaleIdx]}
-            </span>
+              <span style={{ fontSize: '9px' }}>A</span><span style={{ fontSize: '11px' }}>a</span><span style={{ marginLeft: 1, fontSize: '9px' }}>−</span>
+            </button>
             <button
               onClick={() => setFontScaleIdx(i => Math.min(2, i + 1) as LogFontScaleIdx)}
               disabled={fontScaleIdx === 2}
               aria-label="Increase font size"
-              title="Increase font size"
-              className="px-2 py-1 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-              style={{ color: 'var(--text-secondary)' }}
+              title={`Font: ${LOG_FONT_LABELS[fontScaleIdx]} — click to grow`}
+              className="px-1 py-0.5 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+              style={{ color: 'var(--text-muted)' }}
             >
-              <span style={{ fontSize: '11px' }}>A</span><span style={{ fontSize: '15px' }}>a</span><span style={{ marginLeft: 2 }}>+</span>
+              <span style={{ fontSize: '9px' }}>A</span><span style={{ fontSize: '12px' }}>a</span><span style={{ marginLeft: 1, fontSize: '9px' }}>+</span>
             </button>
           </div>
           <button
