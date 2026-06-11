@@ -529,14 +529,15 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
  *  numeric value + pct at reduced opacity so the highlight is readable
  *  without being distracting. */
 function colorizeMessage(text: string): React.ReactNode {
-  const re = /(PnL:\s*)(-?\$[\d,]+\.?\d*)\s*\((-?[\d,]+\.?\d*%)\)/g;
+  // Handles both "-$83.06" and "$-83.06" sign placements; optional "Realized" prefix in pct group.
+  const re = /(PnL:\s*)(-?\$-?[\d,]+\.?\d*)\s*\(\s*(?:Realized\s+)?(-?[\d,]+\.?\d*%)\s*\)/g;
   const nodes: React.ReactNode[] = [];
   let cursor = 0;
   let m: RegExpExecArray | null;
   let idx = 0;
   while ((m = re.exec(text)) !== null) {
     if (m.index > cursor) nodes.push(text.slice(cursor, m.index));
-    const neg = m[2].startsWith('-') || m[3].startsWith('-');
+    const neg = m[2].includes('-') || m[3].startsWith('-');
     const color = neg ? 'rgba(195,82,82,0.75)' : 'rgba(16,185,129,0.75)';
     // Keep "PnL:" label in base text color; only tint the numbers.
     nodes.push(
