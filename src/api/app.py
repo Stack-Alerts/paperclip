@@ -1940,6 +1940,7 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
                 "status": t.get("status") or "closed",
                 "notes": t.get("notes") or t.get("exit_reason") or t.get("exit_condition_name"),
                 "entrySignals": t.get("entry_signals") or [],
+                "exitPercentage": float(t.get("exit_percentage") or 0),
                 "partialBreakdown": t.get("partial_exit_breakdown"),
             })
 

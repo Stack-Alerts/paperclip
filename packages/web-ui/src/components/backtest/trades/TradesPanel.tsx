@@ -91,9 +91,13 @@ function partialDisplay(t: Trade): string {
   if (t.partialBreakdown) return t.partialBreakdown;
   if (!t.exitType) return '—';
   const u = t.exitType.toUpperCase();
-  if (u === 'MAX_BARS' || u === 'TIME_LIMIT') return `Max Bars: ${formatMoney(t.pnl)}`;
-  if (u === 'SL') return `SL: ${formatMoney(t.pnl)}`;
-  if (/^TP[0-9]+$/.test(u)) return `${u}: ${formatMoney(t.pnl)}`;
+  // exitPercentage is decimal 0–1 from engine; multiply × 100 for display.
+  const pct = t.exitPercentage != null && t.exitPercentage > 0
+    ? ` (${(t.exitPercentage * 100).toFixed(0)}%)`
+    : '';
+  if (u === 'MAX_BARS' || u === 'TIME_LIMIT') return `Max Bars${pct}: ${formatMoney(t.pnl)}`;
+  if (u === 'SL' || u === 'STOP_LOSS') return `SL${pct}: ${formatMoney(t.pnl)}`;
+  if (/^TP[0-9]+$/.test(u)) return `${u}${pct}: ${formatMoney(t.pnl)}`;
   return '—';
 }
 

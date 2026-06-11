@@ -285,6 +285,8 @@ export interface Trade {
   notes?: string;
   // Entry signal names that fired at trade open (e.g. ["BULLISH_BREAK"]).
   entrySignals?: string[];
+  // Fraction of position closed on this exit row (0.33 = 33%), as emitted by the engine.
+  exitPercentage?: number;
   // Partial exit breakdown from thick-client _aggregate_exits (e.g. "TP1: $X | TP2: $Y").
   partialBreakdown?: string;
 }
