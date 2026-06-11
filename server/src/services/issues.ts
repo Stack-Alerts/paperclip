@@ -4733,7 +4733,6 @@ export function issueService(db: Db) {
       } = data;
       const isolatedWorkspacesEnabled = (await instanceSettings.getExperimental()).enableIsolatedWorkspaces;
       if (!isolatedWorkspacesEnabled) {
-        delete issueData.executionWorkspaceId;
         delete issueData.executionWorkspacePreference;
         delete issueData.executionWorkspaceSettings;
       }
@@ -4748,6 +4747,9 @@ export function issueService(db: Db) {
       }
       if (data.status === "in_progress" && !data.assigneeAgentId && !data.assigneeUserId) {
         throw unprocessable("in_progress issues require an assignee");
+      }
+      if (issueData.executionWorkspaceId) {
+        await assertValidExecutionWorkspace(companyId, issueData.projectId, issueData.executionWorkspaceId, db);
       }
       return db.transaction(async (tx) => {
         const defaultCompanyGoal = await getDefaultCompanyGoal(tx, companyId);
@@ -4991,9 +4993,14 @@ export function issueService(db: Db) {
       } = data;
       const isolatedWorkspacesEnabled = (await instanceSettings.getExperimental()).enableIsolatedWorkspaces;
       if (!isolatedWorkspacesEnabled) {
-        delete issueData.executionWorkspaceId;
         delete issueData.executionWorkspacePreference;
         delete issueData.executionWorkspaceSettings;
+      }
+
+      if (issueData.executionWorkspaceId !== undefined) {
+        if (issueData.executionWorkspaceId !== null) {
+          await assertValidExecutionWorkspace(existing.companyId, issueData.projectId, issueData.executionWorkspaceId, db);
+        }
       }
 
       if (issueData.status) {

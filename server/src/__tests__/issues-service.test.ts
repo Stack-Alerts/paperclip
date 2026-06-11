@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { asc, eq } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import {
   activityLog,
@@ -3655,6 +3655,237 @@ describeEmbeddedPostgres("issueService.create workspace inheritance", () => {
         serviceStates: null,
       },
     });
+  });
+});
+
+describeEmbeddedPostgres("issueService.create/update executionWorkspaceId (CAR-270 closure-gate writable)", () => {
+  let db!: ReturnType<typeof createDb>;
+  let svc!: ReturnType<typeof issueService>;
+  let settingsSvc!: ReturnType<typeof instanceSettingsService>;
+  let tempDb: Awaited<ReturnType<typeof startEmbeddedPostgresTestDatabase>> | null = null;
+  let workspaceIdA: string;
+  let workspaceIdB: string;
+  let companyId: string;
+  let otherCompanyId: string;
+  let projectId: string;
+
+  const seedCompanyAndProject = async (params: { companyId: string; projectId: string }) => {
+    await db.insert(companies).values({
+      id: params.companyId,
+      name: `Co-${params.companyId.slice(0, 8)}`,
+      issuePrefix: `C${params.companyId.replace(/-/g, "").slice(0, 6).toUpperCase()}`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await db.insert(projects).values({
+      id: params.projectId,
+      companyId: params.companyId,
+      name: "CAR-270 project",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  };
+
+  const seedExecutionWorkspace = async (params: {
+    workspaceId: string;
+    workspaceCompanyId: string;
+    forProjectId: string;
+  }) => {
+    await db.insert(projectWorkspaces).values({
+      id: params.workspaceId,
+      companyId: params.workspaceCompanyId,
+      projectId: params.forProjectId,
+      environmentId: `env-${params.workspaceId.slice(0, 8)}`,
+      name: `Workspace ${params.workspaceId.slice(0, 8)}`,
+      repoUrl: "https://example.com/repo.git",
+      repoRef: "main",
+      status: "ready",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await db.insert(executionWorkspaces).values({
+      id: params.workspaceId,
+      companyId: params.workspaceCompanyId,
+      projectId: params.forProjectId,
+      projectWorkspaceId: params.workspaceId,
+      mode: "isolated_workspace",
+      strategyType: "git_worktree",
+      name: `Workspace ${params.workspaceId.slice(0, 8)}`,
+      status: "ready",
+      providerType: "git_worktree",
+      metadata: {
+        config: {
+          environmentId: `env-${params.workspaceId.slice(0, 8)}`,
+          name: `Workspace ${params.workspaceId.slice(0, 8)}`,
+          repoUrl: "https://example.com/repo.git",
+          repoRef: "main",
+          status: "ready",
+          provisionCommand: null,
+          teardownCommand: null,
+          cleanupCommand: null,
+          workspaceRuntime: null,
+          desiredState: null,
+          serviceStates: null,
+        },
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  };
+
+  beforeAll(async () => {
+    tempDb = await startEmbeddedPostgresTestDatabase("paperclip-issues-car270-");
+    db = createDb(tempDb.connectionString);
+    svc = issueService(db);
+    settingsSvc = instanceSettingsService(db);
+    await ensureIssueRelationsTable(db);
+  }, 20_000);
+
+  beforeEach(async () => {
+    await db.delete(issueComments);
+    await db.delete(issueRelations);
+    await db.delete(issues);
+    await db.delete(executionWorkspaces);
+    await db.delete(projectWorkspaces);
+    await db.delete(projects);
+    await db.delete(companies);
+    await db.delete(instanceSettings);
+
+    // Disable the experimental isolated-workspaces flag so the writable
+    // path is the one exercised by the closure-gate smoke test.
+    const current = await settingsSvc.getExperimental();
+    await settingsSvc.updateExperimental({
+      ...current,
+      enableIsolatedWorkspaces: false,
+    });
+
+    companyId = randomUUID();
+    otherCompanyId = randomUUID();
+    projectId = randomUUID();
+    workspaceIdA = randomUUID();
+    workspaceIdB = randomUUID();
+    const otherProjectId = randomUUID();
+
+    await seedCompanyAndProject({ companyId, projectId });
+    await seedExecutionWorkspace({
+      workspaceId: workspaceIdA,
+      workspaceCompanyId: companyId,
+      forProjectId: projectId,
+    });
+    await seedExecutionWorkspace({
+      workspaceId: workspaceIdB,
+      workspaceCompanyId: companyId,
+      forProjectId: projectId,
+    });
+    await seedCompanyAndProject({ companyId: otherCompanyId, projectId: otherProjectId });
+  });
+
+  afterAll(async () => {
+    if (tempDb) {
+      await tempDb.cleanup();
+      tempDb = null;
+    }
+  });
+
+  it("persists executionWorkspaceId on create even when the isolated-workspaces flag is off", async () => {
+    const created = await svc.create(companyId, {
+      title: "Closure-gate positive smoke",
+      status: "todo",
+      priority: "medium",
+      projectId,
+      createdByUserId: null,
+      assigneeAgentId: null,
+      assigneeUserId: null,
+      goalId: null,
+      parentId: null,
+      billingCode: null,
+      description: "CAR-270",
+      executionWorkspaceId: workspaceIdA,
+    } as any);
+
+    const rows = await db.select().from(issues).where(eq(issues.id, created.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.executionWorkspaceId).toBe(workspaceIdA);
+  });
+
+  it("persists executionWorkspaceId on update even when the isolated-workspaces flag is off", async () => {
+    const created = await svc.create(companyId, {
+      title: "Closure-gate update smoke",
+      status: "todo",
+      priority: "medium",
+      projectId,
+      createdByUserId: null,
+      assigneeAgentId: null,
+      assigneeUserId: null,
+      goalId: null,
+      parentId: null,
+      billingCode: null,
+      description: "CAR-270 update",
+      executionWorkspaceId: workspaceIdA,
+    } as any);
+
+    await svc.update(created.id, {
+      executionWorkspaceId: workspaceIdB,
+    } as any);
+
+    const rows = await db.select().from(issues).where(eq(issues.id, created.id));
+    expect(rows[0]?.executionWorkspaceId).toBe(workspaceIdB);
+  });
+
+  it("rejects create with executionWorkspaceId from a different company", async () => {
+    // Set up a workspace that belongs to otherCompanyId, not the issuing company.
+    const foreignWorkspaceId = randomUUID();
+    await seedExecutionWorkspace({
+      workspaceId: foreignWorkspaceId,
+      workspaceCompanyId: otherCompanyId,
+      forProjectId: projectId,
+    });
+
+    await expect(
+      svc.create(companyId, {
+        title: "Cross-tenant smoke",
+        status: "todo",
+        priority: "medium",
+        projectId,
+        createdByUserId: null,
+        assigneeAgentId: null,
+        assigneeUserId: null,
+        goalId: null,
+        parentId: null,
+        billingCode: null,
+        description: "CAR-270 cross-tenant",
+        executionWorkspaceId: foreignWorkspaceId,
+      } as any),
+    ).rejects.toThrow(/same company/i);
+  });
+
+  it("rejects update with executionWorkspaceId from a different company", async () => {
+    const created = await svc.create(companyId, {
+      title: "Cross-tenant update smoke",
+      status: "todo",
+      priority: "medium",
+      projectId,
+      createdByUserId: null,
+      assigneeAgentId: null,
+      assigneeUserId: null,
+      goalId: null,
+      parentId: null,
+      billingCode: null,
+      description: "CAR-270 cross-tenant update",
+    } as any);
+
+    const foreignWorkspaceId = randomUUID();
+    await seedExecutionWorkspace({
+      workspaceId: foreignWorkspaceId,
+      workspaceCompanyId: otherCompanyId,
+      forProjectId: projectId,
+    });
+
+    await expect(
+      svc.update(created.id, {
+        executionWorkspaceId: foreignWorkspaceId,
+      } as any),
+    ).rejects.toThrow(/same company/i);
   });
 });
 
