@@ -1938,7 +1938,7 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
                 "bars": int(t.get("bars_held") or t.get("barsHeld") or t.get("bars") or 0),
                 "exitType": t.get("exit_condition_name") or t.get("exit_reason") or t.get("exitReason") or t.get("exitType"),
                 "status": t.get("status") or "closed",
-                "notes": t.get("notes") or t.get("exit_condition_name"),
+                "notes": t.get("notes") or t.get("exit_reason") or t.get("exit_condition_name"),
                 "partialBreakdown": t.get("partial_exit_breakdown"),
             })
 
