@@ -1792,6 +1792,7 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
             run_id,
             f"Starting backtest for '{strategy.get('name', '?')}' "
             f"({config.get('startDate', '?')} → {config.get('endDate', '?')})",
+            level='SYSTEM',
         )
 
         from src.optimizer_v3.core.backtest_data_provider import get_backtest_provider
@@ -1801,24 +1802,24 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
         start = datetime.fromisoformat(str(config["startDate"]))
         end = datetime.fromisoformat(str(config["endDate"]))
 
-        _append_backtest_log(run_id, f"Loading bars {timeframe} {config['startDate']} → {config['endDate']}")
+        _append_backtest_log(run_id, f"Loading bars {timeframe} {config['startDate']} → {config['endDate']}", level='SYSTEM')
 
         def _load_progress(current: int, total: int, msg: str) -> None:
             pct = int((current / total) * 25) if total else 0
             _patch_backtest_run(run_id, progress=pct)
             if msg:
-                _append_backtest_log(run_id, msg)
+                _append_backtest_log(run_id, msg, level='SYSTEM')
 
         provider = get_backtest_provider()
         bars = provider.load_bars_for_backtest(timeframe, start, end, _load_progress)
-        _append_backtest_log(run_id, f"Loaded {len(bars)} bars")
+        _append_backtest_log(run_id, f"Loaded {len(bars)} bars", level='SYSTEM')
         _patch_backtest_run(run_id, progress=30)
 
         def _engine_progress(current: int, total: int, msg: str) -> None:
             pct = 30 + int((current / total) * 70) if total else 30
             _patch_backtest_run(run_id, progress=min(99, pct))
             if msg:
-                _append_backtest_log(run_id, msg)
+                _append_backtest_log(run_id, msg, level='SYSTEM')
 
         # Normalize block names: DB stores display names ("Asia Session 50 Percent")
         # but BlockRegistry is keyed by snake_case ("asia_session_50_percent").
@@ -1895,6 +1896,12 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
             metrics=metrics,
             error="; ".join(errors) if errors else None,
             completedAt=datetime.now(timezone.utc).isoformat(),
+        )
+        _append_backtest_log(
+            run_id,
+            f"Backtest completed successfully! Backtest Trades: {len(trades)}, "
+            f"TP/SL Adjustments: {metrics.get('totalSignals', 0)}",
+            level='SYSTEM',
         )
 
         # Append per-bar decision messages from the engine to the live output

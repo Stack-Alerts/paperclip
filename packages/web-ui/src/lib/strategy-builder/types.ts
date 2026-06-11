@@ -259,6 +259,7 @@ export interface BacktestResult {
   averageLoss: number;
   equityCurve?: Array<{ timestamp: string; value: number }>;
   trades?: Trade[];
+  totalBars?: number;
   createdAt: string;
   completedAt?: string;
 }

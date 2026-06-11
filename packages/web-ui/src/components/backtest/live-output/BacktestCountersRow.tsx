@@ -37,8 +37,8 @@ export function BacktestCountersRow({
   fontSize = '11px',
   className = '',
 }: BacktestCountersRowProps) {
-  const candleCurrent = candles?.current ?? 0;
-  const candleTotal = candles?.total ?? 0;
+  const candleTotal = candles?.total ?? result?.totalBars ?? 0;
+  const candleCurrent = candles?.current ?? candleTotal;
   const tradeCount = result?.totalTrades ?? result?.trades?.length ?? 0;
   const adj = tallyAdjustments(result?.trades);
   const sep = (

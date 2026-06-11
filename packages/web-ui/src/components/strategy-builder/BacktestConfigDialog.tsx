@@ -527,7 +527,13 @@ function StatusColumn({
                 {line || ' '}
               </div>
             ))
-          : logs.slice(-200).map((msg, idx) => (
+          : (() => {
+              // Status panel shows only SYSTEM-level messages (loading, calibration,
+              // completion). Trade event messages (level=INFO) belong in Live Output.
+              // Mirrors thick-client Status pane vs Live Output separation.
+              const systemLogs = logs.filter(m => m.level === 'SYSTEM');
+              return (systemLogs.length > 0 ? systemLogs : logs).slice(-200);
+            })().map((msg, idx) => (
               <div
                 key={`${msg.timestamp}-${idx}`}
                 style={{
@@ -647,8 +653,8 @@ function ConfigTab({
   setMaxRisk: (v: ChipValue) => void;
   leverage: ChipValue;
   setLeverage: (v: ChipValue) => void;
-  confluence: string;
-  setConfluence: (v: string) => void;
+  confluence: number;
+  setConfluence: (v: number) => void;
   minBarsHeld: ChipValue;
   setMinBarsHeld: (v: ChipValue) => void;
   maxBarsHeld: ChipValue;
@@ -1092,7 +1098,7 @@ function ConfigTab({
           <div className="space-y-1">
             <ChipRow
               label="Starting Capital"
-              values={chipSeries(5000, 5000, 8)}
+              values={[500, 1000, 2000, 5000, 10000, 25000, 50000]}
               current={config.initialCapital ?? 10000}
               onSelect={(v) => onChange({ initialCapital: Number(v) })}
               disabled={disabled}
@@ -1105,12 +1111,12 @@ function ConfigTab({
               unitPosition="prefix"
               min={100}
               max={10_000_000}
-              step={1000}
+              step={100}
               tooltip={TT_STARTING_CAPITAL}
             />
             <ChipRow
               label="Min Risk:Reward"
-              values={chipSeries(1, 0.5, 8, 1)}
+              values={[1.2, 1.5, 2.0, 2.2, 2.5, 2.7, 3.0]}
               current={minRiskReward}
               onSelect={setMinRiskReward}
               disabled={disabled}
@@ -1118,32 +1124,32 @@ function ConfigTab({
               unit="x"
               min={1}
               max={100}
-              step={0.5}
+              step={0.1}
               tooltip={TT_MIN_RR}
             />
             <ChipRow
               label="Risk %"
-              values={chipSeries(0.5, 0.5, 8, 1)}
+              values={[1, 2, 5, 7, 10, 12, 15]}
               current={maxRisk}
               onSelect={setMaxRisk}
               disabled={disabled}
-              format={(v) => `${Number(v).toFixed(1)}`}
+              format={(v) => `${Number(v).toFixed(0)}`}
               unit="%"
-              min={0.5}
+              min={1}
               max={100}
-              step={0.5}
+              step={1}
               tooltip={TT_RISK_PCT}
             />
             <ChipRow
               label="Leverage"
-              values={chipSeries(5, 5, 8)}
+              values={[3, 5, 10, 15, 20, 25, 30]}
               current={leverage}
               onSelect={setLeverage}
               disabled={disabled}
               unit="x"
               min={1}
               max={125}
-              step={5}
+              step={1}
               tooltip={TT_LEVERAGE}
             />
           </div>
@@ -1174,40 +1180,51 @@ function ConfigTab({
               />
               <ChipRow
                 label="Max Bars Held"
-                values={chipSeries(25, 25, 8)}
+                values={[15, 20, 25, 30, 40, 50, 75]}
                 current={maxBarsHeld}
                 onSelect={setMaxBarsHeld}
                 disabled={disabled}
                 format={(v) => `${v}`}
                 unit="bars"
                 min={1}
-                max={10000}
-                step={25}
+                max={500}
+                step={1}
                 tooltip={TT_MAX_BARS_HELD}
               />
             </div>
           </div>
 
-          {/* Confluence */}
+          {/* Confluence — numeric pts + increment buttons, mirrors thick-client spinbox */}
           <div>
             <RichTooltip content={TT_CONFLUENCE}>
               <div className="text-[10px] font-medium uppercase mb-1 cursor-help" style={{ color: 'var(--text-muted)' }}>
                 Confluence
               </div>
             </RichTooltip>
-            <RichTooltip content={TT_CONFLUENCE}>
-              <select
+            <div className="flex items-center gap-1 flex-wrap">
+              {([-2, -1, 1, 2] as const).map(delta => (
+                <button
+                  key={delta}
+                  disabled={disabled}
+                  onClick={() => setConfluence(Math.max(0, Math.min(100, Number(confluence) + delta)))}
+                  className="px-2 py-1 rounded text-[11px] disabled:opacity-50"
+                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)', minWidth: 32 }}
+                >
+                  {delta > 0 ? `+${delta}` : delta}
+                </button>
+              ))}
+              <input
+                type="number"
                 disabled={disabled}
-                value={confluence}
-                onChange={(e) => setConfluence(e.target.value)}
-                className="w-full px-2 py-1 rounded text-[11px] focus:outline-none disabled:opacity-50"
-                style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-              >
-                <option>Boost from Strategy</option>
-                <option>Independent Score</option>
-                <option>Disabled</option>
-              </select>
-            </RichTooltip>
+                value={Number(confluence)}
+                min={0}
+                max={100}
+                onChange={(e) => setConfluence(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                className="px-2 py-1 rounded text-[11px] focus:outline-none disabled:opacity-50"
+                style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)', width: 60 }}
+              />
+              <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>pts</span>
+            </div>
           </div>
         </SectionCard>
 
@@ -1399,7 +1416,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
   const [minRiskReward, setMinRiskReward] = useState<ChipValue>(1.2);
   const [maxRisk, setMaxRisk] = useState<ChipValue>(10);
   const [leverage, setLeverage] = useState<ChipValue>(10);
-  const [confluence, setConfluence] = useState<string>('Boost from Strategy');
+  const [confluence, setConfluence] = useState<number>(40);
   const [minBarsHeld, setMinBarsHeld] = useState<ChipValue>(5);
   const [maxBarsHeld, setMaxBarsHeld] = useState<ChipValue>(200);
 
@@ -1472,7 +1489,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
         max_bars_held: Number(maxBarsHeld),
         min_bars_held: Number(minBarsHeld),
         max_leverage: Number(leverage),
-        confluence_threshold: confluence,
+        confluence_threshold: Number(confluence),
       };
 
       // Start the backtest and get runId

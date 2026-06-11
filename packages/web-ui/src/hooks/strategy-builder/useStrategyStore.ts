@@ -807,6 +807,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
             profitFactor: Number(m.profitFactor ?? 0),
             averageWin: Number(m.averageWin ?? 0),
             averageLoss: Number(m.averageLoss ?? 0),
+            totalBars: Number(m.totalBars ?? 0),
             trades: (status.trades as BacktestResult['trades']) ?? [],
             createdAt: status.startedAt ?? new Date().toISOString(),
             completedAt: status.completedAt ?? new Date().toISOString(),
