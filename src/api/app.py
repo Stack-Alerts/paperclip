@@ -2281,6 +2281,373 @@ async def _ws_subscribe(websocket: WebSocket, channel: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 6b Data Management endpoints
+# ---------------------------------------------------------------------------
+
+
+def _get_unified_manager():
+    """Return a UnifiedDataManager in live mode (constructed lazily per-request)."""
+    try:
+        from src.data_manager.unified_manager import UnifiedDataManager
+        return UnifiedDataManager(mode='live')
+    except Exception as exc:
+        logger.warning("UnifiedDataManager unavailable: %s", exc)
+        return None
+
+
+class _DataUpdateRequest(BaseModel):
+    startDate: str
+    endDate: str
+
+
+class _DataRepairRequest(BaseModel):
+    timeframe: Optional[str] = None  # None = all timeframes
+
+
+def _iso_dt(dt: Any) -> Optional[str]:
+    if dt is None:
+        return None
+    if hasattr(dt, "isoformat"):
+        return dt.isoformat()
+    return str(dt)
+
+
+@app.get(
+    "/data/status",
+    tags=["Data Management"],
+    summary="Get current data freshness and coverage status",
+)
+async def get_data_status(_: dict = Depends(require_jwt)) -> dict:
+    """Returns freshness status for all data types (trades, funding, liquidations, etc.)
+    and last-bar timestamps for the OHLCV timeframes (15m, 1h, 1d)."""
+    manager = _get_unified_manager()
+    if manager is None:
+        raise HTTPException(status_code=503, detail="Data manager unavailable")
+
+    def _fetch() -> dict:
+        now = datetime.now(timezone.utc)
+
+        try:
+            all_status_raw = manager.get_all_data_types_status()
+        except Exception as exc:
+            logger.warning("get_all_data_types_status failed: %s", exc)
+            all_status_raw = {}
+
+        all_status = {}
+        for key, info in all_status_raw.items():
+            all_status[key] = {
+                "status": info.get("status", "error"),
+                "start": _iso_dt(info.get("start")),
+                "end": _iso_dt(info.get("end")),
+                "gap_days": info.get("gap_days"),
+                "gap_minutes": info.get("gap_minutes"),
+                "error": info.get("error"),
+            }
+
+        timeframe_freshness: dict = {}
+        for tf in ("15m", "1h", "1d"):
+            try:
+                last_ts = manager.get_last_bar_timestamp(tf)
+                if last_ts is not None:
+                    age_seconds = (now - last_ts.replace(tzinfo=timezone.utc)).total_seconds()
+                    timeframe_freshness[tf] = {
+                        "lastBarTs": _iso_dt(last_ts),
+                        "ageSeconds": round(age_seconds, 1),
+                        "stale": age_seconds > {"15m": 1020, "1h": 3720, "1d": 90000}.get(tf, 3600),
+                    }
+                else:
+                    timeframe_freshness[tf] = {"lastBarTs": None, "ageSeconds": None, "stale": True}
+            except Exception as exc:
+                logger.warning("get_last_bar_timestamp(%s) failed: %s", tf, exc)
+                timeframe_freshness[tf] = {"lastBarTs": None, "ageSeconds": None, "stale": True, "error": str(exc)}
+
+        any_gaps = any(s.get("status") in ("gap", "missing") for s in all_status.values())
+        any_stale = any(f.get("stale") for f in timeframe_freshness.values())
+
+        return {
+            "currentTime": now.isoformat(),
+            "anyGaps": any_gaps,
+            "anyStale": any_stale,
+            "allStatus": all_status,
+            "timeframeFreshness": timeframe_freshness,
+        }
+
+    return await asyncio.to_thread(_fetch)
+
+
+@app.get(
+    "/data/gap-check",
+    tags=["Data Management"],
+    summary="Check for data gaps (used by startup data update modal)",
+)
+async def get_data_gap_check(_: dict = Depends(require_jwt)) -> dict:
+    """Mirrors the thick-client DataUpdateModal gap-check logic.
+
+    Returns the same shape as DataGapCheckResult in the web UI:
+    { any_gaps, max_gap, all_status, current_time, lakeapi_end }
+    """
+    manager = _get_unified_manager()
+    if manager is None:
+        raise HTTPException(status_code=503, detail="Data manager unavailable")
+
+    def _fetch() -> dict:
+        now = datetime.now(timezone.utc)
+
+        try:
+            raw = manager.get_all_data_types_status()
+        except Exception as exc:
+            logger.warning("get_all_data_types_status failed: %s", exc)
+            raw = {}
+
+        any_gaps = False
+        max_gap = 0
+        lakeapi_end: Optional[str] = None
+        all_status: dict = {}
+
+        for data_type, info in raw.items():
+            status_val = info.get("status", "error")
+            gap_days = info.get("gap_days", 0) or 0
+            gap_minutes = info.get("gap_minutes", gap_days * 1440) or 0
+            entry: dict = {
+                "status": status_val,
+                "start": _iso_dt(info.get("start")),
+                "end": _iso_dt(info.get("end")),
+                "gap_days": gap_days,
+                "gap_minutes": gap_minutes,
+                "error": info.get("error"),
+            }
+            all_status[data_type] = entry
+
+            if status_val in ("gap", "missing"):
+                any_gaps = True
+                max_gap = max(max_gap, gap_days)
+                if status_val == "gap" and lakeapi_end is None:
+                    lakeapi_end = _iso_dt(info.get("end"))
+
+        # Also check OHLCV freshness
+        for tf in ("15m", "1h"):
+            try:
+                last_ts = manager.get_last_bar_timestamp(tf)
+                if last_ts is not None:
+                    age_s = (now - last_ts.replace(tzinfo=timezone.utc)).total_seconds()
+                    threshold = 1020 if tf == "15m" else 3720
+                    if age_s > threshold:
+                        any_gaps = True
+                        gap_min = int(age_s / 60)
+                        max_gap = max(max_gap, int(age_s / 86400) or 1)
+                        all_status[f"ohlcv_{tf}"] = {
+                            "status": "gap",
+                            "start": _iso_dt(last_ts),
+                            "end": now.isoformat(),
+                            "gap_days": round(age_s / 86400, 2),
+                            "gap_minutes": gap_min,
+                        }
+                        if lakeapi_end is None:
+                            lakeapi_end = _iso_dt(last_ts)
+                else:
+                    any_gaps = True
+                    max_gap = max(max_gap, 999)
+                    all_status[f"ohlcv_{tf}"] = {
+                        "status": "missing",
+                        "start": None,
+                        "end": None,
+                        "gap_days": 999,
+                        "gap_minutes": 999 * 1440,
+                    }
+            except Exception as exc:
+                logger.warning("freshness check %s failed: %s", tf, exc)
+
+        return {
+            "any_gaps": any_gaps,
+            "max_gap": max_gap,
+            "all_status": all_status,
+            "current_time": now.isoformat(),
+            "lakeapi_end": lakeapi_end,
+        }
+
+    return await asyncio.to_thread(_fetch)
+
+
+@app.post(
+    "/data/update",
+    tags=["Data Management"],
+    summary="Download missing OHLCV data from Binance",
+)
+async def update_data(
+    body: _DataUpdateRequest,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Triggers a Binance download for the requested date range.
+
+    Mirrors the thick-client DataUpdateThread: downloads 15m, 1h, and 1d bars
+    for BTCUSDT Futures and saves them to disk.
+    """
+    manager = _get_unified_manager()
+    if manager is None:
+        raise HTTPException(status_code=503, detail="Data manager unavailable")
+
+    try:
+        start_dt = datetime.fromisoformat(body.startDate.replace("Z", "+00:00"))
+        end_dt = datetime.fromisoformat(body.endDate.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {exc}") from exc
+
+    def _run_update() -> dict:
+        import requests as _requests
+        try:
+            ping = _requests.get("https://api.binance.com/api/v3/ping", timeout=5)
+            ping.raise_for_status()
+        except Exception as exc:
+            raise RuntimeError(f"Binance API unreachable: {exc}") from exc
+
+        results: dict = {}
+        for tf in ("15m", "1h", "1d"):
+            try:
+                bars = manager._fetch_binance_range(
+                    timeframe=tf,
+                    start_ts=start_dt,
+                    end_ts=end_dt,
+                )
+                count = len(bars) if bars is not None else 0
+                if count > 0:
+                    manager._save_binance_bars(bars, tf)
+                results[tf] = {"success": True, "bars_downloaded": count}
+            except Exception as exc:
+                logger.exception("Data update failed for %s: %s", tf, exc)
+                results[tf] = {"success": False, "error": str(exc)}
+
+        all_ok = all(v.get("success") for v in results.values())
+        return {
+            "success": all_ok,
+            "message": "Data update complete" if all_ok else "Some timeframes failed — check errors",
+            "results": results,
+        }
+
+    try:
+        return await asyncio.to_thread(_run_update)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("data/update failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post(
+    "/data/verify",
+    tags=["Data Management"],
+    summary="Run data gap verification (dry-run — no writes)",
+)
+async def verify_data(_: dict = Depends(require_jwt)) -> dict:
+    """Detects gaps in stored Binance OHLCV parquet files.
+
+    Returns per-timeframe gap reports; does NOT repair anything.
+    Shape matches TimeframeVerifyResult used by DataVerifyDialog.
+    """
+    manager = _get_unified_manager()
+    if manager is None:
+        raise HTTPException(status_code=503, detail="Data manager unavailable")
+
+    def _run() -> dict:
+        # detect_gaps_in_binance_files returns the per-gap detail list directly;
+        # verify_and_repair only returns aggregate counts (no gaps list).
+        horizon_cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+        out: dict = {}
+        for tf in ("15m", "1h", "1d"):
+            try:
+                gaps_raw = manager.detect_gaps_in_binance_files(tf)
+            except Exception as exc:
+                logger.warning("detect_gaps_in_binance_files(%s) failed: %s", tf, exc)
+                gaps_raw = []
+
+            gaps_serialized = []
+            for g in gaps_raw:
+                gap_start = g.get("gap_start")
+                if gap_start is not None and hasattr(gap_start, "tzinfo") and gap_start.tzinfo is None:
+                    gap_start = gap_start.replace(tzinfo=timezone.utc)
+                repairable = gap_start is not None and gap_start >= horizon_cutoff
+                gaps_serialized.append({
+                    "gapStart": _iso_dt(g.get("gap_start")),
+                    "gapEnd": _iso_dt(g.get("gap_end")),
+                    "missingBars": g.get("missing_bars", 0),
+                    "repairable": repairable,
+                    "reason": None if repairable else "Older than 90-day Binance API horizon",
+                })
+
+            total_gaps = len(gaps_serialized)
+            repairable_count = sum(1 for g in gaps_serialized if g.get("repairable"))
+            too_old_count = total_gaps - repairable_count
+
+            try:
+                last_ts = manager.get_last_bar_timestamp(tf)
+                last_candle_ts = _iso_dt(last_ts)
+            except Exception:
+                last_candle_ts = None
+
+            out[tf] = {
+                "timeframe": tf,
+                "totalGaps": total_gaps,
+                "repairableCount": repairable_count,
+                "tooOldCount": too_old_count,
+                "totalMissingBars": sum(g.get("missingBars", 0) for g in gaps_serialized),
+                "repairableMissingBars": sum(g.get("missingBars", 0) for g in gaps_serialized if g.get("repairable")),
+                "tooOldMissingBars": sum(g.get("missingBars", 0) for g in gaps_serialized if not g.get("repairable")),
+                "gaps": gaps_serialized,
+                "lastCandleTs": last_candle_ts,
+            }
+        return out
+
+    try:
+        return await asyncio.to_thread(_run)
+    except Exception as exc:
+        logger.exception("data/verify failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post(
+    "/data/repair",
+    tags=["Data Management"],
+    summary="Repair detected data gaps by fetching from Binance",
+)
+async def repair_data(
+    body: _DataRepairRequest,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Repairs detected OHLCV gaps by downloading from Binance.
+
+    Mirrors verify_and_repair(dry_run=False) in the thick client.
+    Pass timeframe to repair only one timeframe, or omit for all.
+    """
+    manager = _get_unified_manager()
+    if manager is None:
+        raise HTTPException(status_code=503, detail="Data manager unavailable")
+
+    def _run() -> dict:
+        tfs = [body.timeframe] if body.timeframe else None
+        report = manager.verify_and_repair(timeframes=tfs, dry_run=False)
+        summary: dict = {}
+        for tf, info in report.items():
+            summary[tf] = {
+                "gapsFound": info.get("gaps_found", 0),
+                "gapsRepaired": info.get("gaps_repaired", 0),
+                "gapsTooOld": info.get("gaps_too_old", 0),
+                "barsFetched": info.get("bars_fetched", 0),
+                "errors": info.get("errors", []),
+            }
+        all_ok = all(len(v.get("errors", [])) == 0 for v in summary.values())
+        return {
+            "success": all_ok,
+            "message": "Repair complete" if all_ok else "Repair finished with some errors",
+            "summary": summary,
+        }
+
+    try:
+        return await asyncio.to_thread(_run)
+    except Exception as exc:
+        logger.exception("data/repair failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
 # 7 WebSocket domains
 # ---------------------------------------------------------------------------
 
