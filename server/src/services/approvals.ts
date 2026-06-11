@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
-import { approvalComments, approvals } from "@paperclipai/db";
+import { approvalComments, approvals, principalPermissionGrants } from "@paperclipai/db";
 import { notFound, unprocessable } from "../errors.js";
 import { redactCurrentUserText } from "../log-redaction.js";
 import { agentService } from "./agents.js";
@@ -22,6 +22,60 @@ export function approvalService(db: Db) {
       ...comment,
       body: redactCurrentUserText(comment.body, { enabled: censorUsernameInLogs }),
     };
+  }
+
+  async function applyRequestGrantsForApproval(
+    approval: ApprovalRecord,
+    decidedByUserId: string,
+  ): Promise<void> {
+    if (approval.type !== "request_board_approval") return;
+    if (!approval.requestedByAgentId) return;
+
+    const payload = (approval.payload ?? {}) as Record<string, unknown>;
+    const rawGrants = payload.grants;
+    if (!Array.isArray(rawGrants) || rawGrants.length === 0) return;
+
+    const now = new Date();
+    for (const raw of rawGrants) {
+      if (!raw || typeof raw !== "object") continue;
+      const grant = raw as Record<string, unknown>;
+      const permissionKey =
+        typeof grant.permissionKey === "string" && grant.permissionKey.length > 0
+          ? grant.permissionKey
+          : null;
+      if (!permissionKey) continue;
+
+      const scope =
+        typeof grant.scope === "object" && grant.scope !== null
+          ? (grant.scope as Record<string, unknown>)
+          : null;
+
+      await db
+        .insert(principalPermissionGrants)
+        .values({
+          companyId: approval.companyId,
+          principalType: "agent",
+          principalId: approval.requestedByAgentId,
+          permissionKey,
+          scope,
+          grantedByUserId: decidedByUserId,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [
+            principalPermissionGrants.companyId,
+            principalPermissionGrants.principalType,
+            principalPermissionGrants.principalId,
+            principalPermissionGrants.permissionKey,
+          ],
+          set: {
+            scope,
+            grantedByUserId: decidedByUserId,
+            updatedAt: now,
+          },
+        });
+    }
   }
 
   async function getExistingApproval(id: string) {
@@ -163,6 +217,10 @@ export function approvalService(db: Db) {
             approvedAt: now,
           }).catch(() => {});
         }
+      }
+
+      if (applied && updated.type === "request_board_approval") {
+        await applyRequestGrantsForApproval(updated, decidedByUserId);
       }
 
       return { approval: updated, applied };
