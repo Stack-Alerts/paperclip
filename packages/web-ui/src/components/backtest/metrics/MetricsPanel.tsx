@@ -51,6 +51,27 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
+function Sparkline({ values, color, fillBelow = false, height = 56 }: { values: number[]; color: string; fillBelow?: boolean; height?: number }) {
+  if (values.length < 2) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const W = 200, H = 100;
+  const pts = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * W;
+    const y = H - ((v - min) / range) * H;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  });
+  const linePts = pts.join(' ');
+  const areaPts = `0,${H} ${linePts} ${W},${H}`;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height, display: 'block' }}>
+      {fillBelow && <polygon points={areaPts} fill={color} fillOpacity="0.12" />}
+      <polyline points={linePts} fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
 function computeTradeStats(trades: Trade[]) {
   if (!trades.length) return null;
 
@@ -112,6 +133,30 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
     ? Math.round((new Date(result.endDate).getTime() - new Date(result.startDate).getTime()) / 86_400_000)
     : null;
 
+  // Equity curve + drawdown series for the Performance sparklines.
+  // Drawdown is reported as a negative percent relative to the running peak.
+  const equityValues = (result.equityCurve ?? []).map(p => p.value);
+  let drawdownPcts: number[] = [];
+  if (equityValues.length > 0) {
+    let peak = equityValues[0];
+    drawdownPcts = equityValues.map(v => {
+      if (v > peak) peak = v;
+      return peak > 0 ? ((v - peak) / peak) * 100 : 0;
+    });
+  }
+  const recoveryFactor = (result.maxDrawdown * result.initialCapital) !== 0
+    ? (netProfit / Math.abs(result.maxDrawdown * result.initialCapital)).toFixed(2)
+    : '—';
+  const avgHoldingBars = tradeStats && tradeStats.avgBars > 0 ? tradeStats.avgBars.toFixed(1) : '—';
+  const returnVolatility = allTrades.length >= 2
+    ? (() => {
+        const rets = allTrades.map(t => t.pnlPercentage);
+        const mean = rets.reduce((s, r) => s + r, 0) / rets.length;
+        const variance = rets.reduce((s, r) => s + (r - mean) ** 2, 0) / (rets.length - 1);
+        return Math.sqrt(variance).toFixed(2);
+      })()
+    : '—';
+
   const returnsRows: MetricRow[] = [
     { label: 'Total Return', value: `${result.returnPercentage >= 0 ? '+' : ''}${result.returnPercentage.toFixed(2)}%`, color: result.returnPercentage >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', tooltip: TT_TOTAL_RETURN },
     { label: 'Net Profit', value: `${netProfit >= 0 ? '+' : ''}$${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: netProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', tooltip: TT_NET_PROFIT },
@@ -121,6 +166,7 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
 
   const riskRows: MetricRow[] = [
     { label: 'Max Drawdown', value: `${(result.maxDrawdown * 100).toFixed(2)}%`, color: 'var(--accent-orange)', tooltip: TT_MAX_DRAWDOWN },
+    { label: 'Recovery Factor', value: recoveryFactor, color: Number(recoveryFactor) >= 1 ? 'var(--accent-green)' : 'var(--accent-red)', tooltip: TT_MAX_DRAWDOWN },
     { label: 'Sharpe Ratio', value: result.sharpeRatio.toFixed(2), tooltip: TT_SHARPE },
     { label: 'Sortino Ratio', value: result.sortino_ratio.toFixed(2), tooltip: TT_SORTINO },
   ];
@@ -161,6 +207,10 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
       const pct = ((count / tradeStats.count) * 100).toFixed(0);
       insightRows.push({ label: `Exit: ${exitType}`, value: `${count} (${pct}%)`, tooltip: TT_EXIT_TYPE(exitType, count, tradeStats.count) });
     }
+    insightRows.push({ label: 'Avg Holding (bars)', value: avgHoldingBars, tooltip: TT_AVG_BARS });
+    if (returnVolatility !== '—') {
+      insightRows.push({ label: 'Return σ (per trade %)', value: `${returnVolatility}%`, tooltip: TT_AVG_BARS });
+    }
   }
 
   const periodRows: MetricRow[] = [];
@@ -171,6 +221,32 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
 
   return (
     <div>
+      {equityValues.length >= 2 && (
+        <>
+          <SectionHeader title="Performance" />
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="rounded p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Equity Curve</p>
+                <p className="text-xs font-semibold" style={{ color: result.finalCapital >= result.initialCapital ? 'var(--accent-green)' : 'var(--accent-red)', fontVariantNumeric: 'tabular-nums' }}>
+                  ${result.finalCapital.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+              </div>
+              <Sparkline values={equityValues} color={result.finalCapital >= result.initialCapital ? 'var(--accent-green)' : 'var(--accent-red)'} fillBelow height={64} />
+            </div>
+            <div className="rounded p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Drawdown</p>
+                <p className="text-xs font-semibold" style={{ color: 'var(--accent-orange)', fontVariantNumeric: 'tabular-nums' }}>
+                  {drawdownPcts.length > 0 ? `${Math.min(...drawdownPcts).toFixed(2)}%` : '—'}
+                </p>
+              </div>
+              <Sparkline values={drawdownPcts} color="var(--accent-orange)" fillBelow height={64} />
+            </div>
+          </div>
+        </>
+      )}
+
       <SectionHeader title="Returns & Capital" />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {returnsRows.map(r => <MetricCard key={r.label} {...r} />)}
