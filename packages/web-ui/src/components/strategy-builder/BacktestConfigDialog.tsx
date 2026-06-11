@@ -1194,36 +1194,62 @@ function ConfigTab({
             </div>
           </div>
 
-          {/* Confluence — numeric pts + increment buttons, mirrors thick-client spinbox */}
-          <div>
+          {/* Confluence — inline ChipRow-identical layout: same grid, same spinbox */}
+          <div className="grid grid-cols-[88px_minmax(0,1fr)_76px] items-center gap-x-1.5">
             <RichTooltip content={TT_CONFLUENCE}>
-              <div className="text-[10px] font-medium uppercase mb-1 cursor-help" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-[11px] font-medium truncate cursor-help" style={{ color: 'var(--text-secondary)' }}>
                 Confluence
-              </div>
+              </span>
             </RichTooltip>
-            <div className="flex items-center gap-1 flex-wrap">
+            {/* Chip track: Reset + increment buttons, flush like ChipRow */}
+            <div className="flex gap-1 flex-nowrap items-stretch min-w-0">
+              <button
+                disabled={disabled}
+                onClick={() => setConfluence(40)}
+                className="basis-0 grow shrink min-w-0 py-1.5 rounded-[4px] text-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap text-center"
+                style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                onMouseEnter={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)'; }}
+              >
+                Reset
+              </button>
               {([-2, -1, 1, 2] as const).map(delta => (
                 <button
                   key={delta}
                   disabled={disabled}
-                  onClick={() => setConfluence(Math.max(0, Math.min(100, Number(confluence) + delta)))}
-                  className="px-2 py-1 rounded text-[11px] disabled:opacity-50"
-                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)', minWidth: 32 }}
+                  onClick={() => setConfluence(Math.max(0, Math.min(100, confluence + delta)))}
+                  className="basis-0 grow shrink min-w-0 py-1.5 rounded-[4px] text-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed leading-tight whitespace-nowrap text-center"
+                  style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}
+                  onMouseEnter={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-hover)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-deep)'; }}
                 >
                   {delta > 0 ? `+${delta}` : delta}
                 </button>
               ))}
+            </div>
+            {/* Spinbox — identical structure to ChipRow spinbox */}
+            <div
+              className="flex items-stretch rounded overflow-hidden h-[26px] border border-solid transition-[border-color,box-shadow] hover:border-[rgba(46,140,255,0.55)] hover:shadow-[0_0_0_2px_rgba(46,140,255,0.15)] focus-within:border-[rgba(46,140,255,0.55)] focus-within:shadow-[0_0_0_2px_rgba(46,140,255,0.25)] border-[var(--border)]"
+              style={{ background: 'rgba(255,255,255,0.03)' }}
+            >
               <input
                 type="number"
+                value={confluence}
                 disabled={disabled}
-                value={Number(confluence)}
                 min={0}
                 max={100}
-                onChange={(e) => setConfluence(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-                className="px-2 py-1 rounded text-[11px] focus:outline-none disabled:opacity-50"
-                style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)', color: 'var(--text-secondary)', width: 60 }}
+                step={1}
+                aria-label="Confluence value"
+                onChange={e => {
+                  const n = Number(e.target.value);
+                  if (!Number.isNaN(n)) setConfluence(Math.max(0, Math.min(100, n)));
+                }}
+                className="flex-1 min-w-0 px-0.5 text-[11px] focus:outline-none focus:ring-0 disabled:opacity-50 disabled:cursor-not-allowed text-right bg-transparent appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}
               />
-              <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>pts</span>
+              <span className="flex items-center pl-0.5 pr-1 text-[10px] leading-none whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                pts
+              </span>
             </div>
           </div>
         </SectionCard>
