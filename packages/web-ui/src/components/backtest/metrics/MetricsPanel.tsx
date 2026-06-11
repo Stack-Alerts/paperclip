@@ -120,7 +120,7 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
   ];
 
   const riskRows: MetricRow[] = [
-    { label: 'Max Drawdown', value: `${result.maxDrawdown.toFixed(2)}%`, color: 'var(--accent-orange)', tooltip: TT_MAX_DRAWDOWN },
+    { label: 'Max Drawdown', value: `${(result.maxDrawdown * 100).toFixed(2)}%`, color: 'var(--accent-orange)', tooltip: TT_MAX_DRAWDOWN },
     { label: 'Sharpe Ratio', value: result.sharpeRatio.toFixed(2), tooltip: TT_SHARPE },
     { label: 'Sortino Ratio', value: result.sortino_ratio.toFixed(2), tooltip: TT_SORTINO },
   ];

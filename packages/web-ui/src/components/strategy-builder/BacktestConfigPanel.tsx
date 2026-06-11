@@ -948,7 +948,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                     />
                     <MetricCard
                       label="Max Drawdown"
-                      value={`${fmt(result.maxDrawdown, 2)}%`}
+                      value={`${fmt(result.maxDrawdown * 100, 2)}%`}
                     />
                     <MetricCard
                       label="Profit Factor"
@@ -1009,7 +1009,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
                   <div className="rounded p-3 text-xs font-mono space-y-1" style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)' }}>
                     <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>Auto-generated request preview:</p>
                     <p>Strategy: {currentStrategy?.name}</p>
-                    <p>Win Rate: {fmt(result.winRate * 100, 1)}% | Sharpe: {fmt(result.sharpeRatio, 2)} | Drawdown: {fmt(result.maxDrawdown, 2)}%</p>
+                    <p>Win Rate: {fmt(result.winRate * 100, 1)}% | Sharpe: {fmt(result.sharpeRatio, 2)} | Drawdown: {fmt(result.maxDrawdown * 100, 2)}%</p>
                     <p>Trades: {result.totalTrades} | Profit Factor: {fmt(result.profitFactor, 2)}</p>
                   </div>
                   <div className="space-y-1.5">

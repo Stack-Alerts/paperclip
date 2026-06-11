@@ -59,7 +59,7 @@ function QuickPreviewResultsDialog({ open, result, onClose }: QuickPreviewResult
     ['Winning Trades', String(result.winningTrades),      'var(--accent-green)'],
     ['Total Return',   `${result.returnPercentage >= 0 ? '+' : ''}${result.returnPercentage.toFixed(2)}%`,
       result.returnPercentage >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'],
-    ['Max Drawdown',   `${result.maxDrawdown.toFixed(2)}%`,  'var(--accent-red)'],
+    ['Max Drawdown',   `${(result.maxDrawdown * 100).toFixed(2)}%`,  'var(--accent-red)'],
     ['Sharpe Ratio',   result.sharpeRatio.toFixed(2),     'var(--text-secondary)'],
     ['Profit Factor',  result.profitFactor.toFixed(2),    'var(--text-secondary)'],
   ];
