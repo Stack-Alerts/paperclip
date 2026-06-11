@@ -1945,8 +1945,50 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
             })
 
         wins = [t for t in trades if (t.get("pnl") or 0) > 0]
+        losses = [t for t in trades if (t.get("pnl") or 0) <= 0]
         win_rate = (len(wins) / len(trades)) if trades else 0.0
         total_return = sum(float(t.get("pnl_pct") or t.get("pnl_percent") or 0.0) for t in trades)
+
+        # Risk metric calculations from raw trades
+        import math as _math
+        _initial_capital = float(config.get("initialCapital", 10000.0))
+        _win_pnls = [float(t.get("pnl", 0)) for t in wins]
+        _loss_pnls = [float(t.get("pnl", 0)) for t in losses]
+        _total_win = sum(_win_pnls)
+        _total_loss_abs = abs(sum(_loss_pnls)) if _loss_pnls else 0.0
+        _avg_win = _total_win / len(_win_pnls) if _win_pnls else 0.0
+        _avg_loss = sum(_loss_pnls) / len(_loss_pnls) if _loss_pnls else 0.0
+        _profit_factor = (_total_win / _total_loss_abs) if _total_loss_abs > 0 else (9.99 if _total_win > 0 else 0.0)
+
+        # Max drawdown from equity curve
+        _equity = _initial_capital
+        _peak = _initial_capital
+        _max_dd_pct = 0.0
+        for _t in trades:
+            _equity += float(_t.get("pnl", 0))
+            if _equity > _peak:
+                _peak = _equity
+            if _peak > 0:
+                _dd = (_peak - _equity) / _peak * 100.0
+                if _dd > _max_dd_pct:
+                    _max_dd_pct = _dd
+        _final_capital = _equity
+
+        # Sharpe & Sortino from per-trade return percentages
+        _trade_rets = [float(t.get("pnl_pct") or t.get("pnl_percent") or 0.0) for t in trades]
+        _n = len(_trade_rets)
+        if _n > 1:
+            _mean_ret = sum(_trade_rets) / _n
+            _variance = sum((_r - _mean_ret) ** 2 for _r in _trade_rets) / (_n - 1)
+            _std_ret = _variance ** 0.5
+            _sharpe = (_mean_ret / _std_ret) * _math.sqrt(_n) if _std_ret > 0 else 0.0
+            _down_sq = [_r ** 2 for _r in _trade_rets if _r < 0]
+            _down_dev = _math.sqrt(sum(_down_sq) / _n) if _down_sq else 0.0
+            _sortino = (_mean_ret / _down_dev) * _math.sqrt(_n) if _down_dev > 0 else 0.0
+        else:
+            _sharpe = _sortino = 0.0
+
+        _calmar = (total_return / _max_dd_pct) if _max_dd_pct > 0 else 0.0
 
         metrics = {
             "totalTrades": len(trades),
@@ -1956,6 +1998,15 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
             "returnPercentage": total_return,
             "totalBars": int(result.get("total_bars", len(bars))),
             "totalSignals": int(result.get("total_signals", 0)),
+            "profitFactor": round(_profit_factor, 4),
+            "averageWin": round(_avg_win, 2),
+            "averageLoss": round(_avg_loss, 2),
+            "maxDrawdown": round(_max_dd_pct, 4),
+            "sharpeRatio": round(_sharpe, 4),
+            "sortinoRatio": round(_sortino, 4),
+            "calmarRatio": round(_calmar, 4),
+            "finalCapital": round(_final_capital, 2),
+            "initialCapital": round(_initial_capital, 2),
         }
 
         _patch_backtest_run(

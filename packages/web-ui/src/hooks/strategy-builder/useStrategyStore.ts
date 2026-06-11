@@ -792,9 +792,10 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
             status: 'completed',
             startDate: (config as BacktestConfig).startDate ?? '',
             endDate: (config as BacktestConfig).endDate ?? '',
-            initialCapital: (config as BacktestConfig).initialCapital ?? 10000,
-            finalCapital: ((config as BacktestConfig).initialCapital ?? 10000) *
-              (1 + Number(m.returnPercentage ?? 0) / 100),
+            initialCapital: m.initialCapital != null ? Number(m.initialCapital) : ((config as BacktestConfig).initialCapital ?? 10000),
+            finalCapital: m.finalCapital != null
+              ? Number(m.finalCapital)
+              : ((config as BacktestConfig).initialCapital ?? 10000) * (1 + Number(m.returnPercentage ?? 0) / 100),
             totalTrades: Number(m.totalTrades ?? (status.trades as unknown[])?.length ?? 0),
             winningTrades: Number(m.winningTrades ?? 0),
             losingTrades: Number(m.losingTrades ?? 0),
@@ -803,7 +804,8 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
             returnPercentage: Number(m.returnPercentage ?? 0),
             maxDrawdown: Number(m.maxDrawdown ?? 0),
             sharpeRatio: Number(m.sharpeRatio ?? 0),
-            sortino_ratio: Number(m.sortinoRatio ?? 0),
+            sortino_ratio: Number(m.sortinoRatio ?? m.sortino_ratio ?? 0),
+            calmar_ratio: m.calmarRatio != null ? Number(m.calmarRatio) : m.calmar_ratio != null ? Number(m.calmar_ratio) : undefined,
             profitFactor: Number(m.profitFactor ?? 0),
             averageWin: Number(m.averageWin ?? 0),
             averageLoss: Number(m.averageLoss ?? 0),
