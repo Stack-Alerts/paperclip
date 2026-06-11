@@ -412,20 +412,29 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
               return (
                 <div
                   key={row.key}
-                  className="flex items-baseline gap-1.5 leading-[1.4] rounded"
+                  className="rounded leading-[1.4]"
                   data-testid="log-row"
-                  style={{ paddingLeft: row.isContext ? 12 : 0, paddingRight: 4, paddingTop: 1, paddingBottom: 1 }}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '12ch 12ch 13ch 1fr',
+                    columnGap: '0.25rem',
+                    alignItems: 'baseline',
+                    paddingLeft: row.isContext ? 12 : 2,
+                    paddingRight: 4,
+                    paddingTop: 1,
+                    paddingBottom: 1,
+                  }}
                   onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.04)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = ''; }}
                 >
-                  <span style={{ color: 'var(--text-faint)', whiteSpace: 'nowrap', flexShrink: 0, minWidth: '12ch', display: 'inline-block' }}>{time}</span>
-                  <span style={{ color: lColor, whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 700, minWidth: '11ch', display: 'inline-block' }}>
+                  <span style={{ color: 'var(--text-faint)', whiteSpace: 'nowrap', overflow: 'hidden' }}>{time}</span>
+                  <span style={{ color: lColor, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden' }}>
                     [{lDef?.label ?? row.lvl}]
                   </span>
-                  <span style={{ color: cColor, whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 600, minWidth: '11ch', display: 'inline-block' }}>
+                  <span style={{ color: cColor, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden' }}>
                     [{cDef?.label ?? row.cat}]
                   </span>
-                  <span style={{ color: '#E8EAED', wordBreak: 'break-word' }}>
+                  <span style={{ color: '#E8EAED', wordBreak: 'break-word', minWidth: 0 }}>
                     {row.text}
                   </span>
                 </div>
