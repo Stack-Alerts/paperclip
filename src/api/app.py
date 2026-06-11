@@ -1797,7 +1797,7 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
             self.setFormatter(_logging.Formatter('%(message)s'))
         def emit(self, record: _logging.LogRecord) -> None:
             try:
-                _append_backtest_log(run_id, self.format(record), level='SYSTEM')
+                _append_backtest_log(run_id, self.format(record).strip(), level='SYSTEM')
             except Exception:
                 pass
 

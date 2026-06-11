@@ -202,8 +202,10 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
 
     for (let i = 0; i < visibleLogs.length; i++) {
       const msg = visibleLogs[i];
-      const text = msg.message ?? '';
-      const isCtx = isContextLine(text);
+      // Strip leading whitespace so Python logger output (which may include
+      // leading spaces/tabs from formatting) doesn't mis-trigger isContextLine
+      // and doesn't render as indentation artifacts in the message column.
+      const text = (msg.message ?? '').replace(/^\s+/, '');
       const lvl = detectLevel(text);
       const cat = detectCategory(text);
 
