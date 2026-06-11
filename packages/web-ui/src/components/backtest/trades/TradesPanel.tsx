@@ -303,7 +303,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
               minWidth: totalWidth,
               width: '100%',
               borderCollapse: 'collapse',
-              color: 'var(--text-secondary)',
+              color: 'var(--text-muted)',
               fontVariantNumeric: 'tabular-nums',
               fontSize: 12,
             }}
@@ -442,8 +442,8 @@ function PerformanceSummary({
       <SummaryItem label="Win Rate" value={`${summary.winRate.toFixed(2)}%`} valueColor={winRateColored} />
       <SummaryItem label="Long Trades" value={String(summary.longs)} valueColor={longColor} />
       <SummaryItem label="Short Trades" value={String(summary.shorts)} valueColor={shortColor} />
-      <SummaryItem label="Winning Trades" value={String(summary.wins)} />
-      <SummaryItem label="Losing Trades" value={String(summary.losses)} />
+      <SummaryItem label="Winning Trades" value={String(summary.wins)} valueColor={hasTrades && summary.wins > 0 ? ACCENT.success : undefined} />
+      <SummaryItem label="Losing Trades" value={String(summary.losses)} valueColor={hasTrades && summary.losses > 0 ? ACCENT.error : undefined} />
     </div>
   );
 }
