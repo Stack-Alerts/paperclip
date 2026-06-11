@@ -223,23 +223,21 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
   const [sortKey, setSortKey] = useState<ColumnKey>('id');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
-  // Aggregate partial exits into single rows (mirrors thick-client _aggregate_exits).
-  const aggregated = useMemo(() => aggregateTrades(trades), [trades]);
-
+  // Show individual partial-exit rows (no aggregation) — mirrors thick-client display.
   const summary = useMemo(() => {
-    const total = aggregated.length;
-    const wins = aggregated.filter(t => t.pnl > 0).length;
-    const losses = aggregated.filter(t => t.pnl < 0).length;
-    const longs = aggregated.filter(t => normalizeSide(t.side) === 'LONG').length;
-    const shorts = aggregated.filter(t => normalizeSide(t.side) === 'SHORT').length;
-    const totalPnl = aggregated.reduce((s, t) => s + t.pnl, 0);
+    const total = trades.length;
+    const wins = trades.filter(t => t.pnl > 0).length;
+    const losses = trades.filter(t => t.pnl < 0).length;
+    const longs = trades.filter(t => normalizeSide(t.side) === 'LONG').length;
+    const shorts = trades.filter(t => normalizeSide(t.side) === 'SHORT').length;
+    const totalPnl = trades.reduce((s, t) => s + t.pnl, 0);
     const winRate = total > 0 ? (wins / total) * 100 : 0;
     return { total, wins, losses, longs, shorts, totalPnl, winRate };
-  }, [aggregated]);
+  }, [trades]);
 
   const sortedTrades = useMemo(() => {
-    if (aggregated.length === 0) return aggregated;
-    const arr = [...aggregated];
+    if (trades.length === 0) return trades;
+    const arr = [...trades];
     arr.sort((a, b) => {
       const av = sortValue(a, sortKey);
       const bv = sortValue(b, sortKey);
@@ -249,7 +247,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return arr;
-  }, [aggregated, sortKey, sortDir]);
+  }, [trades, sortKey, sortDir]);
 
   const handleHeaderClick = (col: Column) => {
     if (!col.sortable) return;
@@ -359,7 +357,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
             fontSize: 12,
           }}
         >
-          Showing: <b style={{ color: 'var(--text-secondary)' }}>All Trades ({aggregated.length})</b>
+          Showing: <b style={{ color: 'var(--text-secondary)' }}>All Trades ({trades.length})</b>
         </div>
       </SectionShell>
     </div>
