@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Paperclip Speech Input",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Mic button for Paperclip inputs. Web Speech API (no backend). Scoped to Paperclip only.",
   "permissions": [],
   "host_permissions": [],

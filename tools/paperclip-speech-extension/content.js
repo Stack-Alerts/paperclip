@@ -163,15 +163,20 @@
       }
     });
     // Ensure a single space follows terminal punctuation when a letter immediately follows.
-    return replaced.replace(/([,\.!?;:…])([A-Za-z])/g, '$1 $2').trim();
+    return replaced
+      .replace(/([,\.!?;:…])([A-Za-z])/g, '$1 $2')
+      .replace(/ +\n/g, '\n')   // drop spaces immediately before newlines
+      .replace(/\n +/g, '\n')   // drop spaces immediately after newlines
+      .replace(/^[ \t]+|[ \t]+$/g, '');  // trim horizontal whitespace only — preserve \n
   }
 
   function appendText(el, transcript) {
     if (!transcript) return;
     const normalized = normalizeTranscript(transcript);
+    if (!normalized) return;
     const isText = el.tagName === 'TEXTAREA' || el.tagName === 'INPUT';
-    // Attaching symbols (no leading space): , . ! ? ; : etc.
-    const startsAttach = /^[,\.!?;:'")\]}'…%\-—]/.test(normalized);
+    // Attaching symbols (no leading space before them): , . ! ? newlines etc.
+    const startsAttach = /^[\n,\.!?;:'")\]}'…%\-—]/.test(normalized);
     if (isText) {
       const current = el.value || '';
       const sep = (!startsAttach && current && !current.endsWith(' ') && !current.endsWith('\n')) ? ' ' : '';
