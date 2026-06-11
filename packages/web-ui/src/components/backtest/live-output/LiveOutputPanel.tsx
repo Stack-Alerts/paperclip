@@ -435,8 +435,8 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
                   <span style={{ color: cColor, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden' }}>
                     [{cDef?.label ?? row.cat}]
                   </span>
-                  <span style={{ color: '#E8EAED', wordBreak: 'break-word', minWidth: 0 }}>
-                    {row.text}
+                  <span style={{ color: '#9AA0A6', wordBreak: 'break-word', minWidth: 0 }}>
+                    {colorizeMessage(row.text)}
                   </span>
                 </div>
               );
@@ -480,6 +480,25 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
       </div>
     </div>
   );
+}
+
+/** Highlight PnL dollar + pct pairs green (positive) or red (negative).
+ *  Only "PnL: $X.XX (Y.YY%)" patterns are colored — price context stays neutral. */
+function colorizeMessage(text: string): React.ReactNode {
+  const re = /(PnL:\s*)(-?\$[\d,]+\.?\d*)\s*\((-?[\d,]+\.?\d*%)\)/g;
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+  let m: RegExpExecArray | null;
+  let idx = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > cursor) nodes.push(text.slice(cursor, m.index));
+    const neg = m[2].startsWith('-') || m[3].startsWith('-');
+    const color = neg ? '#C35252' : '#10B981';
+    nodes.push(<span key={idx++} style={{ color }}>{m[1]}{m[2]} ({m[3]})</span>);
+    cursor = m.index + m[0].length;
+  }
+  if (cursor < text.length) nodes.push(text.slice(cursor));
+  return nodes.length > 1 ? <>{nodes}</> : text;
 }
 
 function formatTime(iso: string): string {
