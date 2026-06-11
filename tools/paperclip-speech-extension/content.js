@@ -265,8 +265,16 @@
         };
 
         recognition.onerror = (event) => {
-          console.warn('[Paperclip Speech] recognition error:', event.error, event);
           recording = false;
+          // 'no-speech' just means the mic timed out with no audio — not a real error.
+          // Reset silently so the user can click again without seeing a warning.
+          if (event.error === 'no-speech') {
+            btn.dataset.state = 'idle';
+            btn.textContent = '🎤';
+            btn.title = 'Dictate (Web Speech API)';
+            return;
+          }
+          console.warn('[Paperclip Speech] recognition error:', event.error, event);
           btn.dataset.state = 'error';
           btn.textContent = '⚠️';
           if (event.error === 'network') {
