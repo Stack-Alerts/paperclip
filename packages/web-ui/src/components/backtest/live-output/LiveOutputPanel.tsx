@@ -306,76 +306,81 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
       {/* TP/SL + candles counters row */}
       <BacktestCountersRow result={effectiveResult} candles={candles} className="mb-2" />
 
-      {/* ── Thick-client filter bar ─────────────────────────────────────────── */}
-      <div className="mb-1 flex flex-col gap-1" data-testid="live-output-filters">
-        {/* Level filter row: INFO | DECISION | WIN | LOSS | STOP/LOSS */}
-        <div className="flex items-center flex-wrap gap-1">
-          {LEVEL_DEFS_TC.map(def => {
-            const on = enabledLevels.has(def.tag);
-            return (
-              <button
-                key={def.tag}
-                type="button"
-                aria-label={def.label}
-                aria-pressed={on}
-                onClick={() => toggleLevel(def.tag)}
-                className="text-[11px] font-semibold px-2 py-0.5 rounded"
-                style={{
-                  background: on ? `${def.color}22` : 'var(--bg-deep)',
-                  color: on ? def.color : 'var(--text-muted)',
-                  border: `1px solid ${on ? def.color : 'var(--border)'}`,
-                  cursor: 'pointer',
-                }}
-              >
-                {def.label}
-              </button>
-            );
-          })}
-          <div className="flex-1" />
-          <button
-            type="button"
-            onClick={toggleAll}
-            title="Toggle all event filters"
-            className="text-[11px] px-3 py-0.5 rounded"
-            style={{
-              background: 'var(--bg-deep)',
-              color: 'var(--text-secondary)',
-              border: '1px solid var(--border)',
-              cursor: 'pointer',
-            }}
-          >
-            {allOn ? 'Unselect All' : 'Select All'}
-          </button>
-        </div>
+      {/* ── Thick-client filter bar — single inline row ─────────────────────── */}
+      <div className="mb-1 flex items-center flex-wrap gap-1" data-testid="live-output-filters">
+        <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
+          Levels:
+        </span>
+        {LEVEL_DEFS_TC.map(def => {
+          const on = enabledLevels.has(def.tag);
+          return (
+            <button
+              key={def.tag}
+              type="button"
+              aria-label={def.label}
+              aria-pressed={on}
+              onClick={() => toggleLevel(def.tag)}
+              className="text-[11px] font-semibold px-2 py-0.5 rounded"
+              style={{
+                background: on ? `${def.color}22` : 'var(--bg-deep)',
+                color: on ? def.color : 'var(--text-muted)',
+                border: `1px solid ${on ? def.color : 'var(--border)'}`,
+                cursor: 'pointer',
+              }}
+            >
+              {def.label}
+            </button>
+          );
+        })}
 
-        {/* Category filter row: Global | TRADE | RISK | SYSTEM | OPTIMIZER | SERVICE */}
-        <div className="flex items-center flex-wrap gap-1">
-          <span className="text-[10px] uppercase tracking-wider mr-1" style={{ color: 'var(--text-muted)' }}>
-            Categories:
-          </span>
-          {CATEGORY_DEFS_TC.map(def => {
-            const on = enabledCategories.has(def.tag);
-            const isHexColor = def.color.startsWith('#');
-            return (
-              <button
-                key={def.tag}
-                type="button"
-                aria-label={def.label}
-                aria-pressed={on}
-                onClick={() => toggleCategory(def.tag)}
-                className="text-[11px] font-semibold px-2 py-0.5 rounded"
-                style={{
-                  background: on ? (isHexColor ? `${def.color}22` : 'var(--bg-hover)') : 'var(--bg-deep)',
-                  color: on ? (isHexColor ? def.color : 'var(--text-secondary)') : 'var(--text-muted)',
-                  border: `1px solid ${on && isHexColor ? def.color : 'var(--border)'}`,
-                  cursor: 'pointer',
-                }}
-              >
-                {def.label}
-              </button>
-            );
-          })}
-        </div>
+        {/* divider */}
+        <span style={{ color: 'var(--border)', margin: '0 4px', flexShrink: 0, userSelect: 'none' }}>|</span>
+
+        <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
+          Categories:
+        </span>
+        {CATEGORY_DEFS_TC.map(def => {
+          const on = enabledCategories.has(def.tag);
+          const isHexColor = def.color.startsWith('#');
+          // Non-Global chips are visually disabled when Global is active
+          const globalActive = enabledCategories.has('GLOBAL');
+          const dimmed = def.tag !== 'GLOBAL' && globalActive;
+          return (
+            <button
+              key={def.tag}
+              type="button"
+              aria-label={def.label}
+              aria-pressed={on}
+              onClick={() => toggleCategory(def.tag)}
+              className="text-[11px] font-semibold px-2 py-0.5 rounded"
+              style={{
+                background: on && !dimmed ? (isHexColor ? `${def.color}22` : 'var(--bg-hover)') : 'var(--bg-deep)',
+                color: dimmed ? 'var(--text-faint)' : on ? (isHexColor ? def.color : 'var(--text-secondary)') : 'var(--text-muted)',
+                border: `1px solid ${on && !dimmed && isHexColor ? def.color : 'var(--border)'}`,
+                cursor: 'pointer',
+                opacity: dimmed ? 0.4 : 1,
+              }}
+            >
+              {def.label}
+            </button>
+          );
+        })}
+
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={toggleAll}
+          title="Toggle all event filters"
+          className="text-[11px] px-3 py-0.5 rounded"
+          style={{
+            background: 'var(--bg-deep)',
+            color: 'var(--text-secondary)',
+            border: '1px solid var(--border)',
+            cursor: 'pointer',
+          }}
+        >
+          {allOn ? 'Unselect All' : 'Select All'}
+        </button>
       </div>
 
       {/* ── Log output ─────────────────────────────────────────────────────── */}
@@ -407,9 +412,11 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
               return (
                 <div
                   key={row.key}
-                  className="flex items-baseline gap-1.5 leading-[1.4]"
+                  className="flex items-baseline gap-1.5 leading-[1.4] rounded"
                   data-testid="log-row"
-                  style={{ paddingLeft: row.isContext ? 12 : 0 }}
+                  style={{ paddingLeft: row.isContext ? 12 : 0, paddingRight: 4, paddingTop: 1, paddingBottom: 1 }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.04)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = ''; }}
                 >
                   <span style={{ color: 'var(--text-faint)', whiteSpace: 'nowrap', flexShrink: 0, minWidth: '12ch', display: 'inline-block' }}>{time}</span>
                   <span style={{ color: lColor, whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 700, minWidth: '11ch', display: 'inline-block' }}>
