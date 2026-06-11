@@ -446,7 +446,7 @@ function SummaryItem({ label, value, valueColor }: { label: string; value: strin
 
 function TradeRow({ trade, rowBg }: { trade: Trade; rowBg: string }) {
   const [hovered, setHovered] = useState(false);
-  const bg = hovered ? 'rgba(255, 255, 255, 0.04)' : rowBg;
+  const bg = hovered ? 'rgb(81 126 227 / 9%)' : rowBg;
   const side = normalizeSide(trade.side);
   const status = normalizeStatus(trade.status);
   const pnlColor = trade.pnl > 0 ? ACCENT.success : trade.pnl < 0 ? ACCENT.error : 'var(--text-muted)';
