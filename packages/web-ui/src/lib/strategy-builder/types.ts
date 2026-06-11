@@ -279,7 +279,11 @@ export interface Trade {
   side?: 'LONG' | 'SHORT' | string;
   // Symbol traded; thick-client defaults to BTC.P/USDT when not present on the record.
   symbol?: string;
-  status?: 'open' | 'closed' | 'OPEN' | 'CLOSED' | string;
+  status?: 'open' | 'closed' | 'OPEN' | 'CLOSED' | 'PARTIAL' | string;
+  // Aggregated notes from thick-client _format_notes / _aggregate_exits (e.g. "ALL TP Exits").
+  notes?: string;
+  // Partial exit breakdown from thick-client _aggregate_exits (e.g. "TP1: $X | TP2: $Y").
+  partialBreakdown?: string;
 }
 
 // UI State for panels and modals

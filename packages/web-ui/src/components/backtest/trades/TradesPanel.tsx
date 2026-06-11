@@ -74,9 +74,10 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString(undefined, { hour12: false });
 }
 
-function normalizeStatus(raw?: string): 'OPEN' | 'CLOSED' {
+function normalizeStatus(raw?: string): 'OPEN' | 'PARTIAL' | 'CLOSED' {
   if (!raw) return 'CLOSED';
-  return raw.toUpperCase() === 'OPEN' ? 'OPEN' : 'CLOSED';
+  const u = raw.toUpperCase();
+  return u === 'OPEN' ? 'OPEN' : u === 'PARTIAL' ? 'PARTIAL' : 'CLOSED';
 }
 
 function normalizeSide(raw?: string): 'LONG' | 'SHORT' | '—' {
@@ -86,6 +87,7 @@ function normalizeSide(raw?: string): 'LONG' | 'SHORT' | '—' {
 }
 
 function partialDisplay(t: Trade): string {
+  if (t.partialBreakdown) return t.partialBreakdown;
   if (!t.exitType) return '—';
   const u = t.exitType.toUpperCase();
   if (u === 'MAX_BARS' || u === 'TIME_LIMIT') return `Max Bars: ${formatMoney(t.pnl)}`;
@@ -95,6 +97,7 @@ function partialDisplay(t: Trade): string {
 }
 
 function notesDisplay(t: Trade): string {
+  if (t.notes) return t.notes;
   if (!t.exitType) return '—';
   const u = t.exitType.toUpperCase();
   if (u === 'TP1' || u === 'TP2' || u === 'TP3') return `${u} Hit`;
@@ -349,7 +352,7 @@ function TradeRow({ trade, rowBg }: { trade: Trade; rowBg: string }) {
   const pnlColor = trade.pnl > 0 ? ACCENT.success : trade.pnl < 0 ? ACCENT.error : 'var(--text-muted)';
   const pctColor = trade.pnlPercentage > 0 ? ACCENT.success : trade.pnlPercentage < 0 ? ACCENT.error : 'var(--text-muted)';
   const sideColor = side === 'LONG' ? ACCENT.success : side === 'SHORT' ? ACCENT.error : 'var(--text-muted)';
-  const statusColor = status === 'OPEN' ? ACCENT.success : 'var(--text-muted)';
+  const statusColor = status === 'OPEN' ? ACCENT.success : status === 'PARTIAL' ? ACCENT.warning : 'var(--text-muted)';
   const partial = partialDisplay(trade);
 
   const cellStyle: React.CSSProperties = {

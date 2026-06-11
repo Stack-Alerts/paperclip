@@ -1854,19 +1854,23 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
         # doesn't have to bridge two shapes.
         normalized_trades = []
         for idx, t in enumerate(trades):
+            raw_id = t.get("trade_id") or t.get("id")
             normalized_trades.append({
-                "id": str(idx),
+                "id": str(raw_id) if raw_id is not None else str(idx + 1),
                 "entryTime": str(t["entry_timestamp"]) if t.get("entry_timestamp") else None,
                 "exitTime": str(t["exit_timestamp"]) if t.get("exit_timestamp") else None,
                 "side": t.get("side") or t.get("direction"),
+                "symbol": t.get("symbol") or "BTC.P/USDT",
                 "entryPrice": float(t.get("entry_price") or t.get("entryPrice") or 0),
                 "exitPrice": float(t.get("exit_price") or t.get("exitPrice") or 0),
                 "quantity": float(t.get("quantity") or t.get("size") or 0),
                 "pnl": float(t.get("pnl") or 0),
                 "pnlPercentage": float(t.get("pnl_pct") or t.get("pnl_percent") or t.get("pnlPercentage") or 0),
                 "bars": int(t.get("bars_held") or t.get("barsHeld") or t.get("bars") or 0),
-                "exitType": t.get("exit_reason") or t.get("exitReason") or t.get("exitType"),
-                "status": "closed",
+                "exitType": t.get("exit_condition_name") or t.get("exit_reason") or t.get("exitReason") or t.get("exitType"),
+                "status": t.get("status") or "closed",
+                "notes": t.get("notes") or t.get("exit_condition_name"),
+                "partialBreakdown": t.get("partial_exit_breakdown"),
             })
 
         wins = [t for t in trades if (t.get("pnl") or 0) > 0]
