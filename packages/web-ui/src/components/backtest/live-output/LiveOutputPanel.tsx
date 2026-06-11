@@ -365,12 +365,13 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
               aria-label={def.label}
               aria-pressed={on}
               onClick={() => toggleLevel(def.tag)}
-              className="text-[11px] font-semibold px-2 py-0.5 rounded"
+              className="text-[10px] font-semibold px-1.5 py-0 rounded whitespace-nowrap"
               style={{
                 background: on ? `${def.color}22` : 'var(--bg-deep)',
                 color: on ? def.color : 'var(--text-muted)',
                 border: `1px solid ${on ? def.color : 'var(--border)'}`,
                 cursor: 'pointer',
+                lineHeight: '18px',
               }}
             >
               {def.label}
@@ -414,7 +415,7 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
           type="button"
           onClick={toggleAll}
           title="Toggle all event filters"
-          className="text-[11px] px-3 py-0.5 rounded"
+          className="text-[10px] px-2 py-0 rounded whitespace-nowrap"
           style={{
             background: 'var(--bg-deep)',
             color: 'var(--text-secondary)',
