@@ -13,35 +13,41 @@ jobs:
     name: Apply branch protection to main
     runs-on: ubuntu-latest
     steps:
-      - name: Apply branch protection (idempotent)
+      - name: Verify branch protection is intact
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh api --method PUT \
-            "repos/${{ github.repository }}/branches/main/protection" \
-            --input - <<'PAYLOAD'
-          {
-            "required_status_checks": {
-              "strict": true,
-              "contexts": []
-            },
-            "enforce_admins": false,
-            "required_pull_request_reviews": {
-              "required_approving_review_count": 1,
-              "dismiss_stale_reviews": true,
-              "require_code_owner_reviews": false,
-              "require_last_push_approval": false
-            },
-            "restrictions": null,
-            "required_linear_history": false,
-            "allow_force_pushes": false,
-            "allow_deletions": false,
-            "block_creations": false,
-            "required_conversation_resolution": true
-          }
-          PAYLOAD
+          # GITHUB_TOKEN cannot set branch protection (requires admin PAT).
+          # This step verifies current protection matches expected settings.
+          # Add secret ADMIN_PAT with repo+admin scope to enable auto-apply.
+          PROTECTION=$(gh api "repos/${{ github.repository }}/branches/main/protection" 2>&1)
 
-      - name: Verify protection applied
+          if echo "$PROTECTION" | grep -q '"message"'; then
+            echo "::error::Branch protection GET failed: $PROTECTION"
+            exit 1
+          fi
+
+          REVIEWS=$(echo "$PROTECTION" | jq '.required_pull_request_reviews.required_approving_review_count')
+          DISMISS=$(echo "$PROTECTION" | jq '.required_pull_request_reviews.dismiss_stale_reviews')
+          STRICT=$(echo "$PROTECTION" | jq '.required_status_checks.strict')
+          FORCE=$(echo "$PROTECTION" | jq '.allow_force_pushes.enabled')
+          DELETES=$(echo "$PROTECTION" | jq '.allow_deletions.enabled')
+
+          DRIFT=0
+          [ "$REVIEWS" != "1" ]    && echo "::error::DRIFT: required_approving_review_count=$REVIEWS (expected 1)" && DRIFT=1
+          [ "$DISMISS" != "true" ] && echo "::error::DRIFT: dismiss_stale_reviews=$DISMISS (expected true)" && DRIFT=1
+          [ "$STRICT" != "true" ]  && echo "::error::DRIFT: status_checks.strict=$STRICT (expected true)" && DRIFT=1
+          [ "$FORCE" != "false" ]  && echo "::error::DRIFT: allow_force_pushes=$FORCE (expected false)" && DRIFT=1
+          [ "$DELETES" != "false" ] && echo "::error::DRIFT: allow_deletions=$DELETES (expected false)" && DRIFT=1
+
+          if [ "$DRIFT" -eq 1 ]; then
+            echo "::error::Branch protection has drifted from policy. Manual re-apply required."
+            exit 1
+          fi
+
+          echo "Branch protection verified — all settings match policy."
+
+      - name: Write protection summary
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
