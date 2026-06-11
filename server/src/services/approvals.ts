@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
 import { approvalComments, approvals, principalPermissionGrants } from "@paperclipai/db";
+import { requestBoardApprovalPayloadSchema } from "@paperclipai/shared/validators/approval";
 import { notFound, unprocessable } from "../errors.js";
 import { redactCurrentUserText } from "../log-redaction.js";
 import { agentService } from "./agents.js";
@@ -31,32 +32,21 @@ export function approvalService(db: Db) {
     if (approval.type !== "request_board_approval") return;
     if (!approval.requestedByAgentId) return;
 
-    const payload = (approval.payload ?? {}) as Record<string, unknown>;
-    const rawGrants = payload.grants;
-    if (!Array.isArray(rawGrants) || rawGrants.length === 0) return;
+    const parsed = requestBoardApprovalPayloadSchema.safeParse(approval.payload ?? {});
+    if (!parsed.success) return;
+    const grants = parsed.data.grants ?? [];
+    if (grants.length === 0) return;
 
     const now = new Date();
-    for (const raw of rawGrants) {
-      if (!raw || typeof raw !== "object") continue;
-      const grant = raw as Record<string, unknown>;
-      const permissionKey =
-        typeof grant.permissionKey === "string" && grant.permissionKey.length > 0
-          ? grant.permissionKey
-          : null;
-      if (!permissionKey) continue;
-
-      const scope =
-        typeof grant.scope === "object" && grant.scope !== null
-          ? (grant.scope as Record<string, unknown>)
-          : null;
-
+    for (const grant of grants) {
+      const scope = (grant.scope ?? null) as Record<string, unknown> | null;
       await db
         .insert(principalPermissionGrants)
         .values({
           companyId: approval.companyId,
           principalType: "agent",
           principalId: approval.requestedByAgentId,
-          permissionKey,
+          permissionKey: grant.permissionKey,
           scope,
           grantedByUserId: decidedByUserId,
           createdAt: now,
