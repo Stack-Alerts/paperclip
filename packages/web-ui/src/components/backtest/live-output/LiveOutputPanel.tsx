@@ -28,6 +28,10 @@ export interface LiveOutputPanelProps {
 }
 
 const FILTERS_STORAGE_KEY = 'backtest.liveOutput.filters.v3';
+const FONT_SCALE_KEY = 'backtest.liveOutput.fontScale';
+const LOG_FONT_SIZES = ['10px', '11px', '13px'] as const;
+const LOG_FONT_LABELS = ['Compact', 'Normal', 'Large'] as const;
+type LogFontScaleIdx = 0 | 1 | 2;
 
 function loadStoredFilters(): { levels: Set<LevelTag>; categories: Set<CategoryTag> } | null {
   if (typeof window === 'undefined') return null;
@@ -95,6 +99,11 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
   const [enabledLevels, setEnabledLevels] = useState<Set<LevelTag>>(defaultLevels);
   const [enabledCategories, setEnabledCategories] = useState<Set<CategoryTag>>(defaultCategories);
   const [clearedBefore, setClearedBefore] = useState(0);
+  const [fontScaleIdx, setFontScaleIdx] = useState<LogFontScaleIdx>(() => {
+    if (typeof window === 'undefined') return 1;
+    const n = parseInt(window.localStorage.getItem(FONT_SCALE_KEY) ?? '1', 10);
+    return (n === 0 || n === 1 || n === 2) ? n as LogFontScaleIdx : 1;
+  });
 
   useEffect(() => {
     const stored = loadStoredFilters();
@@ -113,6 +122,11 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
       }));
     } catch { /* quota/private-mode */ }
   }, [enabledLevels, enabledCategories]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try { window.localStorage.setItem(FONT_SCALE_KEY, String(fontScaleIdx)); } catch { /* quota/private-mode */ }
+  }, [fontScaleIdx]);
 
   useEffect(() => {
     if (!isPaused && scrollRef.current) {
@@ -290,6 +304,41 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
           {isRunning && (
             <span className="text-xs" style={{ color: 'var(--accent-green)' }}>● RUNNING</span>
           )}
+          {/* Aa−/Aa+ font scale — mirrors BacktestConfigDialog header control */}
+          <div
+            role="group"
+            aria-label="Log font size"
+            className="flex items-center rounded-[4px] overflow-hidden"
+            style={{ border: '1px solid var(--border)', background: 'var(--bg-deep)' }}
+          >
+            <button
+              onClick={() => setFontScaleIdx(i => Math.max(0, i - 1) as LogFontScaleIdx)}
+              disabled={fontScaleIdx === 0}
+              aria-label="Decrease font size"
+              title="Decrease font size"
+              className="px-2 py-1 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              <span style={{ fontSize: '11px' }}>A</span><span style={{ fontSize: '13px' }}>a</span><span style={{ marginLeft: 2 }}>−</span>
+            </button>
+            <span
+              aria-live="polite"
+              className="px-2 text-[10px] font-medium uppercase tracking-wider whitespace-nowrap select-none"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {LOG_FONT_LABELS[fontScaleIdx]}
+            </span>
+            <button
+              onClick={() => setFontScaleIdx(i => Math.min(2, i + 1) as LogFontScaleIdx)}
+              disabled={fontScaleIdx === 2}
+              aria-label="Increase font size"
+              title="Increase font size"
+              className="px-2 py-1 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              <span style={{ fontSize: '11px' }}>A</span><span style={{ fontSize: '15px' }}>a</span><span style={{ marginLeft: 2 }}>+</span>
+            </button>
+          </div>
           <button
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
@@ -387,12 +436,13 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
       {/* ── Log output ─────────────────────────────────────────────────────── */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto rounded font-mono text-[11px]"
+        className="flex-1 overflow-y-auto rounded font-mono"
         style={{
           background: 'var(--bg-deep)',
           border: '1px solid var(--border)',
           padding: '0.5rem 0.75rem',
           minHeight: 240,
+          fontSize: LOG_FONT_SIZES[fontScaleIdx],
         }}
         data-testid="live-output-log"
       >
