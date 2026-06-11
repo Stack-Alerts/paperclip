@@ -121,8 +121,9 @@ function notesDisplay(t: Trade): string {
 // The web API sends individual partial-exit records; we group them here so
 // each logical trade shows one row with combined partial_exit_breakdown/notes.
 function aggregateTrades(raw: Trade[]): Trade[] {
-  // Strip trailing _N suffix to get base trade ID (e.g. "5_1" → "5").
-  const baseId = (id: string) => id.replace(/_\d+$/, '');
+  // Strip trailing .N or _N suffix to get base trade ID (e.g. "5.1" → "5", "5_1" → "5").
+  // The registry assigns dot notation ("5.1"), so the regex must accept both separators.
+  const baseId = (id: string) => id.replace(/[._]\d+$/, '');
 
   // Preserve insertion order of first-seen base IDs.
   const order: string[] = [];
