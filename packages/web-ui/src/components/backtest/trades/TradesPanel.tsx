@@ -32,20 +32,21 @@ type ColumnKey =
 interface Column { key: ColumnKey; label: string; width: number; sortable: boolean; }
 
 // Matches PyQt5 column order/widths from trades_panel.py:230,252.
+// Widths trimmed (BTCAAAAA-35662) so total ~1185px fits 1280px+ screens.
 const COLUMNS: Column[] = [
-  { key: 'id',       label: 'ID',        width: 80,  sortable: true  },
-  { key: 'time',     label: 'Time',      width: 110, sortable: true  },
-  { key: 'symbol',   label: 'Symbol',    width: 110, sortable: false },
-  { key: 'side',     label: 'Side',      width: 80,  sortable: true  },
-  { key: 'size',     label: 'Size',      width: 90,  sortable: true  },
-  { key: 'entry',    label: 'Entry',     width: 110, sortable: true  },
-  { key: 'exit',     label: 'Exit',      width: 110, sortable: true  },
-  { key: 'duration', label: 'Duration',  width: 100, sortable: false },
-  { key: 'pnl',      label: 'P&L',       width: 110, sortable: true  },
-  { key: 'pnlPct',   label: 'P&L %',     width: 100, sortable: true  },
-  { key: 'status',   label: 'Status',    width: 90,  sortable: true  },
-  { key: 'partial',  label: 'Partial %', width: 160, sortable: false },
-  { key: 'notes',    label: 'Notes',     width: 380, sortable: false },
+  { key: 'id',       label: 'ID',        width: 55,  sortable: true  },
+  { key: 'time',     label: 'Time',      width: 85,  sortable: true  },
+  { key: 'symbol',   label: 'Symbol',    width: 100, sortable: false },
+  { key: 'side',     label: 'Side',      width: 65,  sortable: true  },
+  { key: 'size',     label: 'Size',      width: 75,  sortable: true  },
+  { key: 'entry',    label: 'Entry',     width: 95,  sortable: true  },
+  { key: 'exit',     label: 'Exit',      width: 95,  sortable: true  },
+  { key: 'duration', label: 'Duration',  width: 80,  sortable: false },
+  { key: 'pnl',      label: 'P&L',       width: 95,  sortable: true  },
+  { key: 'pnlPct',   label: 'P&L %',     width: 80,  sortable: true  },
+  { key: 'status',   label: 'Status',    width: 75,  sortable: true  },
+  { key: 'partial',  label: 'Partial %', width: 115, sortable: false },
+  { key: 'notes',    label: 'Notes',     width: 170, sortable: false },
 ];
 
 function formatDuration(bars: number): string {
@@ -481,7 +482,7 @@ function TradeRow({ trade, rowBg }: { trade: Trade; rowBg: string }) {
       </td>
       <td style={{ ...cellStyle, color: statusColor, fontWeight: 600 }}>{status}</td>
       <td style={{ ...cellStyle, color: pnlColor }}>{partial}</td>
-      <td style={{ ...cellStyle }}>{notesDisplay(trade)}</td>
+      <td style={{ ...cellStyle, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }} title={notesDisplay(trade)}>{notesDisplay(trade)}</td>
     </tr>
   );
 }
