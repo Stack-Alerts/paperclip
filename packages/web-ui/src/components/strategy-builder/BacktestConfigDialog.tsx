@@ -888,6 +888,13 @@ function ConfigTab({
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 2: ADAPTIVE SL v2.0 (35%)
             ════════════════════════════════════════════════════════════════════ */}
+        <div
+          style={{
+            opacity: slAdjustment === 'Static' ? 0.35 : 1,
+            pointerEvents: slAdjustment === 'Static' ? 'none' : 'auto',
+            transition: 'opacity 0.15s',
+          }}
+        >
         <SectionCard title="Adaptive SL v2.0">
           {/* Presets row — inline (cycle-16 board revision 2026-06-03).
               Matches ChipRow's `88px label | 1fr chips | 76px spinbox` template
@@ -1089,6 +1096,7 @@ function ConfigTab({
             />
           </div>
         </SectionCard>
+        </div>
 
         {/* ═════════════════════════════════════════════════════════════════════
             COLUMN 3: RISK / REWARD (30%)

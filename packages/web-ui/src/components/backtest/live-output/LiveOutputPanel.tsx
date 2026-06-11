@@ -306,81 +306,82 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
       {/* TP/SL + candles counters row */}
       <BacktestCountersRow result={effectiveResult} candles={candles} className="mb-2" />
 
-      {/* ── Thick-client filter bar — single inline row ─────────────────────── */}
-      <div className="mb-1 flex items-center flex-wrap gap-1" data-testid="live-output-filters">
-        <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
-          Levels:
-        </span>
-        {LEVEL_DEFS_TC.map(def => {
-          const on = enabledLevels.has(def.tag);
-          return (
-            <button
-              key={def.tag}
-              type="button"
-              aria-label={def.label}
-              aria-pressed={on}
-              onClick={() => toggleLevel(def.tag)}
-              className="text-[11px] font-semibold px-2 py-0.5 rounded"
-              style={{
-                background: on ? `${def.color}22` : 'var(--bg-deep)',
-                color: on ? def.color : 'var(--text-muted)',
-                border: `1px solid ${on ? def.color : 'var(--border)'}`,
-                cursor: 'pointer',
-              }}
-            >
-              {def.label}
-            </button>
-          );
-        })}
+      {/* ── Thick-client filter bar — two rows matching TC layout ─────────────── */}
+      <div className="mb-1 flex flex-col gap-1" data-testid="live-output-filters">
+        {/* Row 1: Levels */}
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] uppercase tracking-wider w-[68px] shrink-0" style={{ color: 'var(--text-muted)' }}>
+            Levels:
+          </span>
+          {LEVEL_DEFS_TC.map(def => {
+            const on = enabledLevels.has(def.tag);
+            return (
+              <button
+                key={def.tag}
+                type="button"
+                aria-label={def.label}
+                aria-pressed={on}
+                onClick={() => toggleLevel(def.tag)}
+                className="text-[11px] font-semibold px-2 py-0.5 rounded"
+                style={{
+                  background: on ? `${def.color}22` : 'var(--bg-deep)',
+                  color: on ? def.color : 'var(--text-muted)',
+                  border: `1px solid ${on ? def.color : 'var(--border)'}`,
+                  cursor: 'pointer',
+                }}
+              >
+                {def.label}
+              </button>
+            );
+          })}
+        </div>
 
-        {/* divider */}
-        <span style={{ color: 'var(--border)', margin: '0 4px', flexShrink: 0, userSelect: 'none' }}>|</span>
-
-        <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
-          Categories:
-        </span>
-        {CATEGORY_DEFS_TC.map(def => {
-          const on = enabledCategories.has(def.tag);
-          const isHexColor = def.color.startsWith('#');
-          // Non-Global chips are visually disabled when Global is active
-          const globalActive = enabledCategories.has('GLOBAL');
-          const dimmed = def.tag !== 'GLOBAL' && globalActive;
-          return (
-            <button
-              key={def.tag}
-              type="button"
-              aria-label={def.label}
-              aria-pressed={on}
-              onClick={() => toggleCategory(def.tag)}
-              className="text-[11px] font-semibold px-2 py-0.5 rounded"
-              style={{
-                background: on && !dimmed ? (isHexColor ? `${def.color}22` : 'var(--bg-hover)') : 'var(--bg-deep)',
-                color: dimmed ? 'var(--text-faint)' : on ? (isHexColor ? def.color : 'var(--text-secondary)') : 'var(--text-muted)',
-                border: `1px solid ${on && !dimmed && isHexColor ? def.color : 'var(--border)'}`,
-                cursor: 'pointer',
-                opacity: dimmed ? 0.4 : 1,
-              }}
-            >
-              {def.label}
-            </button>
-          );
-        })}
-
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={toggleAll}
-          title="Toggle all event filters"
-          className="text-[11px] px-3 py-0.5 rounded"
-          style={{
-            background: 'var(--bg-deep)',
-            color: 'var(--text-secondary)',
-            border: '1px solid var(--border)',
-            cursor: 'pointer',
-          }}
-        >
-          {allOn ? 'Unselect All' : 'Select All'}
-        </button>
+        {/* Row 2: Categories + Unselect All */}
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] uppercase tracking-wider w-[68px] shrink-0" style={{ color: 'var(--text-muted)' }}>
+            Categories:
+          </span>
+          {CATEGORY_DEFS_TC.map(def => {
+            const on = enabledCategories.has(def.tag);
+            const isHexColor = def.color.startsWith('#');
+            const globalActive = enabledCategories.has('GLOBAL');
+            const dimmed = def.tag !== 'GLOBAL' && globalActive;
+            return (
+              <button
+                key={def.tag}
+                type="button"
+                aria-label={def.label}
+                aria-pressed={on}
+                onClick={() => toggleCategory(def.tag)}
+                className="text-[11px] font-semibold px-2 py-0.5 rounded"
+                style={{
+                  background: on && !dimmed ? (isHexColor ? `${def.color}22` : 'var(--bg-hover)') : 'var(--bg-deep)',
+                  color: dimmed ? 'var(--text-faint)' : on ? (isHexColor ? def.color : 'var(--text-secondary)') : 'var(--text-muted)',
+                  border: `1px solid ${on && !dimmed && isHexColor ? def.color : 'var(--border)'}`,
+                  cursor: 'pointer',
+                  opacity: dimmed ? 0.4 : 1,
+                }}
+              >
+                {def.label}
+              </button>
+            );
+          })}
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={toggleAll}
+            title="Toggle all event filters"
+            className="text-[11px] px-3 py-0.5 rounded"
+            style={{
+              background: 'var(--bg-deep)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border)',
+              cursor: 'pointer',
+            }}
+          >
+            {allOn ? 'Unselect All' : 'Select All'}
+          </button>
+        </div>
       </div>
 
       {/* ── Log output ─────────────────────────────────────────────────────── */}

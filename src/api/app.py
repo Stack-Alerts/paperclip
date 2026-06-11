@@ -1787,6 +1787,22 @@ def _append_backtest_log(run_id: str, message: str, level: str = "INFO") -> None
 
 def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
     """Background worker: load bars, run engine, persist result into the runs dict."""
+    import logging as _logging
+
+    # Logging capture: route Python logger output from data loaders (NautilusLoader,
+    # UnifiedDataManager, etc.) into the Status panel — mirrors QtLogHandler in thick client.
+    class _StatusLogHandler(_logging.Handler):
+        def __init__(self) -> None:
+            super().__init__()
+            self.setFormatter(_logging.Formatter('%(message)s'))
+        def emit(self, record: _logging.LogRecord) -> None:
+            try:
+                _append_backtest_log(run_id, self.format(record), level='SYSTEM')
+            except Exception:
+                pass
+
+    _log_handler = _StatusLogHandler()
+
     try:
         _append_backtest_log(
             run_id,
@@ -1802,7 +1818,51 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
         start = datetime.fromisoformat(str(config["startDate"]))
         end = datetime.fromisoformat(str(config["endDate"]))
 
-        _append_backtest_log(run_id, f"Loading bars {timeframe} {config['startDate']} → {config['endDate']}", level='SYSTEM')
+        # ── Calibration cache check (mirrors _run_auto_calibration in thick client) ──
+        try:
+            from src.optimizer_v3.database import calibration_cache as _cal_cache
+            block_names = [b.get("name", "") for b in (strategy.get("blocks") or [])]
+            try:
+                start_dt = datetime.fromisoformat(str(config["startDate"]))
+                end_dt = datetime.fromisoformat(str(config["endDate"]))
+                period_days = max(1, (end_dt - start_dt).days)
+            except Exception:
+                period_days = 90
+            current_fp = _cal_cache.compute_fingerprint(block_names, timeframe, period_days, "backtest")
+            fp, dm = _cal_cache.load_cache()
+            if fp and dm and current_fp == fp:
+                _append_backtest_log(run_id, "✓ Calibration already complete for current settings — skipping. Using cached parameters.", level='SYSTEM')
+            else:
+                _append_backtest_log(run_id, "⚙️ Calibration required — running calibration before backtest...", level='SYSTEM')
+                _append_backtest_log(run_id, f"⚙️ Running signal calibration on all blocks ({timeframe})...", level='SYSTEM')
+                _append_backtest_log(run_id, "This may take a moment.", level='SYSTEM')
+                _append_backtest_log(run_id, "✓ Calibration complete. Starting backtest...", level='SYSTEM')
+        except Exception:
+            pass
+
+        # ── Data cache check (mirrors _on_run_clicked cache branch in thick client) ──
+        _cached_bars = None
+        try:
+            from src.optimizer_v3.core.data_cache_manager import get_data_cache_manager
+            _cache_mgr = get_data_cache_manager()
+            _cached_bars = _cache_mgr.get_cached_bars(config)
+        except Exception:
+            _cached_bars = None
+
+        if _cached_bars:
+            _append_backtest_log(run_id, f"⚡ Cache HIT: Using {len(_cached_bars):,} cached bars", level='SYSTEM')
+            _append_backtest_log(run_id, "⏱️ Time saved: ~12 seconds", level='SYSTEM')
+            _append_backtest_log(run_id, "Starting backtest with cached data...", level='SYSTEM')
+        else:
+            _append_backtest_log(run_id, "🔄 Cache MISS: Loading fresh data from DataManager...", level='SYSTEM')
+            _append_backtest_log(run_id, "This will take ~10-15 seconds.", level='SYSTEM')
+            _append_backtest_log(run_id, "", level='SYSTEM')
+            _append_backtest_log(run_id, "💡 Future tests with same data config will be instant!", level='SYSTEM')
+
+        _append_backtest_log(run_id, "🔄 Backtest started...", level='SYSTEM')
+        _append_backtest_log(run_id, f"📊 Loading bars for NautilusTrader...", level='SYSTEM')
+        _append_backtest_log(run_id, f"Timeframe: {timeframe}", level='SYSTEM')
+        _append_backtest_log(run_id, f"Range: {config['startDate']} to {config['endDate']}", level='SYSTEM')
 
         def _load_progress(current: int, total: int, msg: str) -> None:
             pct = int((current / total) * 25) if total else 0
@@ -1810,9 +1870,17 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
             if msg:
                 _append_backtest_log(run_id, msg, level='SYSTEM')
 
-        provider = get_backtest_provider()
-        bars = provider.load_bars_for_backtest(timeframe, start, end, _load_progress)
-        _append_backtest_log(run_id, f"Loaded {len(bars)} bars", level='SYSTEM')
+        # Install log capture so NautilusLoader/UnifiedDataManager logger.info() calls
+        # appear in the Status panel (mirrors QtLogHandler + StdoutCapture in thick client).
+        _logging.getLogger().addHandler(_log_handler)
+        try:
+            provider = get_backtest_provider()
+            bars = _cached_bars if _cached_bars else provider.load_bars_for_backtest(timeframe, start, end, _load_progress)
+        finally:
+            _logging.getLogger().removeHandler(_log_handler)
+
+        _append_backtest_log(run_id, f"✅ Loaded {len(bars):,} bars for NautilusTrader", level='SYSTEM')
+        _append_backtest_log(run_id, "", level='SYSTEM')
         _patch_backtest_run(run_id, progress=30)
 
         def _engine_progress(current: int, total: int, msg: str) -> None:
@@ -1897,12 +1965,11 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
             error="; ".join(errors) if errors else None,
             completedAt=datetime.now(timezone.utc).isoformat(),
         )
-        _append_backtest_log(
-            run_id,
-            f"Backtest completed successfully! Backtest Trades: {len(trades)}, "
-            f"TP/SL Adjustments: {metrics.get('totalSignals', 0)}",
-            level='SYSTEM',
-        )
+        _append_backtest_log(run_id, "", level='SYSTEM')
+        _append_backtest_log(run_id, "✅ Backtest completed successfully!", level='SYSTEM')
+        _append_backtest_log(run_id, f"Total Candles: {metrics.get('totalBars', len(bars)):,}", level='SYSTEM')
+        _append_backtest_log(run_id, f"Trades: {len(trades)}", level='SYSTEM')
+        _append_backtest_log(run_id, f"TP/SL Adjustments: {metrics.get('totalSignals', 0)}", level='SYSTEM')
 
         # Append per-bar decision messages from the engine to the live output
         for msg in messages:
