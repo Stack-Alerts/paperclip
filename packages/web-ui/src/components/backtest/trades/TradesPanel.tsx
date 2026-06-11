@@ -261,7 +261,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
 
   if (trades.length === 0) {
     return (
-      <div className="flex flex-col min-w-0 overflow-hidden">
+      <div className="flex flex-col min-w-0">
         <PerformanceSummary summary={summary} hasTrades={false} />
         <SectionShell title="Trade History">
           <div
@@ -279,7 +279,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
   const totalWidth = COLUMNS.reduce((s, c) => s + c.width, 0);
 
   return (
-    <div className="flex flex-col min-w-0 overflow-hidden">
+    <div className="flex flex-col min-w-0">
       <PerformanceSummary summary={summary} hasTrades />
 
       <SectionShell title="Trade History">
