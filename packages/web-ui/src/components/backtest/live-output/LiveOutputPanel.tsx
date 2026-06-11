@@ -418,7 +418,7 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
                   <span style={{ color: cColor, whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 600, minWidth: '11ch', display: 'inline-block' }}>
                     [{cDef?.label ?? row.cat}]
                   </span>
-                  <span style={{ color: 'var(--text-secondary)', wordBreak: 'break-word' }}>
+                  <span style={{ color: '#9AA0A6', wordBreak: 'break-word' }}>
                     {row.text}
                   </span>
                 </div>
