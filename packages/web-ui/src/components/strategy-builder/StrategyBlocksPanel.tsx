@@ -455,6 +455,8 @@ function BlockCard({
   onHighlightInLibrary,
   blockExits, signalExits, onEditExit, onRemoveExit, onDuplicateExit,
 }: BlockCardProps) {
+  const [collapsed, setCollapsed] = useState(false);
+
   const blockName = (block.data.name as string | undefined) || BLOCK_TYPE_LABELS[block.type] || block.type;
   const logic = (block.data.logic as string | undefined) ?? 'AND';
   const signals = (block.data.signals as BlockSignal[] | undefined) ?? [];
@@ -478,8 +480,12 @@ function BlockCard({
   return (
     <div className="rounded border border-[var(--border)] mb-3" style={{ background: cardBg, borderLeft: `4px solid ${leftBorderColor}` }}>
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--border)]">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="flex-shrink-0">
+      <div
+        className="flex items-center gap-2 px-3 py-2.5 cursor-pointer select-none"
+        style={{ borderBottom: collapsed ? 'none' : '1px solid var(--border)' }}
+        onClick={() => setCollapsed(v => !v)}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="flex-shrink-0" onClick={e => e.stopPropagation()}>
           <rect x="1" y="9" width="4" height="6" rx="0.5" style={{ fill: 'var(--accent-blue)' }}/>
           <rect x="6" y="5" width="4" height="10" rx="0.5" style={{ fill: 'var(--accent-green)' }}/>
           <rect x="11" y="7" width="4" height="8" rx="0.5" style={{ fill: 'var(--accent-blue)', opacity: 0.55 }}/>
@@ -488,12 +494,17 @@ function BlockCard({
           <span
             className="flex-1 text-sm font-semibold truncate hover:text-sky-300 transition-colors"
             style={{ color: 'var(--text-dim)', cursor: definitionId ? 'pointer' : 'default' }}
-            onClick={() => { if (definitionId) onHighlightInLibrary(definitionId); }}
+            onClick={e => { e.stopPropagation(); if (definitionId) onHighlightInLibrary(definitionId); }}
           >
             {blockName}
           </span>
         </RichTooltip>
-        <span className="text-xs px-2 py-0.5 rounded font-mono flex-shrink-0" style={badgeStyle}>{badgeLabel}</span>
+        <span className="text-xs px-2 py-0.5 rounded font-mono flex-shrink-0" style={badgeStyle} onClick={e => e.stopPropagation()}>{badgeLabel}</span>
+        {collapsed && (
+          <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }} onClick={e => e.stopPropagation()}>
+            {signals.length} signal{signals.length !== 1 ? 's' : ''}
+          </span>
+        )}
         <div className="flex items-center gap-0.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
           <RichTooltip content={TT_MOVE_UP}>
             <button onClick={() => onMoveUp(index)} disabled={mainIndex === 0}
@@ -505,141 +516,153 @@ function BlockCard({
               className="p-1 rounded hover:text-[var(--text-secondary)] hover:bg-[var(--bg-card)] disabled:opacity-25 disabled:cursor-not-allowed text-xs transition-colors"
               style={{ color: 'var(--text-secondary)' }}>▼</button>
           </RichTooltip>
+          <button
+            onClick={e => { e.stopPropagation(); setCollapsed(v => !v); }}
+            title={collapsed ? 'Expand block' : 'Collapse block'}
+            className="p-1 rounded hover:bg-[var(--bg-card)] text-xs transition-colors"
+            style={{ color: 'var(--text-secondary)', lineHeight: 1, marginLeft: 2 }}
+          >
+            {collapsed ? '▶' : '▼'}
+          </button>
         </div>
       </div>
 
-      {/* Action row: # + Config (block #2+ only) + Remove */}
-      <div className="flex items-center gap-2 px-3 pt-2 pb-1">
-        <span className="text-sm font-bold" style={{ color: 'var(--accent-blue-mid)' }}>#{mainIndex + 1}</span>
-        <div className="flex-1" />
-        <div className="flex items-center gap-1.5">
-          {mainIndex > 0 && (
-            <RichTooltip content={TT_TIMING_CONFIG}>
-              <button
-                onClick={() => onConfig(index)}
-                className="hover:opacity-80 transition-opacity"
-                style={{ ...BTN, background: 'var(--accent-blue-mid)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-blue-dark)', gap: 5 }}
-              ><GearIcon size={11} /> Config</button>
-            </RichTooltip>
-          )}
-          <RichTooltip content={TT_REMOVE_BLOCK}>
-            <button
-              onClick={() => onRemove(index)}
-              className="hover:opacity-80 transition-opacity"
-              style={{ ...BTN, background: 'rgba(153,27,27,0.7)', color: 'var(--text-secondary)', border: '1px solid var(--accent-red)', gap: 5 }}
-            ><XIcon size={9} /> Remove</button>
-          </RichTooltip>
-        </div>
-      </div>
-
-      <div className="px-3 pb-2 text-xs" style={{ color: 'var(--text-secondary)' }}>Signals: {signals.length}</div>
-
-      {signals.length > 0 && (
-        <div className="mx-3 mb-2 rounded border border-[var(--border)]" style={{ background: 'var(--bg-deep)' }}>
-          <div className="px-3 py-2.5 space-y-2">
-            <div className="text-xs font-semibold mb-1" style={{ color: 'var(--text-dim)' }}>Signals:</div>
-            {signals.map((sig, si) => {
-              const sigLogic = (sig.logic as string | undefined) ?? logic;
-              const hasRecheck = sig.recheckEnabled || sig.recheck_config?.enabled;
-              const hasTiming = !!sig.timing_constraint;
-              const logicColor = sigLogic === 'OR' ? 'var(--accent-blue-bright)' : 'var(--accent-green-bright)';
-              const sigExits = signalExits.get(sig.name) ?? [];
-
-              return (
-                <div key={si} className="space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <span className="flex-1 min-w-0">
-                      <span
-                        className="hover:text-sky-300 transition-colors"
-                        style={{ color: 'var(--text-secondary)', cursor: definitionId ? 'pointer' : 'default' }}
-                        onClick={() => { if (definitionId) onHighlightInLibrary(definitionId); }}
-                      >
-                        {si + 1}. {formatSignalName(sig.name)}
-                      </span>
-                      <span className="font-mono font-semibold ml-1.5" style={{ color: logicColor }}>[{sigLogic}]</span>
-                      {hasTiming && (
-                        <span className="ml-2" style={{ color: 'var(--accent-orange)' }}>
-                          ⏱ Within {sig.timing_constraint?.max_candles} candles
-                          {sig.timing_constraint?.reference_signal ? ` of ${sig.timing_constraint.reference_signal}` : ''}
-                        </span>
-                      )}
-                    </span>
-                    <div style={BTN_GROUP}>
-                      {si > 0 && (
-                        <RichTooltip content={TT_TIMING_CONFIG}>
-                          <div className="relative" style={{ display: 'inline-flex' }}>
-                            <button
-                              onClick={() => onConfigSignalTiming(index, si)}
-                              className="hover:opacity-80"
-                              style={GEAR_STYLE}>
-                              <GearIcon />
-                            </button>
-                            {hasTiming && (
-                              <span className="absolute -top-px -right-px w-1.5 h-1.5 rounded-full" style={{ background: 'var(--accent-orange)', border: '1px solid var(--bg-deep)' }} />
-                            )}
-                          </div>
-                        </RichTooltip>
-                      )}
-                      <RichTooltip content={TT_RECHECK_CONFIG}>
-                        <div className="relative" style={{ display: 'inline-flex' }}>
-                          <button
-                            onClick={() => onConfigRecheck(index, si)}
-                            className="hover:opacity-80"
-                            style={GEAR_STYLE}>
-                            <GearIcon />
-                          </button>
-                          {hasRecheck && (
-                            <span className="absolute -top-px -right-px w-1.5 h-1.5 rounded-full" style={{ background: 'var(--accent-green)', border: '1px solid var(--bg-deep)' }} />
-                          )}
-                        </div>
-                      </RichTooltip>
-                      <RichTooltip content={TT_DUPLICATE_SIGNAL}>
-                        <button onClick={() => onDuplicateSignal(index, si)} className="hover:opacity-80"
-                          style={DUP_STYLE}><DupIcon /></button>
-                      </RichTooltip>
-                      <RichTooltip content={TT_REMOVE_SIGNAL}>
-                        <button onClick={() => onRemoveSignal(index, si)} className="hover:opacity-80"
-                          style={REM_STYLE}><XIcon /></button>
-                      </RichTooltip>
-                    </div>
-                  </div>
-
-                  {sigExits.map(({ block: eb, globalIndex: gi }) => (
-                    <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} onDuplicate={onDuplicateExit} onHighlightInLibrary={onHighlightInLibrary} />
-                  ))}
-
-                  {hasRecheck && (
-                    <div className="flex items-center gap-1.5 ml-3 text-xs">
-                      <span style={{ color: 'var(--accent-teal)' }}>↳</span>
-                      <span className="flex-1 font-semibold" style={{ color: 'var(--accent-teal)' }}>
-                        RECHECK ({sig.recheck_config?.mode ?? 'WITHIN'} {sig.recheck_config?.bar_delay ?? 3} bars)
-                      </span>
-                      <RichTooltip content={TT_REMOVE_RECHECK}>
-                        <button onClick={() => onRemoveRecheck(index, si)} className="hover:opacity-80"
-                          style={REM_STYLE}><XIcon /></button>
-                      </RichTooltip>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+      {!collapsed && (
+        <>
+          {/* Action row: # + Config (block #2+ only) + Remove */}
+          <div className="flex items-center gap-2 px-3 pt-2 pb-1">
+            <span className="text-sm font-bold" style={{ color: 'var(--accent-blue-mid)' }}>#{mainIndex + 1}</span>
+            <div className="flex-1" />
+            <div className="flex items-center gap-1.5">
+              {mainIndex > 0 && (
+                <RichTooltip content={TT_TIMING_CONFIG}>
+                  <button
+                    onClick={() => onConfig(index)}
+                    className="hover:opacity-80 transition-opacity"
+                    style={{ ...BTN, background: 'var(--accent-blue-mid)', color: 'var(--btn-primary-text)', border: '1px solid var(--accent-blue-dark)', gap: 5 }}
+                  ><GearIcon size={11} /> Config</button>
+                </RichTooltip>
+              )}
+              <RichTooltip content={TT_REMOVE_BLOCK}>
+                <button
+                  onClick={() => onRemove(index)}
+                  className="hover:opacity-80 transition-opacity"
+                  style={{ ...BTN, background: 'rgba(153,27,27,0.7)', color: 'var(--text-secondary)', border: '1px solid var(--accent-red)', gap: 5 }}
+                ><XIcon size={9} /> Remove</button>
+              </RichTooltip>
+            </div>
           </div>
-        </div>
-      )}
 
-      {signals.length === 0 && (
-        <div className="px-3 pb-2">
-          <span className="text-xs italic" style={{ color: 'var(--text-muted)' }}>No signals — configure this block</span>
-        </div>
-      )}
+          <div className="px-3 pb-2 text-xs" style={{ color: 'var(--text-secondary)' }}>Signals: {signals.length}</div>
 
-      {blockExits.length > 0 && (
-        <div className="mx-3 mb-3 rounded border border-[var(--border)] px-3 py-2 space-y-1" style={{ background: 'var(--bg-deep)' }}>
-          <div className="text-xs font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>Block Exit Conditions:</div>
-          {blockExits.map(({ block: eb, globalIndex: gi }) => (
-            <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} onDuplicate={onDuplicateExit} onHighlightInLibrary={onHighlightInLibrary} />
-          ))}
-        </div>
+          {signals.length > 0 && (
+            <div className="mx-3 mb-2 rounded border border-[var(--border)]" style={{ background: 'var(--bg-deep)' }}>
+              <div className="px-3 py-2.5 space-y-2">
+                <div className="text-xs font-semibold mb-1" style={{ color: 'var(--text-dim)' }}>Signals:</div>
+                {signals.map((sig, si) => {
+                  const sigLogic = (sig.logic as string | undefined) ?? logic;
+                  const hasRecheck = sig.recheckEnabled || sig.recheck_config?.enabled;
+                  const hasTiming = !!sig.timing_constraint;
+                  const logicColor = sigLogic === 'OR' ? 'var(--accent-blue-bright)' : 'var(--accent-green-bright)';
+                  const sigExits = signalExits.get(sig.name) ?? [];
+
+                  return (
+                    <div key={si} className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="flex-1 min-w-0">
+                          <span
+                            className="hover:text-sky-300 transition-colors"
+                            style={{ color: 'var(--text-secondary)', cursor: definitionId ? 'pointer' : 'default' }}
+                            onClick={() => { if (definitionId) onHighlightInLibrary(definitionId); }}
+                          >
+                            {si + 1}. {formatSignalName(sig.name)}
+                          </span>
+                          <span className="font-mono font-semibold ml-1.5" style={{ color: logicColor }}>[{sigLogic}]</span>
+                          {hasTiming && (
+                            <span className="ml-2" style={{ color: 'var(--accent-orange)' }}>
+                              ⏱ Within {sig.timing_constraint?.max_candles} candles
+                              {sig.timing_constraint?.reference_signal ? ` of ${sig.timing_constraint.reference_signal}` : ''}
+                            </span>
+                          )}
+                        </span>
+                        <div style={BTN_GROUP}>
+                          {si > 0 && (
+                            <RichTooltip content={TT_TIMING_CONFIG}>
+                              <div className="relative" style={{ display: 'inline-flex' }}>
+                                <button
+                                  onClick={() => onConfigSignalTiming(index, si)}
+                                  className="hover:opacity-80"
+                                  style={GEAR_STYLE}>
+                                  <GearIcon />
+                                </button>
+                                {hasTiming && (
+                                  <span className="absolute -top-px -right-px w-1.5 h-1.5 rounded-full" style={{ background: 'var(--accent-orange)', border: '1px solid var(--bg-deep)' }} />
+                                )}
+                              </div>
+                            </RichTooltip>
+                          )}
+                          <RichTooltip content={TT_RECHECK_CONFIG}>
+                            <div className="relative" style={{ display: 'inline-flex' }}>
+                              <button
+                                onClick={() => onConfigRecheck(index, si)}
+                                className="hover:opacity-80"
+                                style={GEAR_STYLE}>
+                                <GearIcon />
+                              </button>
+                              {hasRecheck && (
+                                <span className="absolute -top-px -right-px w-1.5 h-1.5 rounded-full" style={{ background: 'var(--accent-green)', border: '1px solid var(--bg-deep)' }} />
+                              )}
+                            </div>
+                          </RichTooltip>
+                          <RichTooltip content={TT_DUPLICATE_SIGNAL}>
+                            <button onClick={() => onDuplicateSignal(index, si)} className="hover:opacity-80"
+                              style={DUP_STYLE}><DupIcon /></button>
+                          </RichTooltip>
+                          <RichTooltip content={TT_REMOVE_SIGNAL}>
+                            <button onClick={() => onRemoveSignal(index, si)} className="hover:opacity-80"
+                              style={REM_STYLE}><XIcon /></button>
+                          </RichTooltip>
+                        </div>
+                      </div>
+
+                      {sigExits.map(({ block: eb, globalIndex: gi }) => (
+                        <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} onDuplicate={onDuplicateExit} onHighlightInLibrary={onHighlightInLibrary} />
+                      ))}
+
+                      {hasRecheck && (
+                        <div className="flex items-center gap-1.5 ml-3 text-xs">
+                          <span style={{ color: 'var(--accent-teal)' }}>↳</span>
+                          <span className="flex-1 font-semibold" style={{ color: 'var(--accent-teal)' }}>
+                            RECHECK ({sig.recheck_config?.mode ?? 'WITHIN'} {sig.recheck_config?.bar_delay ?? 3} bars)
+                          </span>
+                          <RichTooltip content={TT_REMOVE_RECHECK}>
+                            <button onClick={() => onRemoveRecheck(index, si)} className="hover:opacity-80"
+                              style={REM_STYLE}><XIcon /></button>
+                          </RichTooltip>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {signals.length === 0 && (
+            <div className="px-3 pb-2">
+              <span className="text-xs italic" style={{ color: 'var(--text-muted)' }}>No signals — configure this block</span>
+            </div>
+          )}
+
+          {blockExits.length > 0 && (
+            <div className="mx-3 mb-3 rounded border border-[var(--border)] px-3 py-2 space-y-1" style={{ background: 'var(--bg-deep)' }}>
+              <div className="text-xs font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>Block Exit Conditions:</div>
+              {blockExits.map(({ block: eb, globalIndex: gi }) => (
+                <ExitPill key={gi} block={eb} globalIndex={gi} onEdit={onEditExit} onRemove={onRemoveExit} onDuplicate={onDuplicateExit} onHighlightInLibrary={onHighlightInLibrary} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -657,15 +680,23 @@ interface ExitConditionsSectionProps {
 }
 
 function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate, onHighlightInLibrary }: ExitConditionsSectionProps) {
+  const [collapsed, setCollapsed] = useState(false);
   return (
     <div className="border-t flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
-      <div className="px-4 py-2 flex items-center justify-between" style={{ background: 'color-mix(in srgb, var(--bg-panel) 60%, transparent)' }}>
+      <div
+        className="px-4 py-2 flex items-center justify-between cursor-pointer select-none"
+        style={{ background: 'color-mix(in srgb, var(--bg-panel) 60%, transparent)' }}
+        onClick={() => setCollapsed(v => !v)}
+      >
         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><ExitDot size={6} /> Strategy Exit Conditions</span>
         </span>
-        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{strategyExits.length} exit block{strategyExits.length !== 1 ? 's' : ''}</span>
+        <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+          {strategyExits.length} exit block{strategyExits.length !== 1 ? 's' : ''}
+          <span style={{ fontSize: 9 }}>{collapsed ? '▶' : '▼'}</span>
+        </span>
       </div>
-      <div className="px-4 pb-3">
+      {!collapsed && <div className="px-4 pb-3">
         {strategyExits.length === 0 ? (
           <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>
             No strategy-wide exit conditions. Add exit blocks with STRATEGY binding from the library.
@@ -726,7 +757,7 @@ function ExitConditionsSection({ strategyExits, onRemove, onEdit, onDuplicate, o
             })}
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
