@@ -96,14 +96,24 @@ function partialDisplay(t: Trade): string {
   return t.exitType;
 }
 
+// Short exit-type codes the backend sends via exit_condition_name — these need
+// expansion into human-readable notes rather than being returned verbatim.
+const EXIT_TYPE_CODES = new Set(['TP1','TP2','TP3','TP4','TP5','SL','STOP_LOSS','MAX_BARS','TIME_LIMIT']);
+
 function notesDisplay(t: Trade): string {
-  if (t.notes) return t.notes;
-  if (!t.exitType) return '—';
-  const u = t.exitType.toUpperCase();
-  if (u === 'TP1' || u === 'TP2' || u === 'TP3') return `${u} Hit`;
-  if (u === 'SL') return 'Stop Loss Hit';
-  if (u === 'MAX_BARS' || u === 'TIME_LIMIT') return `Max Hold Time (${t.bars} bars)`;
-  return t.exitType;
+  // Use raw notes only when they are a real descriptive string, not just a
+  // bare exit-type abbreviation that the backend copies from exit_condition_name.
+  const rawNotes = (t.notes ?? '').trim();
+  const isAbbrev = rawNotes === '' || EXIT_TYPE_CODES.has(rawNotes.toUpperCase());
+
+  if (!isAbbrev) return rawNotes;
+
+  const u = ((t.exitType ?? rawNotes) as string).toUpperCase().trim();
+  if (/^TP[0-9]+$/.test(u)) return `${u} Hit`;
+  if (u === 'SL' || u === 'STOP_LOSS') return 'Stop Loss Hit (1 exits)';
+  if (u === 'MAX_BARS' || u === 'TIME_LIMIT') return `Max Hold Time (${t.bars ?? 0} bars)`;
+  if (u) return u;
+  return '—';
 }
 
 function sortValue(t: Trade, key: ColumnKey): number | string {
