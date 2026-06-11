@@ -1947,7 +1947,6 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
         wins = [t for t in trades if (t.get("pnl") or 0) > 0]
         losses = [t for t in trades if (t.get("pnl") or 0) <= 0]
         win_rate = (len(wins) / len(trades)) if trades else 0.0
-        total_return = sum(float(t.get("pnl_pct") or t.get("pnl_percent") or 0.0) for t in trades)
 
         # Risk metric calculations from raw trades
         import math as _math
@@ -1974,8 +1973,18 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
                     _max_dd_pct = _dd
         _final_capital = _equity
 
-        # Sharpe & Sortino from per-trade return percentages
-        _trade_rets = [float(t.get("pnl_pct") or t.get("pnl_percent") or 0.0) for t in trades]
+        # True portfolio return % based on dollar P&L — avoids summing per-trade %s
+        # which diverges from actual equity growth whenever position sizes vary.
+        _actual_return_pct = (_final_capital - _initial_capital) / _initial_capital * 100.0 \
+            if _initial_capital > 0 else 0.0
+
+        # Sharpe & Sortino: derive per-trade return as % of initial capital when
+        # the engine does not supply pnl_pct/pnl_percent (common in raw trade dicts).
+        _trade_rets = [
+            float(t.get("pnl_pct") or t.get("pnl_percent") or
+                  (float(t.get("pnl", 0)) / _initial_capital * 100.0 if _initial_capital > 0 else 0.0))
+            for t in trades
+        ]
         _n = len(_trade_rets)
         if _n > 1:
             _mean_ret = sum(_trade_rets) / _n
@@ -1988,14 +1997,14 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
         else:
             _sharpe = _sortino = 0.0
 
-        _calmar = (total_return / _max_dd_pct) if _max_dd_pct > 0 else 0.0
+        _calmar = (_actual_return_pct / _max_dd_pct) if _max_dd_pct > 0 else 0.0
 
         metrics = {
             "totalTrades": len(trades),
             "winningTrades": len(wins),
             "losingTrades": len(trades) - len(wins),
             "winRate": win_rate,
-            "returnPercentage": total_return,
+            "returnPercentage": round(_actual_return_pct, 4),
             "totalBars": int(result.get("total_bars", len(bars))),
             "totalSignals": int(result.get("total_signals", 0)),
             "profitFactor": round(_profit_factor, 4),
