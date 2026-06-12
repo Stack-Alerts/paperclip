@@ -79,8 +79,15 @@ function computeTradeStats(trades: Trade[]) {
   const source = closed.length > 0 ? closed : trades;
 
   const pnls = source.map(t => t.pnl);
-  const bestTrade = Math.max(...pnls);
-  const worstTrade = Math.min(...pnls);
+  // "Best trade" must be the largest *winning* P&L and "Worst trade" the
+  // smallest *losing* P&L. Using all-PnL min/max made a single winning trade
+  // show +$X as Best and -$X as Worst (the display layer hardcodes a leading
+  // minus for Worst Trade), producing the impossible +203/-203 pair seen in
+  // BTCAAAAA-35996. With no winners or no losers the corresponding value is 0.
+  const winPnls = pnls.filter(p => p > 0);
+  const lossPnls = pnls.filter(p => p < 0);
+  const bestTrade = winPnls.length ? Math.max(...winPnls) : 0;
+  const worstTrade = lossPnls.length ? Math.min(...lossPnls) : 0;
   const avgBars = source.reduce((s, t) => s + (t.bars ?? 0), 0) / source.length;
 
   const longs = source.filter(t => (t.side ?? '').toUpperCase() === 'LONG').length;
@@ -147,6 +154,18 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
   const recoveryFactor = (result.maxDrawdown * result.initialCapital) !== 0
     ? (netProfit / Math.abs(result.maxDrawdown * result.initialCapital)).toFixed(2)
     : '—';
+  // Sample std dev requires N>=2; downside deviation requires >=1 losing trade;
+  // Calmar's denominator is max drawdown. With degenerate inputs the backend
+  // returns 0.0 for these (app.py:1989-2000) — the math is actually undefined,
+  // not zero. Match the recoveryFactor / rrRatio "—" pattern so users see the
+  // same "undefined" sentinel for every undefined denominator (BTCAAAAA-35996).
+  const sharpeStr = allTrades.length >= 2 ? result.sharpeRatio.toFixed(2) : '—';
+  const sortinoStr = allTrades.length >= 2 && result.losingTrades > 0
+    ? result.sortino_ratio.toFixed(2)
+    : '—';
+  const calmarStr = result.maxDrawdown > 0 && result.calmar_ratio != null
+    ? result.calmar_ratio.toFixed(2)
+    : '—';
   const avgHoldingBars = tradeStats && tradeStats.avgBars > 0 ? tradeStats.avgBars.toFixed(1) : '—';
   const returnVolatility = allTrades.length >= 2
     ? (() => {
@@ -167,11 +186,11 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
   const riskRows: MetricRow[] = [
     { label: 'Max Drawdown', value: `${(result.maxDrawdown * 100).toFixed(2)}%`, color: 'var(--accent-orange)', tooltip: TT_MAX_DRAWDOWN },
     { label: 'Recovery Factor', value: recoveryFactor, color: Number(recoveryFactor) >= 1 ? 'var(--accent-green)' : 'var(--accent-red)', tooltip: TT_MAX_DRAWDOWN },
-    { label: 'Sharpe Ratio', value: result.sharpeRatio.toFixed(2), tooltip: TT_SHARPE },
-    { label: 'Sortino Ratio', value: result.sortino_ratio.toFixed(2), tooltip: TT_SORTINO },
+    { label: 'Sharpe Ratio', value: sharpeStr, tooltip: TT_SHARPE },
+    { label: 'Sortino Ratio', value: sortinoStr, tooltip: TT_SORTINO },
   ];
   if (result.calmar_ratio != null) {
-    riskRows.push({ label: 'Calmar Ratio', value: result.calmar_ratio.toFixed(2), tooltip: TT_CALMAR });
+    riskRows.push({ label: 'Calmar Ratio', value: calmarStr, tooltip: TT_CALMAR });
   }
 
   const tradeRows: MetricRow[] = [
