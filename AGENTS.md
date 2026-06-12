@@ -161,9 +161,18 @@ Agent contract when `enforce` is on:
 - Include a `Fix-SHA: <40-hex-sha>` line in your closure comment body.
 - Optionally include `Fix-Target: <branch>` on the next line; defaults
   to `main` if omitted.
+- Optionally include `Fix-Repo: <url>` on its own line to override the
+  `git ls-remote` target URL for this closure. Use this when the issue
+  inherits an `executionWorkspaces.repoUrl` that is *not* the repo where
+  the fix actually landed (e.g. Paperclip-side rollout decisions on a
+  different fork). Absent the line, the gate uses the workspace's
+  configured `repoUrl`. A malformed or unreachable `Fix-Repo:` URL
+  produces the same `422` (`details.reason = "git_error"`) the gate
+  would emit for an unreachable SHA on the default repo.
 - The SHA must be reachable on `<repo-url>@<target>` of the issue's
-  configured execution workspace (`git ls-remote --quiet` is used under
-  the hood, results are cached for 60s).
+  configured execution workspace — or on the `Fix-Repo:` override if
+  one is present (`git ls-remote --quiet` is used under the hood,
+  results are cached for 60s).
 - If you have no comment body, the gate falls back to the most recent
   persisted comment on the issue (desc, limit 1).
 

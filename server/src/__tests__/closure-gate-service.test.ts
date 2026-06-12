@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   CLOSURE_GATE_FIX_SHA_LINE_REGEX,
+  CLOSURE_GATE_FIX_REPO_LINE_REGEX,
   CLOSURE_GATE_VERIFY_CACHE_TTL_MS,
 } from "@paperclipai/shared";
 import {
   createClosureGate,
   createClosureGateCache,
+  extractFixRepo,
   extractFixSha,
   parseLsRemoteOutput,
   verifyFixShaOnRemote,
@@ -45,6 +47,35 @@ describe("extractFixSha", () => {
 
   it("returns null when the SHA is the wrong length", () => {
     expect(extractFixSha(`Fix-SHA: ${REAL_SHA.slice(0, 39)}\n`)).toBeNull();
+  });
+});
+
+describe("extractFixRepo", () => {
+  it("returns null for empty input", () => {
+    expect(extractFixRepo("")).toBeNull();
+    expect(extractFixRepo(null)).toBeNull();
+    expect(extractFixRepo(undefined)).toBeNull();
+  });
+
+  it("returns null when no Fix-Repo line is present", () => {
+    expect(extractFixRepo(`All done.\n\nFix-SHA: ${REAL_SHA}\n`)).toBeNull();
+  });
+
+  it("extracts a Fix-Repo URL on its own line", () => {
+    const url = "https://github.com/Stack-Alerts/paperclip.git";
+    expect(extractFixRepo(`Done.\nFix-SHA: ${REAL_SHA}\nFix-Target: master\nFix-Repo: ${url}\n`)).toBe(
+      url,
+    );
+  });
+
+  it("tolerates leading whitespace before Fix-Repo:", () => {
+    expect(extractFixRepo(`Fix-SHA: ${REAL_SHA}\n   Fix-Repo: https://example.com/repo.git\n`)).toBe(
+      "https://example.com/repo.git",
+    );
+  });
+
+  it("returns null for a Fix-Repo line that has no URL after the colon", () => {
+    expect(extractFixRepo(`Fix-SHA: ${REAL_SHA}\nFix-Repo:    \n`)).toBeNull();
   });
 });
 
@@ -244,6 +275,61 @@ describe("createClosureGate.assertAllowed — mode: enforce", () => {
     });
     expect(out.allowed).toBe(true);
   });
+
+  it("uses the Fix-Repo override for git ls-remote instead of the workspace repoUrl", async () => {
+    const overrideUrl = "https://github.com/Stack-Alerts/paperclip.git";
+    const calls: Array<{ repoUrl: string; target: string }> = [];
+    const fetchImpl = async (repoUrl: string, target: string) => {
+      calls.push({ repoUrl, target });
+      return new Set([REAL_SHA]);
+    };
+    const gate = createClosureGate({ fetchImpl });
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      commentBody: `Done.\nFix-SHA: ${REAL_SHA}\nFix-Target: master\nFix-Repo: ${overrideUrl}\n`,
+      resolveRepoUrl: async () => "https://github.com/CarSpotting/website.git",
+    });
+    expect(out.allowed).toBe(true);
+    if (!out.allowed) return;
+    expect(out.verified).toBe("fresh");
+    expect(calls).toEqual([{ repoUrl: overrideUrl, target: "master" }]);
+  });
+
+  it("falls back to the workspace repoUrl when no Fix-Repo override is present", async () => {
+    const workspaceUrl = "https://github.com/CarSpotting/website.git";
+    const calls: Array<{ repoUrl: string; target: string }> = [];
+    const fetchImpl = async (repoUrl: string, target: string) => {
+      calls.push({ repoUrl, target });
+      return new Set([REAL_SHA]);
+    };
+    const gate = createClosureGate({ fetchImpl });
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      commentBody: `Done.\nFix-SHA: ${REAL_SHA}\nFix-Target: main\n`,
+      resolveRepoUrl: async () => workspaceUrl,
+    });
+    expect(out.allowed).toBe(true);
+    expect(calls).toEqual([{ repoUrl: workspaceUrl, target: "main" }]);
+  });
+
+  it("rejects with git_error when the Fix-Repo override is unreachable", async () => {
+    const fetchImpl = async () => {
+      throw new Error("could not resolve host");
+    };
+    const gate = createClosureGate({ fetchImpl });
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      commentBody: `Done.\nFix-SHA: ${REAL_SHA}\nFix-Repo: https://nope.invalid/missing.git\n`,
+      resolveRepoUrl: async () => "https://github.com/CarSpotting/website.git",
+    });
+    expect(out.allowed).toBe(false);
+    if (out.allowed) return;
+    expect(out.reason).toBe("git_error");
+    expect(out.message).toContain("https://nope.invalid/missing.git");
+  });
 });
 
 describe("createClosureGate.assertAllowed — mode: advisory", () => {
@@ -331,5 +417,13 @@ describe("closure-gate constants integration", () => {
   it("uses the shared cache TTL constant", () => {
     expect(typeof CLOSURE_GATE_VERIFY_CACHE_TTL_MS).toBe("number");
     expect(CLOSURE_GATE_VERIFY_CACHE_TTL_MS).toBe(60_000);
+  });
+
+  it("uses the shared Fix-Repo regex from @paperclipai/shared", () => {
+    expect(CLOSURE_GATE_FIX_REPO_LINE_REGEX).toBeInstanceOf(RegExp);
+    const m = CLOSURE_GATE_FIX_REPO_LINE_REGEX.exec(
+      `Fix-SHA: ${REAL_SHA}\nFix-Repo: https://github.com/Stack-Alerts/paperclip.git\n`,
+    );
+    expect(m?.[1]).toBe("https://github.com/Stack-Alerts/paperclip.git");
   });
 });
