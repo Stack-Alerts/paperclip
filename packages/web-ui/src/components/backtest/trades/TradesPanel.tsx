@@ -33,9 +33,10 @@ interface Column { key: ColumnKey; label: string; width: number; sortable: boole
 
 // Matches PyQt5 column order/widths from trades_panel.py:230,252.
 // Widths trimmed (BTCAAAAA-35662) so total ~1185px fits 1280px+ screens.
+// "Date/Time" widened (BTCAAAAA-36001) to fit MM/DD HH:MM:SS + padding.
 const COLUMNS: Column[] = [
   { key: 'id',       label: 'ID',        width: 55,  sortable: true  },
-  { key: 'time',     label: 'Time',      width: 85,  sortable: true  },
+  { key: 'time',     label: 'Date/Time', width: 115, sortable: true  },
   { key: 'symbol',   label: 'Symbol',    width: 100, sortable: false },
   { key: 'side',     label: 'Side',      width: 65,  sortable: true  },
   { key: 'size',     label: 'Size',      width: 75,  sortable: true  },
@@ -72,7 +73,10 @@ function formatTime(iso: string): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleTimeString(undefined, { hour12: false });
+  // BTCAAAAA-36001: include the calendar date so users can see when the trade
+  // occurred, not just the time. Full ISO is exposed via the cell's title attr.
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 function normalizeStatus(raw?: string): 'OPEN' | 'PARTIAL' | 'CLOSED' {
@@ -471,7 +475,7 @@ function TradeRow({ trade, rowBg }: { trade: Trade; rowBg: string }) {
       style={{ background: bg }}
     >
       <td style={cellStyle}>{trade.id}</td>
-      <td style={cellStyle}>{formatTime(trade.entryTime)}</td>
+      <td style={cellStyle} title={trade.entryTime}>{formatTime(trade.entryTime)}</td>
       <td style={cellStyle}>{trade.symbol ?? 'BTC.P/USDT'}</td>
       <td style={{ ...cellStyle, color: sideColor, fontWeight: 600 }}>{side}</td>
       <td style={cellStyle}>{trade.quantity.toFixed(4)}</td>
