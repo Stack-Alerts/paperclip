@@ -49,7 +49,7 @@ import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -2119,7 +2119,7 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
 
         _append_backtest_log(
             run_id,
-            f"Backtest completed: {len(trades)} trades, win rate {win_rate:.1%}, total return {total_return:.2f}%",
+            f"Backtest completed: {len(trades)} trades, win rate {win_rate:.1%}, total return {_actual_return_pct:.2f}%",
             level="SYSTEM",
         )
     except Exception as exc:  # noqa: BLE001 — surface to webui caller
@@ -2233,6 +2233,360 @@ async def get_backtest_status(
 
 
 # ---------------------------------------------------------------------------
+# REST: Config Discovery (BTCAAAAA-36002)
+# ---------------------------------------------------------------------------
+#
+# Wraps the existing PyQt5 ``ConfigPermutationEngine`` for the web UI so the
+# "Config Discovery" button in BacktestConfigDialog can run a parameter sweep
+# over a strategy's backtest config and rank the results.
+#
+#   POST /strategies/{strategy_id}/config-discovery              -> {runId, status}
+#   GET  /strategies/{strategy_id}/config-discovery/{run_id}     -> live status + results
+#
+# Mirrors the backtest run / poll pattern. The permutation engine itself is
+# driven by a plain ``threading.Thread`` (the engine's QThread variant emits
+# Qt signals, which we cannot use from a thread spawned outside the Qt event
+# loop). The data classes, permutation generators, and metric aggregator are
+# re-imported from ``src.strategy_builder.ui.config_permutation_engine`` and
+# the underlying MulticoreBacktestEngine is invoked once per scenario with a
+# ``config_delta`` overlay — same call shape as the thick-client QThread.
+
+_config_discovery_runs: dict[str, dict[str, Any]] = {}
+_config_discovery_lock = threading.Lock()
+
+
+def _new_config_discovery_run(strategy_id: str, config: dict) -> str:
+    run_id = uuid.uuid4().hex
+    now = datetime.now(timezone.utc).isoformat()
+    with _config_discovery_lock:
+        _config_discovery_runs[run_id] = {
+            "runId": run_id,
+            "strategyId": strategy_id,
+            "status": "running",
+            "progress": 0,
+            "baseline": None,
+            "results": [],
+            "logs": [],
+            "error": None,
+            "config": config,
+            "startedAt": now,
+            "completedAt": None,
+        }
+    return run_id
+
+
+def _patch_config_discovery_run(run_id: str, **patch: Any) -> None:
+    with _config_discovery_lock:
+        run = _config_discovery_runs.get(run_id)
+        if run is not None:
+            run.update(patch)
+
+
+def _append_config_discovery_log(run_id: str, message: str, level: str = "INFO") -> None:
+    entry = {
+        "message": str(message),
+        "level": level,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    with _config_discovery_lock:
+        run = _config_discovery_runs.get(run_id)
+        if run is not None:
+            logs = run.setdefault("logs", [])
+            logs.append(entry)
+            if len(logs) > 500:
+                del logs[: len(logs) - 500]
+
+
+def _serialize_discovery_result(result: Any) -> dict:
+    """Convert a PyQt5 DiscoveryResult to a JSON-safe dict for the web UI."""
+    return {
+        "scenarioId": getattr(result, "scenario_id", ""),
+        "description": getattr(result, "description", ""),
+        "configDelta": dict(getattr(result, "config_delta", {}) or {}),
+        "paramLabels": [list(p) for p in (getattr(result, "param_labels", []) or [])],
+        "totalPnl": float(getattr(result, "total_pnl", 0.0)),
+        "winRate": float(getattr(result, "win_rate", 0.0)),
+        "tradeCount": int(getattr(result, "trade_count", 0)),
+        "avgPnlPerTrade": float(getattr(result, "avg_pnl_per_trade", 0.0)),
+        "sharpeRatio": float(getattr(result, "sharpe_ratio", 0.0)),
+        "exitTp1": int(getattr(result, "exit_tp1", 0)),
+        "exitTp2": int(getattr(result, "exit_tp2", 0)),
+        "exitTp3": int(getattr(result, "exit_tp3", 0)),
+        "exitSl": int(getattr(result, "exit_sl", 0)),
+        "exitTime": int(getattr(result, "exit_time", 0)),
+        "avgBarsHeld": float(getattr(result, "avg_bars_held", 0.0)),
+        "maxDrawdown": float(getattr(result, "max_drawdown", 0.0)),
+        "error": getattr(result, "error", None),
+    }
+
+
+def _run_config_discovery_in_thread(
+    run_id: str, strategy: dict, config: dict
+) -> None:
+    """Background worker: load bars, build scenarios, run each through the engine.
+
+    Re-uses the existing ``MulticoreBacktestEngine`` and the permutation
+    helpers from the thick-client config discovery engine. Each scenario's
+    ``config_delta`` is overlaid onto a deep-copy of the backtest config,
+    matching the QThread worker's call shape.
+    """
+    import copy as _copy
+    import traceback as _tb
+
+    try:
+        from src.strategy_builder.ui.config_permutation_engine import (
+            DEFAULT_PARAMETER_RANGES,
+            DiscoveryScenario,
+            aggregate_metrics,
+            generate_single_axis_permutations,
+        )
+        from src.optimizer_v3.core.backtest_data_provider import get_backtest_provider
+        from src.optimizer_v3.core.multicore_backtest_engine import MulticoreBacktestEngine
+        from src.detectors.building_blocks.registry import BlockRegistry as _BR
+
+        _append_config_discovery_log(
+            run_id,
+            f"Starting config discovery for '{strategy.get('name', '?')}' "
+            f"({config.get('startDate', '?')} → {config.get('endDate', '?')})",
+            level="SYSTEM",
+        )
+        _append_config_discovery_log(
+            run_id,
+            f"Parameter ranges: {len(DEFAULT_PARAMETER_RANGES)} axes, "
+            f"strategy=single_axis (per thick-client default)",
+            level="SYSTEM",
+        )
+
+        timeframe = str(
+            config.get("timeframe")
+            or strategy.get("settings", {}).get("timeframe")
+            or "15m"
+        )
+        start = datetime.fromisoformat(str(config["startDate"]))
+        end = datetime.fromisoformat(str(config["endDate"]))
+
+        _append_config_discovery_log(run_id, "Loading bars (once for all scenarios)…", level="SYSTEM")
+
+        def _load_progress(current: int, total: int, msg: str) -> None:
+            _patch_config_discovery_run(run_id, progress=min(20, int((current / total) * 20) if total else 5))
+            if msg:
+                _append_config_discovery_log(run_id, msg, level="SYSTEM")
+
+        provider = get_backtest_provider()
+        bars = provider.load_bars_for_backtest(timeframe, start, end, _load_progress)
+        _append_config_discovery_log(
+            run_id, f"Loaded {len(bars):,} bars", level="SYSTEM"
+        )
+        _patch_config_discovery_run(run_id, progress=20)
+
+        # Normalize block names + backfill signal weights (matches the backtest worker)
+        strategy_normalized = _copy.deepcopy(strategy)
+        for blk in strategy_normalized.get("blocks") or []:
+            raw = blk.get("name", "")
+            blk["name"] = raw.lower().replace(" ", "_")
+            block_meta = _BR.get_block(blk["name"])
+            for sig in blk.get("signals") or []:
+                if sig.get("weight") is None and block_meta:
+                    tier = (block_meta.signal_tiers or {}).get(sig.get("name", ""))
+                    if tier:
+                        sig["weight"] = tier.get("base_points", 10)
+
+        engine = MulticoreBacktestEngine()
+        base_bc = _copy.deepcopy(config)
+
+        # 1) Baseline run (current config)
+        _append_config_discovery_log(run_id, "Running baseline scenario…", level="SYSTEM")
+        baseline_scenario = DiscoveryScenario(
+            scenario_id="BASELINE",
+            description="[BASELINE] Current config",
+            config_delta={},
+            param_labels=[],
+        )
+        try:
+            bl = engine.run_backtest(
+                bars=bars,
+                strategy_config=strategy_normalized,
+                backtest_config=_copy.deepcopy(base_bc),
+                progress_callback=None,
+            )
+            baseline_result = aggregate_metrics(baseline_scenario, bl.get("trades", []))
+        except Exception as exc:
+            _append_config_discovery_log(
+                run_id, f"Baseline error: {exc}", level="ERROR"
+            )
+            baseline_result = aggregate_metrics(
+                baseline_scenario, [], error=str(exc)
+            )
+        baseline_result.scenario_id = "BASELINE"
+        baseline_dict = _serialize_discovery_result(baseline_result)
+        _patch_config_discovery_run(run_id, baseline=baseline_dict, progress=30)
+        _append_config_discovery_log(
+            run_id,
+            f"Baseline: {baseline_result.trade_count} trades, "
+            f"PnL ${baseline_result.total_pnl:.2f}, "
+            f"win rate {baseline_result.win_rate:.1f}%",
+            level="SYSTEM",
+        )
+
+        # 2) Build permutation scenarios from default ranges
+        scenarios = generate_single_axis_permutations(base_bc, DEFAULT_PARAMETER_RANGES)
+        total = len(scenarios)
+        _append_config_discovery_log(
+            run_id, f"Running {total} permutation scenarios…", level="SYSTEM"
+        )
+
+        results: list[dict] = [baseline_dict]
+        for i, scenario in enumerate(scenarios, start=1):
+            _patch_config_discovery_run(
+                run_id,
+                progress=30 + int((i / max(1, total)) * 70),
+            )
+            _append_config_discovery_log(
+                run_id,
+                f"Scenario {i}/{total}: {scenario.description}",
+                level="INFO",
+            )
+            try:
+                bc = _copy.deepcopy(base_bc)
+                for key, val in scenario.config_delta.items():
+                    parts = key.split(".")
+                    target = bc
+                    for part in parts[:-1]:
+                        if not isinstance(target.get(part), dict):
+                            target[part] = {}
+                        target = target[part]
+                    target[parts[-1]] = val
+
+                run_result = engine.run_backtest(
+                    bars=bars,
+                    strategy_config=strategy_normalized,
+                    backtest_config=bc,
+                    progress_callback=None,
+                )
+                agg = aggregate_metrics(scenario, run_result.get("trades", []))
+            except Exception as exc:
+                _append_config_discovery_log(
+                    run_id, f"Scenario {scenario.scenario_id} error: {exc}", level="ERROR"
+                )
+                agg = aggregate_metrics(scenario, [], error=str(exc))
+                agg.error = _tb.format_exc()
+            results.append(_serialize_discovery_result(agg))
+
+        _patch_config_discovery_run(
+            run_id,
+            status="completed",
+            results=results,
+            progress=100,
+            completedAt=datetime.now(timezone.utc).isoformat(),
+        )
+        _append_config_discovery_log(
+            run_id,
+            f"Config discovery complete: {len(results) - 1} permutations + baseline",
+            level="SYSTEM",
+        )
+    except Exception as exc:  # noqa: BLE001 — surface to webui caller
+        logger.exception("Config discovery run %s failed", run_id)
+        _patch_config_discovery_run(
+            run_id,
+            status="error",
+            error=str(exc),
+            completedAt=datetime.now(timezone.utc).isoformat(),
+        )
+        _append_config_discovery_log(run_id, f"ERROR: {exc}", level="ERROR")
+
+
+class ConfigDiscoveryStartResponse(BaseModel):
+    runId: str
+    status: str
+
+
+class ConfigDiscoveryRunStatus(BaseModel):
+    runId: str
+    strategyId: str
+    status: str
+    progress: int
+    baseline: Optional[dict] = None
+    results: list = []
+    logs: list = []
+    error: Optional[str] = None
+    startedAt: str
+    completedAt: Optional[str] = None
+
+
+@app.post(
+    "/strategies/{strategy_id}/config-discovery",
+    response_model=ConfigDiscoveryStartResponse,
+    tags=["Backtest"],
+    summary="Start a config-discovery permutation run for a strategy",
+)
+async def start_config_discovery(
+    strategy_id: str,
+    payload: dict,
+    _: dict = Depends(require_jwt),
+) -> ConfigDiscoveryStartResponse:
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    def _load_strategy() -> Optional[dict]:
+        with db.scoped_managers() as scoped:
+            return scoped.strategy.get_latest_version(strategy_id)
+
+    try:
+        strategy = await asyncio.to_thread(_load_strategy)
+    except Exception as exc:
+        logger.exception("Failed to load strategy %s for config discovery", strategy_id)
+        raise HTTPException(status_code=500, detail=f"Failed to load strategy: {exc}") from exc
+
+    if strategy is None:
+        raise _strategy_not_found(strategy_id)
+
+    config = dict(payload or {})
+    run_id = _new_config_discovery_run(strategy_id, config)
+
+    worker = threading.Thread(
+        target=_run_config_discovery_in_thread,
+        args=(run_id, strategy, config),
+        name=f"config-discovery-{run_id[:8]}",
+        daemon=True,
+    )
+    worker.start()
+
+    return ConfigDiscoveryStartResponse(runId=run_id, status="running")
+
+
+@app.get(
+    "/strategies/{strategy_id}/config-discovery/{run_id}",
+    response_model=ConfigDiscoveryRunStatus,
+    tags=["Backtest"],
+    summary="Get current status / final result of a config-discovery run",
+)
+async def get_config_discovery_status(
+    strategy_id: str,
+    run_id: str,
+    _: dict = Depends(require_jwt),
+) -> ConfigDiscoveryRunStatus:
+    with _config_discovery_lock:
+        run = _config_discovery_runs.get(run_id)
+        snapshot = dict(run) if run is not None else None
+
+    if snapshot is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Config discovery run '{run_id}' not found (may have expired or never started)",
+        )
+
+    if snapshot.get("strategyId") != strategy_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Run does not belong to this strategy",
+        )
+
+    snapshot.pop("config", None)
+    return ConfigDiscoveryRunStatus(**snapshot)
+
+
+# ---------------------------------------------------------------------------
 # WebSocket helper: subscribe one channel and fan out to one client
 # ---------------------------------------------------------------------------
 
@@ -2305,10 +2659,23 @@ class _DataRepairRequest(BaseModel):
 
 
 def _iso_dt(dt: Any) -> Optional[str]:
+    """
+    Serialize a datetime as an ISO 8601 string with an explicit timezone.
+
+    Naive datetimes are assumed UTC and tagged with 'Z' so the client does not
+    interpret them as local time (see BTCAAAAA-35962 follow-up: a user in
+    UTC+2 reading naive ISO 07:00 with ``toUTCString()`` saw "05:00" and
+    thought there was a 4-hour gap).
+    """
     if dt is None:
         return None
     if hasattr(dt, "isoformat"):
-        return dt.isoformat()
+        iso = dt.isoformat()
+        if iso.endswith("+00:00"):
+            return iso[:-6] + "Z"
+        if dt.tzinfo is None and "+" not in iso[10:] and "-" not in iso[10:]:
+            return iso + "Z"
+        return iso
     return str(dt)
 
 

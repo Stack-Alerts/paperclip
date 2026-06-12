@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { formatLocalShort } from '@/lib/data-management/api';
 
 export interface DataGapEntry {
   gapStart: string;
@@ -90,17 +91,7 @@ interface TfRowProps {
 
 function formatLastCandle(ts: string | null): string {
   if (!ts) return '—';
-  try {
-    const d = new Date(ts);
-    const yyyy = d.getUTCFullYear();
-    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(d.getUTCDate()).padStart(2, '0');
-    const hh = String(d.getUTCHours()).padStart(2, '0');
-    const min = String(d.getUTCMinutes()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd} ${hh}:${min} UTC`;
-  } catch {
-    return ts;
-  }
+  return formatLocalShort(ts);
 }
 
 function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {

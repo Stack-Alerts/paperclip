@@ -234,6 +234,31 @@ export interface TpSlAdjustments {
   SL: number;
 }
 
+// Persisted snapshot of the last backtest run for a strategy, so the user
+// sees their last test / result / config on reload and across server
+// restarts (BTCAAAAA-35963). The result snapshot lets us restore the UI
+// even if the server has discarded the in-memory `_backtest_runs[runId]`
+// (server-side runs are not durable across restarts by default).
+export interface BacktestSession {
+  strategyId: string;
+  runId: string;
+  // The narrow BacktestConfig fields the dialog binds to the date / capital
+  // inputs (startDate, endDate, initialCapital, ...). The full BacktestConfigFull
+  // below captures every field the run was dispatched with so re-running with
+  // the same inputs is one click away.
+  config: Omit<BacktestConfig, 'strategyId'>;
+  fullConfig: BacktestConfigFull;
+  // Cached result snapshot — used as the source of truth when the server
+  // has lost the in-memory run (most common after a server restart). When
+  // the server still has the run, the live `getBacktestResults` call takes
+  // precedence and refreshes this snapshot.
+  resultSnapshot: BacktestResult;
+  logs: BacktestStatusMessage[];
+  // ISO 8601 — when the user switches between strategies the most recent
+  // session per strategy wins.
+  savedAt: string;
+}
+
 // Backtest execution result
 export interface BacktestResult {
   id: string;

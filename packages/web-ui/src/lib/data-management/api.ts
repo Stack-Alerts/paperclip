@@ -74,3 +74,36 @@ export async function runDataVerify(): Promise<Record<string, TimeframeVerifyRes
 export async function runDataRepair(timeframe?: string): Promise<DataRepairResult> {
   return post<DataRepairResult>('/data/repair', { timeframe: timeframe ?? null });
 }
+
+// ---------------------------------------------------------------------------
+// Timestamp formatting helpers (BTCAAAAA-35962 follow-up)
+//
+// The backend's ``_iso_dt()`` now tags naive datetimes with 'Z' so a string
+// like ``"2026-06-12T07:00:00"`` from a legacy call or a manual test is
+// still treated as UTC.  ``parseApiTimestamp`` normalizes both forms before
+// handing a ``Date`` to the formatters below.  ``formatLocalShort`` shows
+// the time in the user's local timezone (matches what the thick client
+// shows) so a user in UTC+2 reading 07:00Z sees 09:00, not 05:00.
+// ---------------------------------------------------------------------------
+
+export function parseApiTimestamp(ts: string | null | undefined): Date | null {
+  if (!ts) return null;
+  try {
+    const hasTz = /Z$|[+-]\d{2}:?\d{2}$/.test(ts);
+    return new Date(hasTz ? ts : ts + 'Z');
+  } catch {
+    return null;
+  }
+}
+
+export function formatLocalShort(ts: string | null | undefined): string {
+  const d = parseApiTimestamp(ts);
+  if (!d) return '—';
+  // "2026-06-12 09:00" in the user's local timezone
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+}

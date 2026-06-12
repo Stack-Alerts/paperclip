@@ -9,6 +9,7 @@ import {
   triggerDataUpdate,
   runDataVerify,
   runDataRepair,
+  formatLocalShort,
 } from '@/lib/data-management/api';
 import type { DataStatusResponse, TimeframeVerifyResult } from '@/lib/data-management/api';
 
@@ -28,12 +29,39 @@ function StatusDot({ stale }: { stale: boolean }) {
   );
 }
 
+function NextCandleCountdown({ timeframe, lastCandleTs }: { timeframe: string; lastCandleTs: string | null }) {
+  const [now, setNow] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  if (!lastCandleTs) return <>—</>;
+  const minutes: Record<string, number> = { '1m': 1, '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240, '1d': 1440 };
+  const m = minutes[timeframe] ?? 15;
+  const lastMs = new Date(lastCandleTs.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(lastCandleTs) ? lastCandleTs : lastCandleTs + 'Z').getTime();
+  const closesAt = lastMs + m * 60_000;
+  const remainingMs = closesAt - now;
+  if (remainingMs <= 0) return <>closing…</>;
+  const totalSec = Math.floor(remainingMs / 1000);
+  const hh = Math.floor(totalSec / 3600);
+  const mm = Math.floor((totalSec % 3600) / 60);
+  const ss = totalSec % 60;
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return <>next close: {hh > 0 ? `${hh}:${pad(mm)}:${pad(ss)}` : `${mm}:${pad(ss)}`}</>;
+}
+
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     complete: 'var(--accent-green)',
     gap: 'var(--color-bearish)',
     missing: 'var(--color-bearish)',
     error: 'var(--color-warning)',
+  };
+  const labels: Record<string, string> = {
+    complete: 'up-to-date',
+    gap: 'gap',
+    missing: 'missing',
+    error: 'error',
   };
   return (
     <span
@@ -44,7 +72,7 @@ function StatusBadge({ status }: { status: string }) {
         border: `1px solid ${colors[status] ?? 'var(--border-subtle)'}`,
       }}
     >
-      {status}
+      {labels[status] ?? status}
     </span>
   );
 }
@@ -209,7 +237,7 @@ export default function MarketDataPage() {
                   <>
                     <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                       Last bar:{' '}
-                      {f.lastBarTs ? new Date(f.lastBarTs).toUTCString().slice(5, 22) : '—'}
+                      {f.lastBarTs ? formatLocalShort(f.lastBarTs) : '—'}
                     </p>
                     <p
                       className="text-xs mt-0.5"
@@ -286,7 +314,9 @@ export default function MarketDataPage() {
                     <td className="px-4 py-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
                       {val.start && val.end
                         ? `${val.start.slice(0, 10)} → ${val.end.slice(0, 10)}`
-                        : '—'}
+                        : val.end
+                          ? `Recent → ${val.end.slice(0, 10)}`
+                          : '—'}
                     </td>
                     <td
                       className="px-4 py-2 text-xs"
@@ -365,23 +395,59 @@ export default function MarketDataPage() {
                     {tf}
                   </span>
                   <div className="flex items-center gap-3 text-xs">
-                    <span
-                      style={{
-                        color:
-                          r.totalGaps > 0 ? 'var(--color-bearish)' : 'var(--accent-green)',
-                      }}
-                    >
-                      {r.totalGaps === 0 ? '✓ No gaps' : `${r.totalGaps} gaps`}
-                    </span>
-                    {r.repairableCount > 0 && (
-                      <button
-                        onClick={() => handleRepair(tf)}
-                        disabled={repairing}
-                        className="px-2 py-0.5 rounded text-xs"
-                        style={{ background: 'var(--accent-green)', color: '#000' }}
+                    {r.totalGaps === 0 ? (
+                      <span style={{ color: 'var(--accent-green)' }}>✓ No gaps</span>
+                    ) : r.repairableCount > 0 ? (
+                      <>
+                        <span style={{ color: 'var(--color-bearish)' }}>
+                          {r.totalGaps} gap{r.totalGaps === 1 ? '' : 's'}
+                        </span>
+                        <button
+                          onClick={() => handleRepair(tf)}
+                          disabled={repairing}
+                          className="px-2 py-0.5 rounded text-xs"
+                          style={{ background: 'var(--accent-green)', color: '#000' }}
+                        >
+                          {repairing ? 'Repairing…' : `Repair ${r.repairableCount}`}
+                        </button>
+                      </>
+                    ) : (
+                      <span
+                        style={{ color: 'var(--color-warning)' }}
+                        title={`Historical gap(s) from ${r.gaps?.[0]?.gapStart?.slice(0, 10) ?? '?'} → ${r.gaps?.[0]?.gapEnd?.slice(0, 10) ?? '?'}. Predates the 90-day Binance API horizon; cannot be auto-filled from Binance. Requires LakeAPI backfill.`}
                       >
-                        {repairing ? 'Repairing…' : `Repair ${r.repairableCount}`}
-                      </button>
+                        ⚠ {r.totalGaps} historical gap{r.totalGaps === 1 ? '' : 's'} (LakeAPI)
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div
+                  className="mb-3 p-2.5 rounded text-xs flex items-center justify-between"
+                  style={{
+                    background: 'var(--bg-panel-raised)',
+                    border: '1px solid var(--accent-green)',
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="inline-block w-2 h-2 rounded-full"
+                      style={{
+                        background: 'var(--accent-green)',
+                        boxShadow: '0 0 6px var(--accent-green)',
+                      }}
+                    />
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                      Current Candle: Open
+                    </span>
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)' }}>
+                    {r.lastCandleTs ? (
+                      <>
+                        opened {formatLocalShort(r.lastCandleTs)} ·{' '}
+                        <NextCandleCountdown timeframe={tf} lastCandleTs={r.lastCandleTs} />
+                      </>
+                    ) : (
+                      '—'
                     )}
                   </div>
                 </div>
@@ -409,10 +475,28 @@ export default function MarketDataPage() {
                     <span style={{ color: 'var(--accent-green)' }}>{r.repairableCount}</span>
                   </div>
                   <div>
-                    <span className="block" style={{ color: 'var(--text-muted)' }}>
-                      Too Old
+                    <span
+                      className="block"
+                      style={{ color: 'var(--text-muted)' }}
+                      title="Closed candles from before the 90-day Binance horizon that have not been backfilled from LakeAPI. Not the current in-flight candle."
+                    >
+                      Old Gaps
                     </span>
                     <span style={{ color: 'var(--color-warning)' }}>{r.tooOldCount}</span>
+                    {r.tooOldCount > 0 && r.gaps?.find((g) => !g.repairable) && (
+                      <span
+                        className="block mt-0.5"
+                        style={{ color: 'var(--text-muted)', fontSize: '10px' }}
+                      >
+                        {(() => {
+                          const g = r.gaps.find((g) => !g.repairable);
+                          if (!g) return null;
+                          const s = g.gapStart?.slice(0, 10);
+                          const e = g.gapEnd?.slice(0, 10);
+                          return s && e ? `${s} → ${e}` : (e ?? s ?? 'historical');
+                        })()}
+                      </span>
+                    )}
                   </div>
                   <div>
                     <span className="block" style={{ color: 'var(--text-muted)' }}>
@@ -420,7 +504,7 @@ export default function MarketDataPage() {
                     </span>
                     <span>
                       {r.lastCandleTs
-                        ? new Date(r.lastCandleTs).toUTCString().slice(5, 22)
+                        ? formatLocalShort(r.lastCandleTs)
                         : '—'}
                     </span>
                   </div>

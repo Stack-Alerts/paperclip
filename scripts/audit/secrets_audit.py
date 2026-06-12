@@ -118,6 +118,9 @@ def scan_file(path: Path) -> list[str]:
                     continue
                 if re.search(r'\.(?:get|pop|setdefault)\s*\(\s*["'"'"']' + re.escape(val) + r'["'"'"']', line):
                     continue
+                # dict key usage: {"api_key": var} — not a literal credential
+                if re.search(r'''["']\s*''' + re.escape(val) + r'''\s*["']\s*:''', line):
+                    continue
                 snippet = line.strip()[:80]
                 findings.append(f"{file_str}:{lineno}: binance_literal_string: {_redact_value(snippet, val)}")
                 break

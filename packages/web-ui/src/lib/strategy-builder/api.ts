@@ -208,6 +208,14 @@ export async function getBacktestResults(id: string, runId: string) {
   return get(`/strategies/${id}/backtest/${runId}`);
 }
 
+export async function startConfigDiscovery(id: string, config: unknown) {
+  return post(`/strategies/${id}/config-discovery`, config);
+}
+
+export async function getConfigDiscoveryStatus(id: string, runId: string) {
+  return get(`/strategies/${id}/config-discovery/${runId}`);
+}
+
 export async function deployStrategy(id: string) {
   return post(`/strategies/${id}/deploy`, {});
 }
