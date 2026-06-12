@@ -242,6 +242,138 @@ class TestGetAllDataTypesStatus:
             # Only TypeError indicates the tz mismatch bug; other errors (missing data) are OK
             assert not isinstance(exc, TypeError), f"TypeError raised: {exc}"
 
+    def test_no_lakeapi_files_falls_back_to_binance(self, tmp_path):
+        """
+        Regression for BTCAAAAA-35962.
+
+        When ``self.lakeapi_dir`` exists but contains no per-type subdirs
+        (the normal state when LakeAPI is decommissioned and the only data
+        on disk lives under ``self.binance_dir``), each of the 5 by-product
+        data types must be reported with the most recent Binance bar
+        timestamp, NOT with ``status='missing' / gap_days=999``.
+
+        This mirrors the on-disk reality of the running instance and matches
+        the user-reported expectation: gaps reflect the actual data, not the
+        bogus 999-day sentinel.
+        """
+        from datetime import datetime, timezone
+        binance_dir = tmp_path / "binance"
+        fixture_start = _write_parquet_fixture(binance_dir, timeframe='15m', n_bars=20)
+
+        mgr = UnifiedDataManager(mode='backtest')
+        mgr.lakeapi_dir = tmp_path / "lakeapi_empty"  # exists but empty
+        mgr.binance_dir = binance_dir
+
+        result = mgr.get_all_data_types_status()
+
+        # Compute the gap_days the function SHOULD return based on the fixture.
+        # Fixture spans fixture_start..fixture_start + 20*15min.
+        fixture_end_naive = fixture_start + timedelta(minutes=15 * 19)
+        fixture_end_aware = fixture_end_naive.replace(tzinfo=timezone.utc)
+        expected_gap_days = (datetime.now(timezone.utc) - fixture_end_aware).days
+
+        for data_type in (
+            'trades', 'funding', 'liquidations', 'open_interest', 'orderbook',
+        ):
+            entry = result[data_type]
+            assert entry['status'] != 'missing', (
+                f"{data_type} should not be missing when Binance fallback data exists"
+            )
+            # Before the fix, every type returned gap_days=999 (bogus sentinel).
+            # After the fix, the gap reflects the actual fixture data's age.
+            assert entry['gap_days'] != 999, (
+                f"{data_type} gap_days=999 is the bogus sentinel; should reflect fixture"
+            )
+            assert entry['gap_days'] == expected_gap_days, (
+                f"{data_type} gap_days={entry['gap_days']} does not match expected "
+                f"gap from fixture ({expected_gap_days})"
+            )
+            assert entry.get('source') == 'binance_fallback', (
+                f"{data_type} should be marked source='binance_fallback'"
+            )
+
+    def test_latest_binance_bar_timestamp_helper(self, tmp_path):
+        """_latest_binance_bar_timestamp returns the most recent bar across all timeframes."""
+        binance_dir = tmp_path / "binance"
+        _write_parquet_fixture(binance_dir, timeframe='15m', n_bars=20)
+        _write_parquet_fixture(binance_dir, timeframe='1h', n_bars=5)
+
+        mgr = UnifiedDataManager(mode='backtest')
+        mgr.binance_dir = binance_dir
+
+        latest = mgr._latest_binance_bar_timestamp()
+        assert latest is not None
+        assert latest.tzinfo is not None, "must be tz-aware UTC"
+
+    def test_latest_binance_bar_timestamp_no_files_returns_none(self, tmp_path):
+        """_latest_binance_bar_timestamp returns None when no Binance data exists."""
+        mgr = UnifiedDataManager(mode='backtest')
+        mgr.binance_dir = tmp_path / "empty_binance"
+        assert mgr._latest_binance_bar_timestamp() is None
+
+
+# ---------------------------------------------------------------------------
+# BTCAAAAA-36000: binance-fallback start date
+#
+# Regression for the "Recent → date" display in the market-data page.
+# The 5 by-product data types have no LakeAPI files of their own; the
+# fallback must report the *earliest* available Binance 15m bar as the
+# start date so the UI shows "2024-01-01 → 2026-06-12" instead of
+# "Recent → 2026-06-12".
+# ---------------------------------------------------------------------------
+
+class TestBinanceFallbackStartDate:
+    """get_all_data_types_status() must populate 'start' in the Binance-fallback branch."""
+
+    def test_fallback_status_populates_start_from_earliest_binance_bar(self, tmp_path):
+        """
+        Regression for BTCAAAAA-36000.
+
+        With a single 15m parquet fixture (20 bars starting 2026-03-10)
+        and an empty LakeAPI dir, each of the 5 by-product types must
+        report ``start`` = the fixture's first bar timestamp, not None.
+        """
+        binance_dir = tmp_path / "binance"
+        fixture_start = _write_parquet_fixture(binance_dir, timeframe='15m', n_bars=20)
+
+        mgr = UnifiedDataManager(mode='backtest')
+        mgr.lakeapi_dir = tmp_path / "lakeapi_empty"  # exists but empty
+        mgr.binance_dir = binance_dir
+
+        result = mgr.get_all_data_types_status()
+
+        # Fixture start is tz-naive UTC; expected start is tz-aware UTC.
+        expected_start = pd.to_datetime(fixture_start, utc=True).to_pydatetime()
+
+        for data_type in (
+            'trades', 'funding', 'liquidations', 'open_interest', 'orderbook',
+        ):
+            entry = result[data_type]
+            assert entry.get('start') is not None, (
+                f"{data_type} 'start' must be populated in Binance-fallback branch "
+                f"(BTCAAAAA-36000: caused 'Recent → date' display in market-data page)"
+            )
+            assert entry['start'] == expected_start, (
+                f"{data_type} start={entry['start']!r} != expected fixture start "
+                f"{expected_start!r}"
+            )
+
+    def test_fallback_status_start_is_tz_aware_utc(self, tmp_path):
+        """The populated 'start' must be tz-aware UTC so the API can serialize it."""
+        binance_dir = tmp_path / "binance"
+        _write_parquet_fixture(binance_dir, timeframe='15m', n_bars=20)
+
+        mgr = UnifiedDataManager(mode='backtest')
+        mgr.lakeapi_dir = tmp_path / "lakeapi_empty"
+        mgr.binance_dir = binance_dir
+
+        result = mgr.get_all_data_types_status()
+        entry = result['trades']
+        assert entry['start'] is not None
+        assert entry['start'].tzinfo is not None, (
+            f"start must be tz-aware UTC; got {entry['start']!r}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # _RuntimeCandleUpdateThread data path (BTCAAAAA-872 regression)

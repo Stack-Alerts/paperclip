@@ -61,7 +61,7 @@ _ALGORITHMS = ["RS256"]
 # NEVER enable in production — all requests are accepted without a token.
 _DEV_MODE: bool = os.environ.get("BTE_API_DEV_MODE", "").lower() in ("1", "true", "yes")
 
-_bearer = HTTPBearer(auto_error=not _DEV_MODE)
+_bearer = HTTPBearer(auto_error=False)
 
 
 def _decode(token: str) -> dict[str, Any]:
