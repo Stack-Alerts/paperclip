@@ -49,7 +49,7 @@ import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -197,6 +197,50 @@ _KEY_ALERTS = "itm:alerts:active"
 
 # Default limits for recent-N queries
 _DEFAULT_RECENT_N = 50
+
+# ---------------------------------------------------------------------------
+# Unified data manager singleton (lazy, shared across data endpoints)
+# ---------------------------------------------------------------------------
+
+_unified_manager_instance: Any = None
+_unified_manager_lock = threading.Lock()
+
+
+def _get_unified_manager() -> Any:
+    global _unified_manager_instance
+    if _unified_manager_instance is None:
+        with _unified_manager_lock:
+            if _unified_manager_instance is None:
+                try:
+                    from src.data_manager.unified_manager import UnifiedDataManager
+                    _unified_manager_instance = UnifiedDataManager(mode='backtest')
+                except Exception as exc:
+                    logger.warning("Could not initialise UnifiedDataManager: %s", exc)
+    return _unified_manager_instance
+
+
+# ---------------------------------------------------------------------------
+# Data management Pydantic models
+# ---------------------------------------------------------------------------
+
+
+class _DataBackfillRequest(BaseModel):
+    startDate: str  # ISO date, e.g. "2024-01-02"
+    endDate: str    # ISO date, e.g. "2024-12-31"
+    timeframe: Optional[str] = None  # None = all (15m, 1h, 1d)
+
+
+class _DataRepairRequest(BaseModel):
+    timeframe: Optional[str] = None
+
+
+def _iso_dt(dt: Any) -> Optional[str]:
+    """Serialize datetime to ISO 8601 UTC string."""
+    if dt is None:
+        return None
+    if hasattr(dt, 'tzinfo') and dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -2170,6 +2214,174 @@ async def get_backtest_status(
 
     snapshot.pop("config", None)
     return BacktestRunStatus(**snapshot)
+
+
+# ---------------------------------------------------------------------------
+# Data management endpoints (gap verification, repair, historical backfill)
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/data/verify",
+    tags=["Data Management"],
+    summary="Run data gap verification (dry-run — no writes)",
+)
+async def verify_data(_: dict = Depends(require_jwt)) -> dict:
+    """Detect gaps in stored Binance OHLCV parquet files across all timeframes."""
+    manager = _get_unified_manager()
+    if manager is None:
+        raise HTTPException(status_code=503, detail="Data manager unavailable")
+
+    def _run() -> dict:
+        horizon_cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+        out: dict = {}
+        for tf in ("15m", "1h", "1d"):
+            try:
+                gaps_raw = manager.detect_gaps_in_binance_files(tf)
+            except Exception as exc:
+                logger.warning("detect_gaps_in_binance_files(%s) failed: %s", tf, exc)
+                gaps_raw = []
+
+            gaps_serialized = []
+            for g in gaps_raw:
+                gap_start = g.get("gap_start")
+                if gap_start is not None and hasattr(gap_start, "tzinfo") and gap_start.tzinfo is None:
+                    gap_start = gap_start.replace(tzinfo=timezone.utc)
+                repairable = gap_start is not None and gap_start >= horizon_cutoff
+                gaps_serialized.append({
+                    "gapStart": _iso_dt(g.get("gap_start")),
+                    "gapEnd": _iso_dt(g.get("gap_end")),
+                    "missingBars": g.get("missing_bars", 0),
+                    "repairable": repairable,
+                    "reason": None if repairable else "Older than 90-day Binance horizon — use Backfill",
+                })
+
+            total_gaps = len(gaps_serialized)
+            repairable_count = sum(1 for g in gaps_serialized if g.get("repairable"))
+            too_old_count = total_gaps - repairable_count
+
+            try:
+                last_ts = manager.get_last_bar_timestamp(tf)
+                last_candle_ts = _iso_dt(last_ts)
+            except Exception:
+                last_candle_ts = None
+
+            out[tf] = {
+                "timeframe": tf,
+                "totalGaps": total_gaps,
+                "repairableCount": repairable_count,
+                "tooOldCount": too_old_count,
+                "totalMissingBars": sum(g.get("missingBars", 0) for g in gaps_serialized),
+                "repairableMissingBars": sum(g.get("missingBars", 0) for g in gaps_serialized if g.get("repairable")),
+                "tooOldMissingBars": sum(g.get("missingBars", 0) for g in gaps_serialized if not g.get("repairable")),
+                "gaps": gaps_serialized,
+                "lastCandleTs": last_candle_ts,
+            }
+        return out
+
+    try:
+        return await asyncio.to_thread(_run)
+    except Exception as exc:
+        logger.exception("data/verify failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post(
+    "/data/repair",
+    tags=["Data Management"],
+    summary="Repair recent data gaps (within 90-day Binance horizon)",
+)
+async def repair_data(
+    body: _DataRepairRequest,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Repair OHLCV gaps within the 90-day Binance API window."""
+    manager = _get_unified_manager()
+    if manager is None:
+        raise HTTPException(status_code=503, detail="Data manager unavailable")
+
+    def _run() -> dict:
+        tfs = [body.timeframe] if body.timeframe else None
+        report = manager.verify_and_repair(timeframes=tfs, dry_run=False)
+        summary: dict = {}
+        for tf, info in report.items():
+            summary[tf] = {
+                "gapsFound": info.get("gaps_found", 0),
+                "gapsRepaired": info.get("gaps_repaired", 0),
+                "gapsTooOld": info.get("gaps_too_old", 0),
+                "barsFetched": info.get("bars_fetched", 0),
+                "errors": info.get("errors", []),
+            }
+        all_ok = all(len(v.get("errors", [])) == 0 for v in summary.values())
+        return {
+            "success": all_ok,
+            "message": "Repair complete" if all_ok else "Repair finished with some errors",
+            "summary": summary,
+        }
+
+    try:
+        return await asyncio.to_thread(_run)
+    except Exception as exc:
+        logger.exception("data/repair failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post(
+    "/data/backfill",
+    tags=["Data Management"],
+    summary="Backfill historical OHLCV data from Binance (bypasses 90-day limit)",
+)
+async def backfill_data(
+    body: _DataBackfillRequest,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Fetch and store historical OHLCV bars for an arbitrary date range.
+
+    Unlike /data/repair (which only handles the last 90 days), this endpoint
+    fetches from any point in Binance Futures history.  Intended to fill the
+    2024-01-02 → 2025-01-01 LakeAPI gap and similar long-range gaps.
+    """
+    manager = _get_unified_manager()
+    if manager is None:
+        raise HTTPException(status_code=503, detail="Data manager unavailable")
+
+    try:
+        start_dt = datetime.fromisoformat(body.startDate).replace(tzinfo=timezone.utc)
+        end_dt = datetime.fromisoformat(body.endDate).replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid date format: {exc}") from exc
+
+    if start_dt >= end_dt:
+        raise HTTPException(status_code=422, detail="startDate must be before endDate")
+
+    timeframes = [body.timeframe] if body.timeframe else ["15m", "1h", "1d"]
+
+    def _run() -> dict:
+        results: dict = {}
+        for tf in timeframes:
+            try:
+                bars = manager._fetch_binance_range(tf, start_dt, end_dt)
+                if bars is not None and not bars.empty:
+                    manager._save_binance_bars(bars, tf)
+                    results[tf] = {"success": True, "barsDownloaded": len(bars)}
+                else:
+                    results[tf] = {"success": True, "barsDownloaded": 0}
+            except Exception as exc:
+                logger.exception("Backfill failed for %s: %s", tf, exc)
+                results[tf] = {"success": False, "error": str(exc)}
+
+        all_ok = all(v.get("success") for v in results.values())
+        return {
+            "success": all_ok,
+            "message": "Backfill complete" if all_ok else "Backfill finished with some errors",
+            "results": results,
+        }
+
+    try:
+        return await asyncio.to_thread(_run)
+    except Exception as exc:
+        logger.exception("data/backfill failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------

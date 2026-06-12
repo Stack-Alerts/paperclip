@@ -27,6 +27,7 @@ export interface DataVerifyDialogProps {
   open: boolean;
   onVerify: () => Promise<Record<string, TimeframeVerifyResult>>;
   onRepair: (timeframe: string) => Promise<void>;
+  onBackfill?: (gaps: DataGapEntry[], timeframe: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -60,14 +61,14 @@ function computeSummary(
   }
   if (totalRepairable === 0 && totalTooOld > 0) {
     return {
-      icon: '❌',
-      text: `Too-old gaps (unfixable) — ${totalTooOld} gap(s), ${totalTooOldMissing} missing bars older than 90-day Binance horizon. LakeAPI backfill needed.`,
+      icon: '⚠️',
+      text: `Historical gaps — ${totalTooOld} gap(s), ${totalTooOldMissing} missing bars older than 90-day window. Use "Backfill from Binance" to repair.`,
       variant: 'too-old',
     };
   }
   return {
     icon: '⚠️',
-    text: `Mixed gaps — ${totalRepairable} fixable (${totalRepairableMissing} bars) + ${totalTooOld} too old (${totalTooOldMissing} bars, need LakeAPI).`,
+    text: `Mixed gaps — ${totalRepairable} fixable (${totalRepairableMissing} bars) + ${totalTooOld} historical (${totalTooOldMissing} bars, use Backfill).`,
     variant: 'mixed',
   };
 }
@@ -85,7 +86,9 @@ const BANNER_INLINE_STYLES: Record<SummaryVariant, React.CSSProperties> = {
 interface TfRowProps {
   result: TimeframeVerifyResult;
   isRepairing: boolean;
+  isBackfilling: boolean;
   onRepair: () => void;
+  onBackfill?: () => void;
 }
 
 function formatLastCandle(ts: string | null): string {
@@ -103,7 +106,7 @@ function formatLastCandle(ts: string | null): string {
   }
 }
 
-function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
+function TimeframeRow({ result, isRepairing, isBackfilling, onRepair, onBackfill }: TfRowProps) {
   const {
     timeframe,
     repairableCount,
@@ -135,17 +138,17 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
       .sort()[0];
     primaryNotes = earliest ? `Earliest: ${earliest}` : '';
   } else if (repairableCount === 0 && tooOldCount > 0) {
-    statusLabel = 'Too Old (Binance limit - cannot repair)';
+    statusLabel = 'Historical Gap (Backfill available)';
     statusStyle = { background: 'color-mix(in srgb, var(--accent-orange) 20%, transparent)', color: 'var(--accent-orange)' };
     const earliest = gaps
       .filter((g) => !g.repairable)
       .map((g) => g.gapStart)
       .sort()[0];
-    primaryNotes = earliest ? `From ${earliest} — beyond 90d horizon` : '';
+    primaryNotes = earliest ? `From ${earliest} — use Backfill from Binance` : '';
   } else {
     statusLabel = 'Mixed Gaps';
     statusStyle = { background: 'color-mix(in srgb, var(--accent-orange) 15%, transparent)', color: 'var(--accent-orange)' };
-    primaryNotes = `${repairableCount} fixable, ${tooOldCount} need LakeAPI`;
+    primaryNotes = `${repairableCount} fixable, ${tooOldCount} historical`;
   }
 
   const repairableGaps = gaps.filter((g) => g.repairable);
@@ -189,11 +192,21 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
           {repairableCount > 0 && (
             <button
               onClick={onRepair}
-              disabled={isRepairing}
+              disabled={isRepairing || isBackfilling}
               className="px-3 py-1 rounded text-xs font-medium disabled:opacity-50 transition-colors"
               style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
             >
               {isRepairing ? 'Repairing…' : 'Fix Gaps'}
+            </button>
+          )}
+          {tooOldCount > 0 && onBackfill && (
+            <button
+              onClick={onBackfill}
+              disabled={isRepairing || isBackfilling}
+              className="px-3 py-1 rounded text-xs font-medium disabled:opacity-50 transition-colors"
+              style={{ background: 'color-mix(in srgb, var(--accent-orange) 80%, transparent)', color: 'var(--btn-primary-text)' }}
+            >
+              {isBackfilling ? 'Backfilling…' : 'Backfill from Binance'}
             </button>
           )}
         </div>
@@ -204,14 +217,14 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
         <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-b" style={{ borderColor: 'color-mix(in srgb, var(--border) 60%, transparent)', background: 'color-mix(in srgb, var(--bg-panel) 30%, transparent)' }}>
           <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{timeframe} (old)</span>
           <span className="px-2 py-0.5 rounded text-xs font-semibold" style={{ background: 'color-mix(in srgb, var(--accent-orange) 20%, transparent)', color: 'var(--accent-orange)' }}>
-            Too Old (Binance limit - cannot repair)
+            Historical Gap (Backfill available)
           </span>
           <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
             {tooOldCount} gap(s) · {tooOldMissingBars ?? 0} missing bars
           </span>
           {tooOldGaps.length > 0 && (
             <span className="text-xs italic" style={{ color: 'var(--text-muted)' }}>
-              From {tooOldGaps.map((g) => g.gapStart).sort()[0]} — beyond 90d horizon
+              From {tooOldGaps.map((g) => g.gapStart).sort()[0]} — use Backfill
             </span>
           )}
         </div>
@@ -263,7 +276,7 @@ function TimeframeRow({ result, isRepairing, onRepair }: TfRowProps) {
                     </span>
                   </td>
                   <td className="px-3 py-1.5" style={{ color: 'var(--text-muted)' }}>
-                    {gap.reason ?? '(Binance limit - cannot repair)'}
+                    {gap.reason ?? 'Historical — use Backfill from Binance'}
                   </td>
                 </tr>
               ))}
@@ -281,10 +294,12 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
   open,
   onVerify,
   onRepair,
+  onBackfill,
   onClose,
 }) => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isRepairing, setIsRepairing] = useState<string | null>(null);
+  const [isBackfilling, setIsBackfilling] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, TimeframeVerifyResult> | null>(null);
   const [error, setError] = useState('');
   const [repairStatus, setRepairStatus] = useState('');
@@ -310,7 +325,6 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
       try {
         await onRepair(tf);
         setRepairStatus(`Repair complete for ${tf} — re-verifying…`);
-        // Auto-repair + re-verify chain
         const res = await onVerify();
         setResults(res);
         setRepairStatus('');
@@ -323,11 +337,32 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
     [onRepair, onVerify]
   );
 
+  const handleBackfill = useCallback(
+    async (tf: string, gaps: DataGapEntry[]) => {
+      if (!onBackfill) return;
+      setIsBackfilling(tf);
+      setError('');
+      try {
+        await onBackfill(gaps, tf);
+        setRepairStatus(`Backfill complete for ${tf} — re-verifying…`);
+        const res = await onVerify();
+        setResults(res);
+        setRepairStatus('');
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setIsBackfilling(null);
+      }
+    },
+    [onBackfill, onVerify]
+  );
+
   if (!open) return null;
 
   const tfResults = results ? Object.values(results) : [];
   const summary = tfResults.length > 0 ? computeSummary(tfResults) : null;
   const hasAnyRepairable = tfResults.some((r) => r.repairableCount > 0);
+  const hasAnyBackfillable = tfResults.some((r) => r.tooOldCount > 0) && !!onBackfill;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -414,7 +449,9 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
               key={tfResult.timeframe}
               result={tfResult}
               isRepairing={isRepairing === tfResult.timeframe}
+              isBackfilling={isBackfilling === tfResult.timeframe}
               onRepair={() => handleRepair(tfResult.timeframe)}
+              onBackfill={onBackfill ? () => handleBackfill(tfResult.timeframe, tfResult.gaps.filter(g => !g.repairable)) : undefined}
             />
           ))}
         </div>
@@ -434,11 +471,9 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
                 Re-verify
               </button>
             )}
-            {hasAnyRepairable && !isRepairing && (
+            {hasAnyRepairable && !isRepairing && !isBackfilling && (
               <button
                 onClick={() => {
-                  // Repair all timeframes sequentially by triggering the first repairable one —
-                  // each repair auto-re-verifies, so subsequent ones will appear on next Re-verify.
                   const first = tfResults.find((r) => r.repairableCount > 0);
                   if (first) handleRepair(first.timeframe);
                 }}
@@ -446,6 +481,18 @@ export const DataVerifyDialog: React.FC<DataVerifyDialogProps> = ({
                 style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
               >
                 Fix Gaps
+              </button>
+            )}
+            {hasAnyBackfillable && !isRepairing && !isBackfilling && (
+              <button
+                onClick={() => {
+                  const first = tfResults.find((r) => r.tooOldCount > 0);
+                  if (first) handleBackfill(first.timeframe, first.gaps.filter(g => !g.repairable));
+                }}
+                className="px-4 py-2 rounded text-sm font-medium transition-colors"
+                style={{ background: 'color-mix(in srgb, var(--accent-orange) 80%, transparent)', color: 'var(--btn-primary-text)' }}
+              >
+                Backfill from Binance
               </button>
             )}
           </div>
