@@ -5,7 +5,7 @@ import { X, Play, Square, Pause, RotateCcw, Settings, Terminal, TrendingUp, BarC
 import { AppBrand } from '@/components/shared/AppBrand';
 import { ThemeSelector } from './ThemeSelector';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
-import { BacktestConfig, BacktestResult, BacktestStatusMessage } from '@/lib/strategy-builder/types';
+import { BacktestConfig, BacktestConfigFull, BacktestResult, BacktestStatusMessage } from '@/lib/strategy-builder/types';
 import { getBacktestResults } from '@/lib/strategy-builder/api';
 import { RichTooltip, type TooltipContent } from './RichTooltip';
 import {
@@ -1455,6 +1455,183 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
   const [maxBarsHeld, setMaxBarsHeld] = useState<ChipValue>(200);
 
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Pull the persisted last session from the store. The store hydrates this
+  // from localStorage on mount; the dialog seeds every useState from it on
+  // open and writes config edits back via setLastBacktestSession so the
+  // user's last inputs survive a reload (BTCAAAAA-35963).
+  const lastBacktestSession = useStrategyStore((s) => s.lastBacktestSession);
+  const setLastBacktestSession = useStrategyStore((s) => s.setLastBacktestSession);
+  const backTestResultForSeed = useStrategyStore((s) => s.backTestResult);
+  const backTestLogsForSeed = useStrategyStore((s) => s.backTestLogs);
+
+  // Tracks which strategyId we've already seeded from. Reset to undefined
+  // when the dialog closes so the next open re-seeds. Prevents re-seeding
+  // every render (which would clobber the user's in-progress edits).
+  const seededForStrategyIdRef = useRef<string | null | undefined>(undefined);
+
+  // Seed all inputs from the persisted session when the dialog opens for a
+  // strategy that has a saved session. Without this, the dialog always
+  // opens on the default values and the user's last test/result/config is
+  // invisible until they rerun (BTCAAAAA-35963).
+  useEffect(() => {
+    if (!open) {
+      seededForStrategyIdRef.current = undefined;
+      return;
+    }
+    if (!currentStrategy) return;
+    if (seededForStrategyIdRef.current === currentStrategy.id) return;
+    if (!lastBacktestSession || lastBacktestSession.strategyId !== currentStrategy.id) {
+      // No saved session for this strategy — just mark as seeded so the
+      // seeding block doesn't run again on every render.
+      seededForStrategyIdRef.current = currentStrategy.id;
+      return;
+    }
+    const fc = lastBacktestSession.fullConfig;
+    if (fc) {
+      if (typeof fc.lookbackDays === 'number') setLookbackDays(fc.lookbackDays);
+      if (typeof fc.trainingDays === 'number') setTrainingDays(fc.trainingDays);
+      if (typeof fc.testingDays === 'number') setTestingDays(fc.testingDays);
+      if (fc.mode === 'historical') setMode('walk-forward');
+      else if (fc.mode === 'live_replay') setMode('live-replay');
+      // The dialog has 3 modes (walk-forward / walk / live-replay) but
+      // BacktestConfigFull.mode only enumerates 2 ('historical' / 'live_replay').
+      // Persisted 'walk' is impossible under the strict type but pre-existing
+      // sessions in localStorage from before this fix may carry it; the else
+      // branch keeps the dialog's default rather than silently no-op'ing.
+      else setMode('walk');
+      if (fc.tpslMode === 'Fibonacci' || fc.tpslMode === 'Hybrid' || fc.tpslMode === 'Fixed') {
+        setTpSlConfig(fc.tpslMode);
+      }
+      if (fc.slAdjustmentMode === 'Adaptive v2.0' || fc.slAdjustmentMode === 'Static') {
+        setSlAdjustment(fc.slAdjustmentMode);
+      }
+      if (fc.adaptiveSLPreset) setAdaptivePreset(fc.adaptiveSLPreset as typeof adaptivePreset);
+      const adaptive = fc.adaptiveSL;
+      if (adaptive) {
+        if (typeof adaptive.delayEnabled === 'boolean') setDelayStopLoss(adaptive.delayEnabled);
+        if (typeof adaptive.delayBars === 'number') setStopLossDelay(adaptive.delayBars);
+        if (typeof adaptive.emergencySlPct === 'number') setEmergency(adaptive.emergencySlPct);
+        if (typeof adaptive.volatilityLookback === 'number') setVolatilityLookback(adaptive.volatilityLookback);
+        if (typeof adaptive.volatilityMultiplier === 'number') setVolatilityMultiplier(adaptive.volatilityMultiplier);
+        if (typeof adaptive.minSlPct === 'number') setMinStopLoss(adaptive.minSlPct);
+        if (typeof adaptive.maxSlPct === 'number') setMaxStopLoss(adaptive.maxSlPct);
+        if (typeof adaptive.useStructureSl === 'boolean') setMarketStructureStop(adaptive.useStructureSl);
+      }
+      if (typeof fc.riskPerTradePct === 'number') setMaxRisk(fc.riskPerTradePct);
+      if (typeof fc.minRiskRewardRatio === 'number') setMinRiskReward(fc.minRiskRewardRatio);
+      if (typeof fc.maxBarsHeld === 'number') setMaxBarsHeld(fc.maxBarsHeld);
+      if (typeof fc.lookbackDays === 'number') setMinBarsHeld((fc as { minBarsHeld?: number }).minBarsHeld ?? 5);
+      if (typeof fc.maxLeverage === 'number') setLeverage(fc.maxLeverage);
+      if (typeof fc.confluenceThreshold === 'number') setConfluence(fc.confluenceThreshold);
+    }
+    // Seed the narrow config (dates, capital, ...) from the saved session.
+    // The session's `config` field is BacktestConfig minus strategyId.
+    const c = lastBacktestSession.config;
+    if (c) {
+      setConfig((prev) => ({
+        ...prev,
+        startDate: c.startDate ?? prev.startDate,
+        endDate: c.endDate ?? prev.endDate,
+        initialCapital: c.initialCapital ?? prev.initialCapital,
+        commissionPercentage: c.commissionPercentage ?? prev.commissionPercentage,
+        slippagePercentage: c.slippagePercentage ?? prev.slippagePercentage,
+        maxConcurrentPositions: c.maxConcurrentPositions ?? prev.maxConcurrentPositions,
+        timeframe: c.timeframe ?? prev.timeframe,
+      }));
+    }
+    seededForStrategyIdRef.current = currentStrategy.id;
+  }, [open, currentStrategy, lastBacktestSession]);
+
+  // Persist the current dialog inputs to the store on every change so a
+  // page reload reopens the dialog with the user's exact state. The
+  // existing resultSnapshot + logs are preserved — they only change when
+  // a new backtest completes (runBacktest writes the canonical session).
+  // BTCAAAAA-35963.
+  useEffect(() => {
+    if (!open) return;
+    if (!currentStrategy) return;
+    // Build the same fullConfig shape handleStart dispatches.
+    const fullConfig = {
+      strategyId: currentStrategy.id,
+      startDate: config.startDate,
+      endDate: config.endDate,
+      initialCapital: config.initialCapital,
+      commissionPercentage: config.commissionPercentage,
+      slippagePercentage: config.slippagePercentage,
+      maxConcurrentPositions: config.maxConcurrentPositions,
+      timeframe: config.timeframe,
+      lookbackDays: Number(lookbackDays),
+      trainingDays: Number(trainingDays),
+      testingDays: Number(testingDays),
+      mode: (mode === 'walk-forward' ? 'historical' : mode === 'walk' ? 'walk' : 'live_replay'),
+      tpslMode: tpSlConfig,
+      slAdjustmentMode: slAdjustment,
+      adaptiveSLPreset: adaptivePreset,
+      adaptiveSL: {
+        enabled: slAdjustment === 'Adaptive v2.0',
+        delayEnabled: delayStopLoss,
+        delayBars: Number(stopLossDelay),
+        emergencySlPct: Number(emergency),
+        volatilityLookback: Number(volatilityLookback),
+        volatilityMultiplier: Number(volatilityMultiplier),
+        minSlPct: Number(minStopLoss),
+        maxSlPct: Number(maxStopLoss),
+        useStructureSl: marketStructureStop,
+        structureSources: undefined,
+      },
+      riskPerTradePct: Number(maxRisk),
+      minRiskRewardRatio: Number(minRiskReward),
+      maxBarsHeld: Number(maxBarsHeld),
+      minBarsHeld: Number(minBarsHeld),
+      maxLeverage: Number(leverage),
+      confluenceThreshold: Number(confluence),
+    };
+    // Only persist once a session has been *actually* run (we need a
+    // resultSnapshot to bind to). Before the first run, the user has
+    // nothing to restore — and runBacktest writes the canonical session on
+    // success anyway.
+    if (!lastBacktestSession || lastBacktestSession.strategyId !== currentStrategy.id) {
+      return;
+    }
+    setLastBacktestSession({
+      strategyId: currentStrategy.id,
+      runId: lastBacktestSession.runId,
+      config: {
+        startDate: config.startDate,
+        endDate: config.endDate,
+        initialCapital: config.initialCapital,
+        commissionPercentage: config.commissionPercentage,
+        slippagePercentage: config.slippagePercentage,
+        maxConcurrentPositions: config.maxConcurrentPositions,
+        timeframe: config.timeframe,
+      },
+      // The literal `mode` here is the union 'historical' | 'walk' | 'live_replay'
+      // (dialog's 3 choices) but BacktestConfigFull.mode is the narrower
+      // 'historical' | 'live_replay'. We pass through the value the dialog
+      // actually holds; the existing handleStart builds a slightly different
+      // fullConfig (with snake_case fields) for the backend, so this is the
+      // seed-only shape, not the wire shape. Assert to keep TypeScript happy.
+      fullConfig: fullConfig as unknown as BacktestConfigFull,
+      resultSnapshot: lastBacktestSession.resultSnapshot ?? backTestResultForSeed,
+      logs: lastBacktestSession.logs ?? backTestLogsForSeed,
+      savedAt: new Date().toISOString(),
+    });
+    // We intentionally exclude lastBacktestSession/backTestResultForSeed/backTestLogsForSeed
+    // from deps — those are written by runBacktest on completion and would
+    // cause an immediate re-write that clobbers the canonical session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    open, currentStrategy?.id,
+    config.startDate, config.endDate, config.initialCapital,
+    config.commissionPercentage, config.slippagePercentage,
+    config.maxConcurrentPositions, config.timeframe,
+    lookbackDays, trainingDays, testingDays, mode, tpSlConfig, slAdjustment,
+    adaptivePreset, delayStopLoss, stopLossDelay, emergency,
+    volatilityLookback, volatilityMultiplier, minStopLoss, maxStopLoss,
+    marketStructureStop, maxRisk, minRiskReward, maxBarsHeld, minBarsHeld,
+    leverage, confluence,
+  ]);
 
   // Seed timeframe from current strategy when dialog opens
   useEffect(() => {

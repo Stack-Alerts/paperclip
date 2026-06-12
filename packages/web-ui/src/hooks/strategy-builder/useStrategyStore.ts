@@ -17,6 +17,7 @@ import {
   BacktestConfig,
   BacktestConfigFull,
   BacktestResult,
+  BacktestSession,
   BacktestStatusMessage,
   StrategySettings,
 } from '@/lib/strategy-builder/types';
@@ -34,6 +35,14 @@ function isBackendStrategyId(id: string | undefined | null): boolean {
 }
 
 const STORAGE_KEY = 'strategy_builder_strategies';
+// BTCAAAAA-35963: per-strategy backtest session persistence. The session
+// record holds the dialog's last *configuration* (config + fullConfig) plus
+// a cached *result snapshot* + logs, keyed by strategyId. Persisting this
+// in localStorage lets the dialog reopen with all inputs populated after
+// a page reload or server restart — the server's in-memory
+// `_backtest_runs[runId]` is not durable, so the snapshot is the source of
+// truth when the live result is no longer available.
+const SESSIONS_STORAGE_KEY = 'strategy_builder_backtest_sessions';
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -52,6 +61,35 @@ function loadFromStorage(): Strategy[] {
 function saveToStorage(strategies: Strategy[]) {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(strategies));
+}
+
+// Backtest session persistence helpers (BTCAAAAA-35963). The map is keyed
+// by strategyId so switching strategies preserves each strategy's own
+// last test/result/config. The store keeps a single in-memory record
+// (lastBacktestSession) — the *current* strategy's — and writes the map on
+// every change so reloading immediately shows the right one.
+function loadSessionsFromStorage(): Record<string, BacktestSession> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(SESSIONS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, BacktestSession>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSessionsToStorage(sessions: Record<string, BacktestSession>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
+  } catch {
+    // localStorage may be full or disabled (private mode); the in-memory
+    // copy still drives the current session, so we just lose the
+    // cross-reload durability for this strategy. Don't throw — callers
+    // already saved the run result via runBacktest's set() call.
+  }
 }
 
 function makeDefaultStrategy(name: string, description = ''): Strategy {
@@ -123,6 +161,13 @@ interface StrategyStoreState {
   // Output / STATUS panels can tail the run instead of waiting for the
   // 30-min poll loop to resolve. Cleared at run start.
   backTestLogs: BacktestStatusMessage[];
+  // BTCAAAAA-35963: persisted snapshot of the *current* strategy's last
+  // backtest (config + fullConfig + cached result + logs). Survives page
+  // reloads AND server restarts (the server's in-memory _backtest_runs
+  // entry is gone after a restart, so the resultSnapshot is the source of
+  // truth in that case). null when no test has been run for the current
+  // strategy yet.
+  lastBacktestSession: BacktestSession | null;
   fixedIssuesInSession: FixedIssueEntry[];
 
   // Actions
@@ -149,6 +194,17 @@ interface StrategyStoreState {
   highlightedLibraryBlockId: string | null;
   highlightLibraryBlock: (definitionId: string | null) => void;
   duplicateBlock: (fromIndex: number, position: number) => void;
+  // BTCAAAAA-35963: persist a complete backtest session (config + fullConfig
+  // + cached result + logs) for `strategyId`. Called by runBacktest on
+  // success and by the dialog when the user changes configuration so the
+  // change survives a reload.
+  setLastBacktestSession: (session: BacktestSession | null) => void;
+  // BTCAAAAA-35963: after hydrate / loadStrategy, ask the backend for the
+  // live result for the persisted runId. On 200, the live result wins and
+  // the snapshot is refreshed. On 404 (server restart cleared the
+  // in-memory run) the cached snapshot is kept and backTestResult is
+  // seeded from it so the UI shows the last-known numbers.
+  restoreBacktestSession: () => Promise<void>;
 }
 
 export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
@@ -169,6 +225,10 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
   backTestProgress: 0,
   backTestResult: null,
   backTestLogs: [],
+  // BTCAAAAA-35963: hydrated by hydrateFromLocalStorage() from
+  // SESSIONS_STORAGE_KEY for the strategy that hydration picks as
+  // current. null on first render / no saved session.
+  lastBacktestSession: null,
   fixedIssuesInSession: [],
 
   // Load localStorage state after client mount — keeps SSR/client renders in sync.
@@ -178,7 +238,24 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     const migrated = list.map(s => s.name === 'New_Strategy' ? { ...s, name: '' } : s);
     const migratedCurrent = current?.name === 'New_Strategy' ? { ...current, name: '' } : current;
     if (migrated.some((s, i) => s.name !== list[i].name)) saveToStorage(migrated);
-    set({ currentStrategy: migratedCurrent, strategyList: migrated });
+    // BTCAAAAA-35963: also restore the persisted backtest session for the
+    // strategy hydration just chose. The session is keyed by strategyId so
+    // each strategy keeps its own last test/result/config across reloads.
+    const sessions = loadSessionsFromStorage();
+    const restoredSession = migratedCurrent
+      ? sessions[migratedCurrent.id] ?? null
+      : null;
+    set({
+      currentStrategy: migratedCurrent,
+      strategyList: migrated,
+      lastBacktestSession: restoredSession,
+      // Seed the result/logs from the cached snapshot so the backtest panel
+      // shows the last-known numbers immediately on reload, before the
+      // (async) restoreBacktestSession() call below can fetch a fresher
+      // copy from the backend.
+      backTestResult: restoredSession?.resultSnapshot ?? null,
+      backTestLogs: restoredSession?.logs ?? [],
+    });
   },
 
   // Load existing strategy by ID
@@ -190,7 +267,19 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
       set({ isLoadingStrategy: false, strategyError: `Strategy ${id} not found` });
       return;
     }
-    set({ currentStrategy: strategy, isLoadingStrategy: false });
+    // BTCAAAAA-35963: switching to a different strategy must surface *that*
+    // strategy's last session (or nothing if it has never been tested).
+    // The previous strategy's session stays in SESSIONS_STORAGE_KEY keyed
+    // by its own id, so switching back later restores it.
+    const sessions = loadSessionsFromStorage();
+    const session = sessions[id] ?? null;
+    set({
+      currentStrategy: strategy,
+      isLoadingStrategy: false,
+      lastBacktestSession: session,
+      backTestResult: session?.resultSnapshot ?? null,
+      backTestLogs: session?.logs ?? [],
+    });
   },
 
   // Create new strategy (stored in localStorage)
@@ -205,6 +294,13 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
       strategyList: strategies,
       isLoadingStrategy: false,
       validationMessages: [],
+      // BTCAAAAA-35963: a brand-new strategy has never been tested — clear
+      // the prior strategy's session out of the live store. The persisted
+      // record for the previous strategy stays in SESSIONS_STORAGE_KEY so
+      // switching back to it still shows its last test.
+      lastBacktestSession: null,
+      backTestResult: null,
+      backTestLogs: [],
     });
   },
 
@@ -815,6 +911,36 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
             completedAt: status.completedAt ?? new Date().toISOString(),
           };
           set({ backTestResult: result, backTestInProgress: false, backTestProgress: 100 });
+          // BTCAAAAA-35963: persist this run as the current strategy's last
+          // backtest session. Both `config` (narrow) and `fullConfig` (every
+          // field the dialog bound) are captured so reopening the dialog
+          // re-populates every input verbatim. The result snapshot is the
+          // source of truth if the server restarts and loses the in-memory
+          // `_backtest_runs[runId]` map.
+          const { currentStrategy: owningStrategy, backTestLogs: tailLogs } = get();
+          if (owningStrategy && owningStrategy.id === strategyId) {
+            const session: BacktestSession = {
+              strategyId,
+              runId,
+              config: {
+                startDate: (config as BacktestConfig).startDate,
+                endDate: (config as BacktestConfig).endDate,
+                initialCapital: (config as BacktestConfig).initialCapital,
+                commissionPercentage: (config as BacktestConfig).commissionPercentage,
+                slippagePercentage: (config as BacktestConfig).slippagePercentage,
+                maxConcurrentPositions: (config as BacktestConfig).maxConcurrentPositions,
+                timeframe: (config as BacktestConfig).timeframe,
+              },
+              fullConfig: config as BacktestConfigFull,
+              resultSnapshot: result,
+              logs: tailLogs,
+              savedAt: new Date().toISOString(),
+            };
+            const all = loadSessionsFromStorage();
+            all[strategyId] = session;
+            saveSessionsToStorage(all);
+            set({ lastBacktestSession: session });
+          }
           return result;
         }
       }
@@ -905,6 +1031,119 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
       validationReport: null,
       validationMessages: [],
     });
+  },
+
+  // BTCAAAAA-35963: persist a backtest session (or clear it with null) for
+  // a strategy. Called by the dialog every time the user edits a config
+  // field (so changes survive a reload) and by runBacktest on completion.
+  setLastBacktestSession: (session) => {
+    if (session === null) {
+      set({ lastBacktestSession: null });
+      return;
+    }
+    const all = loadSessionsFromStorage();
+    all[session.strategyId] = session;
+    saveSessionsToStorage(all);
+    set({ lastBacktestSession: session });
+  },
+
+  // BTCAAAAA-35963: after hydrate / loadStrategy, attempt to fetch the
+  // live result for the persisted runId from the backend. If the server
+  // still has the in-memory run, the fresh result + logs replace the
+  // cached snapshot. If the run is gone (404 — most commonly a server
+  // restart), the cached snapshot stays as the source of truth so the
+  // user still sees the last test/result/config.
+  restoreBacktestSession: async () => {
+    const { lastBacktestSession, currentStrategy } = get();
+    if (!lastBacktestSession || !currentStrategy) return;
+    if (lastBacktestSession.strategyId !== currentStrategy.id) return;
+    try {
+      const status = (await apiGetBacktestResults(
+        lastBacktestSession.strategyId,
+        lastBacktestSession.runId,
+      )) as {
+        status: string;
+        progress?: number;
+        logs?: Array<{ message: string; level: string; timestamp: string }>;
+        metrics?: Record<string, unknown>;
+        trades?: unknown[];
+        error?: string | null;
+        startedAt?: string;
+        completedAt?: string | null;
+      };
+
+      if (status.status === 'done' || status.status === 'error') {
+        // Build a fresh result and persist it as the new snapshot.
+        const cfg = lastBacktestSession.fullConfig;
+        const m = status.metrics ?? {};
+        const live: BacktestResult = {
+          id: lastBacktestSession.runId,
+          strategyId: lastBacktestSession.strategyId,
+          runId: lastBacktestSession.runId,
+          status: 'completed',
+          startDate: cfg.startDate,
+          endDate: cfg.endDate,
+          initialCapital: m.initialCapital != null
+            ? Number(m.initialCapital)
+            : cfg.initialCapital,
+          finalCapital: m.finalCapital != null
+            ? Number(m.finalCapital)
+            : cfg.initialCapital * (1 + Number(m.returnPercentage ?? 0) / 100),
+          totalTrades: Number(m.totalTrades ?? (status.trades as unknown[])?.length ?? 0),
+          winningTrades: Number(m.winningTrades ?? 0),
+          losingTrades: Number(m.losingTrades ?? 0),
+          winRate: Number(m.winRate ?? 0),
+          totalReturn: Number(m.returnPercentage ?? 0),
+          returnPercentage: Number(m.returnPercentage ?? 0),
+          maxDrawdown: Number(m.maxDrawdown ?? 0),
+          sharpeRatio: Number(m.sharpeRatio ?? 0),
+          sortino_ratio: Number(m.sortinoRatio ?? m.sortino_ratio ?? 0),
+          calmar_ratio: m.calmarRatio != null
+            ? Number(m.calmarRatio)
+            : m.calmar_ratio != null ? Number(m.calmar_ratio) : undefined,
+          profitFactor: Number(m.profitFactor ?? 0),
+          averageWin: Number(m.averageWin ?? 0),
+          averageLoss: Number(m.averageLoss ?? 0),
+          totalBars: Number(m.totalBars ?? 0),
+          trades: (status.trades as BacktestResult['trades']) ?? [],
+          createdAt: status.startedAt ?? lastBacktestSession.resultSnapshot.createdAt,
+          completedAt: status.completedAt ?? new Date().toISOString(),
+        };
+        const freshLogs: BacktestStatusMessage[] = Array.isArray(status.logs)
+          ? status.logs.map((l) => ({
+              message: l.message,
+              level: (l.level as BacktestStatusMessage['level']) ?? 'INFO',
+              timestamp: l.timestamp,
+            }))
+          : lastBacktestSession.logs;
+        const refreshed: BacktestSession = {
+          ...lastBacktestSession,
+          resultSnapshot: live,
+          logs: freshLogs,
+          savedAt: new Date().toISOString(),
+        };
+        const all = loadSessionsFromStorage();
+        all[refreshed.strategyId] = refreshed;
+        saveSessionsToStorage(all);
+        set({
+          lastBacktestSession: refreshed,
+          backTestResult: live,
+          backTestLogs: freshLogs,
+        });
+      } else if (status.status === 'running') {
+        // Server still has the run mid-flight — reflect that in the UI but
+        // don't replace the snapshot (we don't have final metrics yet).
+        set({ backTestInProgress: true, backTestProgress: status.progress ?? 0 });
+      }
+    } catch (err) {
+      // 404 or network error: the cached snapshot is the source of truth
+      // and hydrateFromLocalStorage already seeded backTestResult from it,
+      // so this is a graceful no-op.
+      const msg = err instanceof Error ? err.message : '';
+      if (!/\b404\b/.test(msg)) {
+        console.warn('restoreBacktestSession: backend unreachable, keeping cached snapshot', err);
+      }
+    }
   },
 
   highlightedLibraryBlockId: null,
