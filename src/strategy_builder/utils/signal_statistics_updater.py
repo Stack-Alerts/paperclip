@@ -41,7 +41,7 @@ class SignalStatisticsUpdater:
             stats_file: Path to statistics JSON file (default: data/catalog/signal_occurrence_statistics.json)
         """
         if stats_file is None:
-            self.stats_file = Path(__file__).parent.parent.parent / 'data' / 'catalog' / 'signal_occurrence_statistics.json'
+            self.stats_file = Path(__file__).parent.parent.parent.parent / 'data' / 'catalog' / 'signal_occurrence_statistics.json'
         else:
             self.stats_file = Path(stats_file)
         
@@ -193,19 +193,28 @@ class SignalStatisticsUpdater:
                     logger.info(f"ℹ️  No new signals found on new dates for {block_name}")
                     return True
                 
-                # Load current statistics
+                # Load current statistics — bootstrap file when it doesn't exist yet
                 if not self.stats_file.exists():
-                    logger.error(f"❌ Statistics file not found: {self.stats_file}")
-                    return False
+                    self.stats_file.parent.mkdir(parents=True, exist_ok=True)
+                    bootstrap = {
+                        'analysis_date': datetime.now().isoformat(),
+                        'data_days': 0,
+                        'total_blocks': 0,
+                        'last_updated': datetime.now().isoformat(),
+                        'blocks': {},
+                        'update_history': [],
+                    }
+                    self._save_stats_atomic(bootstrap)
+                    logger.info("✅ Bootstrapped empty signal_occurrence_statistics.json")
                 
                 with open(self.stats_file, 'r') as f:
                     stats = json.load(f)
                 
-                # Get block stats
-                blocks = stats.get('blocks', {})
+                # Get block stats — create entry on first encounter
+                blocks = stats.setdefault('blocks', {})
                 if block_name not in blocks:
-                    logger.error(f"❌ Block {block_name} not found in statistics")
-                    return False
+                    blocks[block_name] = {'total_candles': 0, 'signals': {}}
+                    stats['total_blocks'] = len(blocks)
                 
                 block_stats = blocks[block_name]
                 signals = block_stats.get('signals', {})
