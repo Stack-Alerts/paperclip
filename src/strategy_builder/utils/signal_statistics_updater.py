@@ -183,16 +183,27 @@ class SignalStatisticsUpdater:
                     return True
                 
                 # Count only signals on truly new dates
+                # new_signal_counts[signal] = number of candle-bars where signal fired on new dates
+                # new_candle_counts = total candle-bars seen on new dates (denominator for percentages)
                 new_signal_counts = defaultdict(int)
+                new_candle_counts = defaultdict(int)  # per-signal candle total (same date list)
                 for signal, dates in signal_occurrences.items():
                     for d in dates:
                         if d in truly_new_dates:
                             new_signal_counts[signal] += 1
-                
+                            new_candle_counts[signal] += 1
+
+                # Also count total new candle-bars from any signal's date list
+                all_new_bars = sum(
+                    1 for dates in signal_occurrences.values() for d in dates if d in truly_new_dates
+                )
+                # Fallback: use date count if no bar-level data
+                total_new_candles_actual = all_new_bars if all_new_bars > 0 else len(truly_new_dates)
+
                 if not new_signal_counts:
                     logger.info(f"ℹ️  No new signals found on new dates for {block_name}")
                     return True
-                
+
                 # Load current statistics — bootstrap file when it doesn't exist yet
                 if not self.stats_file.exists():
                     self.stats_file.parent.mkdir(parents=True, exist_ok=True)
@@ -206,23 +217,22 @@ class SignalStatisticsUpdater:
                     }
                     self._save_stats_atomic(bootstrap)
                     logger.info("✅ Bootstrapped empty signal_occurrence_statistics.json")
-                
+
                 with open(self.stats_file, 'r') as f:
                     stats = json.load(f)
-                
+
                 # Get block stats — create entry on first encounter
                 blocks = stats.setdefault('blocks', {})
                 if block_name not in blocks:
                     blocks[block_name] = {'total_candles': 0, 'signals': {}}
                     stats['total_blocks'] = len(blocks)
-                
+
                 block_stats = blocks[block_name]
                 signals = block_stats.get('signals', {})
-                
-                # Update counts and recalculate percentages
-                total_new_candles = len(truly_new_dates)
+
+                # Update counts: total_candles tracks actual bars evaluated, not dates
                 old_total_candles = block_stats.get('total_candles', 0)
-                new_total_candles = old_total_candles + total_new_candles
+                new_total_candles = old_total_candles + total_new_candles_actual
                 
                 for signal, new_count in new_signal_counts.items():
                     if signal not in signals:
