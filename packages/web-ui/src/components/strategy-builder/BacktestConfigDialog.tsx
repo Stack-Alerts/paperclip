@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useCallback, useContext, useEffect, useRef, createContext } from 'react';
+import { useState, useCallback, useContext, useEffect, useRef, createContext, startTransition } from 'react';
 import { X, Play, Square, Pause, Settings, Terminal, TrendingUp, BarChart3, BarChart2, Sparkles, GitCompare, ChevronUp, ChevronDown } from 'lucide-react';
 import { AppBrand } from '@/components/shared/AppBrand';
 import { ThemeSelector } from './ThemeSelector';
 import { useTooltipSettings } from './TooltipSettingsContext';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
-import { BacktestConfig, BacktestConfigFull, BacktestResult, BacktestStatusMessage } from '@/lib/strategy-builder/types';
+import { BacktestConfig, BacktestConfigFull, BacktestStatusMessage } from '@/lib/strategy-builder/types';
 import { getBacktestResults } from '@/lib/strategy-builder/api';
 import { RichTooltip, type TooltipContent } from './RichTooltip';
 import {
@@ -1493,59 +1493,64 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
       seededForStrategyIdRef.current = currentStrategy.id;
       return;
     }
-    const fc = lastBacktestSession.fullConfig;
-    if (fc) {
-      if (typeof fc.lookbackDays === 'number') setLookbackDays(fc.lookbackDays);
-      if (typeof fc.trainingDays === 'number') setTrainingDays(fc.trainingDays);
-      if (typeof fc.testingDays === 'number') setTestingDays(fc.testingDays);
-      if (fc.mode === 'historical') setMode('walk-forward');
-      else if (fc.mode === 'live_replay') setMode('live-replay');
-      // The dialog has 3 modes (walk-forward / walk / live-replay) but
-      // BacktestConfigFull.mode only enumerates 2 ('historical' / 'live_replay').
-      // Persisted 'walk' is impossible under the strict type but pre-existing
-      // sessions in localStorage from before this fix may carry it; the else
-      // branch keeps the dialog's default rather than silently no-op'ing.
-      else setMode('walk');
-      if (fc.tpslMode === 'Fibonacci' || fc.tpslMode === 'Hybrid' || fc.tpslMode === 'Fixed') {
-        setTpSlConfig(fc.tpslMode);
+    // Batch all seed setState calls in startTransition so React treats them
+    // as a single low-priority update instead of cascading synchronous renders
+    // (satisfies react-compiler/react-compiler lint rule, BTCAAAAA-36116).
+    startTransition(() => {
+      const fc = lastBacktestSession.fullConfig;
+      if (fc) {
+        if (typeof fc.lookbackDays === 'number') setLookbackDays(fc.lookbackDays);
+        if (typeof fc.trainingDays === 'number') setTrainingDays(fc.trainingDays);
+        if (typeof fc.testingDays === 'number') setTestingDays(fc.testingDays);
+        if (fc.mode === 'historical') setMode('walk-forward');
+        else if (fc.mode === 'live_replay') setMode('live-replay');
+        // The dialog has 3 modes (walk-forward / walk / live-replay) but
+        // BacktestConfigFull.mode only enumerates 2 ('historical' / 'live_replay').
+        // Persisted 'walk' is impossible under the strict type but pre-existing
+        // sessions in localStorage from before this fix may carry it; the else
+        // branch keeps the dialog's default rather than silently no-op'ing.
+        else setMode('walk');
+        if (fc.tpslMode === 'Fibonacci' || fc.tpslMode === 'Hybrid' || fc.tpslMode === 'Fixed') {
+          setTpSlConfig(fc.tpslMode);
+        }
+        if (fc.slAdjustmentMode === 'Adaptive v2.0' || fc.slAdjustmentMode === 'Static') {
+          setSlAdjustment(fc.slAdjustmentMode);
+        }
+        if (fc.adaptiveSLPreset) setAdaptivePreset(fc.adaptiveSLPreset as typeof adaptivePreset);
+        const adaptive = fc.adaptiveSL;
+        if (adaptive) {
+          if (typeof adaptive.delayEnabled === 'boolean') setDelayStopLoss(adaptive.delayEnabled);
+          if (typeof adaptive.delayBars === 'number') setStopLossDelay(adaptive.delayBars);
+          if (typeof adaptive.emergencySlPct === 'number') setEmergency(adaptive.emergencySlPct);
+          if (typeof adaptive.volatilityLookback === 'number') setVolatilityLookback(adaptive.volatilityLookback);
+          if (typeof adaptive.volatilityMultiplier === 'number') setVolatilityMultiplier(adaptive.volatilityMultiplier);
+          if (typeof adaptive.minSlPct === 'number') setMinStopLoss(adaptive.minSlPct);
+          if (typeof adaptive.maxSlPct === 'number') setMaxStopLoss(adaptive.maxSlPct);
+          if (typeof adaptive.useStructureSl === 'boolean') setMarketStructureStop(adaptive.useStructureSl);
+        }
+        if (typeof fc.riskPerTradePct === 'number') setMaxRisk(fc.riskPerTradePct);
+        if (typeof fc.minRiskRewardRatio === 'number') setMinRiskReward(fc.minRiskRewardRatio);
+        if (typeof fc.maxBarsHeld === 'number') setMaxBarsHeld(fc.maxBarsHeld);
+        if (typeof fc.lookbackDays === 'number') setMinBarsHeld((fc as { minBarsHeld?: number }).minBarsHeld ?? 5);
+        if (typeof fc.maxLeverage === 'number') setLeverage(fc.maxLeverage);
+        if (typeof fc.confluenceThreshold === 'number') setConfluence(fc.confluenceThreshold);
       }
-      if (fc.slAdjustmentMode === 'Adaptive v2.0' || fc.slAdjustmentMode === 'Static') {
-        setSlAdjustment(fc.slAdjustmentMode);
+      // Seed the narrow config (dates, capital, ...) from the saved session.
+      // The session's `config` field is BacktestConfig minus strategyId.
+      const c = lastBacktestSession.config;
+      if (c) {
+        setConfig((prev) => ({
+          ...prev,
+          startDate: c.startDate ?? prev.startDate,
+          endDate: c.endDate ?? prev.endDate,
+          initialCapital: c.initialCapital ?? prev.initialCapital,
+          commissionPercentage: c.commissionPercentage ?? prev.commissionPercentage,
+          slippagePercentage: c.slippagePercentage ?? prev.slippagePercentage,
+          maxConcurrentPositions: c.maxConcurrentPositions ?? prev.maxConcurrentPositions,
+          timeframe: c.timeframe ?? prev.timeframe,
+        }));
       }
-      if (fc.adaptiveSLPreset) setAdaptivePreset(fc.adaptiveSLPreset as typeof adaptivePreset);
-      const adaptive = fc.adaptiveSL;
-      if (adaptive) {
-        if (typeof adaptive.delayEnabled === 'boolean') setDelayStopLoss(adaptive.delayEnabled);
-        if (typeof adaptive.delayBars === 'number') setStopLossDelay(adaptive.delayBars);
-        if (typeof adaptive.emergencySlPct === 'number') setEmergency(adaptive.emergencySlPct);
-        if (typeof adaptive.volatilityLookback === 'number') setVolatilityLookback(adaptive.volatilityLookback);
-        if (typeof adaptive.volatilityMultiplier === 'number') setVolatilityMultiplier(adaptive.volatilityMultiplier);
-        if (typeof adaptive.minSlPct === 'number') setMinStopLoss(adaptive.minSlPct);
-        if (typeof adaptive.maxSlPct === 'number') setMaxStopLoss(adaptive.maxSlPct);
-        if (typeof adaptive.useStructureSl === 'boolean') setMarketStructureStop(adaptive.useStructureSl);
-      }
-      if (typeof fc.riskPerTradePct === 'number') setMaxRisk(fc.riskPerTradePct);
-      if (typeof fc.minRiskRewardRatio === 'number') setMinRiskReward(fc.minRiskRewardRatio);
-      if (typeof fc.maxBarsHeld === 'number') setMaxBarsHeld(fc.maxBarsHeld);
-      if (typeof fc.lookbackDays === 'number') setMinBarsHeld((fc as { minBarsHeld?: number }).minBarsHeld ?? 5);
-      if (typeof fc.maxLeverage === 'number') setLeverage(fc.maxLeverage);
-      if (typeof fc.confluenceThreshold === 'number') setConfluence(fc.confluenceThreshold);
-    }
-    // Seed the narrow config (dates, capital, ...) from the saved session.
-    // The session's `config` field is BacktestConfig minus strategyId.
-    const c = lastBacktestSession.config;
-    if (c) {
-      setConfig((prev) => ({
-        ...prev,
-        startDate: c.startDate ?? prev.startDate,
-        endDate: c.endDate ?? prev.endDate,
-        initialCapital: c.initialCapital ?? prev.initialCapital,
-        commissionPercentage: c.commissionPercentage ?? prev.commissionPercentage,
-        slippagePercentage: c.slippagePercentage ?? prev.slippagePercentage,
-        maxConcurrentPositions: c.maxConcurrentPositions ?? prev.maxConcurrentPositions,
-        timeframe: c.timeframe ?? prev.timeframe,
-      }));
-    }
+    });
     seededForStrategyIdRef.current = currentStrategy.id;
   }, [open, currentStrategy, lastBacktestSession]);
 
