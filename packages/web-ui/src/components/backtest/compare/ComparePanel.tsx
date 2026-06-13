@@ -205,12 +205,12 @@ function RunCard({
       style={{
         position: 'relative',
         background: 'var(--bg-card)',
-        border: `1px solid ${selected ? accentColor : 'var(--border)'}`,
+        border: '1px solid var(--border)',
         borderRadius: 6,
         padding: '10px 12px',
         opacity: disabled && !selected ? 0.4 : 1,
         cursor: disabled && !selected ? 'not-allowed' : 'pointer',
-        transition: 'border-color 0.15s, opacity 0.15s',
+        transition: 'opacity 0.15s',
       }}
     >
       {selected && (
@@ -566,40 +566,51 @@ export function ComparePanel({ currentResult }: ComparePanelProps) {
               return (
                 <div
                   key={r.runId}
-                  className="rounded p-3"
+                  className="rounded px-3 py-2 flex items-center gap-3"
                   style={{
                     background: 'var(--bg-card)',
                     border: '1px solid var(--border)',
-                    borderTop: `3px solid ${colColors[i]}`,
+                    borderLeft: `3px solid ${colColors[i]}`,
                   }}
                 >
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <span
-                      className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                      style={{ background: `${colColors[i]}20`, color: colColors[i] }}
-                    >
-                      Run {i + 1}
-                    </span>
-                    {i === 0 && (
-                      <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>baseline</span>
-                    )}
+                  {/* Left: badge + name + dates */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span
+                        className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                        style={{ background: `${colColors[i]}20`, color: colColors[i] }}
+                      >
+                        Run {i + 1}
+                      </span>
+                      {i === 0 && (
+                        <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-faint)' }}>baseline</span>
+                      )}
+                      <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
+                        {r.strategyName}
+                      </p>
+                    </div>
+                    <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                      {fmtDate(r.result.startDate ?? r.config?.startDate ?? r.fullConfig?.startDate)}
+                      {' → '}
+                      {fmtDate(r.result.endDate ?? r.config?.endDate ?? r.fullConfig?.endDate)}
+                    </p>
                   </div>
-                  <p className="text-xs font-semibold truncate mb-0.5" style={{ color: 'var(--text-secondary)' }}>
-                    {r.strategyName}
-                  </p>
-                  <p className="text-[10px] mb-2" style={{ color: 'var(--text-faint)' }}>
-                    {fmtDateTime(r.savedAt)}
-                  </p>
-                  {equityVals.length >= 2
-                    ? <div className="mb-2"><Sparkline values={equityVals} color={colColors[i]} height={44} /></div>
-                    : <div style={{ height: 44, marginBottom: 8 }} />
-                  }
-                  <p className="text-base font-bold tabular-nums" style={{ color: colorReturn(r.result.returnPercentage) }}>
-                    {fmtPct(r.result.returnPercentage)}
-                  </p>
-                  <p className="text-xs tabular-nums" style={{ color: colorReturn(r.result.returnPercentage) }}>
-                    {fmtUSD(r.result.finalCapital - r.result.initialCapital, true)}
-                  </p>
+                  {/* Right: sparkline + return% + profit */}
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    {equityVals.length >= 2 && (
+                      <div style={{ width: 64 }}>
+                        <Sparkline values={equityVals} color={colColors[i]} height={32} />
+                      </div>
+                    )}
+                    <div className="text-right">
+                      <p className="text-sm font-bold tabular-nums leading-tight" style={{ color: colorReturn(r.result.returnPercentage) }}>
+                        {fmtPct(r.result.returnPercentage)}
+                      </p>
+                      <p className="text-xs tabular-nums leading-tight" style={{ color: colorReturn(r.result.returnPercentage) }}>
+                        {fmtUSD(r.result.finalCapital - r.result.initialCapital, true)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               );
             })}
