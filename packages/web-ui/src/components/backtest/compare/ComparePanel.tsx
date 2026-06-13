@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, X, Plus, GitCompare, ChevronUp, ChevronDown, Minus } from 'lucide-react';
+import { Search, X, Plus, GitCompare, ChevronUp, ChevronDown, Minus, CheckCircle2 } from 'lucide-react';
 import { loadAllRunRecords, deleteRunRecord } from '@/lib/backtest-history';
 import type { BacktestRunRecord, BacktestResult, BacktestConfigFull } from '@/lib/strategy-builder/types';
 
@@ -12,14 +12,13 @@ export interface ComparePanelProps {
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
-
 function fmt(n: number | undefined | null, decimals = 2): string {
   if (n == null || !isFinite(n)) return '—';
   return n.toFixed(decimals);
 }
-function fmtRet(n: number | undefined | null): string {
+function fmtPct(n: number | undefined | null, decimals = 2): string {
   if (n == null || !isFinite(n)) return '—';
-  return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
+  return `${n >= 0 ? '+' : ''}${n.toFixed(decimals)}%`;
 }
 function fmtDate(iso: string | undefined | null): string {
   if (!iso) return '—';
@@ -32,14 +31,23 @@ function fmtDateTime(iso: string | undefined | null): string {
     return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   } catch { return iso; }
 }
-function fmtUSD(n: number | undefined | null): string {
+function fmtUSD(n: number | undefined | null, showSign = false): string {
   if (n == null || !isFinite(n)) return '—';
-  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const abs = Math.abs(n);
+  const sign = showSign ? (n >= 0 ? '+' : '-') : n < 0 ? '-' : '';
+  return `${sign}$${abs.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
-function colorForReturn(v: number | undefined | null): string {
+function colorReturn(v: number | undefined | null): string {
   if (v == null) return 'var(--text-secondary)';
   return v >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
 }
+
+// ── Per-slot accent colors — blue / violet / amber ────────────────────────────
+const RUN_COLORS = [
+  'var(--accent-blue)',
+  '#a78bfa',
+  '#f59e0b',
+] as const;
 
 // ── Sparkline ─────────────────────────────────────────────────────────────────
 function Sparkline({ values, color, height = 40 }: { values: number[]; color: string; height?: number }) {
@@ -47,10 +55,10 @@ function Sparkline({ values, color, height = 40 }: { values: number[]; color: st
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
-  const W = 120, H = 40;
+  const W = 120, H = height;
   const pts = values.map((v, i) => {
     const x = (i / (values.length - 1)) * W;
-    const y = H - ((v - min) / range) * H;
+    const y = H - ((v - min) / range) * H * 0.85 - H * 0.075;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
   return (
@@ -60,74 +68,53 @@ function Sparkline({ values, color, height = 40 }: { values: number[]; color: st
   );
 }
 
-function SectionLabel({ title }: { title: string }) {
+// ── Section header — matches MetricsPanel pattern ─────────────────────────────
+function SectionHeader({ title }: { title: string }) {
   return (
-    <p className="text-[10px] font-semibold uppercase tracking-widest mt-4 mb-2 first:mt-0" style={{ color: 'var(--text-muted)' }}>
+    <p className="text-xs font-medium uppercase tracking-wide mt-5 mb-2 first:mt-0" style={{ color: 'var(--text-muted)' }}>
       {title}
     </p>
   );
 }
 
-// ── Diff badge ────────────────────────────────────────────────────────────────
-function DiffBadge({ base, compare }: { base: number; compare: number }) {
+// ── Delta badge ───────────────────────────────────────────────────────────────
+function DeltaBadge({ base, compare, higherIsBetter = true }: { base: number; compare: number; higherIsBetter?: boolean }) {
   const delta = compare - base;
-  if (Math.abs(delta) < 0.0001) return null;
-  const color = delta > 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-  const prefix = delta > 0 ? '+' : '';
+  if (Math.abs(delta) < 0.001) return null;
+  const positive = higherIsBetter ? delta > 0 : delta < 0;
+  const color = positive ? 'var(--accent-green)' : 'var(--accent-red)';
   return (
-    <span className="ml-1 text-[10px]" style={{ color }}>
-      ({prefix}{fmt(delta)})
+    <span className="ml-1 text-[10px] tabular-nums" style={{ color }}>
+      ({delta > 0 ? '+' : ''}{fmt(delta, Math.abs(delta) < 1 ? 3 : 1)})
     </span>
   );
 }
 
-// ── Config diff row ───────────────────────────────────────────────────────────
-function ConfigDiffRow({ label, values }: {
-  label: string;
-  values: (string | number | boolean | undefined | null)[];
-}) {
-  const strVals = values.map(v => v == null ? '—' : String(v));
-  const allSame = strVals.every(v => v === strVals[0]);
-  return (
-    <tr style={{ borderBottom: '1px solid var(--border)' }}>
-      <td className="py-1.5 pr-3 text-[11px] whitespace-nowrap" style={{ color: 'var(--text-muted)', minWidth: 140 }}>
-        {label}
-      </td>
-      {strVals.map((v, i) => (
-        <td key={i} className="py-1.5 px-2 text-[11px] text-center" style={{
-          color: (!allSame && i > 0) ? 'var(--accent-yellow, #f0a500)' : 'var(--text-secondary)',
-          background: (!allSame && i > 0) ? 'rgba(240,165,0,0.07)' : 'transparent',
-          fontVariantNumeric: 'tabular-nums',
-        }}>
-          {v}
-        </td>
-      ))}
-    </tr>
-  );
-}
-
-// ── Metric comparison row ─────────────────────────────────────────────────────
-function MetricRow({ label, values, colorFn, suffix = '', prefix = '' }: {
+// ── Metric table row ──────────────────────────────────────────────────────────
+function MetricRow({
+  label, values, fmtFn, colorFn, higherIsBetter = true, isEven = false,
+}: {
   label: string;
   values: (number | undefined | null)[];
+  fmtFn?: (v: number) => string;
   colorFn?: (v: number | null) => string;
-  suffix?: string;
-  prefix?: string;
+  higherIsBetter?: boolean;
+  isEven?: boolean;
 }) {
   const baseVal = values[0] ?? null;
+  const format = fmtFn ?? ((v: number) => fmt(v));
   return (
-    <tr style={{ borderBottom: '1px solid var(--border)' }}>
-      <td className="py-1.5 pr-3 text-[11px] whitespace-nowrap" style={{ color: 'var(--text-muted)', minWidth: 140 }}>
+    <tr style={{ background: isEven ? 'var(--bg-deep)' : 'transparent' }}>
+      <td className="py-2 pl-3 pr-4 text-xs" style={{ color: 'var(--text-muted)', width: 160 }}>
         {label}
       </td>
       {values.map((v, i) => {
-        const str = v == null ? '—' : `${prefix}${fmt(v)}${suffix}`;
         const color = colorFn ? colorFn(v ?? null) : 'var(--text-secondary)';
         return (
-          <td key={i} className="py-1.5 px-2 text-[11px] text-center" style={{ color, fontVariantNumeric: 'tabular-nums' }}>
-            {str}
+          <td key={i} className="py-2 px-3 text-xs text-center tabular-nums" style={{ color }}>
+            {v == null ? <span style={{ color: 'var(--text-faint)' }}>—</span> : format(v)}
             {i > 0 && v != null && baseVal != null && (
-              <DiffBadge base={baseVal} compare={v} />
+              <DeltaBadge base={baseVal} compare={v} higherIsBetter={higherIsBetter} />
             )}
           </td>
         );
@@ -136,98 +123,170 @@ function MetricRow({ label, values, colorFn, suffix = '', prefix = '' }: {
   );
 }
 
+// ── Config diff row ───────────────────────────────────────────────────────────
+function ConfigRow({
+  label, values, isEven = false,
+}: {
+  label: string;
+  values: (string | number | boolean | undefined | null)[];
+  isEven?: boolean;
+}) {
+  const strs = values.map(v => (v == null || v === '') ? '—' : String(v));
+  const allSame = strs.every(v => v === strs[0]);
+  return (
+    <tr style={{ background: isEven ? 'var(--bg-deep)' : 'transparent' }}>
+      <td className="py-2 pl-3 pr-4 text-xs" style={{ color: 'var(--text-muted)', width: 160 }}>
+        {label}
+      </td>
+      {strs.map((v, i) => (
+        <td
+          key={i}
+          className="py-2 px-3 text-xs text-center tabular-nums"
+          style={{
+            color: !allSame && i > 0 ? 'var(--accent-yellow, #f59e0b)' : 'var(--text-secondary)',
+            fontWeight: !allSame && i > 0 ? 500 : 400,
+          }}
+        >
+          {v}
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+// ── Table wrapper with per-run column headers ──────────────────────────────────
+function CompareTable({
+  colLabels, colColors, children,
+}: {
+  colLabels: string[];
+  colColors: string[];
+  children: React.ReactNode;
+}) {
+  return (
+    <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+      <colgroup>
+        <col style={{ width: 160 }} />
+        {colLabels.map((_, i) => <col key={i} />)}
+      </colgroup>
+      <thead>
+        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+          <th className="pb-1.5 pl-3" />
+          {colLabels.map((l, i) => (
+            <th key={i} className="pb-1.5 px-3 text-xs font-semibold text-center" style={{ color: colColors[i] }}>
+              {l}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>{children}</tbody>
+    </table>
+  );
+}
+
 // ── Run card ──────────────────────────────────────────────────────────────────
 function RunCard({
-  record, selected, onSelect, onRemove, disabled,
+  record, selected, onSelect, onRemove, disabled, slotColor,
 }: {
   record: BacktestRunRecord;
   selected: boolean;
   onSelect: () => void;
   onRemove: () => void;
   disabled: boolean;
+  slotColor?: string;
 }) {
   const r = record.result;
-  const equityVals = (r.equityCurve ?? []).map(p => p.value);
+  const equityVals = (r.equityCurve ?? []).map((p: { value: number }) => p.value);
   const profit = r.finalCapital - r.initialCapital;
+  const accentColor = slotColor ?? (profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)');
+
   return (
     <div
-      className="rounded p-3 cursor-pointer transition-all"
       onClick={disabled && !selected ? undefined : onSelect}
       style={{
-        border: `1px solid ${selected ? 'rgba(46,140,255,0.6)' : 'var(--border)'}`,
-        background: selected ? 'rgba(46,140,255,0.08)' : 'var(--bg-card)',
-        opacity: disabled && !selected ? 0.45 : 1,
+        position: 'relative',
+        background: 'var(--bg-card)',
+        border: `1px solid ${selected ? accentColor : 'var(--border)'}`,
+        borderRadius: 6,
+        padding: '10px 12px',
+        opacity: disabled && !selected ? 0.4 : 1,
         cursor: disabled && !selected ? 'not-allowed' : 'pointer',
+        transition: 'border-color 0.15s, opacity 0.15s',
       }}
     >
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
-            {record.strategyName}
-          </p>
-          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-            {fmtDateTime(record.savedAt)}
-          </p>
+      {selected && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, bottom: 0, width: 3,
+          background: accentColor, borderRadius: '6px 0 0 6px',
+        }} />
+      )}
+      <div style={{ paddingLeft: selected ? 6 : 0 }}>
+        {/* Header */}
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
+              {record.strategyName}
+            </p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
+              {fmtDateTime(record.savedAt)}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {selected && <CheckCircle2 size={13} style={{ color: accentColor }} />}
+            <button
+              onClick={e => { e.stopPropagation(); onRemove(); }}
+              className="p-0.5 rounded"
+              title="Remove from history"
+              style={{ color: 'var(--text-faint)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent-red)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}
+            >
+              <X size={12} />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {selected && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-[3px]" style={{
-              background: 'rgba(46,140,255,0.18)', color: 'var(--accent-blue)', border: '1px solid rgba(46,140,255,0.35)',
-            }}>
-              Selected
-            </span>
+        {/* Metrics + sparkline */}
+        <div className="flex items-end gap-3">
+          <div className="flex-1 min-w-0 space-y-1">
+            <div className="flex items-baseline gap-2.5">
+              <span className="text-sm font-bold tabular-nums" style={{ color: colorReturn(r.returnPercentage) }}>
+                {fmtPct(r.returnPercentage)}
+              </span>
+              <span className="text-xs tabular-nums" style={{ color: colorReturn(profit) }}>
+                {fmtUSD(profit, true)}
+              </span>
+            </div>
+            <div className="flex gap-3">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                WR <span style={{ color: r.winRate >= 0.5 ? 'var(--accent-green)' : 'var(--text-secondary)' }}>
+                  {(r.winRate * 100).toFixed(1)}%
+                </span>
+              </span>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{r.totalTrades} trades</span>
+              <span className="text-xs tabular-nums" style={{ color: 'var(--accent-orange, #f97316)' }}>
+                DD {(r.maxDrawdown * 100).toFixed(1)}%
+              </span>
+            </div>
+            <div className="flex gap-3">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                PF <span style={{ color: 'var(--text-secondary)' }}>{r.profitFactor.toFixed(2)}</span>
+              </span>
+              <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                {fmtDate(record.config?.startDate ?? record.fullConfig?.startDate)}–{fmtDate(record.config?.endDate ?? record.fullConfig?.endDate)}
+              </span>
+            </div>
+          </div>
+          {equityVals.length >= 2 && (
+            <div style={{ width: 68, flexShrink: 0 }}>
+              <Sparkline values={equityVals} color={accentColor} height={38} />
+            </div>
           )}
-          <button
-            onClick={e => { e.stopPropagation(); onRemove(); }}
-            className="p-0.5 rounded transition-colors"
-            title="Remove from history"
-            style={{ color: 'var(--text-faint)' }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent-red)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}
-          >
-            <X size={12} />
-          </button>
         </div>
-      </div>
-      <div className="flex gap-3 items-end">
-        <div className="flex-1 min-w-0 space-y-0.5">
-          <div className="flex gap-2 flex-wrap">
-            <span className="text-[11px] font-semibold" style={{ color: colorForReturn(r.returnPercentage), fontVariantNumeric: 'tabular-nums' }}>
-              {fmtRet(r.returnPercentage)}
-            </span>
-            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-              WR {(r.winRate * 100).toFixed(1)}%
-            </span>
-            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-              {r.totalTrades} trades
-            </span>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <span className="text-[10px]" style={{ color: profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', fontVariantNumeric: 'tabular-nums' }}>
-              {profit >= 0 ? '+' : ''}{fmtUSD(profit)}
-            </span>
-            <span className="text-[10px]" style={{ color: 'var(--accent-orange)' }}>
-              DD {(r.maxDrawdown * 100).toFixed(1)}%
-            </span>
-            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-              PF {r.profitFactor.toFixed(2)}
-            </span>
-          </div>
-          <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
-            {fmtDate(record.config?.startDate ?? record.fullConfig?.startDate)} → {fmtDate(record.config?.endDate ?? record.fullConfig?.endDate)}
-          </p>
-        </div>
-        {equityVals.length >= 2 && (
-          <div style={{ width: 70, flexShrink: 0 }}>
-            <Sparkline values={equityVals} color={profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'} height={36} />
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-// ── Sort controls ─────────────────────────────────────────────────────────────
+// ── Sort helpers ──────────────────────────────────────────────────────────────
 type SortKey = 'date' | 'return' | 'winRate' | 'profit' | 'drawdown';
 
 function sortRecords(records: BacktestRunRecord[], key: SortKey, dir: 'asc' | 'desc'): BacktestRunRecord[] {
@@ -242,7 +301,7 @@ function sortRecords(records: BacktestRunRecord[], key: SortKey, dir: 'asc' | 'd
   });
 }
 
-// ── Config rows extractor ─────────────────────────────────────────────────────
+// ── Config rows ───────────────────────────────────────────────────────────────
 function extractConfigRows(records: BacktestRunRecord[]) {
   const g = (r: BacktestRunRecord, field: keyof BacktestConfigFull) =>
     (r.fullConfig as unknown as Record<string, unknown>)?.[field as string] as string | number | boolean | null | undefined;
@@ -266,45 +325,35 @@ function extractConfigRows(records: BacktestRunRecord[]) {
   ];
 }
 
-// ── Full config expandable table ──────────────────────────────────────────────
-function FullConfigSection({ configRows, colCount, colLabels }: {
+// ── Expandable full config ────────────────────────────────────────────────────
+function FullConfigSection({
+  configRows, colLabels, colColors,
+}: {
   configRows: ReturnType<typeof extractConfigRows>;
-  colCount: number;
   colLabels: string[];
+  colColors: string[];
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <div className="mt-3">
       <button
         onClick={() => setExpanded(e => !e)}
-        className="flex items-center gap-1 text-[10px] transition-colors"
+        className="flex items-center gap-1.5 text-xs"
         style={{ color: 'var(--text-muted)' }}
         onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
         onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
       >
-        {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+        {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         {expanded ? 'Hide' : 'Show'} all configuration parameters
       </button>
       {expanded && (
-        <table className="w-full mt-2" style={{ borderCollapse: 'collapse' }}>
-          <colgroup>
-            <col style={{ width: 140 }} />
-            {Array.from({ length: colCount }).map((_, i) => <col key={i} />)}
-          </colgroup>
-          <thead>
-            <tr>
-              <th className="py-1 text-left text-[10px]" style={{ color: 'var(--text-faint)' }}>Parameter</th>
-              {colLabels.map((l, i) => (
-                <th key={i} className="py-1 text-center text-[10px]" style={{ color: 'var(--text-faint)' }}>{l}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {configRows.map(row => (
-              <ConfigDiffRow key={row.label} label={row.label} values={row.values} />
+        <div className="mt-2 rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+          <CompareTable colLabels={colLabels} colColors={colColors}>
+            {configRows.map((row, idx) => (
+              <ConfigRow key={row.label} label={row.label} values={row.values} isEven={idx % 2 === 1} />
             ))}
-          </tbody>
-        </table>
+          </CompareTable>
+        </div>
       )}
     </div>
   );
@@ -321,7 +370,6 @@ export function ComparePanel({ currentResult }: ComparePanelProps) {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const reload = useCallback(() => setRecords(loadAllRunRecords()), []);
-
   useEffect(() => { reload(); }, [reload, currentResult]);
 
   const filtered = useMemo(() => {
@@ -362,27 +410,31 @@ export function ComparePanel({ currentResult }: ComparePanelProps) {
     });
   }, []);
 
-  const SortBtn = ({ k, label }: { k: SortKey; label: string }) => (
-    <button
-      onClick={() => handleSortClick(k)}
-      className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-[3px] transition-colors"
-      style={{
-        background: sortKey === k ? 'rgba(46,140,255,0.12)' : 'var(--bg-deep)',
-        border: `1px solid ${sortKey === k ? 'rgba(46,140,255,0.4)' : 'var(--border)'}`,
-        color: sortKey === k ? 'var(--accent-blue)' : 'var(--text-muted)',
-      }}
-    >
-      {label}
-      {sortKey === k && (sortDir === 'desc' ? <ChevronDown size={9} /> : <ChevronUp size={9} />)}
-    </button>
-  );
+  const SortBtn = ({ k, label }: { k: SortKey; label: string }) => {
+    const active = sortKey === k;
+    return (
+      <button
+        onClick={() => handleSortClick(k)}
+        className="flex items-center gap-0.5 text-xs px-2 py-1 rounded"
+        style={{
+          background: active ? 'rgba(46,140,255,0.1)' : 'transparent',
+          border: `1px solid ${active ? 'rgba(46,140,255,0.35)' : 'var(--border)'}`,
+          color: active ? 'var(--accent-blue)' : 'var(--text-muted)',
+        }}
+      >
+        {label}
+        {active && (sortDir === 'desc' ? <ChevronDown size={10} /> : <ChevronUp size={10} />)}
+      </button>
+    );
+  };
 
+  // ── Empty state ──────────────────────────────────────────────────────────────
   if (records.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3" style={{ color: 'var(--text-faint)' }}>
-        <GitCompare size={32} strokeWidth={1.5} />
+      <div className="flex flex-col items-center justify-center py-16 gap-3">
+        <GitCompare size={32} strokeWidth={1.5} style={{ color: 'var(--text-faint)' }} />
         <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>No runs to compare yet.</p>
-        <p className="text-xs text-center max-w-[280px]">
+        <p className="text-xs text-center max-w-xs" style={{ color: 'var(--text-faint)' }}>
           Complete a backtest to populate the history. Up to {MAX_SELECTED} runs can be compared side-by-side.
         </p>
       </div>
@@ -390,40 +442,42 @@ export function ComparePanel({ currentResult }: ComparePanelProps) {
   }
 
   const colCount = selectedRecords.length;
-  const colLabels = selectedRecords.map((r, i) =>
-    `Run ${i + 1}: ${r.strategyName.length > 18 ? r.strategyName.slice(0, 16) + '…' : r.strategyName}`
-  );
+  const colLabels = selectedRecords.map((r, i) => {
+    const name = r.strategyName.length > 16 ? r.strategyName.slice(0, 14) + '…' : r.strategyName;
+    return `Run ${i + 1} · ${name}`;
+  });
+  const colColors = selectedRecords.map((_, i) => RUN_COLORS[i] as string);
   const configRows = colCount >= 1 ? extractConfigRows(selectedRecords) : [];
   const diffConfigRows = configRows.filter(row => {
-    const strs = row.values.map(v => v == null ? '—' : String(v));
+    const strs = row.values.map(v => (v == null || v === '') ? '—' : String(v));
     return strs.some(v => v !== strs[0]);
   });
 
   return (
     <div className="flex flex-col gap-0">
-      {/* Search + sort bar */}
+
+      {/* ── Toolbar ── */}
       <div className="flex items-center gap-2 mb-3 flex-shrink-0">
         <div
-          className="flex items-center gap-1.5 flex-1 rounded px-2 py-1.5"
+          className="flex items-center gap-1.5 flex-1 rounded px-2.5 py-1.5"
           style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)' }}
         >
-          <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <Search size={12} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
           <input
             type="text"
-            placeholder="Search runs by name or date…"
+            placeholder="Search by strategy name or date…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="flex-1 bg-transparent text-[11px] focus:outline-none"
+            className="flex-1 bg-transparent text-xs focus:outline-none"
             style={{ color: 'var(--text-secondary)' }}
           />
           {search && (
-            <button onClick={() => setSearch('')}>
-              <X size={11} style={{ color: 'var(--text-muted)' }} />
+            <button onClick={() => setSearch('')} style={{ color: 'var(--text-faint)' }}>
+              <X size={11} />
             </button>
           )}
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Sort:</span>
+        <div className="flex items-center gap-1">
           <SortBtn k="date" label="Date" />
           <SortBtn k="return" label="Return" />
           <SortBtn k="winRate" label="Win%" />
@@ -432,156 +486,183 @@ export function ComparePanel({ currentResult }: ComparePanelProps) {
         </div>
       </div>
 
-      {/* Selection status */}
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-          Select up to {MAX_SELECTED} runs to compare
+      {/* ── Selection status ── */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          Select up to <strong style={{ color: 'var(--text-secondary)' }}>{MAX_SELECTED}</strong> runs to compare
         </span>
         {selectedIds.length > 0 && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded-[3px]" style={{
-            background: 'rgba(46,140,255,0.1)', color: 'var(--accent-blue)', border: '1px solid rgba(46,140,255,0.25)',
-          }}>
-            {selectedIds.length}/{MAX_SELECTED} selected
-          </span>
-        )}
-        {selectedIds.length > 0 && (
-          <button
-            onClick={() => setSelectedIds([])}
-            className="text-[10px] px-1.5 py-0.5 rounded-[3px]"
-            style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}
-          >
-            Clear
-          </button>
+          <>
+            <span
+              className="text-xs px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(46,140,255,0.1)', color: 'var(--accent-blue)', border: '1px solid rgba(46,140,255,0.25)' }}
+            >
+              {selectedIds.length}/{MAX_SELECTED} selected
+            </span>
+            <button
+              onClick={() => setSelectedIds([])}
+              className="text-xs px-2 py-0.5 rounded"
+              style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+            >
+              Clear all
+            </button>
+          </>
         )}
       </div>
 
-      {/* Run cards */}
-      <div className="grid gap-2 flex-shrink-0" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
-        {filtered.map(record => (
-          <RunCard
-            key={record.runId}
-            record={record}
-            selected={selectedIds.includes(record.runId)}
-            onSelect={() => toggleSelect(record.runId)}
-            onRemove={() => handleDelete(record.runId)}
-            disabled={selectedIds.length >= MAX_SELECTED && !selectedIds.includes(record.runId)}
-          />
-        ))}
+      {/* ── Run cards ── */}
+      <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>
+        {filtered.map(record => {
+          const slotIdx = selectedIds.indexOf(record.runId);
+          return (
+            <RunCard
+              key={record.runId}
+              record={record}
+              selected={slotIdx >= 0}
+              slotColor={slotIdx >= 0 ? RUN_COLORS[slotIdx] as string : undefined}
+              onSelect={() => toggleSelect(record.runId)}
+              onRemove={() => handleDelete(record.runId)}
+              disabled={selectedIds.length >= MAX_SELECTED && !selectedIds.includes(record.runId)}
+            />
+          );
+        })}
         {filtered.length === 0 && (
-          <p className="text-[11px] col-span-full py-4 text-center" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs col-span-full py-6 text-center" style={{ color: 'var(--text-muted)' }}>
             No runs match &ldquo;{search}&rdquo;
           </p>
         )}
       </div>
 
-      {/* Prompt to select more */}
+      {/* ── Prompt: select one more ── */}
       {colCount === 1 && (
-        <div className="mt-4 p-3 rounded flex items-center gap-2" style={{ border: '1px dashed var(--border)', background: 'var(--bg-card)' }}>
-          <Plus size={13} style={{ color: 'var(--text-muted)' }} />
-          <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-            Select {MAX_SELECTED - 1} more run{MAX_SELECTED - 1 > 1 ? 's' : ''} above to start comparing.
+        <div
+          className="mt-4 p-3 rounded flex items-center gap-2"
+          style={{ border: '1px dashed var(--border)', background: 'var(--bg-card)' }}
+        >
+          <Plus size={14} style={{ color: 'var(--text-muted)' }} />
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Select at least one more run above to start comparing.
           </p>
         </div>
       )}
 
-      {/* Comparison dashboard */}
+      {/* ── Comparison dashboard ── */}
       {colCount >= 2 && (
-        <div className="mt-4">
-          <div className="rounded" style={{ border: '1px solid var(--border)', background: 'var(--bg-card)', overflow: 'hidden' }}>
-            {/* Equity sparkline headers */}
-            <div className="grid px-3 pt-3 pb-2 gap-2" style={{ gridTemplateColumns: `140px repeat(${colCount}, 1fr)` }}>
-              <div />
-              {selectedRecords.map((r, i) => {
-                const equityVals = (r.result.equityCurve ?? []).map(p => p.value);
-                const profit = r.result.finalCapital - r.result.initialCapital;
-                return (
-                  <div key={r.runId} className="rounded p-2" style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)' }}>
-                    <p className="text-[10px] font-semibold mb-0.5 truncate" style={{ color: 'var(--accent-blue)' }}>
-                      {colLabels[i]}
-                    </p>
-                    <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
-                      {fmtDateTime(r.savedAt)}
-                    </p>
-                    {equityVals.length >= 2
-                      ? <Sparkline values={equityVals} color={profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'} height={44} />
-                      : <div style={{ height: 44 }} />
-                    }
-                    <p className="text-[12px] font-bold mt-0.5" style={{ color: colorForReturn(r.result.returnPercentage), fontVariantNumeric: 'tabular-nums' }}>
-                      {fmtRet(r.result.returnPercentage)}
-                    </p>
+        <div className="mt-4 rounded" style={{ border: '1px solid var(--border)', background: 'var(--bg-card)', overflow: 'hidden' }}>
+
+          {/* Run header cards — top border tinted per slot color */}
+          <div
+            className="grid gap-2 p-3"
+            style={{
+              gridTemplateColumns: `repeat(${colCount}, 1fr)`,
+              background: 'var(--bg-elevated, var(--bg-deep))',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            {selectedRecords.map((r, i) => {
+              const equityVals = (r.result.equityCurve ?? []).map((p: { value: number }) => p.value);
+              return (
+                <div
+                  key={r.runId}
+                  className="rounded p-3"
+                  style={{
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border)',
+                    borderTop: `3px solid ${colColors[i]}`,
+                  }}
+                >
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span
+                      className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                      style={{ background: `${colColors[i]}20`, color: colColors[i] }}
+                    >
+                      Run {i + 1}
+                    </span>
+                    {i === 0 && (
+                      <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>baseline</span>
+                    )}
                   </div>
-                );
-              })}
+                  <p className="text-xs font-semibold truncate mb-0.5" style={{ color: 'var(--text-secondary)' }}>
+                    {r.strategyName}
+                  </p>
+                  <p className="text-[10px] mb-2" style={{ color: 'var(--text-faint)' }}>
+                    {fmtDateTime(r.savedAt)}
+                  </p>
+                  {equityVals.length >= 2
+                    ? <div className="mb-2"><Sparkline values={equityVals} color={colColors[i]} height={44} /></div>
+                    : <div style={{ height: 44, marginBottom: 8 }} />
+                  }
+                  <p className="text-base font-bold tabular-nums" style={{ color: colorReturn(r.result.returnPercentage) }}>
+                    {fmtPct(r.result.returnPercentage)}
+                  </p>
+                  <p className="text-xs tabular-nums" style={{ color: colorReturn(r.result.returnPercentage) }}>
+                    {fmtUSD(r.result.finalCapital - r.result.initialCapital, true)}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Metric sections */}
+          <div className="p-3 overflow-x-auto">
+
+            <SectionHeader title="Returns & Capital" />
+            <div className="rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+              <CompareTable colLabels={colLabels} colColors={colColors}>
+                <MetricRow isEven={false} label="Total Return" values={selectedRecords.map(r => r.result.returnPercentage)} fmtFn={v => fmtPct(v)} colorFn={colorReturn} />
+                <MetricRow isEven={true} label="Net Profit" values={selectedRecords.map(r => r.result.finalCapital - r.result.initialCapital)} fmtFn={v => fmtUSD(v, true)} colorFn={v => v != null && v >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'} />
+                <MetricRow isEven={false} label="Initial Capital" values={selectedRecords.map(r => r.result.initialCapital)} fmtFn={fmtUSD} colorFn={() => 'var(--text-secondary)'} />
+                <MetricRow isEven={true} label="Final Capital" values={selectedRecords.map(r => r.result.finalCapital)} fmtFn={fmtUSD} colorFn={() => 'var(--text-secondary)'} />
+              </CompareTable>
             </div>
 
-            <div className="px-3 pb-3 overflow-x-auto">
-              {/* Returns & Capital */}
-              <SectionLabel title="Returns & Capital" />
-              <table className="w-full" style={{ borderCollapse: 'collapse' }}>
-                <colgroup><col style={{ width: 140 }} />{selectedRecords.map((_, i) => <col key={i} />)}</colgroup>
-                <tbody>
-                  <MetricRow label="Total Return %" values={selectedRecords.map(r => r.result.returnPercentage)} colorFn={colorForReturn} suffix="%" />
-                  <MetricRow label="Net Profit" values={selectedRecords.map(r => r.result.finalCapital - r.result.initialCapital)} colorFn={v => v != null && v >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'} prefix="$" />
-                  <MetricRow label="Initial Capital" values={selectedRecords.map(r => r.result.initialCapital)} prefix="$" />
-                  <MetricRow label="Final Capital" values={selectedRecords.map(r => r.result.finalCapital)} prefix="$" />
-                </tbody>
-              </table>
+            <SectionHeader title="Risk Metrics" />
+            <div className="rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+              <CompareTable colLabels={colLabels} colColors={colColors}>
+                <MetricRow isEven={false} label="Max Drawdown" values={selectedRecords.map(r => r.result.maxDrawdown * 100)} fmtFn={v => `${fmt(v)}%`} colorFn={() => 'var(--accent-orange, #f97316)'} higherIsBetter={false} />
+                <MetricRow isEven={true} label="Sharpe Ratio" values={selectedRecords.map(r => r.result.sharpeRatio)} colorFn={v => v != null && v >= 1 ? 'var(--accent-green)' : 'var(--text-secondary)'} />
+                <MetricRow isEven={false} label="Sortino Ratio" values={selectedRecords.map(r => r.result.sortino_ratio)} colorFn={v => v != null && v >= 1 ? 'var(--accent-green)' : 'var(--text-secondary)'} />
+                <MetricRow isEven={true} label="Calmar Ratio" values={selectedRecords.map(r => r.result.calmar_ratio ?? null)} colorFn={() => 'var(--text-secondary)'} />
+                <MetricRow isEven={false} label="Profit Factor" values={selectedRecords.map(r => r.result.profitFactor)} colorFn={v => v != null && v >= 1.5 ? 'var(--accent-green)' : v != null && v >= 1 ? 'var(--text-secondary)' : 'var(--accent-red)'} />
+              </CompareTable>
+            </div>
 
-              {/* Risk */}
-              <SectionLabel title="Risk Metrics" />
-              <table className="w-full" style={{ borderCollapse: 'collapse' }}>
-                <colgroup><col style={{ width: 140 }} />{selectedRecords.map((_, i) => <col key={i} />)}</colgroup>
-                <tbody>
-                  <MetricRow label="Max Drawdown" values={selectedRecords.map(r => r.result.maxDrawdown * 100)} colorFn={() => 'var(--accent-orange)'} suffix="%" />
-                  <MetricRow label="Sharpe Ratio" values={selectedRecords.map(r => r.result.sharpeRatio)} />
-                  <MetricRow label="Sortino Ratio" values={selectedRecords.map(r => r.result.sortino_ratio)} />
-                  <MetricRow label="Calmar Ratio" values={selectedRecords.map(r => r.result.calmar_ratio ?? null)} />
-                  <MetricRow label="Profit Factor" values={selectedRecords.map(r => r.result.profitFactor)} />
-                </tbody>
-              </table>
+            <SectionHeader title="Trade Statistics" />
+            <div className="rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+              <CompareTable colLabels={colLabels} colColors={colColors}>
+                <MetricRow isEven={false} label="Total Trades" values={selectedRecords.map(r => r.result.totalTrades)} fmtFn={v => String(Math.round(v))} colorFn={() => 'var(--text-secondary)'} />
+                <MetricRow isEven={true} label="Win Rate" values={selectedRecords.map(r => r.result.winRate * 100)} fmtFn={v => `${fmt(v, 1)}%`} colorFn={v => v != null && v >= 50 ? 'var(--accent-green)' : 'var(--accent-red)'} />
+                <MetricRow isEven={false} label="Winning Trades" values={selectedRecords.map(r => r.result.winningTrades)} fmtFn={v => String(Math.round(v))} colorFn={() => 'var(--accent-green)'} />
+                <MetricRow isEven={true} label="Losing Trades" values={selectedRecords.map(r => r.result.losingTrades)} fmtFn={v => String(Math.round(v))} colorFn={() => 'var(--accent-red)'} higherIsBetter={false} />
+                <MetricRow isEven={false} label="Avg Win" values={selectedRecords.map(r => r.result.averageWin)} fmtFn={fmtUSD} colorFn={() => 'var(--accent-green)'} />
+                <MetricRow isEven={true} label="Avg Loss" values={selectedRecords.map(r => Math.abs(r.result.averageLoss))} fmtFn={v => `-${fmtUSD(v)}`} colorFn={() => 'var(--accent-red)'} higherIsBetter={false} />
+              </CompareTable>
+            </div>
 
-              {/* Trade stats */}
-              <SectionLabel title="Trade Statistics" />
-              <table className="w-full" style={{ borderCollapse: 'collapse' }}>
-                <colgroup><col style={{ width: 140 }} />{selectedRecords.map((_, i) => <col key={i} />)}</colgroup>
-                <tbody>
-                  <MetricRow label="Total Trades" values={selectedRecords.map(r => r.result.totalTrades)} />
-                  <MetricRow label="Win Rate" values={selectedRecords.map(r => r.result.winRate * 100)} colorFn={v => v != null && v >= 50 ? 'var(--accent-green)' : 'var(--accent-red)'} suffix="%" />
-                  <MetricRow label="Winning Trades" values={selectedRecords.map(r => r.result.winningTrades)} colorFn={() => 'var(--accent-green)'} />
-                  <MetricRow label="Losing Trades" values={selectedRecords.map(r => r.result.losingTrades)} colorFn={() => 'var(--accent-red)'} />
-                  <MetricRow label="Avg Win" values={selectedRecords.map(r => r.result.averageWin)} colorFn={() => 'var(--accent-green)'} prefix="$" />
-                  <MetricRow label="Avg Loss" values={selectedRecords.map(r => Math.abs(r.result.averageLoss))} colorFn={() => 'var(--accent-red)'} prefix="-$" />
-                </tbody>
-              </table>
-
-              {/* Config diffs */}
-              <SectionLabel title="Configuration Differences" />
-              {diffConfigRows.length === 0 ? (
-                <p className="text-[11px] py-2 flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                  <Minus size={12} />
-                  All selected runs share identical configuration parameters.
+            <SectionHeader title="Configuration Differences" />
+            {diffConfigRows.length === 0 ? (
+              <div
+                className="flex items-center gap-2 py-3 px-3 rounded"
+                style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)' }}
+              >
+                <Minus size={13} style={{ color: 'var(--text-faint)' }} />
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  All selected runs share identical configuration.
                 </p>
-              ) : (
-                <table className="w-full" style={{ borderCollapse: 'collapse' }}>
-                  <colgroup><col style={{ width: 140 }} />{selectedRecords.map((_, i) => <col key={i} />)}</colgroup>
-                  <thead>
-                    <tr>
-                      <th className="py-1 text-left text-[10px]" style={{ color: 'var(--text-faint)' }}>Parameter</th>
-                      {colLabels.map((l, i) => (
-                        <th key={i} className="py-1 text-center text-[10px]" style={{ color: 'var(--text-faint)' }}>{l}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {diffConfigRows.map(row => (
-                      <ConfigDiffRow key={row.label} label={row.label} values={row.values} />
-                    ))}
-                  </tbody>
-                </table>
-              )}
+              </div>
+            ) : (
+              <div className="rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+                <CompareTable colLabels={colLabels} colColors={colColors}>
+                  {diffConfigRows.map((row, idx) => (
+                    <ConfigRow key={row.label} label={row.label} values={row.values} isEven={idx % 2 === 1} />
+                  ))}
+                </CompareTable>
+              </div>
+            )}
 
-              <FullConfigSection configRows={configRows} colCount={colCount} colLabels={colLabels} />
-            </div>
+            <FullConfigSection configRows={configRows} colLabels={colLabels} colColors={colColors} />
           </div>
         </div>
       )}
