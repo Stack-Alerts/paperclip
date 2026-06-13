@@ -59,7 +59,9 @@ for arg in "$@"; do
   esac
 done
 
-# If --branch specified, switch to it
+# Branch handling: explicit --branch overrides; otherwise auto-switch to main.
+CURRENT_BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+
 if [[ -n "$BRANCH_OVERRIDE" ]]; then
   echo "[test-instance] switching to branch $BRANCH_OVERRIDE..."
   git -C "$REPO_ROOT" fetch --quiet origin "$BRANCH_OVERRIDE" 2>/dev/null || true
@@ -69,6 +71,19 @@ if [[ -n "$BRANCH_OVERRIDE" ]]; then
       exit 1
     fi
   fi
+elif [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
+  echo "[test-instance] on branch '$CURRENT_BRANCH' — auto-switching to main for the test server..."
+  DIRTY=$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null | grep -c '^.' || true)
+  if [[ "$DIRTY" -gt 0 ]]; then
+    echo "[test-instance] stashing $DIRTY uncommitted change(s) before switch..."
+    git -C "$REPO_ROOT" stash push -m "start-test auto-stash before switching to main" --include-untracked 2>&1 || {
+      echo "ERROR: git stash failed; commit or discard changes before running start-test.sh." >&2
+      exit 1
+    }
+  fi
+  git -C "$REPO_ROOT" checkout main 2>&1 || { echo "ERROR: git checkout main failed." >&2; exit 1; }
+  git -C "$REPO_ROOT" pull --ff-only origin main 2>&1 || { echo "ERROR: git pull --ff-only origin main failed." >&2; exit 1; }
+  echo "[test-instance] switched to main — starting test server..."
 fi
 
 # Resolve npm
@@ -253,7 +268,9 @@ cleanup() {
 trap cleanup INT TERM EXIT
 
 # Launch test instance
+# BTE_BRANCH_GATE_OK=1 tells gate-main-branch.sh (the predev hook) that we've
+# already done branch verification here — skip the npm-level gate.
 echo "[test-instance] spawning next dev on :3000..."
 echo
 cd "$REPO_ROOT/packages/web-ui"
-exec "$NPM" run dev -- --port 3000
+exec env BTE_BRANCH_GATE_OK=1 "$NPM" run dev -- --port 3000

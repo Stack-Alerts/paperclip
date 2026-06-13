@@ -20,18 +20,50 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
-# Early branch gate: detect non-main branch before touching systemd, and guide
-# the user to start-test.sh (the correct tool for feature-branch development).
+# Early branch gate: detect non-main branch and offer to switch before touching systemd.
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 if [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
-  echo "ERROR: start-dev.sh only works on the main branch." >&2
-  echo "       Current branch: $CURRENT_BRANCH" >&2
-  echo "" >&2
-  echo "For feature-branch development, use the ephemeral test server instead:" >&2
-  echo "  ./start-test.sh --branch $CURRENT_BRANCH" >&2
-  echo "" >&2
-  echo "That runs on :3000 without the systemd branch gate." >&2
-  exit 1
+  echo ""
+  echo "⚠️  You are on branch: $CURRENT_BRANCH"
+  echo "   start-dev.sh requires the main branch (btc-dev-server.service enforces this)."
+  echo ""
+  echo "Options:"
+  echo "  [s] switch to main and start the dev server"
+  echo "  [t] use ./start-test.sh instead (ephemeral :3000, no branch restriction)"
+  echo "  [c] cancel"
+  echo ""
+  if [[ -t 0 ]]; then
+    read -r -p "Action? [s/t/c]: " action
+  else
+    echo "Non-interactive: defaulting to [c] cancel." >&2
+    action="c"
+  fi
+  case "${action,,}" in
+    s)
+      echo "[start-dev] switching to main..."
+      DIRTY=$(git status --porcelain 2>/dev/null | grep -c '^.' || true)
+      if [[ "$DIRTY" -gt 0 ]]; then
+        echo "[start-dev] stashing $DIRTY uncommitted change(s)..."
+        git stash push -m "start-dev auto-stash before switching to main" --include-untracked 2>&1 || {
+          echo "ERROR: git stash failed; commit or discard changes before switching." >&2
+          exit 1
+        }
+      fi
+      git checkout main 2>&1 || { echo "ERROR: git checkout main failed." >&2; exit 1; }
+      git pull --ff-only origin main 2>&1 || { echo "ERROR: git pull --ff-only origin main failed." >&2; exit 1; }
+      CURRENT_BRANCH="main"
+      echo "[start-dev] now on main — continuing..."
+      ;;
+    t)
+      echo "[start-dev] use: ./start-test.sh"
+      echo "            (runs on :3000, auto-switches to main, no systemd branch gate)"
+      exit 0
+      ;;
+    *)
+      echo "[start-dev] cancelled."
+      exit 1
+      ;;
+  esac
 fi
 
 WATCH=0
