@@ -1,7 +1,0 @@
-{
-  "issue": "BTCAAAAA-25995",
-  "status": "done",
-  "resolution": "Impact Gate scan-done completed — dry-run scan on 7-day window shows 136 fix/bug issues, all gated (33 PASS, 23 FAIL, 18 ERROR, 62 SKIPPED). Result: 0 ungated, 100% coverage.",
-  "timestamp": "2026-05-14T01:11:20Z",
-  "agent": "AutomationEngineer"
-}

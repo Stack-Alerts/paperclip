@@ -209,3 +209,16 @@ DELIVERABLES.txt
 
 # Backup/stale config copies
 .clinerules.backup
+
+# Hindsight/docs agent-generated completion reports and verification artifacts
+docs/completion/BTCAAAAA-*.md
+docs/verification/BTCAAAAA-*.md
+docs/impact-gate-*-completion.md
+docs/ui-migration-assessment-BTCAAAAA-*.md
+docs/screenshots/BTCAAAAA-*.png
+
+# Issue status JSON markers and agent local state files
+.issue_BTCAAAAA-*_status.json
+.github_issue_update_BTCAAAAA-*.md
+.freeze-blocker-BTCAAAAA-*.md
+.e2e-test

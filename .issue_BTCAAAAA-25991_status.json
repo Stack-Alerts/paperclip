@@ -1,8 +1,0 @@
-{
-  "issue": "BTCAAAAA-25991",
-  "status": "done",
-  "resolvedBy": "DataEngineer",
-  "resolution": "Verified transition-to-done guard fix (removed is None fallback) — only 'done' issues are now transitioned. 102/102 bug worker tests pass, 477/477 total touch_index tests pass.",
-  "commitSha": "a35c15c",
-  "completedAt": "2026-05-14T03:05:00Z"
-}

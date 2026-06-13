@@ -1,7 +1,0 @@
-{
-  "issue": "BTCAAAAA-25248",
-  "status": "done",
-  "resolved_by": "AutomationEngineer",
-  "resolution": "BTCAAAAA-640 regression tests expanded from 5 to 12 (commit 0e8901ef), meeting 10-test Impact Gate bar. All 12 tests pass. Impact Gate runner reports PASS. Blocking issue resolved.",
-  "timestamp": "2026-05-14T00:51:04Z"
-}
