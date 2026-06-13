@@ -2033,6 +2033,27 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
         _append_backtest_log(run_id, f"Trades: {len(trades)}", level='SYSTEM')
         _append_backtest_log(run_id, f"TP/SL Adjustments: {metrics.get('totalSignals', 0)}", level='SYSTEM')
 
+        # Update signal found-count statistics for each block active in this strategy.
+        # Only new dates (not previously recorded) increment the counts — dedup is
+        # handled inside SignalStatisticsUpdater to prevent double-counting.
+        try:
+            from src.strategy_builder.utils.signal_statistics_updater import update_block_statistics
+            signal_dates = result.get("signal_dates_by_block", {})
+            updated_blocks = 0
+            for block_name, sigs in signal_dates.items():
+                if sigs:
+                    ok = update_block_statistics(block_name, sigs)
+                    if ok:
+                        updated_blocks += 1
+            if updated_blocks:
+                _append_backtest_log(
+                    run_id,
+                    f"📈 Signal found-counts updated for {updated_blocks} block(s)",
+                    level='SYSTEM',
+                )
+        except Exception as _stats_err:
+            _append_backtest_log(run_id, f"⚠️ Signal stats update skipped: {_stats_err}", level='SYSTEM')
+
         # Append per-bar decision messages from the engine to the live output
         for msg in messages:
             msg_text = msg.get("text", "")

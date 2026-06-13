@@ -1242,6 +1242,17 @@ class InstitutionalValidator:
         
         return graph
     
+    @staticmethod
+    def _normalize_block_name(name: str) -> str:
+        """Normalise to snake_case for comparison.
+
+        BTCAAAAA-34821 changed the web UI to persist block names as Title Case
+        ("Asia Session 50 Percent") while timing_constraint.reference strings
+        still use the canonical snake_case form ("asia_session_50_percent").
+        Normalise both sides so TIMING_002 does not fire on a pure casing mismatch.
+        """
+        return name.lower().replace(" ", "_")
+
     def _find_signal_in_config(
         self,
         config: Any,
@@ -1252,17 +1263,18 @@ class InstitutionalValidator:
         if '::' in signal_ref:
             # Cross-block reference
             parts = signal_ref.split('::', 1)
-            target_block = parts[0]
+            target_block = self._normalize_block_name(parts[0])
             target_signal = parts[1]
-            
+
             for block in config.blocks:
-                if block.name == target_block:
+                if self._normalize_block_name(block.name) == target_block:
                     return any(s.name == target_signal for s in block.signals)
             return False
         else:
             # Same-block reference
+            norm_current = self._normalize_block_name(current_block)
             for block in config.blocks:
-                if block.name == current_block:
+                if self._normalize_block_name(block.name) == norm_current:
                     return any(s.name == signal_ref for s in block.signals)
             return False
     

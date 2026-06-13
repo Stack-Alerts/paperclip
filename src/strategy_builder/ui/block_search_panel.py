@@ -341,7 +341,22 @@ class BlockListItem(QWidget):
         """)
         
         self.setLayout(layout)
-    
+
+    def refresh_signal_occurrences(self):
+        """Re-read occurrence counts from block_info signals and update checkbox labels in-place."""
+        for signal_info in self.block_info.signals:
+            checkbox = self.signal_checkboxes.get(signal_info.name)
+            if checkbox is None:
+                continue
+            signal_text = signal_info.name
+            if hasattr(signal_info, 'occurrences') and signal_info.occurrences is not None:
+                if hasattr(signal_info, 'total_candles') and signal_info.total_candles > 0:
+                    pct = (signal_info.occurrences / signal_info.total_candles) * 100
+                    signal_text += f"  ({signal_info.occurrences:,} found, {pct:.1f}%)"
+                else:
+                    signal_text += f"  ({signal_info.occurrences:,} occurrences)"
+            checkbox.setText(signal_text)
+
     def _toggle_signals(self):
         """Toggle the visibility of the signals section."""
         self.expanded = not self.expanded
@@ -1139,6 +1154,18 @@ class BlockSearchPanel(QWidget):
             if result.errors:
                 logger.error(LogComponent.SEARCH_PANEL, f"Details: {result.errors}")
     
+    def refresh_statistics(self):
+        """
+        Reload signal occurrence statistics from disk and update all block item labels.
+        Call this after a backtest completes so counts reflect newly-tested dates.
+        """
+        self.stats_loaded = self.stats_loader.load(force_reload=True)
+        if not self.stats_loaded:
+            return
+        for block_name, block_item in self.block_items.items():
+            self._enrich_signals_with_stats(block_item.block_info, block_name)
+            block_item.refresh_signal_occurrences()
+
     def mark_block_as_added(self, block_name: str):
         """
         Mark a block as added.
