@@ -41,6 +41,9 @@ if [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
   case "${action,,}" in
     s)
       echo "[start-dev] switching to main..."
+      # Prune stale worktree references so git doesn't reject checkout due to a
+      # deleted-but-untracked worktree directory (e.g. /tmp/main-merge-NNN).
+      git worktree prune 2>/dev/null || true
       DIRTY=$(git status --porcelain 2>/dev/null | grep -c '^.' || true)
       if [[ "$DIRTY" -gt 0 ]]; then
         echo "[start-dev] stashing $DIRTY uncommitted change(s)..."

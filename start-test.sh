@@ -18,6 +18,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ORIGINAL_REPO_ROOT="$REPO_ROOT"
+CREATED_TEMP_WORKTREE=0
+TEMP_WORKTREE=""
 cd "$REPO_ROOT"
 
 BRANCH_OVERRIDE=""
@@ -72,18 +75,48 @@ if [[ -n "$BRANCH_OVERRIDE" ]]; then
     fi
   fi
 elif [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
-  echo "[test-instance] on branch '$CURRENT_BRANCH' — auto-switching to main for the test server..."
-  DIRTY=$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null | grep -c '^.' || true)
-  if [[ "$DIRTY" -gt 0 ]]; then
-    echo "[test-instance] stashing $DIRTY uncommitted change(s) before switch..."
-    git -C "$REPO_ROOT" stash push -m "start-test auto-stash before switching to main" --include-untracked 2>&1 || {
-      echo "ERROR: git stash failed; commit or discard changes before running start-test.sh." >&2
-      exit 1
-    }
+  echo "[test-instance] on branch '$CURRENT_BRANCH' — resolving main for test server..."
+
+  # Prune stale worktree references first (handles the case where /tmp/... was deleted but
+  # git still tracks the reference, causing "already used by worktree" false positives).
+  git -C "$REPO_ROOT" worktree prune 2>/dev/null || true
+
+  # Check if main is actively checked out in another worktree (not just a stale ref).
+  MAIN_WORKTREE=$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | \
+    awk '/^worktree /{wt=$2} /^branch refs\/heads\/main$/{print wt; exit}' || true)
+
+  if [[ -n "$MAIN_WORKTREE" && "$MAIN_WORKTREE" != "$REPO_ROOT" ]]; then
+    # main is actively checked out in another worktree — use it directly.
+    # This avoids any stashing and works even when agents are using main.
+    echo "[test-instance] main is checked out in worktree at: $MAIN_WORKTREE"
+    echo "[test-instance] using existing worktree (no stash or branch switch needed)..."
+    REPO_ROOT="$MAIN_WORKTREE"
+  else
+    DIRTY=$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null | grep -c '^.' || true)
+    if [[ "$DIRTY" -gt 0 ]]; then
+      echo "[test-instance] stashing $DIRTY uncommitted change(s) before switch..."
+      git -C "$REPO_ROOT" stash push -m "start-test auto-stash before switching to main" --include-untracked 2>&1 || {
+        echo "ERROR: git stash failed; commit or discard changes before running start-test.sh." >&2
+        exit 1
+      }
+    fi
+    if git -C "$REPO_ROOT" checkout main 2>/dev/null; then
+      git -C "$REPO_ROOT" pull --ff-only origin main 2>&1 || true
+      echo "[test-instance] switched to main — starting test server..."
+    else
+      # main checkout still failed (actively used by another worktree) — create a temp worktree.
+      TEMP_WORKTREE="/tmp/user-test-main-$$"
+      echo "[test-instance] main branch is in use; creating temporary worktree at $TEMP_WORKTREE..."
+      git -C "$REPO_ROOT" fetch --quiet origin main 2>/dev/null || true
+      git -C "$REPO_ROOT" worktree add "$TEMP_WORKTREE" main 2>&1 || {
+        echo "ERROR: failed to create worktree for main at $TEMP_WORKTREE" >&2
+        exit 1
+      }
+      CREATED_TEMP_WORKTREE=1
+      REPO_ROOT="$TEMP_WORKTREE"
+      echo "[test-instance] using temporary worktree — starting test server..."
+    fi
   fi
-  git -C "$REPO_ROOT" checkout main 2>&1 || { echo "ERROR: git checkout main failed." >&2; exit 1; }
-  git -C "$REPO_ROOT" pull --ff-only origin main 2>&1 || { echo "ERROR: git pull --ff-only origin main failed." >&2; exit 1; }
-  echo "[test-instance] switched to main — starting test server..."
 fi
 
 # Resolve npm
@@ -262,8 +295,10 @@ export NEXT_PUBLIC_BRIDGE_WS_URL="${NEXT_PUBLIC_BRIDGE_WS_URL:-ws://${BACKEND_PU
 # Cleanup on exit
 cleanup() {
   trap - INT TERM EXIT
-  # The process group management is handled by npm/node naturally
-  # Just exit gracefully
+  if [[ "${CREATED_TEMP_WORKTREE:-0}" -eq 1 && -n "${TEMP_WORKTREE:-}" ]]; then
+    echo "[test-instance] cleaning up temporary worktree at $TEMP_WORKTREE..."
+    git -C "$ORIGINAL_REPO_ROOT" worktree remove --force "$TEMP_WORKTREE" 2>/dev/null || true
+  fi
 }
 trap cleanup INT TERM EXIT
 
