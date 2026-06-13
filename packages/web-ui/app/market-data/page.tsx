@@ -126,6 +126,20 @@ export default function MarketDataPage() {
     }
   }, []);
 
+  const handleVerify = useCallback(async () => {
+    setVerifying(true);
+    setVerifyError(null);
+    setVerifyResults(null);
+    try {
+      const results = await runDataVerify();
+      setVerifyResults(results);
+    } catch (e) {
+      setVerifyError(e instanceof Error ? e.message : 'Verification failed');
+    } finally {
+      setVerifying(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadStatus();
     handleVerify();
@@ -152,20 +166,6 @@ export default function MarketDataPage() {
       setUpdateRunning(false);
     }
   }, [loadStatus]);
-
-  const handleVerify = useCallback(async () => {
-    setVerifying(true);
-    setVerifyError(null);
-    setVerifyResults(null);
-    try {
-      const results = await runDataVerify();
-      setVerifyResults(results);
-    } catch (e) {
-      setVerifyError(e instanceof Error ? e.message : 'Verification failed');
-    } finally {
-      setVerifying(false);
-    }
-  }, []);
 
   const handleRepair = useCallback(async (timeframe?: string) => {
     setRepairing(true);
