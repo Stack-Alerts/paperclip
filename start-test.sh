@@ -15,6 +15,7 @@
 #   ./start-test.sh --branch <name> # Spawn test on <name>, not main
 #   ./start-test.sh --force         # Stop supervised service, then spawn test on :3000
 #   ./start-test.sh --restart       # Kill existing :3000, pull latest main, restart fresh
+#   ./start-test.sh --stop          # Kill existing :3000 and exit (no new server started)
 
 set -euo pipefail
 
@@ -30,6 +31,7 @@ KILL_EXISTING=0
 REUSE_EXISTING=0
 CANCEL_ON_CONFLICT=0
 RESTART_MODE=0
+STOP_MODE=0
 prev_arg=""
 for arg in "$@"; do
   if [[ "$prev_arg" == "--branch" ]]; then
@@ -60,9 +62,13 @@ for arg in "$@"; do
       RESTART_MODE=1
       KILL_EXISTING=1
       ;;
+    --stop)
+      STOP_MODE=1
+      KILL_EXISTING=1
+      ;;
     *)
       echo "ERROR: unknown flag: $arg" >&2
-      echo "Usage: ./start-test.sh [--branch <name>] [--force] [--kill-existing] [--reuse-existing] [--cancel-on-conflict] [--restart]" >&2
+      echo "Usage: ./start-test.sh [--branch <name>] [--force] [--kill-existing] [--reuse-existing] [--cancel-on-conflict] [--restart] [--stop]" >&2
       exit 1
       ;;
   esac
@@ -159,6 +165,29 @@ check_port_in_use() {
   fi
   echo "$pid"
 }
+
+# --stop: kill any process on :3000 and exit without starting a new server.
+if [[ $STOP_MODE -eq 1 ]]; then
+  _stop_pid=$(check_port_in_use 3000)
+  if [[ -n "$_stop_pid" ]]; then
+    echo "[test-instance] --stop: terminating PID $_stop_pid on :3000..."
+    kill -TERM "$_stop_pid" 2>/dev/null || true
+    _wait=0
+    while [[ $(check_port_in_use 3000) != "" ]] && [[ $_wait -lt 50 ]]; do
+      sleep 0.1
+      _wait=$((_wait + 1))
+    done
+    if [[ $(check_port_in_use 3000) == "" ]]; then
+      echo "[test-instance] test server stopped."
+    else
+      echo "ERROR: process on :3000 did not exit after SIGTERM" >&2
+      exit 1
+    fi
+  else
+    echo "[test-instance] no test server running on :3000."
+  fi
+  exit 0
+fi
 
 handle_port_conflict() {
   local port=$1
