@@ -37,6 +37,7 @@ import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
 import { ValidationReport, ValidationIssue, ValidationSeverity } from '@/lib/strategy-builder/types';
 import { AutoFixConfirmDialog } from './AutoFixConfirmDialog';
 import { AppBrand } from '@/components/shared/AppBrand';
+import { ThemeSelector } from './ThemeSelector';
 import { status } from '@/lib/status';
 import { RichTooltip } from './RichTooltip';
 import { FixedIssuesList } from './FixedIssuesList';
@@ -1221,6 +1222,8 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
           </span>
         </h2>
         <div className="flex items-center gap-2">
+          <ThemeSelector />
+          <div className="w-px h-4" style={{ background: 'var(--border)' }} />
           {!standalone && (
             <RichTooltip content={{
               title: 'Pop Out',

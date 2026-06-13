@@ -13,11 +13,16 @@
 # Usage:
 #   ./start-test.sh                 # Spawn test on :3000 (or fail if :3010 is supervised)
 #   ./start-test.sh --branch <name> # Spawn test on <name>, not main
-#   ./start-test.sh --force          # Stop supervised service, then spawn test on :3000
+#   ./start-test.sh --force         # Stop supervised service, then spawn test on :3000
+#   ./start-test.sh --restart       # Kill existing :3000, pull latest main, restart fresh
+#   ./start-test.sh --stop          # Kill existing :3000 and exit (no new server started)
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ORIGINAL_REPO_ROOT="$REPO_ROOT"
+CREATED_TEMP_WORKTREE=0
+TEMP_WORKTREE=""
 cd "$REPO_ROOT"
 
 BRANCH_OVERRIDE=""
@@ -25,6 +30,8 @@ FORCE_MODE=0
 KILL_EXISTING=0
 REUSE_EXISTING=0
 CANCEL_ON_CONFLICT=0
+RESTART_MODE=0
+STOP_MODE=0
 prev_arg=""
 for arg in "$@"; do
   if [[ "$prev_arg" == "--branch" ]]; then
@@ -51,15 +58,25 @@ for arg in "$@"; do
     --cancel-on-conflict)
       CANCEL_ON_CONFLICT=1
       ;;
+    --restart)
+      RESTART_MODE=1
+      KILL_EXISTING=1
+      ;;
+    --stop)
+      STOP_MODE=1
+      KILL_EXISTING=1
+      ;;
     *)
       echo "ERROR: unknown flag: $arg" >&2
-      echo "Usage: ./start-test.sh [--branch <name>] [--force] [--kill-existing] [--reuse-existing] [--cancel-on-conflict]" >&2
+      echo "Usage: ./start-test.sh [--branch <name>] [--force] [--kill-existing] [--reuse-existing] [--cancel-on-conflict] [--restart] [--stop]" >&2
       exit 1
       ;;
   esac
 done
 
-# If --branch specified, switch to it
+# Branch handling: explicit --branch overrides; otherwise auto-switch to main.
+CURRENT_BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+
 if [[ -n "$BRANCH_OVERRIDE" ]]; then
   echo "[test-instance] switching to branch $BRANCH_OVERRIDE..."
   git -C "$REPO_ROOT" fetch --quiet origin "$BRANCH_OVERRIDE" 2>/dev/null || true
@@ -68,6 +85,62 @@ if [[ -n "$BRANCH_OVERRIDE" ]]; then
       echo "ERROR: cannot switch to '$BRANCH_OVERRIDE'" >&2
       exit 1
     fi
+  fi
+elif [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
+  echo "[test-instance] on branch '$CURRENT_BRANCH' — resolving main for test server..."
+
+  # Prune stale worktree references first (handles the case where /tmp/... was deleted but
+  # git still tracks the reference, causing "already used by worktree" false positives).
+  git -C "$REPO_ROOT" worktree prune 2>/dev/null || true
+
+  # Check if main is actively checked out in another worktree (not just a stale ref).
+  MAIN_WORKTREE=$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | \
+    awk '/^worktree /{wt=$2} /^branch refs\/heads\/main$/{print wt; exit}' || true)
+
+  if [[ -n "$MAIN_WORKTREE" && "$MAIN_WORKTREE" != "$REPO_ROOT" ]]; then
+    # main is actively checked out in another worktree — use it directly.
+    # This avoids any stashing and works even when agents are using main.
+    echo "[test-instance] main is checked out in worktree at: $MAIN_WORKTREE"
+    echo "[test-instance] using existing worktree (no stash or branch switch needed)..."
+    REPO_ROOT="$MAIN_WORKTREE"
+  else
+    DIRTY=$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null | grep -c '^.' || true)
+    if [[ "$DIRTY" -gt 0 ]]; then
+      echo "[test-instance] stashing $DIRTY uncommitted change(s) before switch..."
+      git -C "$REPO_ROOT" stash push -m "start-test auto-stash before switching to main" --include-untracked 2>&1 || {
+        echo "ERROR: git stash failed; commit or discard changes before running start-test.sh." >&2
+        exit 1
+      }
+    fi
+    if git -C "$REPO_ROOT" checkout main 2>/dev/null; then
+      git -C "$REPO_ROOT" pull --ff-only origin main 2>&1 || true
+      echo "[test-instance] switched to main — starting test server..."
+    else
+      # main checkout still failed (actively used by another worktree) — create a temp worktree.
+      TEMP_WORKTREE="/tmp/user-test-main-$$"
+      echo "[test-instance] main branch is in use; creating temporary worktree at $TEMP_WORKTREE..."
+      git -C "$REPO_ROOT" fetch --quiet origin main 2>/dev/null || true
+      git -C "$REPO_ROOT" worktree add "$TEMP_WORKTREE" main 2>&1 || {
+        echo "ERROR: failed to create worktree for main at $TEMP_WORKTREE" >&2
+        exit 1
+      }
+      CREATED_TEMP_WORKTREE=1
+      REPO_ROOT="$TEMP_WORKTREE"
+      echo "[test-instance] using temporary worktree — starting test server..."
+    fi
+  fi
+fi
+
+# --restart: pull latest main before starting so the user sees the newest build.
+# REPO_ROOT is already resolved to wherever main lives (own worktree, existing worktree,
+# or temp worktree) so this pull always targets the right directory.
+if [[ $RESTART_MODE -eq 1 ]]; then
+  echo "[test-instance] --restart: pulling latest origin/main..."
+  git -C "$REPO_ROOT" fetch --quiet origin main 2>/dev/null || true
+  if git -C "$REPO_ROOT" pull --ff-only origin main 2>&1; then
+    echo "[test-instance] pull complete — restarting with latest main..."
+  else
+    echo "[test-instance] WARNING: pull --ff-only failed (local divergence?); starting with current code." >&2
   fi
 fi
 
@@ -92,6 +165,29 @@ check_port_in_use() {
   fi
   echo "$pid"
 }
+
+# --stop: kill any process on :3000 and exit without starting a new server.
+if [[ $STOP_MODE -eq 1 ]]; then
+  _stop_pid=$(check_port_in_use 3000)
+  if [[ -n "$_stop_pid" ]]; then
+    echo "[test-instance] --stop: terminating PID $_stop_pid on :3000..."
+    kill -TERM "$_stop_pid" 2>/dev/null || true
+    _wait=0
+    while [[ $(check_port_in_use 3000) != "" ]] && [[ $_wait -lt 50 ]]; do
+      sleep 0.1
+      _wait=$((_wait + 1))
+    done
+    if [[ $(check_port_in_use 3000) == "" ]]; then
+      echo "[test-instance] test server stopped."
+    else
+      echo "ERROR: process on :3000 did not exit after SIGTERM" >&2
+      exit 1
+    fi
+  else
+    echo "[test-instance] no test server running on :3000."
+  fi
+  exit 0
+fi
 
 handle_port_conflict() {
   local port=$1
@@ -247,13 +343,17 @@ export NEXT_PUBLIC_BRIDGE_WS_URL="${NEXT_PUBLIC_BRIDGE_WS_URL:-ws://${BACKEND_PU
 # Cleanup on exit
 cleanup() {
   trap - INT TERM EXIT
-  # The process group management is handled by npm/node naturally
-  # Just exit gracefully
+  if [[ "${CREATED_TEMP_WORKTREE:-0}" -eq 1 && -n "${TEMP_WORKTREE:-}" ]]; then
+    echo "[test-instance] cleaning up temporary worktree at $TEMP_WORKTREE..."
+    git -C "$ORIGINAL_REPO_ROOT" worktree remove --force "$TEMP_WORKTREE" 2>/dev/null || true
+  fi
 }
 trap cleanup INT TERM EXIT
 
 # Launch test instance
+# BTE_BRANCH_GATE_OK=1 tells gate-main-branch.sh (the predev hook) that we've
+# already done branch verification here — skip the npm-level gate.
 echo "[test-instance] spawning next dev on :3000..."
 echo
 cd "$REPO_ROOT/packages/web-ui"
-exec "$NPM" run dev -- --port 3000
+exec env BTE_BRANCH_GATE_OK=1 "$NPM" run dev -- --port 3000
