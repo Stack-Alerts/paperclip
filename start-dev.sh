@@ -20,6 +20,20 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
+# Early branch gate: detect non-main branch before touching systemd, and guide
+# the user to start-test.sh (the correct tool for feature-branch development).
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+if [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
+  echo "ERROR: start-dev.sh only works on the main branch." >&2
+  echo "       Current branch: $CURRENT_BRANCH" >&2
+  echo "" >&2
+  echo "For feature-branch development, use the ephemeral test server instead:" >&2
+  echo "  ./start-test.sh --branch $CURRENT_BRANCH" >&2
+  echo "" >&2
+  echo "That runs on :3000 without the systemd branch gate." >&2
+  exit 1
+fi
+
 WATCH=0
 KILL_EXISTING=0
 REUSE_EXISTING=0
