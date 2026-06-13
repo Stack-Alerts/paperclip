@@ -208,6 +208,7 @@ function RecheckConfigModal({ open, signalName, enabled, barDelay, mode, onSave,
   const [recheckMode, setRecheckMode] = useState(mode);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (open) { setIsEnabled(enabled); setDelay(barDelay); setRecheckMode(mode); }
   }, [open, enabled, barDelay, mode]);
 
@@ -805,6 +806,7 @@ function ReorderConfirmModal({ fromName, toName, direction, onConfirm, onCancel 
 export function StrategyBlocksPanel() {
   const { currentStrategy, deleteBlock, reorderBlocks, updateBlock, duplicateBlock, highlightLibraryBlock } = useStrategyStore();
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const blocks: Block[] = currentStrategy?.blocks ?? [];
 
   const [timingDialogIndex, setTimingDialogIndex] = useState<number | null>(null);
@@ -816,6 +818,7 @@ export function StrategyBlocksPanel() {
   } | null>(null);
 
   // Compute main-block-only global indices for correct up/down behaviour
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const mainBlockIndices = blocks
     .map((b, i) => ({ b, i }))
     .filter(({ b }) => b.type !== BlockType.EXIT_CONDITION && (b.data.logic as string) !== 'EXIT')

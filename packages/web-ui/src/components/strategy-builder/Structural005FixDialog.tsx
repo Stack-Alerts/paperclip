@@ -194,7 +194,7 @@ export const Structural005FixDialog: React.FC<Structural005FixDialogProps> = ({
               )}
               {mode === 'rename' && (
                 <>
-                  <strong>Renaming Signal #{selectedSignal.index + 1}:</strong> Changing "{selectedSignal.name}" to "{newName || '?'}" will eliminate the duplicate
+                  <strong>Renaming Signal #{selectedSignal.index + 1}:</strong> Changing &ldquo;{selectedSignal.name}&rdquo; to &ldquo;{newName || '?'}&rdquo; will eliminate the duplicate
                 </>
               )}
             </p>

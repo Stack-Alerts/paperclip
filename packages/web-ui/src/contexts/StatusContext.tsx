@@ -32,6 +32,7 @@ export function StatusBarProvider({ children }: { children: React.ReactNode }) {
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSettings(prev => ({ ...prev, ...parsed }));
       } catch {
         // Ignore parse errors

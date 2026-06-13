@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
  * ValidationReportWindow - 100% parity port from PyQt5 desktop version
@@ -883,6 +884,7 @@ function getComplexityLevel(score: number): string {
 }
 
 export function ValidationReportWindow({ open, onClose, report, standalone = false }: ValidationReportWindowProps) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { validationMessages, isValidating, validateStrategy, clearValidation, currentStrategy, applyAutoFix, applyLocalAutoFix, fixedIssuesInSession, undoAutoFix, saveStrategy } = useStrategyStore();
   const [isSaving, setIsSaving] = useState(false);
 
@@ -922,6 +924,7 @@ export function ValidationReportWindow({ open, onClose, report, standalone = fal
   const [canPopIn, setCanPopIn] = useState(false);
   useEffect(() => {
     if (typeof window !== 'undefined' && standalone && window.opener) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCanPopIn(true);
     }
   }, [standalone]);

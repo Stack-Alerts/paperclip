@@ -29,24 +29,24 @@ type ColumnKey =
   | 'id' | 'time' | 'symbol' | 'side' | 'size' | 'entry' | 'exit'
   | 'duration' | 'pnl' | 'pnlPct' | 'status' | 'partial' | 'notes';
 
-interface Column { key: ColumnKey; label: string; width: number; sortable: boolean; }
+interface Column { key: ColumnKey; label: string; width: number; sortable: boolean; tooltip: string; }
 
 // Matches PyQt5 column order/widths from trades_panel.py:230,252.
 // Widths trimmed (BTCAAAAA-35662) so total ~1185px fits 1280px+ screens.
 const COLUMNS: Column[] = [
-  { key: 'id',       label: 'ID',        width: 55,  sortable: true  },
-  { key: 'time',     label: 'Time',      width: 85,  sortable: true  },
-  { key: 'symbol',   label: 'Symbol',    width: 100, sortable: false },
-  { key: 'side',     label: 'Side',      width: 65,  sortable: true  },
-  { key: 'size',     label: 'Size',      width: 75,  sortable: true  },
-  { key: 'entry',    label: 'Entry',     width: 95,  sortable: true  },
-  { key: 'exit',     label: 'Exit',      width: 95,  sortable: true  },
-  { key: 'duration', label: 'Duration',  width: 80,  sortable: false },
-  { key: 'pnl',      label: 'P&L',       width: 95,  sortable: true  },
-  { key: 'pnlPct',   label: 'P&L %',     width: 80,  sortable: true  },
-  { key: 'status',   label: 'Status',    width: 75,  sortable: true  },
-  { key: 'partial',  label: 'Partial %', width: 115, sortable: false },
-  { key: 'notes',    label: 'Notes',     width: 170, sortable: false },
+  { key: 'id',       label: 'ID',        width: 55,  sortable: true,  tooltip: 'Trade sequence number. Partial exits share a base ID (e.g. 5.1, 5.2 = sub-exits of trade 5).' },
+  { key: 'time',     label: 'Time',      width: 85,  sortable: true,  tooltip: 'Entry timestamp (bar open time). Hover a cell for the full ISO-8601 timestamp.' },
+  { key: 'symbol',   label: 'Symbol',    width: 100, sortable: false, tooltip: 'Traded instrument. Defaults to BTC.P/USDT (perpetual futures) when not set by the engine.' },
+  { key: 'side',     label: 'Side',      width: 65,  sortable: true,  tooltip: 'Trade direction: LONG = buy-to-open, SHORT = sell-to-open. Green = long, red = short.' },
+  { key: 'size',     label: 'Size',      width: 75,  sortable: true,  tooltip: 'Position size in base currency (BTC). Calculated from risk % × account equity ÷ SL distance. Shows — when the engine did not report a size for this configuration.' },
+  { key: 'entry',    label: 'Entry',     width: 95,  sortable: true,  tooltip: 'Fill price at trade entry including slippage, in USD.' },
+  { key: 'exit',     label: 'Exit',      width: 95,  sortable: true,  tooltip: 'Fill price at trade exit (TP / SL / max-bars). Shows — for open positions.' },
+  { key: 'duration', label: 'Duration',  width: 80,  sortable: false, tooltip: 'Hold time expressed in 15-minute bars, shown as h/m or d/h.' },
+  { key: 'pnl',      label: 'P&L',       width: 95,  sortable: true,  tooltip: 'Realized profit or loss in USD after commission. Green = profit, red = loss.' },
+  { key: 'pnlPct',   label: 'P&L %',     width: 80,  sortable: true,  tooltip: 'P&L as a percentage of entry notional (entry price × size), commissions included.' },
+  { key: 'status',   label: 'Status',    width: 75,  sortable: true,  tooltip: 'CLOSED = fully exited, OPEN = active at backtest end, PARTIAL = partially closed.' },
+  { key: 'partial',  label: 'Partial %', width: 115, sortable: false, tooltip: 'Exit breakdown for multi-target strategies showing each exit type and its realized P&L.' },
+  { key: 'notes',    label: 'Notes',     width: 170, sortable: false, tooltip: 'Exit reason and entry signal summary. Hover the cell for the full note.' },
 ];
 
 function formatDuration(bars: number): string {
@@ -266,6 +266,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
                     <th
                       key={col.key}
                       onClick={() => handleHeaderClick(col)}
+                      title={col.tooltip}
                       onMouseEnter={e => {
                         if (col.sortable) {
                           (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)';
@@ -392,19 +393,19 @@ function PerformanceSummary({
         fontSize: 13,
       }}
     >
-      <SummaryItem label="Total P&L" value={formatMoney(summary.totalPnl)} valueColor={totalPnlColor} />
-      <SummaryItem label="Win Rate" value={`${summary.winRate.toFixed(2)}%`} valueColor={winRateColored} />
-      <SummaryItem label="Long Trades" value={String(summary.longs)} valueColor={longColor} />
-      <SummaryItem label="Short Trades" value={String(summary.shorts)} valueColor={shortColor} />
-      <SummaryItem label="Winning Trades" value={String(summary.wins)} valueColor={hasTrades && summary.wins > 0 ? ACCENT.success : undefined} />
-      <SummaryItem label="Losing Trades" value={String(summary.losses)} valueColor={hasTrades && summary.losses > 0 ? ACCENT.error : undefined} />
+      <SummaryItem label="Total P&L" value={formatMoney(summary.totalPnl)} valueColor={totalPnlColor} tooltip="Sum of all realized P&L across the backtest period, after commissions." />
+      <SummaryItem label="Win Rate" value={`${summary.winRate.toFixed(2)}%`} valueColor={winRateColored} tooltip="Percentage of trades that closed with positive P&L. Bands: ≥60% high (green), 40–60% mid (orange), <40% low (red)." />
+      <SummaryItem label="Long Trades" value={String(summary.longs)} valueColor={longColor} tooltip="Number of buy-side (long) positions opened during the backtest." />
+      <SummaryItem label="Short Trades" value={String(summary.shorts)} valueColor={shortColor} tooltip="Number of sell-side (short) positions opened during the backtest." />
+      <SummaryItem label="Winning Trades" value={String(summary.wins)} valueColor={hasTrades && summary.wins > 0 ? ACCENT.success : undefined} tooltip="Total number of trades that closed with a net positive P&L." />
+      <SummaryItem label="Losing Trades" value={String(summary.losses)} valueColor={hasTrades && summary.losses > 0 ? ACCENT.error : undefined} tooltip="Total number of trades that closed at breakeven or negative P&L." />
     </div>
   );
 }
 
-function SummaryItem({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+function SummaryItem({ label, value, valueColor, tooltip }: { label: string; value: string; valueColor?: string; tooltip?: string }) {
   return (
-    <span>
+    <span title={tooltip}>
       {label}:{' '}
       <b style={{ color: valueColor ?? 'var(--text-secondary)' }}>{value}</b>
     </span>
@@ -474,7 +475,7 @@ function TradeRow({ trade, rowBg }: { trade: Trade; rowBg: string }) {
       <td style={cellStyle}>{formatTime(trade.entryTime)}</td>
       <td style={cellStyle}>{trade.symbol ?? 'BTC.P/USDT'}</td>
       <td style={{ ...cellStyle, color: sideColor, fontWeight: 600 }}>{side}</td>
-      <td style={cellStyle}>{trade.quantity.toFixed(4)}</td>
+      <td style={cellStyle}>{trade.quantity > 0 ? trade.quantity.toFixed(4) : '—'}</td>
       <td style={cellStyle}>{formatMoney(trade.entryPrice)}</td>
       <td style={cellStyle}>{trade.exitPrice ? formatMoney(trade.exitPrice) : '—'}</td>
       <td style={cellStyle}>{formatDuration(trade.bars)}</td>

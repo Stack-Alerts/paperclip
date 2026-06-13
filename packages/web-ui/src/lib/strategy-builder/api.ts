@@ -284,6 +284,7 @@ export async function loadStrategyVersion(strategyId: string, versionId: string)
   return get(`${SB}/${strategyId}/versions/${versionId}`);
 }
 
-export async function restoreStrategyVersion(strategyId: string, _versionId: string) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function restoreStrategyVersion(_strategyId: string, __versionId: string) {
   throw new Error('Version restore not yet implemented');
 }

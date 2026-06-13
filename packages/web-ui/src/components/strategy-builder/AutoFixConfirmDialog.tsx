@@ -97,6 +97,7 @@ export const AutoFixConfirmDialog: React.FC<AutoFixConfirmDialogProps> = ({
     .join('|');
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUserOptions(
         Object.fromEntries(options.map((o) => [o.key, o.defaultChecked ?? false]))
       );

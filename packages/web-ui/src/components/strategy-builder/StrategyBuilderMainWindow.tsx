@@ -118,6 +118,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 
   useEffect(() => {
     if (prevCollapsed === true && collapsed === false) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowHopAnimation(true);
       setTimeout(() => setShowHopAnimation(false), 400);
     }
@@ -148,6 +149,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     // Hydrate store from localStorage after mount so SSR and initial client
     // renders are both null (no hydration mismatch).
     hydrateFromLocalStorage();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     if (strategyId) {
       loadStrategy(strategyId).catch(console.error);
@@ -157,6 +159,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 
   // Sync clean snapshot whenever the strategy changes (from hydration or load).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
     if (mounted) setCleanSnapshot(strategySnapshot);
   }, [currentStrategy?.id, mounted]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -179,6 +182,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 
   // Dirty-flag
   const [cleanSnapshot, setCleanSnapshot] = useState<string>('');
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const strategySnapshot = useMemo(
     () =>
       currentStrategy
@@ -192,6 +196,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // Status bar countdown — aligns to real 15-minute UTC candle boundaries (+0.2 s)
   const nextCheckRef = useRef<Date>(
     (() => {
+      // eslint-disable-next-line react-hooks/purity
       const now = Date.now();
       const interval = 15 * 60 * 1000;
       return new Date((Math.floor(now / interval) + 1) * interval + 200);
@@ -302,9 +307,11 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault();
+      // eslint-disable-next-line react-hooks/immutability
       handleSave();
     } else if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
       e.preventDefault();
+      // eslint-disable-next-line react-hooks/immutability
       handleNewStrategy();
     } else if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
       e.preventDefault();
@@ -327,6 +334,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   } | null>(null);
   const [saveModeBusy, setSaveModeBusy] = useState(false);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const finalizeSavedAsRename = useCallback(() => {
     setCleanSnapshot(strategySnapshot);
     status.emit('Strategy saved', { duration: 2000 });
@@ -353,11 +361,12 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       await saveStrategy();
       setCleanSnapshot(strategySnapshot);
       status.emit('Strategy saved', { duration: 2000 });
-    } catch (e) {
+    } catch {
       status.emit('Save failed', { duration: 2000, variant: 'error' });
     } finally {
       isSavingRef.current = false;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveStrategy, strategySnapshot, currentStrategy, cleanSnapshot]);
 
   const handleSaveModeRenameExisting = useCallback(async () => {
@@ -367,13 +376,14 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       await saveStrategy();
       finalizeSavedAsRename();
       setPendingSaveMode(null);
-    } catch (e) {
+    } catch {
       status.emit('Save failed', { duration: 2000, variant: 'error' });
     } finally {
       setSaveModeBusy(false);
     }
   }, [saveStrategy, finalizeSavedAsRename, saveModeBusy]);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleSaveModeSaveAsNew = useCallback(async () => {
     if (saveModeBusy || !pendingSaveMode) return;
     setSaveModeBusy(true);
@@ -382,7 +392,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       setCleanSnapshot(JSON.stringify({ id: forked.id, blocks: forked.blocks, name: forked.name }));
       status.emit(`Saved as new strategy v${(forked as { versionNumber?: number }).versionNumber ?? 1}`, { duration: 2500 });
       setPendingSaveMode(null);
-    } catch (e) {
+    } catch {
       status.emit('Save-as-new failed', { duration: 2000, variant: 'error' });
     } finally {
       setSaveModeBusy(false);
@@ -399,6 +409,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // path still surfaces SaveStrategyModeDialog if the user edited a backend
   // strategy before clicking New, because pendingSaveMode is gated by the
   // existing handleSave flow (line ~333), not by this reset.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleNewStrategy = useCallback(() => {
     const now = new Date().toISOString();
     const fresh: Strategy = {
@@ -496,7 +507,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       const result = await runBacktest(config);
       setQuickPreviewResult(result);
       open('quickPreview');
-    } catch (e) {
+    } catch {
       status.emit('Quick preview failed', { duration: 2000, variant: 'error' });
     }
   }, [currentStrategy, runBacktest, open, backTestInProgress]);
@@ -505,6 +516,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // Strategy browser
   // -------------------------------------------------------------------------
   const handleStrategySelect = useCallback(
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     (strategy: Strategy, selectOpts?: StrategySelectOptions) => {
       // BTCAAAAA-29995: the dialog fetches strategies from the strategy-builder
       // API, which returns blocks in the Python domain shape

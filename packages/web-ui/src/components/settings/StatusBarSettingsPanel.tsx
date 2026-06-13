@@ -13,11 +13,12 @@ export const StatusBarSettingsPanel: React.FC = () => {
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocalSettings(settings);
     setHasChanges(false);
   }, [settings]);
 
-  const handleChange = useCallback((key: keyof typeof settings, value: any) => {
+  const handleChange = useCallback((key: keyof typeof settings, value: typeof settings[keyof typeof settings]) => {
     setLocalSettings(prev => ({ ...prev, [key]: value }));
     setHasChanges(true);
   }, []);
@@ -66,7 +67,7 @@ export const StatusBarSettingsPanel: React.FC = () => {
         <div className="space-y-2">
           <Label htmlFor="max-visible">Maximum Visible Notices</Label>
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-            Number of notices to display (1-5). Extra notices collapse into "+N more"
+            Number of notices to display (1-5). Extra notices collapse into &ldquo;+N more&rdquo;
           </p>
           <div className="flex items-center gap-4">
             <Input

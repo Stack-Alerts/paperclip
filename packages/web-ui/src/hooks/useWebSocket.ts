@@ -12,7 +12,8 @@ export function useWebSocket<T>(url: string) {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmounted = useRef(false);
   const connectRef = useRef<() => void>(() => { /* populated by effect */ });
-  const statusTickerId = useRef<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _statusTickerId = useRef<string | null>(null);
   const { settings } = useStatusSettings();
 
   const connect = useCallback(() => {

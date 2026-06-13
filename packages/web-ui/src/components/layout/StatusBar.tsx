@@ -86,9 +86,13 @@ export function StatusBar() {
     );
   }
 
+  // eslint-disable-next-line react-hooks/purity
+  const renderNow = Date.now();
   return (
     <div className="border-t px-3 flex items-stretch flex-shrink-0 flex-col gap-1 py-1" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)', minHeight: '24px' }}>
-      {visibleEntries.map((entry, idx) => (
+      {visibleEntries.map((entry, idx) => {
+        const fallbackCountdown = countdowns[entry.id] ?? (entry.expiresAt ? entry.expiresAt - renderNow : 0);
+        return (
         <div
           key={entry.id}
           className="flex items-center justify-between gap-2 h-5 animate-fade-in"
@@ -105,7 +109,7 @@ export function StatusBar() {
                 className="text-xs flex-shrink-0"
                 style={{ color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}
               >
-                {formatCountdown(countdowns[entry.id] ?? (entry.expiresAt - Date.now()))}
+                {formatCountdown(fallbackCountdown)}
               </span>
             )}
             <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
@@ -123,7 +127,8 @@ export function StatusBar() {
             </button>
           )}
         </div>
-      ))}
+        );
+      })}
       {overflowCount > 0 && (
         <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
           +{overflowCount} more

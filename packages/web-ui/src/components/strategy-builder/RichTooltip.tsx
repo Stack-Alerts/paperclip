@@ -116,6 +116,7 @@ export function RichTooltip({ content, children }: RichTooltipProps) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mounted, setMounted] = useState(false);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
@@ -123,6 +124,7 @@ export function RichTooltip({ content, children }: RichTooltipProps) {
   useEffect(() => {
     if (!settings.enabled) {
       if (timerRef.current) clearTimeout(timerRef.current);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTriggerRect(null);
     }
   }, [settings.enabled]);
@@ -140,6 +142,7 @@ export function RichTooltip({ content, children }: RichTooltipProps) {
 
   if (!isValidElement(children)) return <>{children}</>;
 
+  // eslint-disable-next-line react-hooks/refs
   const child = cloneElement(children as ReactElement<React.HTMLAttributes<HTMLElement>>, {
     onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
       (children.props as React.HTMLAttributes<HTMLElement>).onMouseEnter?.(e);

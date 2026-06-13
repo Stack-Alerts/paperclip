@@ -592,6 +592,7 @@ export function StrategyBrowserDialog({
   // Fetch from DB every time the dialog opens (not just on user-triggered refresh)
   useEffect(() => {
     if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshList();
   }, [open, refreshList]);
 
@@ -619,6 +620,7 @@ export function StrategyBrowserDialog({
 
   // Load versions when selection changes; reset version override
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!selectedId) { setVersions([]); setSelectedVersionId(null); setDetailOverride(null); return; }
     const currentVersionId = displayList.find(s => s.id === selectedId)?.versionId ?? null;
     setSelectedVersionId(currentVersionId);
@@ -678,6 +680,7 @@ export function StrategyBrowserDialog({
   useEffect(() => {
     const stored = readStoredSplitPct();
     if (stored != null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSplitPct(stored);
       fiveRowDefaultApplied.current = true;
     }
@@ -707,7 +710,6 @@ export function StrategyBrowserDialog({
     const clamped = Math.min(SPLIT_MAX_PCT, Math.max(SPLIT_MIN_PCT, pct));
     setSplitPct(clamped);
     fiveRowDefaultApplied.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, listLoading, displayList.length]);
 
   const handleSort = useCallback((col: SortKey) => {
@@ -915,6 +917,7 @@ export function StrategyBrowserDialog({
   const [canPopIn, setCanPopIn] = useState(false);
   useEffect(() => {
     if (typeof window !== 'undefined' && standalone && window.opener) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCanPopIn(true);
     }
   }, [standalone]);

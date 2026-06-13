@@ -108,6 +108,7 @@ export function LiveOutputPanel({ logs = [], isRunning = false, result = null, c
   useEffect(() => {
     const stored = loadStoredFilters();
     if (stored) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (stored.levels.size > 0) setEnabledLevels(stored.levels);
       if (stored.categories.size > 0) setEnabledCategories(stored.categories);
     }

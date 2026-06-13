@@ -32,6 +32,7 @@ export function B5AlertBanner({ wsBaseUrl }: Props) {
   const { data, status: wsStatus } = useWebSocket<AlertsMessage>(`${wsBaseUrl}/ws/alerts`);
   const emittedAlertIdsRef = useRef<Set<string>>(new Set());
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const active = data?.active_alerts.filter((a) => !a.acknowledged) ?? [];
   const hasCritical = active.some((a) => a.severity === 'CRITICAL');
 

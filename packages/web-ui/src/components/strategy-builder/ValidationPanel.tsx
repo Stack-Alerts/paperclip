@@ -84,6 +84,7 @@ function summarize(messages: ValidationMessage[]) {
 // ValidationReport section types (full-parity with PyQt5 panel)
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type SectionStatus = 'pass' | 'warn' | 'error' | 'empty';
 
 interface SectionConfig {

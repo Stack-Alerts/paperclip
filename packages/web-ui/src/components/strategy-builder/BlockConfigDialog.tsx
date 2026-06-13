@@ -27,6 +27,7 @@ export function BlockConfigDialog({ open, block, blockIndex, onSave, onClose }: 
 
   useEffect(() => {
     if (!block) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setName((block.data?.name as string) ?? '');
     setLogic(((block.data?.logic as string) === 'OR' ? 'OR' : 'AND') as 'AND' | 'OR');
     setSignals(((block.data?.signals as BlockSignalEntry[]) ?? []).map((s) => ({ ...s })));

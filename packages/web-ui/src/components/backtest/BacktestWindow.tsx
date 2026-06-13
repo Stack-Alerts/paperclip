@@ -42,7 +42,7 @@ export function BacktestWindow({
     endDate: new Date(),
   });
 
-  const handleConfigChange = useCallback((field: keyof BacktestConfig, value: any) => {
+  const handleConfigChange = useCallback((field: keyof BacktestConfig, value: BacktestConfig[keyof BacktestConfig]) => {
     setConfig(prev => ({
       ...prev,
       [field]: value,
@@ -287,7 +287,7 @@ export function BacktestWindow({
           return (
             <button
               key={id}
-              onClick={() => setCurrentTab(id as any)}
+              onClick={() => setCurrentTab(id)}
               className="px-4 py-2.5 font-medium text-sm border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap"
               style={
                 isActive

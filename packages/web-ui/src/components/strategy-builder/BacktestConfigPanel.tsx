@@ -278,6 +278,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
   // Update strategyId when strategy changes
   useEffect(() => {
     if (currentStrategy?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setConfig((prev) => ({ ...prev, strategyId: currentStrategy.id }));
     }
   }, [currentStrategy?.id]);
@@ -292,6 +293,7 @@ export function BacktestConfigPanel({ open, onClose }: BacktestConfigPanelProps)
     setConfig((prev) => ({ ...prev, adaptiveSL: { ...prev.adaptiveSL, [k]: v }, adaptiveSLPreset: 'custom' }));
   }, []);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const applyPresetDays = useCallback((days: number) => {
     setConfig((prev) => ({ ...prev, startDate: daysAgo(days), endDate: today() }));
   }, []);

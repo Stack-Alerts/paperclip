@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useCallback, useContext, useEffect, useRef, createContext } from 'react';
-import { X, Play, Square, Pause, RotateCcw, Settings, Terminal, TrendingUp, BarChart3, BarChart2, Sparkles, GitCompare, ChevronUp, ChevronDown } from 'lucide-react';
+import { X, Play, Square, Pause, Settings, Terminal, TrendingUp, BarChart3, BarChart2, Sparkles, GitCompare, ChevronUp, ChevronDown } from 'lucide-react';
 import { AppBrand } from '@/components/shared/AppBrand';
 import { ThemeSelector } from './ThemeSelector';
+import { useTooltipSettings } from './TooltipSettingsContext';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
-import { BacktestConfig, BacktestResult, BacktestStatusMessage } from '@/lib/strategy-builder/types';
+import { BacktestConfig, BacktestStatusMessage } from '@/lib/strategy-builder/types';
 import { getBacktestResults } from '@/lib/strategy-builder/api';
 import { RichTooltip, type TooltipContent } from './RichTooltip';
 import {
@@ -52,7 +53,6 @@ const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
   { key: 'compare', label: 'Compare', icon: <GitCompare size={14} /> },
 ];
 
-const PRESET_DAYS = [30, 90, 180, 365];
 
 // ─── STATUS section font scaling (BTCAAAAA-34264 → scoped down by BTCAAAAA-34312) ─
 //
@@ -673,6 +673,7 @@ function ConfigTab({
         setAdaptivePreset('Custom');
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [adaptivePreset],
   );
   const currentAdaptive: AdaptiveValues = {
@@ -696,11 +697,13 @@ function ConfigTab({
     setMinStopLoss(v.minStopLoss);
     setMaxStopLoss(v.maxStopLoss);
     setAdaptivePreset(preset);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const applyLookbackToDates = useCallback((days: number) => {
     setLookbackDays(days);
     onChange({ startDate: daysAgo(days), endDate: today() });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onChange]);
 
   return (
@@ -1381,12 +1384,15 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
     runBacktest,
   } = useStrategyStore();
 
+  const { settings: tooltipSettings, update: updateTooltipSettings } = useTooltipSettings();
+
   const [activeTab, setActiveTab] = useState<TabKey>('config');
   // Font scale picked from header Aa−/Aa+ control. Defaults to `Normal` per
   // BTCAAAAA-34264 acceptance #1; reads the persisted choice on mount so each
   // dialog open respects the user's last selection.
   const [fontScale, setFontScale] = useState<FontScale>('Normal');
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (open) setFontScale(readStoredFontScale());
   }, [open]);
   const updateFontScale = useCallback((next: FontScale) => {
@@ -1459,6 +1465,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
   // Seed timeframe from current strategy when dialog opens
   useEffect(() => {
     if (open && currentStrategy?.settings?.timeframe) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setConfig(prev => ({ ...prev, timeframe: currentStrategy.settings?.timeframe ?? '1h' }));
     }
   }, [open, currentStrategy]);
@@ -1535,7 +1542,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
       let attempts = 0;
       const maxAttempts = 600; // 10 min at 1s intervals
       const pollInterval = 1000;
-      let seenLogIds = new Set<string>();
+      const seenLogIds = new Set<string>();
 
       while (attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, pollInterval));
@@ -1556,7 +1563,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
                   ...prev,
                   {
                     message: log.message,
-                    level: log.level as any,
+                    level: log.level as BacktestStatusMessage['level'],
                     timestamp: log.timestamp,
                   },
                 ]);
@@ -1596,6 +1603,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
   // a new browser window navigates to /strategy-builder/backtest-config which
   // re-mounts this same component with standalone={true}. Inline dialog
   // closes itself so only one config surface is visible at a time.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handlePopOut = useCallback(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams({ popout: '1' });
@@ -1621,6 +1629,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
   const [canPopIn, setCanPopIn] = useState(false);
   useEffect(() => {
     if (typeof window !== 'undefined' && standalone && window.opener) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCanPopIn(true);
     }
   }, [standalone]);
@@ -1701,6 +1710,35 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
               (window.open → /strategy-builder/backtest-config). */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <ThemeSelector />
+            {/* Tooltip delay — shared singleton with BacktestWindow / strategy builder */}
+            <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-faint)' }}>
+              <label className="flex items-center gap-1 cursor-pointer select-none" title="Toggle institutional-grade tooltips on all configuration fields">
+                <input
+                  type="checkbox"
+                  checked={tooltipSettings.enabled}
+                  onChange={e => updateTooltipSettings({ enabled: e.target.checked })}
+                  style={{ accentColor: 'var(--toolbar-accent)', width: 11, height: 11 }}
+                />
+                Tooltips
+              </label>
+              {tooltipSettings.enabled && (
+                <>
+                  <input
+                    type="range"
+                    min={300}
+                    max={3000}
+                    step={100}
+                    value={tooltipSettings.delayMs}
+                    onChange={e => updateTooltipSettings({ delayMs: Number(e.target.value) })}
+                    title="Tooltip hover delay — lower = tooltips appear faster"
+                    style={{ width: 54, accentColor: 'var(--toolbar-accent)', cursor: 'pointer', opacity: 0.75 }}
+                  />
+                  <span style={{ minWidth: 28, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                    {(tooltipSettings.delayMs / 1000).toFixed(1)}s
+                  </span>
+                </>
+              )}
+            </div>
             <div className="w-px h-4" style={{ background: 'var(--border)' }} />
             {!standalone && (
               <button
