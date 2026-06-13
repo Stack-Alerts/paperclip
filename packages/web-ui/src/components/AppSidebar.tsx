@@ -16,6 +16,7 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 import { BtcWaveformLogo } from './shared/AppBrand';
+import { ConnectionStatusPanel } from './shared/ConnectionStatusPanel';
 import { useSidebar } from '@/contexts/SidebarContext';
 
 const NAV_ITEMS = [
@@ -155,29 +156,7 @@ export function AppSidebar() {
       </nav>
 
       <div className="px-3 py-3" style={{ borderTop: '1px solid var(--border)' }}>
-        {!collapsed && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: '50%',
-                background: 'var(--status-connected)',
-                display: 'inline-block',
-              }}
-            />
-            <span
-              style={{
-                fontSize: 10,
-                color: 'var(--status-connected)',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-              }}
-            >
-              CONNECTED
-            </span>
-          </div>
-        )}
+        <ConnectionStatusPanel collapsed={collapsed} />
       </div>
     </aside>
   );
