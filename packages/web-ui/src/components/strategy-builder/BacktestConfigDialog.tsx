@@ -29,6 +29,7 @@ import { MetricsPanel } from '@/components/backtest/metrics/MetricsPanel';
 import { AiRecommendationsPanel } from '@/components/backtest/ai-recommendations/AiRecommendationsPanel';
 import { ComparePanel } from '@/components/backtest/compare/ComparePanel';
 import { BacktestProgressMeter } from '@/components/backtest/progress-meter';
+import { addRunRecord } from '@/lib/backtest-history';
 
 export interface BacktestConfigDialogProps {
   open: boolean;
@@ -1474,6 +1475,65 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
     setConfig(prev => ({ ...prev, ...patch }));
   }, []);
 
+  // Persist each completed run to the compare-panel history.
+  const savedRunIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!backTestResult || !currentStrategy) return;
+    if (backTestResult.status !== 'completed') return;
+    if (savedRunIdRef.current === backTestResult.runId) return;
+    savedRunIdRef.current = backTestResult.runId;
+    const fc: import('@/lib/strategy-builder/types').BacktestConfigFull = {
+      strategyId: currentStrategy.id,
+      startDate: config.startDate,
+      endDate: config.endDate,
+      initialCapital: config.initialCapital ?? 10000,
+      commissionPercentage: config.commissionPercentage,
+      slippagePercentage: config.slippagePercentage,
+      maxConcurrentPositions: config.maxConcurrentPositions,
+      timeframe: config.timeframe,
+      mode: mode === 'live-replay' ? 'live_replay' : 'historical',
+      tpslMode: tpSlConfig,
+      slAdjustmentMode: slAdjustment,
+      adaptiveSLPreset: adaptivePreset,
+      adaptiveSL: {
+        enabled: slAdjustment === 'Adaptive v2.0',
+        delayEnabled: delayStopLoss,
+        delayBars: Number(stopLossDelay),
+        emergencySlPct: Number(emergency),
+        volatilityLookback: Number(volatilityLookback),
+        volatilityMultiplier: Number(volatilityMultiplier),
+        minSlPct: Number(minStopLoss),
+        maxSlPct: Number(maxStopLoss),
+        useStructureSl: marketStructureStop,
+      },
+      riskPerTradePct: Number(maxRisk),
+      minRiskRewardRatio: Number(minRiskReward),
+      maxBarsHeld: Number(maxBarsHeld),
+      lookbackDays: Number(lookbackDays),
+      trainingDays: Number(trainingDays),
+      testingDays: Number(testingDays),
+      maxLeverage: Number(leverage),
+      confluenceThreshold: Number(confluence),
+    };
+    addRunRecord({
+      runId: backTestResult.runId,
+      strategyId: currentStrategy.id,
+      strategyName: currentStrategy.name ?? 'Unnamed',
+      savedAt: new Date().toISOString(),
+      config: {
+        startDate: config.startDate,
+        endDate: config.endDate,
+        initialCapital: config.initialCapital ?? 10000,
+        commissionPercentage: config.commissionPercentage,
+        slippagePercentage: config.slippagePercentage,
+        maxConcurrentPositions: config.maxConcurrentPositions,
+        timeframe: config.timeframe,
+      },
+      fullConfig: fc,
+      result: backTestResult,
+    });
+  }, [backTestResult, currentStrategy, config, mode, tpSlConfig, slAdjustment, adaptivePreset, delayStopLoss, stopLossDelay, emergency, volatilityLookback, volatilityMultiplier, minStopLoss, maxStopLoss, marketStructureStop, maxRisk, minRiskReward, maxBarsHeld, lookbackDays, trainingDays, testingDays, leverage, confluence]);
+
   const handleStart = useCallback(async () => {
     if (!currentStrategy) return;
     if (!config.startDate || !config.endDate) {
@@ -1898,7 +1958,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
             />
           )}
           {activeTab === 'compare' && (
-            <ComparePanel />
+            <ComparePanel currentResult={backTestResult ?? undefined} currentStrategyId={currentStrategy?.id} currentStrategyName={currentStrategy?.name} />
           )}
         </div>
 
