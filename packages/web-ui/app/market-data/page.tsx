@@ -128,9 +128,10 @@ export default function MarketDataPage() {
 
   useEffect(() => {
     loadStatus();
+    handleVerify();
     const interval = setInterval(loadStatus, 60_000);
     return () => clearInterval(interval);
-  }, [loadStatus]);
+  }, [loadStatus, handleVerify]);
 
   const handleCheckGaps = useCallback(async (): Promise<DataGapCheckResult> => {
     return fetchDataGapCheck();
@@ -214,8 +215,9 @@ export default function MarketDataPage() {
             onClick={() => setShowUpdateModal(true)}
             className="px-3 py-1.5 text-sm rounded font-medium transition-colors"
             style={{
-              background: anyIssue ? 'var(--color-bearish)' : 'var(--accent-blue)',
-              color: '#fff',
+              background: anyIssue ? 'color-mix(in srgb, var(--color-bearish) 20%, #1e2a38)' : '#314255',
+              color: anyIssue ? 'var(--color-bearish)' : 'var(--btn-primary-text, white)',
+              border: anyIssue ? '1px solid var(--color-bearish)' : '1px solid #3d5470',
             }}
           >
             {anyIssue ? '⚠ Update Data' : 'Update Data'}
@@ -369,10 +371,10 @@ export default function MarketDataPage() {
           <button
             onClick={handleVerify}
             disabled={verifying}
-            className="px-3 py-1.5 text-sm rounded font-medium"
-            style={{ background: 'var(--accent-blue)', color: '#fff' }}
+            className="px-3 py-1.5 text-sm rounded font-medium transition-colors"
+            style={{ background: '#314255', color: 'var(--btn-primary-text, white)', border: '1px solid #3d5470' }}
           >
-            {verifying ? 'Verifying…' : 'Run Verification'}
+            {verifying ? 'Verifying…' : 'Re-run Verification'}
           </button>
         </div>
 
