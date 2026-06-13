@@ -13,7 +13,8 @@
 # Usage:
 #   ./start-test.sh                 # Spawn test on :3000 (or fail if :3010 is supervised)
 #   ./start-test.sh --branch <name> # Spawn test on <name>, not main
-#   ./start-test.sh --force          # Stop supervised service, then spawn test on :3000
+#   ./start-test.sh --force         # Stop supervised service, then spawn test on :3000
+#   ./start-test.sh --restart       # Kill existing :3000, pull latest main, restart fresh
 
 set -euo pipefail
 
@@ -28,6 +29,7 @@ FORCE_MODE=0
 KILL_EXISTING=0
 REUSE_EXISTING=0
 CANCEL_ON_CONFLICT=0
+RESTART_MODE=0
 prev_arg=""
 for arg in "$@"; do
   if [[ "$prev_arg" == "--branch" ]]; then
@@ -54,9 +56,13 @@ for arg in "$@"; do
     --cancel-on-conflict)
       CANCEL_ON_CONFLICT=1
       ;;
+    --restart)
+      RESTART_MODE=1
+      KILL_EXISTING=1
+      ;;
     *)
       echo "ERROR: unknown flag: $arg" >&2
-      echo "Usage: ./start-test.sh [--branch <name>] [--force] [--kill-existing] [--reuse-existing] [--cancel-on-conflict]" >&2
+      echo "Usage: ./start-test.sh [--branch <name>] [--force] [--kill-existing] [--reuse-existing] [--cancel-on-conflict] [--restart]" >&2
       exit 1
       ;;
   esac
@@ -116,6 +122,19 @@ elif [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
       REPO_ROOT="$TEMP_WORKTREE"
       echo "[test-instance] using temporary worktree — starting test server..."
     fi
+  fi
+fi
+
+# --restart: pull latest main before starting so the user sees the newest build.
+# REPO_ROOT is already resolved to wherever main lives (own worktree, existing worktree,
+# or temp worktree) so this pull always targets the right directory.
+if [[ $RESTART_MODE -eq 1 ]]; then
+  echo "[test-instance] --restart: pulling latest origin/main..."
+  git -C "$REPO_ROOT" fetch --quiet origin main 2>/dev/null || true
+  if git -C "$REPO_ROOT" pull --ff-only origin main 2>&1; then
+    echo "[test-instance] pull complete — restarting with latest main..."
+  else
+    echo "[test-instance] WARNING: pull --ff-only failed (local divergence?); starting with current code." >&2
   fi
 fi
 
