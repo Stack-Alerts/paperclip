@@ -10,8 +10,28 @@ import {
   runDataVerify,
   runDataRepair,
   formatLocalShort,
+  parseApiTimestamp,
 } from '@/lib/data-management/api';
-import type { DataStatusResponse, TimeframeVerifyResult } from '@/lib/data-management/api';
+import type { DataStatusResponse, TimeframeVerifyResult, TimeframeFreshness } from '@/lib/data-management/api';
+
+// The backend uses a fixed 90 000 s (25 h) threshold for the 1d timeframe,
+// which flags the last *closed* daily candle as stale once it's past 01:00 UTC
+// even though there is no gap (today's in-flight candle hasn't closed yet).
+// This function replaces the backend flag with an interval-aware computation:
+// a bar is stale only when its open-time predates the expected last closed candle.
+function computeActualStale(tf: string, f: TimeframeFreshness): boolean {
+  if (!f.lastBarTs || f.ageSeconds === null) return true;
+  const intervalSeconds: Record<string, number> = { '15m': 900, '1h': 3600, '1d': 86400 };
+  const interval = intervalSeconds[tf];
+  if (interval === undefined) return f.stale;
+  const nowSec = Date.now() / 1000;
+  // Expected open-time of the last fully-closed candle:
+  // floor(now / interval) * interval - interval
+  const expectedLastClosedOpen = Math.floor(nowSec / interval) * interval - interval;
+  const d = parseApiTimestamp(f.lastBarTs);
+  if (!d) return true;
+  return d.getTime() / 1000 < expectedLastClosedOpen;
+}
 
 function formatAge(seconds: number | null): string {
   if (seconds === null) return '—';
@@ -165,7 +185,10 @@ export default function MarketDataPage() {
 
   const timeframes = status?.timeframeFreshness ?? {};
   const allStatuses = status?.allStatus ?? {};
-  const anyIssue = status?.anyGaps || status?.anyStale;
+  // Recalculate staleness using interval-aware logic (backend uses a fixed 25 h
+  // threshold for 1d which falsely flags the normal last-closed-daily-bar as stale).
+  const anyActuallyStale = Object.entries(timeframes).some(([tf, f]) => computeActualStale(tf, f));
+  const anyIssue = status?.anyGaps || anyActuallyStale;
 
   return (
     <div className="flex-1 overflow-y-auto p-6" style={{ background: 'var(--app-bg)' }}>
@@ -217,7 +240,7 @@ export default function MarketDataPage() {
         <div className="grid grid-cols-3 gap-3">
           {(['15m', '1h', '1d'] as const).map((tf) => {
             const f = timeframes[tf];
-            const stale = f ? f.stale : true;
+            const stale = f ? computeActualStale(tf, f) : true;
             return (
               <div
                 key={tf}
