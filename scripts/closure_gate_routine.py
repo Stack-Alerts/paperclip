@@ -47,7 +47,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("closure_gate")
 
-TRACKING_ISSUE = "BTCAAAAA-36129"  # 36131 is outside CTO agent auth boundary (HTTP 403)
+# Use current agent's active task as reporting target when available (avoids
+# auth-boundary 403s when multiple agents with different boundaries run this routine)
+TRACKING_ISSUE = os.environ.get("PAPERCLIP_TASK_ID", "BTCAAAAA-36131")
 API_TIMEOUT = 30
 
 # State file to track closure-gate actions
