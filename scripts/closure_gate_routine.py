@@ -47,7 +47,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("closure_gate")
 
-TRACKING_ISSUE = "BTCAAAAA-36127"
+TRACKING_ISSUE = "BTCAAAAA-36131"
 API_TIMEOUT = 30
 
 # State file to track closure-gate actions
