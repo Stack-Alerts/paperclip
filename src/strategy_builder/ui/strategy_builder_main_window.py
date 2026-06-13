@@ -1419,6 +1419,12 @@ class StrategyBuilderMainWindow(WindowGeometryMixin, QMainWindow):
                     logger.warning(f"[ConfigRetention] Could not apply pending config: {_e}")
             # ── End config retention ──────────────────────────────────────────
             
+            # Refresh block search panel counts after each backtest updates the stats file
+            if self.search_panel is not None:
+                self.backtest_window.backtest_panel.statistics_updated.connect(
+                    self.search_panel.refresh_statistics
+                )
+
             self.backtest_window.show()  # Non-modal so user can see strategy
             self._update_status("Backtest configuration opened")
         except Exception as e:

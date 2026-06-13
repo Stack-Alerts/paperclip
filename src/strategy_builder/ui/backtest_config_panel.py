@@ -233,6 +233,7 @@ class BacktestWorker(QThread):
     live_message = pyqtSignal(str, str, str)  # message, level, category - NEW for real-time messages
     trade_data_emit = pyqtSignal(dict)  # Emits trade data (OPEN initially, then updates when CLOSED)
     status_message = pyqtSignal(str)  # Captured stdout for Status panel
+    statistics_updated = pyqtSignal()  # Emitted after signal found-counts are persisted to disk
     
     def __init__(
         self, 
@@ -636,6 +637,34 @@ class BacktestWorker(QThread):
                 # Emit final progress
                 self.progress_updated.emit(total_candles, total_candles, f"Multicore complete: {trade_count} trades")
                 
+                # Update signal found-count statistics for each active block.
+                # Only new dates increment the counts (dedup inside SignalStatisticsUpdater).
+                try:
+                    from src.strategy_builder.utils.signal_statistics_updater import update_block_statistics
+                    from src.strategy_builder.utils.signal_statistics_loader import SignalStatisticsLoader
+                    signal_dates = mc_results.get("signal_dates_by_block", {})
+                    updated_blocks = 0
+                    for _blk, _sigs in signal_dates.items():
+                        if _sigs:
+                            if update_block_statistics(_blk, _sigs):
+                                updated_blocks += 1
+                    if updated_blocks:
+                        self.live_message.emit(
+                            f"📈 Signal found-counts updated for {updated_blocks} block(s)",
+                            "INFO",
+                            "SYSTEM",
+                        )
+                        # Force the loader singleton to pick up the new file contents
+                        SignalStatisticsLoader().load(force_reload=True)
+                        # Notify UI to refresh signal count labels in the block search panel
+                        self.statistics_updated.emit()
+                except Exception as _stats_err:
+                    self.live_message.emit(
+                        f"⚠️ Signal stats update skipped: {_stats_err}",
+                        "WARNING",
+                        "SYSTEM",
+                    )
+
                 # Calculate results
                 results = {
                     'total_candles': total_candles,
@@ -644,7 +673,7 @@ class BacktestWorker(QThread):
                     'tp_adjustments': mc_results.get('tp_adjustments', {'TP1': 0, 'TP2': 0, 'TP3': 0, 'SL': 0}),  # From multicore engine
                     'sl_adjustments': mc_results.get('sl_adjustments', 0)
                 }
-                
+
                 self.live_message.emit(
                     f"✅ Backtest completed successfully! {trade_count} trades executed.",
                     "INFO",
@@ -1096,6 +1125,7 @@ class BacktestConfigPanel(QWidget):
     # Signals
     capital_changed = pyqtSignal(Money)  # Emits when starting capital changes
     config_changed = pyqtSignal()  # NEW: Emits when ANY config parameter changes (triggers auto-save)
+    statistics_updated = pyqtSignal()  # Forwarded from BacktestWorker after found-counts are updated
 
     def __init__(self, orchestrator, parent=None):
         super().__init__(parent)
@@ -2817,6 +2847,8 @@ class BacktestConfigPanel(QWidget):
         self.worker.trade_data_emit.connect(self._on_trade_data)
         # Connect stdout capture to Status panel (shows data loading progress)
         self.worker.status_message.connect(self._on_status_message)
+        # Forward statistics_updated to parent so main window can refresh the block search panel
+        self.worker.statistics_updated.connect(self.statistics_updated)
         self.worker.start()
         
         # Update UI state

@@ -34,8 +34,9 @@ Date: February 11, 2026
 """
 
 from typing import List, Dict, Optional, Callable, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from collections import defaultdict
 from decimal import Decimal
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -140,6 +141,8 @@ class ChunkResult:
     errors: List[str]
     messages: List[Dict[str, str]]  # NEW: Collected live messages for Live Output
     sl_adjustments: int = 0  # CRITICAL FIX: Track Adaptive SL updates
+    # {block_name: {signal_name: [iso_date_str, ...]}} — one entry per signal fire per date
+    signal_dates_by_block: Dict[str, Dict[str, List[str]]] = field(default_factory=dict)
 
 
 def split_bars_for_parallel_processing(
@@ -275,6 +278,8 @@ def evaluate_chunk(
         signals_evaluated = 0
         messages = []  # NEW: Collect messages for Live Output
         sl_adjustment_count = 0  # CRITICAL FIX: Track SL adjustments
+        # Track signal fires by date: {block_name: {signal_name: [date_str, ...]}}
+        signal_dates_by_block: Dict[str, Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
         
         bars = chunk.bars
         total_bars = len(bars)
@@ -300,7 +305,18 @@ def evaluate_chunk(
             )
             
             signals_evaluated += 1
-            
+
+            # Record each fired signal with its date for found-count statistics
+            if result.signals_fired:
+                bar_date = datetime.fromtimestamp(
+                    current_bar.ts_init / 1e9, tz=timezone.utc
+                ).date().isoformat()
+                for signal_id in result.signals_fired:
+                    parts = signal_id.split("::", 1)
+                    if len(parts) == 2:
+                        blk, sig = parts
+                        signal_dates_by_block[blk][sig].append(bar_date)
+
             # ENTRY DECISION
             if result.should_enter and not evaluator.current_trade:
                 trade_count += 1
@@ -760,6 +776,11 @@ def evaluate_chunk(
                 'remaining_position': evaluator.current_trade.remaining_position
             }
         
+        # Convert defaultdicts to plain dicts for pickling across process boundary
+        plain_signal_dates = {
+            blk: dict(sigs) for blk, sigs in signal_dates_by_block.items()
+        }
+
         return ChunkResult(
             chunk_id=chunk.chunk_id,
             trades=trades,
@@ -768,9 +789,10 @@ def evaluate_chunk(
             signals_evaluated=signals_evaluated,
             errors=errors,
             messages=messages,
-            sl_adjustments=sl_adjustment_count  # CRITICAL FIX: Return SL count
+            sl_adjustments=sl_adjustment_count,
+            signal_dates_by_block=plain_signal_dates,
         )
-        
+
     except Exception as e:
         import traceback
         error_msg = f"Chunk {chunk.chunk_id} failed: {str(e)}\n{traceback.format_exc()}"
@@ -820,22 +842,28 @@ def merge_chunk_results(
     all_errors = []
     all_messages = []
     total_sl_adjustments = 0  # CRITICAL FIX: Accumulate SL adjustments
-    
+    merged_signal_dates: Dict[str, Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
+
     # Sort by chunk_id
     chunk_results.sort(key=lambda x: x.chunk_id)
-    
+
     for result in chunk_results:
         # Add trades from this chunk to registry
         # Registry automatically deduplicates
         for trade_data in result.trades:
             registry.add_trade(trade_data)
-        
+
         # Accumulate stats
         total_bars += result.total_bars_processed
         total_signals += result.signals_evaluated
         all_errors.extend(result.errors)
         all_messages.extend(result.messages)
         total_sl_adjustments += result.sl_adjustments  # CRITICAL FIX: Sum SL counts
+
+        # Merge per-block signal date lists across chunks
+        for blk, sigs in result.signal_dates_by_block.items():
+            for sig, dates in sigs.items():
+                merged_signal_dates[blk][sig].extend(dates)
         
         # Report progress
         if progress_callback:
@@ -870,7 +898,9 @@ def merge_chunk_results(
         'messages': all_messages,
         'duplicates_rejected': duplicates_rejected,
         'tp_adjustments': {'TP1': tp1_count, 'TP2': tp2_count, 'TP3': tp3_count, 'SL': sl_exit_count},
-        'sl_adjustments': total_sl_adjustments
+        'sl_adjustments': total_sl_adjustments,
+        # {block_name: {signal_name: [iso_date, ...]}} — all signal fires across the run
+        'signal_dates_by_block': {blk: dict(sigs) for blk, sigs in merged_signal_dates.items()},
     }
 
 

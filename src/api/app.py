@@ -49,7 +49,7 @@ import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -1945,17 +1945,77 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
             })
 
         wins = [t for t in trades if (t.get("pnl") or 0) > 0]
+        losses = [t for t in trades if (t.get("pnl") or 0) <= 0]
         win_rate = (len(wins) / len(trades)) if trades else 0.0
-        total_return = sum(float(t.get("pnl_pct") or t.get("pnl_percent") or 0.0) for t in trades)
+
+        # Risk metric calculations from raw trades
+        import math as _math
+        _initial_capital = float(config.get("initialCapital", 10000.0))
+        _win_pnls = [float(t.get("pnl", 0)) for t in wins]
+        _loss_pnls = [float(t.get("pnl", 0)) for t in losses]
+        _total_win = sum(_win_pnls)
+        _total_loss_abs = abs(sum(_loss_pnls)) if _loss_pnls else 0.0
+        _avg_win = _total_win / len(_win_pnls) if _win_pnls else 0.0
+        _avg_loss = sum(_loss_pnls) / len(_loss_pnls) if _loss_pnls else 0.0
+        _profit_factor = (_total_win / _total_loss_abs) if _total_loss_abs > 0 else (9.99 if _total_win > 0 else 0.0)
+
+        # Max drawdown from equity curve
+        _equity = _initial_capital
+        _peak = _initial_capital
+        _max_dd_pct = 0.0
+        for _t in trades:
+            _equity += float(_t.get("pnl", 0))
+            if _equity > _peak:
+                _peak = _equity
+            if _peak > 0:
+                _dd = (_peak - _equity) / _peak * 100.0
+                if _dd > _max_dd_pct:
+                    _max_dd_pct = _dd
+        _final_capital = _equity
+
+        # True portfolio return % based on dollar P&L — avoids summing per-trade %s
+        # which diverges from actual equity growth whenever position sizes vary.
+        _actual_return_pct = (_final_capital - _initial_capital) / _initial_capital * 100.0 \
+            if _initial_capital > 0 else 0.0
+
+        # Sharpe & Sortino: derive per-trade return as % of initial capital when
+        # the engine does not supply pnl_pct/pnl_percent (common in raw trade dicts).
+        _trade_rets = [
+            float(t.get("pnl_pct") or t.get("pnl_percent") or
+                  (float(t.get("pnl", 0)) / _initial_capital * 100.0 if _initial_capital > 0 else 0.0))
+            for t in trades
+        ]
+        _n = len(_trade_rets)
+        if _n > 1:
+            _mean_ret = sum(_trade_rets) / _n
+            _variance = sum((_r - _mean_ret) ** 2 for _r in _trade_rets) / (_n - 1)
+            _std_ret = _variance ** 0.5
+            _sharpe = (_mean_ret / _std_ret) * _math.sqrt(_n) if _std_ret > 0 else 0.0
+            _down_sq = [_r ** 2 for _r in _trade_rets if _r < 0]
+            _down_dev = _math.sqrt(sum(_down_sq) / _n) if _down_sq else 0.0
+            _sortino = (_mean_ret / _down_dev) * _math.sqrt(_n) if _down_dev > 0 else 0.0
+        else:
+            _sharpe = _sortino = 0.0
+
+        _calmar = (_actual_return_pct / _max_dd_pct) if _max_dd_pct > 0 else 0.0
 
         metrics = {
             "totalTrades": len(trades),
             "winningTrades": len(wins),
             "losingTrades": len(trades) - len(wins),
             "winRate": win_rate,
-            "returnPercentage": total_return,
+            "returnPercentage": round(_actual_return_pct, 4),
             "totalBars": int(result.get("total_bars", len(bars))),
             "totalSignals": int(result.get("total_signals", 0)),
+            "profitFactor": round(_profit_factor, 4),
+            "averageWin": round(_avg_win, 2),
+            "averageLoss": round(_avg_loss, 2),
+            "maxDrawdown": round(_max_dd_pct, 4),
+            "sharpeRatio": round(_sharpe, 4),
+            "sortinoRatio": round(_sortino, 4),
+            "calmarRatio": round(_calmar, 4),
+            "finalCapital": round(_final_capital, 2),
+            "initialCapital": round(_initial_capital, 2),
         }
 
         _patch_backtest_run(
@@ -1972,6 +2032,27 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
         _append_backtest_log(run_id, f"Total Candles: {metrics.get('totalBars', len(bars)):,}", level='SYSTEM')
         _append_backtest_log(run_id, f"Trades: {len(trades)}", level='SYSTEM')
         _append_backtest_log(run_id, f"TP/SL Adjustments: {metrics.get('totalSignals', 0)}", level='SYSTEM')
+
+        # Update signal found-count statistics for each block active in this strategy.
+        # Only new dates (not previously recorded) increment the counts — dedup is
+        # handled inside SignalStatisticsUpdater to prevent double-counting.
+        try:
+            from src.strategy_builder.utils.signal_statistics_updater import update_block_statistics
+            signal_dates = result.get("signal_dates_by_block", {})
+            updated_blocks = 0
+            for block_name, sigs in signal_dates.items():
+                if sigs:
+                    ok = update_block_statistics(block_name, sigs)
+                    if ok:
+                        updated_blocks += 1
+            if updated_blocks:
+                _append_backtest_log(
+                    run_id,
+                    f"📈 Signal found-counts updated for {updated_blocks} block(s)",
+                    level='SYSTEM',
+                )
+        except Exception as _stats_err:
+            _append_backtest_log(run_id, f"⚠️ Signal stats update skipped: {_stats_err}", level='SYSTEM')
 
         # Append per-bar decision messages from the engine to the live output
         for msg in messages:
@@ -2059,7 +2140,7 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
 
         _append_backtest_log(
             run_id,
-            f"Backtest completed: {len(trades)} trades, win rate {win_rate:.1%}, total return {total_return:.2f}%",
+            f"Backtest completed: {len(trades)} trades, win rate {win_rate:.1%}, total return {_actual_return_pct:.2f}%",
             level="SYSTEM",
         )
     except Exception as exc:  # noqa: BLE001 — surface to webui caller
@@ -2173,6 +2254,360 @@ async def get_backtest_status(
 
 
 # ---------------------------------------------------------------------------
+# REST: Config Discovery (BTCAAAAA-36002)
+# ---------------------------------------------------------------------------
+#
+# Wraps the existing PyQt5 ``ConfigPermutationEngine`` for the web UI so the
+# "Config Discovery" button in BacktestConfigDialog can run a parameter sweep
+# over a strategy's backtest config and rank the results.
+#
+#   POST /strategies/{strategy_id}/config-discovery              -> {runId, status}
+#   GET  /strategies/{strategy_id}/config-discovery/{run_id}     -> live status + results
+#
+# Mirrors the backtest run / poll pattern. The permutation engine itself is
+# driven by a plain ``threading.Thread`` (the engine's QThread variant emits
+# Qt signals, which we cannot use from a thread spawned outside the Qt event
+# loop). The data classes, permutation generators, and metric aggregator are
+# re-imported from ``src.strategy_builder.ui.config_permutation_engine`` and
+# the underlying MulticoreBacktestEngine is invoked once per scenario with a
+# ``config_delta`` overlay — same call shape as the thick-client QThread.
+
+_config_discovery_runs: dict[str, dict[str, Any]] = {}
+_config_discovery_lock = threading.Lock()
+
+
+def _new_config_discovery_run(strategy_id: str, config: dict) -> str:
+    run_id = uuid.uuid4().hex
+    now = datetime.now(timezone.utc).isoformat()
+    with _config_discovery_lock:
+        _config_discovery_runs[run_id] = {
+            "runId": run_id,
+            "strategyId": strategy_id,
+            "status": "running",
+            "progress": 0,
+            "baseline": None,
+            "results": [],
+            "logs": [],
+            "error": None,
+            "config": config,
+            "startedAt": now,
+            "completedAt": None,
+        }
+    return run_id
+
+
+def _patch_config_discovery_run(run_id: str, **patch: Any) -> None:
+    with _config_discovery_lock:
+        run = _config_discovery_runs.get(run_id)
+        if run is not None:
+            run.update(patch)
+
+
+def _append_config_discovery_log(run_id: str, message: str, level: str = "INFO") -> None:
+    entry = {
+        "message": str(message),
+        "level": level,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    with _config_discovery_lock:
+        run = _config_discovery_runs.get(run_id)
+        if run is not None:
+            logs = run.setdefault("logs", [])
+            logs.append(entry)
+            if len(logs) > 500:
+                del logs[: len(logs) - 500]
+
+
+def _serialize_discovery_result(result: Any) -> dict:
+    """Convert a PyQt5 DiscoveryResult to a JSON-safe dict for the web UI."""
+    return {
+        "scenarioId": getattr(result, "scenario_id", ""),
+        "description": getattr(result, "description", ""),
+        "configDelta": dict(getattr(result, "config_delta", {}) or {}),
+        "paramLabels": [list(p) for p in (getattr(result, "param_labels", []) or [])],
+        "totalPnl": float(getattr(result, "total_pnl", 0.0)),
+        "winRate": float(getattr(result, "win_rate", 0.0)),
+        "tradeCount": int(getattr(result, "trade_count", 0)),
+        "avgPnlPerTrade": float(getattr(result, "avg_pnl_per_trade", 0.0)),
+        "sharpeRatio": float(getattr(result, "sharpe_ratio", 0.0)),
+        "exitTp1": int(getattr(result, "exit_tp1", 0)),
+        "exitTp2": int(getattr(result, "exit_tp2", 0)),
+        "exitTp3": int(getattr(result, "exit_tp3", 0)),
+        "exitSl": int(getattr(result, "exit_sl", 0)),
+        "exitTime": int(getattr(result, "exit_time", 0)),
+        "avgBarsHeld": float(getattr(result, "avg_bars_held", 0.0)),
+        "maxDrawdown": float(getattr(result, "max_drawdown", 0.0)),
+        "error": getattr(result, "error", None),
+    }
+
+
+def _run_config_discovery_in_thread(
+    run_id: str, strategy: dict, config: dict
+) -> None:
+    """Background worker: load bars, build scenarios, run each through the engine.
+
+    Re-uses the existing ``MulticoreBacktestEngine`` and the permutation
+    helpers from the thick-client config discovery engine. Each scenario's
+    ``config_delta`` is overlaid onto a deep-copy of the backtest config,
+    matching the QThread worker's call shape.
+    """
+    import copy as _copy
+    import traceback as _tb
+
+    try:
+        from src.strategy_builder.ui.config_permutation_engine import (
+            DEFAULT_PARAMETER_RANGES,
+            DiscoveryScenario,
+            aggregate_metrics,
+            generate_single_axis_permutations,
+        )
+        from src.optimizer_v3.core.backtest_data_provider import get_backtest_provider
+        from src.optimizer_v3.core.multicore_backtest_engine import MulticoreBacktestEngine
+        from src.detectors.building_blocks.registry import BlockRegistry as _BR
+
+        _append_config_discovery_log(
+            run_id,
+            f"Starting config discovery for '{strategy.get('name', '?')}' "
+            f"({config.get('startDate', '?')} → {config.get('endDate', '?')})",
+            level="SYSTEM",
+        )
+        _append_config_discovery_log(
+            run_id,
+            f"Parameter ranges: {len(DEFAULT_PARAMETER_RANGES)} axes, "
+            f"strategy=single_axis (per thick-client default)",
+            level="SYSTEM",
+        )
+
+        timeframe = str(
+            config.get("timeframe")
+            or strategy.get("settings", {}).get("timeframe")
+            or "15m"
+        )
+        start = datetime.fromisoformat(str(config["startDate"]))
+        end = datetime.fromisoformat(str(config["endDate"]))
+
+        _append_config_discovery_log(run_id, "Loading bars (once for all scenarios)…", level="SYSTEM")
+
+        def _load_progress(current: int, total: int, msg: str) -> None:
+            _patch_config_discovery_run(run_id, progress=min(20, int((current / total) * 20) if total else 5))
+            if msg:
+                _append_config_discovery_log(run_id, msg, level="SYSTEM")
+
+        provider = get_backtest_provider()
+        bars = provider.load_bars_for_backtest(timeframe, start, end, _load_progress)
+        _append_config_discovery_log(
+            run_id, f"Loaded {len(bars):,} bars", level="SYSTEM"
+        )
+        _patch_config_discovery_run(run_id, progress=20)
+
+        # Normalize block names + backfill signal weights (matches the backtest worker)
+        strategy_normalized = _copy.deepcopy(strategy)
+        for blk in strategy_normalized.get("blocks") or []:
+            raw = blk.get("name", "")
+            blk["name"] = raw.lower().replace(" ", "_")
+            block_meta = _BR.get_block(blk["name"])
+            for sig in blk.get("signals") or []:
+                if sig.get("weight") is None and block_meta:
+                    tier = (block_meta.signal_tiers or {}).get(sig.get("name", ""))
+                    if tier:
+                        sig["weight"] = tier.get("base_points", 10)
+
+        engine = MulticoreBacktestEngine()
+        base_bc = _copy.deepcopy(config)
+
+        # 1) Baseline run (current config)
+        _append_config_discovery_log(run_id, "Running baseline scenario…", level="SYSTEM")
+        baseline_scenario = DiscoveryScenario(
+            scenario_id="BASELINE",
+            description="[BASELINE] Current config",
+            config_delta={},
+            param_labels=[],
+        )
+        try:
+            bl = engine.run_backtest(
+                bars=bars,
+                strategy_config=strategy_normalized,
+                backtest_config=_copy.deepcopy(base_bc),
+                progress_callback=None,
+            )
+            baseline_result = aggregate_metrics(baseline_scenario, bl.get("trades", []))
+        except Exception as exc:
+            _append_config_discovery_log(
+                run_id, f"Baseline error: {exc}", level="ERROR"
+            )
+            baseline_result = aggregate_metrics(
+                baseline_scenario, [], error=str(exc)
+            )
+        baseline_result.scenario_id = "BASELINE"
+        baseline_dict = _serialize_discovery_result(baseline_result)
+        _patch_config_discovery_run(run_id, baseline=baseline_dict, progress=30)
+        _append_config_discovery_log(
+            run_id,
+            f"Baseline: {baseline_result.trade_count} trades, "
+            f"PnL ${baseline_result.total_pnl:.2f}, "
+            f"win rate {baseline_result.win_rate:.1f}%",
+            level="SYSTEM",
+        )
+
+        # 2) Build permutation scenarios from default ranges
+        scenarios = generate_single_axis_permutations(base_bc, DEFAULT_PARAMETER_RANGES)
+        total = len(scenarios)
+        _append_config_discovery_log(
+            run_id, f"Running {total} permutation scenarios…", level="SYSTEM"
+        )
+
+        results: list[dict] = [baseline_dict]
+        for i, scenario in enumerate(scenarios, start=1):
+            _patch_config_discovery_run(
+                run_id,
+                progress=30 + int((i / max(1, total)) * 70),
+            )
+            _append_config_discovery_log(
+                run_id,
+                f"Scenario {i}/{total}: {scenario.description}",
+                level="INFO",
+            )
+            try:
+                bc = _copy.deepcopy(base_bc)
+                for key, val in scenario.config_delta.items():
+                    parts = key.split(".")
+                    target = bc
+                    for part in parts[:-1]:
+                        if not isinstance(target.get(part), dict):
+                            target[part] = {}
+                        target = target[part]
+                    target[parts[-1]] = val
+
+                run_result = engine.run_backtest(
+                    bars=bars,
+                    strategy_config=strategy_normalized,
+                    backtest_config=bc,
+                    progress_callback=None,
+                )
+                agg = aggregate_metrics(scenario, run_result.get("trades", []))
+            except Exception as exc:
+                _append_config_discovery_log(
+                    run_id, f"Scenario {scenario.scenario_id} error: {exc}", level="ERROR"
+                )
+                agg = aggregate_metrics(scenario, [], error=str(exc))
+                agg.error = _tb.format_exc()
+            results.append(_serialize_discovery_result(agg))
+
+        _patch_config_discovery_run(
+            run_id,
+            status="completed",
+            results=results,
+            progress=100,
+            completedAt=datetime.now(timezone.utc).isoformat(),
+        )
+        _append_config_discovery_log(
+            run_id,
+            f"Config discovery complete: {len(results) - 1} permutations + baseline",
+            level="SYSTEM",
+        )
+    except Exception as exc:  # noqa: BLE001 — surface to webui caller
+        logger.exception("Config discovery run %s failed", run_id)
+        _patch_config_discovery_run(
+            run_id,
+            status="error",
+            error=str(exc),
+            completedAt=datetime.now(timezone.utc).isoformat(),
+        )
+        _append_config_discovery_log(run_id, f"ERROR: {exc}", level="ERROR")
+
+
+class ConfigDiscoveryStartResponse(BaseModel):
+    runId: str
+    status: str
+
+
+class ConfigDiscoveryRunStatus(BaseModel):
+    runId: str
+    strategyId: str
+    status: str
+    progress: int
+    baseline: Optional[dict] = None
+    results: list = []
+    logs: list = []
+    error: Optional[str] = None
+    startedAt: str
+    completedAt: Optional[str] = None
+
+
+@app.post(
+    "/strategies/{strategy_id}/config-discovery",
+    response_model=ConfigDiscoveryStartResponse,
+    tags=["Backtest"],
+    summary="Start a config-discovery permutation run for a strategy",
+)
+async def start_config_discovery(
+    strategy_id: str,
+    payload: dict,
+    _: dict = Depends(require_jwt),
+) -> ConfigDiscoveryStartResponse:
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    def _load_strategy() -> Optional[dict]:
+        with db.scoped_managers() as scoped:
+            return scoped.strategy.get_latest_version(strategy_id)
+
+    try:
+        strategy = await asyncio.to_thread(_load_strategy)
+    except Exception as exc:
+        logger.exception("Failed to load strategy %s for config discovery", strategy_id)
+        raise HTTPException(status_code=500, detail=f"Failed to load strategy: {exc}") from exc
+
+    if strategy is None:
+        raise _strategy_not_found(strategy_id)
+
+    config = dict(payload or {})
+    run_id = _new_config_discovery_run(strategy_id, config)
+
+    worker = threading.Thread(
+        target=_run_config_discovery_in_thread,
+        args=(run_id, strategy, config),
+        name=f"config-discovery-{run_id[:8]}",
+        daemon=True,
+    )
+    worker.start()
+
+    return ConfigDiscoveryStartResponse(runId=run_id, status="running")
+
+
+@app.get(
+    "/strategies/{strategy_id}/config-discovery/{run_id}",
+    response_model=ConfigDiscoveryRunStatus,
+    tags=["Backtest"],
+    summary="Get current status / final result of a config-discovery run",
+)
+async def get_config_discovery_status(
+    strategy_id: str,
+    run_id: str,
+    _: dict = Depends(require_jwt),
+) -> ConfigDiscoveryRunStatus:
+    with _config_discovery_lock:
+        run = _config_discovery_runs.get(run_id)
+        snapshot = dict(run) if run is not None else None
+
+    if snapshot is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Config discovery run '{run_id}' not found (may have expired or never started)",
+        )
+
+    if snapshot.get("strategyId") != strategy_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Run does not belong to this strategy",
+        )
+
+    snapshot.pop("config", None)
+    return ConfigDiscoveryRunStatus(**snapshot)
+
+
+# ---------------------------------------------------------------------------
 # WebSocket helper: subscribe one channel and fan out to one client
 # ---------------------------------------------------------------------------
 
@@ -2218,6 +2653,386 @@ async def _ws_subscribe(websocket: WebSocket, channel: str) -> None:
                 await pubsub.unsubscribe(channel)
             except RedisError:
                 pass
+
+
+# ---------------------------------------------------------------------------
+# 6b Data Management endpoints
+# ---------------------------------------------------------------------------
+
+
+def _get_unified_manager():
+    """Return a UnifiedDataManager in live mode (constructed lazily per-request)."""
+    try:
+        from src.data_manager.unified_manager import UnifiedDataManager
+        return UnifiedDataManager(mode='live')
+    except Exception as exc:
+        logger.warning("UnifiedDataManager unavailable: %s", exc)
+        return None
+
+
+class _DataUpdateRequest(BaseModel):
+    startDate: str
+    endDate: str
+
+
+class _DataRepairRequest(BaseModel):
+    timeframe: Optional[str] = None  # None = all timeframes
+
+
+def _iso_dt(dt: Any) -> Optional[str]:
+    """
+    Serialize a datetime as an ISO 8601 string with an explicit timezone.
+
+    Naive datetimes are assumed UTC and tagged with 'Z' so the client does not
+    interpret them as local time (see BTCAAAAA-35962 follow-up: a user in
+    UTC+2 reading naive ISO 07:00 with ``toUTCString()`` saw "05:00" and
+    thought there was a 4-hour gap).
+    """
+    if dt is None:
+        return None
+    if hasattr(dt, "isoformat"):
+        iso = dt.isoformat()
+        if iso.endswith("+00:00"):
+            return iso[:-6] + "Z"
+        if dt.tzinfo is None and "+" not in iso[10:] and "-" not in iso[10:]:
+            return iso + "Z"
+        return iso
+    return str(dt)
+
+
+@app.get(
+    "/data/status",
+    tags=["Data Management"],
+    summary="Get current data freshness and coverage status",
+)
+async def get_data_status(_: dict = Depends(require_jwt)) -> dict:
+    """Returns freshness status for all data types (trades, funding, liquidations, etc.)
+    and last-bar timestamps for the OHLCV timeframes (15m, 1h, 1d)."""
+    manager = _get_unified_manager()
+    if manager is None:
+        raise HTTPException(status_code=503, detail="Data manager unavailable")
+
+    def _fetch() -> dict:
+        now = datetime.now(timezone.utc)
+
+        try:
+            all_status_raw = manager.get_all_data_types_status()
+        except Exception as exc:
+            logger.warning("get_all_data_types_status failed: %s", exc)
+            all_status_raw = {}
+
+        all_status = {}
+        for key, info in all_status_raw.items():
+            all_status[key] = {
+                "status": info.get("status", "error"),
+                "start": _iso_dt(info.get("start")),
+                "end": _iso_dt(info.get("end")),
+                "gap_days": info.get("gap_days"),
+                "gap_minutes": info.get("gap_minutes"),
+                "error": info.get("error"),
+            }
+
+        timeframe_freshness: dict = {}
+        for tf in ("15m", "1h", "1d"):
+            try:
+                last_ts = manager.get_last_bar_timestamp(tf)
+                if last_ts is not None:
+                    age_seconds = (now - last_ts.replace(tzinfo=timezone.utc)).total_seconds()
+                    timeframe_freshness[tf] = {
+                        "lastBarTs": _iso_dt(last_ts),
+                        "ageSeconds": round(age_seconds, 1),
+                        "stale": age_seconds > {"15m": 1020, "1h": 3720, "1d": 90000}.get(tf, 3600),
+                    }
+                else:
+                    timeframe_freshness[tf] = {"lastBarTs": None, "ageSeconds": None, "stale": True}
+            except Exception as exc:
+                logger.warning("get_last_bar_timestamp(%s) failed: %s", tf, exc)
+                timeframe_freshness[tf] = {"lastBarTs": None, "ageSeconds": None, "stale": True, "error": str(exc)}
+
+        any_gaps = any(s.get("status") in ("gap", "missing") for s in all_status.values())
+        any_stale = any(f.get("stale") for f in timeframe_freshness.values())
+
+        return {
+            "currentTime": now.isoformat(),
+            "anyGaps": any_gaps,
+            "anyStale": any_stale,
+            "allStatus": all_status,
+            "timeframeFreshness": timeframe_freshness,
+        }
+
+    return await asyncio.to_thread(_fetch)
+
+
+@app.get(
+    "/data/gap-check",
+    tags=["Data Management"],
+    summary="Check for data gaps (used by startup data update modal)",
+)
+async def get_data_gap_check(_: dict = Depends(require_jwt)) -> dict:
+    """Mirrors the thick-client DataUpdateModal gap-check logic.
+
+    Returns the same shape as DataGapCheckResult in the web UI:
+    { any_gaps, max_gap, all_status, current_time, lakeapi_end }
+    """
+    manager = _get_unified_manager()
+    if manager is None:
+        raise HTTPException(status_code=503, detail="Data manager unavailable")
+
+    def _fetch() -> dict:
+        now = datetime.now(timezone.utc)
+
+        try:
+            raw = manager.get_all_data_types_status()
+        except Exception as exc:
+            logger.warning("get_all_data_types_status failed: %s", exc)
+            raw = {}
+
+        any_gaps = False
+        max_gap = 0
+        lakeapi_end: Optional[str] = None
+        all_status: dict = {}
+
+        for data_type, info in raw.items():
+            status_val = info.get("status", "error")
+            gap_days = info.get("gap_days", 0) or 0
+            gap_minutes = info.get("gap_minutes", gap_days * 1440) or 0
+            entry: dict = {
+                "status": status_val,
+                "start": _iso_dt(info.get("start")),
+                "end": _iso_dt(info.get("end")),
+                "gap_days": gap_days,
+                "gap_minutes": gap_minutes,
+                "error": info.get("error"),
+            }
+            all_status[data_type] = entry
+
+            if status_val in ("gap", "missing"):
+                any_gaps = True
+                max_gap = max(max_gap, gap_days)
+                if status_val == "gap" and lakeapi_end is None:
+                    lakeapi_end = _iso_dt(info.get("end"))
+
+        # Also check OHLCV freshness
+        for tf in ("15m", "1h"):
+            try:
+                last_ts = manager.get_last_bar_timestamp(tf)
+                if last_ts is not None:
+                    age_s = (now - last_ts.replace(tzinfo=timezone.utc)).total_seconds()
+                    threshold = 1020 if tf == "15m" else 3720
+                    if age_s > threshold:
+                        any_gaps = True
+                        gap_min = int(age_s / 60)
+                        max_gap = max(max_gap, int(age_s / 86400) or 1)
+                        all_status[f"ohlcv_{tf}"] = {
+                            "status": "gap",
+                            "start": _iso_dt(last_ts),
+                            "end": now.isoformat(),
+                            "gap_days": round(age_s / 86400, 2),
+                            "gap_minutes": gap_min,
+                        }
+                        if lakeapi_end is None:
+                            lakeapi_end = _iso_dt(last_ts)
+                else:
+                    any_gaps = True
+                    max_gap = max(max_gap, 999)
+                    all_status[f"ohlcv_{tf}"] = {
+                        "status": "missing",
+                        "start": None,
+                        "end": None,
+                        "gap_days": 999,
+                        "gap_minutes": 999 * 1440,
+                    }
+            except Exception as exc:
+                logger.warning("freshness check %s failed: %s", tf, exc)
+
+        return {
+            "any_gaps": any_gaps,
+            "max_gap": max_gap,
+            "all_status": all_status,
+            "current_time": now.isoformat(),
+            "lakeapi_end": lakeapi_end,
+        }
+
+    return await asyncio.to_thread(_fetch)
+
+
+@app.post(
+    "/data/update",
+    tags=["Data Management"],
+    summary="Download missing OHLCV data from Binance",
+)
+async def update_data(
+    body: _DataUpdateRequest,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Triggers a Binance download for the requested date range.
+
+    Mirrors the thick-client DataUpdateThread: downloads 15m, 1h, and 1d bars
+    for BTCUSDT Futures and saves them to disk.
+    """
+    manager = _get_unified_manager()
+    if manager is None:
+        raise HTTPException(status_code=503, detail="Data manager unavailable")
+
+    try:
+        start_dt = datetime.fromisoformat(body.startDate.replace("Z", "+00:00"))
+        end_dt = datetime.fromisoformat(body.endDate.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {exc}") from exc
+
+    def _run_update() -> dict:
+        import requests as _requests
+        try:
+            ping = _requests.get("https://api.binance.com/api/v3/ping", timeout=5)
+            ping.raise_for_status()
+        except Exception as exc:
+            raise RuntimeError(f"Binance API unreachable: {exc}") from exc
+
+        results: dict = {}
+        for tf in ("15m", "1h", "1d"):
+            try:
+                bars = manager._fetch_binance_range(
+                    timeframe=tf,
+                    start_ts=start_dt,
+                    end_ts=end_dt,
+                )
+                count = len(bars) if bars is not None else 0
+                if count > 0:
+                    manager._save_binance_bars(bars, tf)
+                results[tf] = {"success": True, "bars_downloaded": count}
+            except Exception as exc:
+                logger.exception("Data update failed for %s: %s", tf, exc)
+                results[tf] = {"success": False, "error": str(exc)}
+
+        all_ok = all(v.get("success") for v in results.values())
+        return {
+            "success": all_ok,
+            "message": "Data update complete" if all_ok else "Some timeframes failed — check errors",
+            "results": results,
+        }
+
+    try:
+        return await asyncio.to_thread(_run_update)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("data/update failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post(
+    "/data/verify",
+    tags=["Data Management"],
+    summary="Run data gap verification (dry-run — no writes)",
+)
+async def verify_data(_: dict = Depends(require_jwt)) -> dict:
+    """Detects gaps in stored Binance OHLCV parquet files.
+
+    Returns per-timeframe gap reports; does NOT repair anything.
+    Shape matches TimeframeVerifyResult used by DataVerifyDialog.
+    """
+    manager = _get_unified_manager()
+    if manager is None:
+        raise HTTPException(status_code=503, detail="Data manager unavailable")
+
+    def _run() -> dict:
+        # detect_gaps_in_binance_files returns the per-gap detail list directly;
+        # verify_and_repair only returns aggregate counts (no gaps list).
+        horizon_cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+        out: dict = {}
+        for tf in ("15m", "1h", "1d"):
+            try:
+                gaps_raw = manager.detect_gaps_in_binance_files(tf)
+            except Exception as exc:
+                logger.warning("detect_gaps_in_binance_files(%s) failed: %s", tf, exc)
+                gaps_raw = []
+
+            gaps_serialized = []
+            for g in gaps_raw:
+                gap_start = g.get("gap_start")
+                if gap_start is not None and hasattr(gap_start, "tzinfo") and gap_start.tzinfo is None:
+                    gap_start = gap_start.replace(tzinfo=timezone.utc)
+                repairable = gap_start is not None and gap_start >= horizon_cutoff
+                gaps_serialized.append({
+                    "gapStart": _iso_dt(g.get("gap_start")),
+                    "gapEnd": _iso_dt(g.get("gap_end")),
+                    "missingBars": g.get("missing_bars", 0),
+                    "repairable": repairable,
+                    "reason": None if repairable else "Older than 90-day Binance API horizon",
+                })
+
+            total_gaps = len(gaps_serialized)
+            repairable_count = sum(1 for g in gaps_serialized if g.get("repairable"))
+            too_old_count = total_gaps - repairable_count
+
+            try:
+                last_ts = manager.get_last_bar_timestamp(tf)
+                last_candle_ts = _iso_dt(last_ts)
+            except Exception:
+                last_candle_ts = None
+
+            out[tf] = {
+                "timeframe": tf,
+                "totalGaps": total_gaps,
+                "repairableCount": repairable_count,
+                "tooOldCount": too_old_count,
+                "totalMissingBars": sum(g.get("missingBars", 0) for g in gaps_serialized),
+                "repairableMissingBars": sum(g.get("missingBars", 0) for g in gaps_serialized if g.get("repairable")),
+                "tooOldMissingBars": sum(g.get("missingBars", 0) for g in gaps_serialized if not g.get("repairable")),
+                "gaps": gaps_serialized,
+                "lastCandleTs": last_candle_ts,
+            }
+        return out
+
+    try:
+        return await asyncio.to_thread(_run)
+    except Exception as exc:
+        logger.exception("data/verify failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post(
+    "/data/repair",
+    tags=["Data Management"],
+    summary="Repair detected data gaps by fetching from Binance",
+)
+async def repair_data(
+    body: _DataRepairRequest,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Repairs detected OHLCV gaps by downloading from Binance.
+
+    Mirrors verify_and_repair(dry_run=False) in the thick client.
+    Pass timeframe to repair only one timeframe, or omit for all.
+    """
+    manager = _get_unified_manager()
+    if manager is None:
+        raise HTTPException(status_code=503, detail="Data manager unavailable")
+
+    def _run() -> dict:
+        tfs = [body.timeframe] if body.timeframe else None
+        report = manager.verify_and_repair(timeframes=tfs, dry_run=False)
+        summary: dict = {}
+        for tf, info in report.items():
+            summary[tf] = {
+                "gapsFound": info.get("gaps_found", 0),
+                "gapsRepaired": info.get("gaps_repaired", 0),
+                "gapsTooOld": info.get("gaps_too_old", 0),
+                "barsFetched": info.get("bars_fetched", 0),
+                "errors": info.get("errors", []),
+            }
+        all_ok = all(len(v.get("errors", [])) == 0 for v in summary.values())
+        return {
+            "success": all_ok,
+            "message": "Repair complete" if all_ok else "Repair finished with some errors",
+            "summary": summary,
+        }
+
+    try:
+        return await asyncio.to_thread(_run)
+    except Exception as exc:
+        logger.exception("data/repair failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------

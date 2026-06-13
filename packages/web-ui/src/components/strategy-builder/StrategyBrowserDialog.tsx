@@ -496,7 +496,7 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
                 )}
                 <div className="flex items-center justify-between">
                   <span style={{ color: 'var(--text-muted)' }}>Max DD</span>
-                  <span style={{ color: 'var(--accent-red)', fontWeight: 500 }}>{fmtN(result.maxDrawdown, 2, '%')}</span>
+                  <span style={{ color: 'var(--accent-red)', fontWeight: 500 }}>{fmtN(result.maxDrawdown * 100, 2, '%')}</span>
                 </div>
               </div>
             </div>

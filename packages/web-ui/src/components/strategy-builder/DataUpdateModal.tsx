@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Check,
 } from 'lucide-react';
+import { formatLocalShort } from '@/lib/data-management/api';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -97,7 +98,7 @@ function TimeframeRow({ tf }: { tf: TimeframeProgress }) {
         <span className="flex-1 mx-3 truncate" style={{ color: 'var(--text-secondary)' }}>{tf.message}</span>
         {tf.lastCandleTs && (
           <span className="font-mono text-[10px] whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
-            last: {new Date(tf.lastCandleTs).toUTCString().slice(5, 22)}
+            last: {formatLocalShort(tf.lastCandleTs)}
           </span>
         )}
         <span
@@ -484,7 +485,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                             <p className="font-mono" style={{ color: 'var(--text-secondary)' }}>
                               {dataType.toUpperCase()}:{' '}
                               {info.status === 'complete'
-                                ? 'Complete'
+                                ? 'Up-to-date'
                                 : info.status === 'gap'
                                   ? `GAP DETECTED (${info.gap_days ?? 0} days)`
                                   : info.status === 'missing'

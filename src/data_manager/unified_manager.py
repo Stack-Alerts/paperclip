@@ -779,8 +779,18 @@ class UnifiedDataManager:
     
     def get_all_data_types_status(self) -> Dict[str, Dict]:
         """
-        Check status of ALL data types
-        
+        Check status of ALL data types.
+
+        For each of the 5 by-product data types (trades / funding / liquidations /
+        open_interest / orderbook) we look first under ``self.lakeapi_dir`` for
+        ``BTC-USDT_{type}_YYYY-MM.parquet`` files.  If none exist for that type
+        — which is the normal case when LakeAPI is decommissioned and the only
+        data on disk lives under ``self.binance_dir`` as 15m/1h/1d OHLCV
+        parquets — we **fall back to the most recent Binance OHLCV bar** so the
+        caller sees an accurate (small-hours-or-days) gap instead of an
+        unconditional ``missing / gap_days=999`` that contradicts what the
+        thick-client data-update modal shows.
+
         Returns:
             Dict with status for each data type:
             {
@@ -797,44 +807,65 @@ class UnifiedDataManager:
             }
         """
         data_types = ['trades', 'funding', 'liquidations', 'open_interest', 'orderbook']
+
+        # Compute the most recent Binance timestamp ONCE per call by scanning
+        # the chronologically latest monthly parquet for each timeframe and
+        # taking the max across 15m / 1h / 1d.  Used as the fallback end_date
+        # for any LakeAPI data type that has no files of its own on disk.
+        binance_fallback_end = self._latest_binance_bar_timestamp()
+        now_utc = datetime.now(timezone.utc)
+
         status = {}
-        
+
         for data_type in data_types:
             data_dir = self.lakeapi_dir / data_type
-            if not data_dir.exists():
-                status[data_type] = {
-                    'status': 'missing',
-                    'gap_days': 999,
-                    'start': None,
-                    'end': None
-                }
-                continue
-            
-            # Find last parquet file
-            parquet_files = sorted(data_dir.glob(f'BTC-USDT_{data_type}_*.parquet'))
+            parquet_files = (
+                sorted(data_dir.glob(f'BTC-USDT_{data_type}_*.parquet'))
+                if data_dir.exists()
+                else []
+            )
+
+            # No LakeAPI files for this type — fall back to Binance data.
             if not parquet_files:
-                status[data_type] = {
-                    'status': 'missing',
-                    'gap_days': 999,
-                    'start': None,
-                    'end': None
-                }
+                if binance_fallback_end is not None:
+                    # Compute the start of the Binance data once for all 5
+                    # by-product types — they share the same on-disk origin
+                    # (the earliest 15m parquet file).  Populating 'start'
+                    # here lets the web UI render a real range
+                    # ("2024-01-01 → 2026-06-12") instead of the misleading
+                    # "Recent → {end}" the frontend falls back to when start
+                    # is null.  See BTCAAAAA-36000.
+                    binance_fallback_start = self._get_earliest_binance_date('15m')
+                    status[data_type] = self._build_status_from_fallback(
+                        start_date=binance_fallback_start,
+                        end_date=binance_fallback_end,
+                        now_utc=now_utc,
+                        source='binance_fallback',
+                    )
+                else:
+                    status[data_type] = {
+                        'status': 'missing',
+                        'gap_days': 999,
+                        'gap_minutes': None,
+                        'start': None,
+                        'end': None,
+                    }
                 continue
-            
+
             # Read actual last timestamp (same logic as trades)
             try:
                 last_file = parquet_files[-1]
                 first_file = parquet_files[0]
-                
+
                 # Get start date from first file
                 first_date_str = first_file.stem.split('_')[-1]  # '2022-03'
                 start_date = datetime.strptime(first_date_str, '%Y-%m')
-                
+
                 # Try possible timestamp column names for end date
                 timestamp_cols = ['timestamp', 'origin_time', 'received_time', 'time']
                 df = None
                 end_date = None
-                
+
                 for col in timestamp_cols:
                     try:
                         df = pd.read_parquet(last_file, columns=[col])
@@ -853,7 +884,7 @@ class UnifiedDataManager:
                     end_date = datetime(year, month, last_day, 23, 59, 59, tzinfo=timezone.utc)
 
                 # Calculate gap FIRST
-                gap_days = (datetime.now(timezone.utc) - end_date).days
+                gap_days = (now_utc - end_date).days
 
                 # INSTITUTIONAL: Check DOWNLOADED Binance files (not API!)
                 # Read actual parquet files in data/binance/ directory
@@ -878,30 +909,30 @@ class UnifiedDataManager:
 
                             if latest_timestamp and latest_timestamp > end_date:
                                 end_date = latest_timestamp
-                                gap_days = (datetime.now(timezone.utc) - end_date).days
+                                gap_days = (now_utc - end_date).days
                                 logger.info(f"   ✅ Downloaded Binance: last candle at {latest_timestamp} (gap: {gap_days}d)")
                     except Exception as e:
                         pass
 
                 # For 15min futures, we need precision down to minutes
                 # Calculate gap in minutes for more accurate detection
-                gap_minutes = (datetime.now(timezone.utc) - end_date).total_seconds() / 60
-                
+                gap_minutes = (now_utc - end_date).total_seconds() / 60
+
                 # CRITICAL FIX: Don't count CURRENT unclosed bar as missing!
                 # For 15min bars: if gap is 0-15min, that's just the current forming bar
                 # For 15min bars: if gap is 16-30min, we're missing 1 candle
                 # For 15min bars: if gap is 31-45min, we're missing 2 candles
-                # 
+                #
                 # Formula: actual_missing_candles = (gap_minutes - timeframe_minutes) / timeframe_minutes
                 # Example: gap=25min for 15min bars → (25-15)/15 = 0.66 → 0 complete candles missing
                 # Example: gap=35min for 15min bars → (35-15)/15 = 1.33 → 1 complete candles missing
-                
+
                 timeframe_minutes = 15  # For 15min bars
-                
+
                 # Subtract current bar period to get TRUE gap
                 # If result is negative or 0, we're up-to-date (current bar is forming)
                 true_gap_minutes = max(0, gap_minutes - timeframe_minutes)
-                
+
                 status[data_type] = {
                     'start': start_date,
                     'end': end_date,
@@ -915,7 +946,7 @@ class UnifiedDataManager:
                     # threshold incorrectly flagged these as DATA GAPS.
                     'status': 'complete' if true_gap_minutes < timeframe_minutes else 'gap'
                 }
-                
+
             except Exception as e:
                 logger.error(f"Error checking {data_type}: {e}")
                 status[data_type] = {
@@ -925,8 +956,67 @@ class UnifiedDataManager:
                     'end': None,
                     'error': str(e)
                 }
-        
+
         return status
+
+    def _latest_binance_bar_timestamp(self) -> Optional[datetime]:
+        """
+        Return the most recent bar timestamp across all Binance timeframes
+        (15m / 1h / 1d) on disk, or ``None`` if no Binance parquet files exist.
+
+        Reads only the ``timestamp`` column of the chronologically latest
+        monthly parquet per timeframe to keep the cost low.  Returns a
+        tz-aware UTC ``datetime``.
+        """
+        latest: Optional[datetime] = None
+        if not self.binance_dir.exists():
+            return None
+        for timeframe in ('15m', '1h', '1d'):
+            pattern = f'**/BTCUSDT_PERP_{timeframe}_*.parquet'
+            files = sorted(self.binance_dir.glob(pattern))
+            if not files:
+                continue
+            try:
+                df = pd.read_parquet(files[-1], columns=['timestamp'])
+            except Exception:
+                continue
+            if len(df) == 0:
+                continue
+            ts = pd.to_datetime(df['timestamp'].iloc[-1], utc=True)
+            if latest is None or ts > latest:
+                latest = ts
+        return latest
+
+    @staticmethod
+    def _build_status_from_fallback(
+        end_date: datetime,
+        now_utc: datetime,
+        source: str,
+        start_date: Optional[datetime] = None,
+    ) -> Dict:
+        """
+        Build a status dict for a by-product data type whose only on-disk
+        evidence is the Binance OHLCV fallback timestamp (no LakeAPI files
+        of its own).  Mirrors the 15m-bar true-gap semantics of the main
+        status branch so the UI shows an accurate small gap, not 199 days.
+
+        ``start_date`` is the earliest available Binance bar (15m).  When
+        provided, it lets the web UI render a real range
+        ("2024-01-01 → 2026-06-12") instead of falling through to the
+        "Recent → {end}" placeholder.  See BTCAAAAA-36000.
+        """
+        gap_minutes = (now_utc - end_date).total_seconds() / 60
+        timeframe_minutes = 15
+        true_gap_minutes = max(0, gap_minutes - timeframe_minutes)
+        gap_days = (now_utc - end_date).days
+        return {
+            'start': start_date,
+            'end': end_date,
+            'gap_days': gap_days,
+            'gap_minutes': int(true_gap_minutes),
+            'status': 'complete' if true_gap_minutes < timeframe_minutes else 'gap',
+            'source': source,
+        }
     
     def get_available_date_range(self, timeframe: str = '15m') -> Dict[str, datetime]:
         """

@@ -21,9 +21,9 @@ import { useSidebar } from '@/contexts/SidebarContext';
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutGrid },
   { href: '/strategy-builder', label: 'Strategies', icon: GitBranch },
-  { href: '/backtest', label: 'Backtesting', icon: BarChart2 },
+  { href: '/strategy-builder/backtest-config', label: 'Backtesting', icon: BarChart2 },
   { href: '/signals', label: 'Signals', icon: Activity },
-  { href: '/data-management', label: 'Market Data', icon: TrendingUp },
+  { href: '/market-data', label: 'Market Data', icon: TrendingUp },
   { href: '/reports', label: 'Reports', icon: FileText },
   { href: '/templates', label: 'Templates', icon: Copy },
   { href: '/settings', label: 'Settings', icon: Settings },

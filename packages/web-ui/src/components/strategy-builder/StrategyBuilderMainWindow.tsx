@@ -59,7 +59,7 @@ function QuickPreviewResultsDialog({ open, result, onClose }: QuickPreviewResult
     ['Winning Trades', String(result.winningTrades),      'var(--accent-green)'],
     ['Total Return',   `${result.returnPercentage >= 0 ? '+' : ''}${result.returnPercentage.toFixed(2)}%`,
       result.returnPercentage >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'],
-    ['Max Drawdown',   `${result.maxDrawdown.toFixed(2)}%`,  'var(--accent-red)'],
+    ['Max Drawdown',   `${(result.maxDrawdown * 100).toFixed(2)}%`,  'var(--accent-red)'],
     ['Sharpe Ratio',   result.sharpeRatio.toFixed(2),     'var(--text-secondary)'],
     ['Profit Factor',  result.profitFactor.toFixed(2),    'var(--text-secondary)'],
   ];
@@ -138,6 +138,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     setCurrentStrategy,
     backTestInProgress,
     hydrateFromLocalStorage,
+    restoreBacktestSession,
   } = useStrategyStore();
 
   const [mounted, setMounted] = useState(false);
@@ -156,6 +157,20 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     }
     loadBlockLibrary().catch(console.error);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // BTCAAAAA-35963: after the initial hydrate (or any strategy change),
+  // try to fetch a fresh result + logs for the persisted runId from the
+  // backend. If the server still has the in-memory run, this refreshes
+  // the cached snapshot. If the run is gone (server restart, 404), the
+  // cached snapshot stays as the source of truth so the user still sees
+  // the last test/result/config.
+  useEffect(() => {
+    if (!mounted) return;
+    restoreBacktestSession().catch(() => {
+      // restoreBacktestSession swallows 404s internally; anything else is
+      // non-fatal (we still have the cached snapshot).
+    });
+  }, [mounted, currentStrategy?.id, restoreBacktestSession]);
 
   // Sync clean snapshot whenever the strategy changes (from hydration or load).
   useEffect(() => {

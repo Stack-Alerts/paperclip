@@ -10,7 +10,7 @@ This routine:
    ("out of scope / deferred / tracking issue / ...") without a filed BTCAAAAA-NNNNN
 6. Reopens issues with unmerged SHAs to in_review, assigns to closer's manager
 7. Requests Fix-SHA tags for orphaned done issues without commit evidence
-8. Aggregates unfiled-deferral flags into routine report at BTCAAAAA-30040
+8. Aggregates unfiled-deferral flags into routine report at BTCAAAAA-36129
 
 Usage:
     python scripts/closure_gate_routine.py
@@ -47,7 +47,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("closure_gate")
 
-TRACKING_ISSUE = "BTCAAAAA-30040"
+# Use current agent's active task as reporting target when available (avoids
+# auth-boundary 403s when multiple agents with different boundaries run this routine)
+TRACKING_ISSUE = os.environ.get("PAPERCLIP_TASK_ID", "BTCAAAAA-36131")
 API_TIMEOUT = 30
 
 # State file to track closure-gate actions
