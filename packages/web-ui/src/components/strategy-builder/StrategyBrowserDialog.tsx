@@ -14,6 +14,7 @@ import {
   Trash2, Copy, Download, Upload, FolderOpen,
 } from 'lucide-react';
 import { AppBrand } from '@/components/shared/AppBrand';
+import { ThemeSelector } from './ThemeSelector';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -960,6 +961,8 @@ export function StrategyBrowserDialog({
           </span>
         </h2>
         <div className="flex items-center gap-2">
+          <ThemeSelector />
+          <div className="w-px h-4" style={{ background: 'var(--border)' }} />
           {!standalone && (
             <button
               onClick={handlePopOut}
