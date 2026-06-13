@@ -1,6 +1,16 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import {
+  Download,
+  BarChart3,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Loader2,
+  RefreshCw,
+  Check,
+} from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -91,10 +101,12 @@ function TimeframeRow({ tf }: { tf: TimeframeProgress }) {
           </span>
         )}
         <span
-          className="ml-2 text-[10px] font-medium"
+          className="ml-2 flex items-center"
           style={{ color: tf.done ? 'var(--accent-green)' : 'var(--text-secondary)' }}
         >
-          {tf.done ? '✅' : `${pct}%`}
+          {tf.done
+            ? <CheckCircle size={12} strokeWidth={1.5} />
+            : <span className="text-[10px] font-medium">{pct}%</span>}
         </span>
       </div>
       <div className="w-full rounded-full h-1" style={{ background: 'var(--bg-hover)' }}>
@@ -125,12 +137,12 @@ function NetworkCheckBanner({
     >
       {status === 'checking' ? (
         <>
-          <span className="animate-spin">⏳</span>
+          <Loader2 size={14} strokeWidth={1.5} className="animate-spin" style={{ flexShrink: 0 }} />
           <span>Checking Binance connectivity…</span>
         </>
       ) : (
         <>
-          <span>❌</span>
+          <XCircle size={14} strokeWidth={1.5} style={{ flexShrink: 0 }} />
           <span>Binance API unreachable — check your internet connection.</span>
         </>
       )}
@@ -150,7 +162,7 @@ function RetryBanner({
 }) {
   return (
     <div className="flex items-center gap-2 text-xs px-3 py-2 rounded border" style={{ background: 'color-mix(in srgb, var(--accent-orange) 12%, transparent)', borderColor: 'var(--accent-orange)', color: 'var(--accent-orange)' }}>
-      <span className="animate-pulse">🔄</span>
+      <RefreshCw size={14} strokeWidth={1.5} className="animate-pulse" style={{ flexShrink: 0 }} />
       <span>
         Attempt {attempt}/{maxRetries}… retrying in {retryInSeconds}s
       </span>
@@ -162,7 +174,7 @@ function RetryBanner({
 function AlreadyCurrentBanner() {
   return (
     <div className="flex items-center gap-2 text-xs px-3 py-2 rounded border" style={{ background: 'color-mix(in srgb, var(--accent-green) 12%, transparent)', borderColor: 'var(--accent-green-dark)', color: 'var(--accent-green)' }}>
-      <span>✅</span>
+      <CheckCircle size={14} strokeWidth={1.5} style={{ flexShrink: 0 }} />
       <span>Data already current — skipping download.</span>
     </div>
   );
@@ -413,7 +425,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
       <div className="rounded-lg shadow-2xl w-full max-w-2xl mx-4 border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         {/* Header */}
         <div className="flex items-center gap-3 border-b px-6 py-4" style={{ borderColor: 'var(--border)' }}>
-          <span className="text-xl">📥</span>
+          <Download size={20} strokeWidth={1.5} style={{ flexShrink: 0, color: 'var(--text-secondary)' }} />
           <div>
             <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>Data Update</h2>
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Strategy Builder Startup Check</p>
@@ -426,7 +438,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
           {gapCheckLoading && !isRunning && !result && (
             <div className="text-center py-6">
               <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>Checking data availability…</p>
-              <div className="animate-spin inline-block">⏳</div>
+              <Loader2 size={20} strokeWidth={1.5} className="animate-spin inline-block" style={{ color: 'var(--text-secondary)' }} />
             </div>
           )}
 
@@ -437,19 +449,26 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                 <>
                   {/* Data Status Group - shows per-type gaps */}
                   <div className="rounded-lg p-4 space-y-3 border" style={{ borderColor: 'var(--border)' }}>
-                    <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>📊 Data Status</h3>
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                      <BarChart3 size={14} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                      Data Status
+                    </h3>
 
                     <div className="space-y-2 text-sm">
                       {Object.entries(gapCheckResult.all_status).map(([dataType, info]) => (
                         <div key={dataType} className="flex items-start gap-3">
-                          <span className="mt-0.5">
+                          <span className="mt-0.5" style={{
+                            color: info.status === 'complete'
+                              ? 'var(--accent-green)'
+                              : info.status === 'error'
+                                ? 'var(--accent-orange)'
+                                : 'var(--accent-red)',
+                          }}>
                             {info.status === 'complete'
-                              ? '✅'
-                              : info.status === 'gap'
-                                ? '❌'
-                                : info.status === 'missing'
-                                  ? '❌'
-                                  : '⚠️'}
+                              ? <CheckCircle size={14} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                              : info.status === 'gap' || info.status === 'missing'
+                                ? <XCircle size={14} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                                : <AlertTriangle size={14} strokeWidth={1.5} style={{ flexShrink: 0 }} />}
                           </span>
                           <div className="flex-1">
                             <p className="font-mono" style={{ color: 'var(--text-secondary)' }}>
@@ -474,17 +493,21 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
 
                     {gapCheckResult.any_gaps && (
                       <div className="mt-3 p-3 rounded text-xs border" style={{ background: 'color-mix(in srgb, var(--accent-red) 12%, transparent)', borderColor: 'color-mix(in srgb, var(--accent-red-dark) 50%, transparent)', color: 'var(--accent-red)' }}>
-                        <p>
+                        <p className="flex items-center gap-1.5">
+                          <AlertTriangle size={12} strokeWidth={1.5} style={{ flexShrink: 0 }} />
                           {gapCheckResult.max_gap > 0
-                            ? `⚠️ DATA GAPS DETECTED: Up to ${gapCheckResult.max_gap} days MISSING`
-                            : '⚠️ Some data types are missing or incomplete'}
+                            ? `DATA GAPS DETECTED: Up to ${gapCheckResult.max_gap} days MISSING`
+                            : 'Some data types are missing or incomplete'}
                         </p>
                       </div>
                     )}
 
                     {!gapCheckResult.any_gaps && (
                       <div className="mt-3 p-3 rounded text-xs border" style={{ background: 'color-mix(in srgb, var(--accent-green) 12%, transparent)', borderColor: 'color-mix(in srgb, var(--accent-green-dark) 50%, transparent)', color: 'var(--accent-green)' }}>
-                        <p>✅ ALL DATA COMPLETE - 100% ACCURATE</p>
+                        <p className="flex items-center gap-1.5">
+                          <CheckCircle size={12} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                          ALL DATA COMPLETE - 100% ACCURATE
+                        </p>
                       </div>
                     )}
                   </div>
@@ -617,7 +640,9 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                     : { background: 'color-mix(in srgb, var(--accent-red) 12%, transparent)', borderColor: 'var(--accent-red-dark)', color: 'var(--accent-red)' }
                 }
               >
-                <span className="text-lg">{result.success ? '✅' : '❌'}</span>
+                {result.success
+                  ? <CheckCircle size={18} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: 1 }} />
+                  : <XCircle size={18} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: 1 }} />}
                 <p className="text-sm whitespace-pre-wrap">{result.message}</p>
               </div>
 
@@ -651,19 +676,20 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                   >
-                    ⏭️ Skip for Now
+                    Skip for Now
                   </button>
                   <button
                     onClick={handleUpdate}
                     disabled={!buttonEnabled}
-                    className="px-4 py-2 rounded text-sm font-medium transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition-colors"
                     style={
                       buttonEnabled
                         ? { background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }
                         : { background: 'var(--bg-hover)', color: 'var(--text-muted)', cursor: 'not-allowed', opacity: 0.5 }
                     }
                   >
-                    📥 Update Data
+                    <Download size={13} strokeWidth={1.5} aria-hidden="true" />
+                    Update Data
                   </button>
                 </>
               )}
@@ -671,10 +697,11 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
               {!gapCheckResult.any_gaps && (
                 <button
                   onClick={onSkip}
-                  className="px-4 py-2 rounded text-sm font-medium transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition-colors"
                   style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
                 >
-                  ✅ Continue
+                  <Check size={13} strokeWidth={2} aria-hidden="true" />
+                  Continue
                   {autoCloseSeconds !== null && autoCloseSeconds > 0
                     ? ` (${autoCloseSeconds}s)`
                     : ''}
@@ -697,13 +724,14 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
               <button
                 onClick={handleUpdate}
                 disabled={!buttonEnabled}
-                className="px-4 py-2 rounded text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition-colors"
                 style={
                   buttonEnabled
                     ? { background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }
                     : { background: 'var(--bg-hover)', color: 'var(--text-muted)', cursor: 'not-allowed', opacity: 0.5 }
                 }
               >
+                <Download size={13} strokeWidth={1.5} aria-hidden="true" />
                 Download Data
               </button>
             </>
@@ -726,10 +754,11 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
               {result.success ? (
                 <button
                   onClick={onSkip}
-                  className="px-4 py-2 rounded text-sm font-medium transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition-colors"
                   style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
                 >
-                  ✅ Continue
+                  <Check size={13} strokeWidth={2} aria-hidden="true" />
+                  Continue
                   {autoMode && autoCloseSeconds !== null && autoCloseSeconds > 0
                     ? ` (${autoCloseSeconds}s)`
                     : ''}
@@ -737,8 +766,9 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
               ) : (
                 <>
                   {autoMode && retryCount < maxRetries && retryTimer !== null && retryTimer > 0 && (
-                    <span className="text-xs mr-2" style={{ color: 'var(--accent-orange)' }}>
-                      🔄 Retrying in {retryTimer}s…
+                    <span className="flex items-center gap-1.5 text-xs mr-2" style={{ color: 'var(--accent-orange)' }}>
+                      <RefreshCw size={12} strokeWidth={1.5} />
+                      Retrying in {retryTimer}s…
                     </span>
                   )}
                   <button
