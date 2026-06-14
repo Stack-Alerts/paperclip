@@ -13,6 +13,7 @@ import {
   generateSingleAxisScenarios,
   aggregateMetrics,
   buildDiscoveryRows,
+  toEnginePayload,
   type ParameterRange,
   type AggregatedScenario,
   type ScenarioMetrics,
@@ -117,7 +118,7 @@ function toResult(runId: string, config: BacktestConfigFull, status: BacktestSta
 
 // Run a single backtest to completion and return the typed result.
 async function runOne(config: BacktestConfigFull): Promise<BacktestResult> {
-  const startResp = (await apiRunBacktest(config.strategyId, config)) as { runId: string };
+  const startResp = (await apiRunBacktest(config.strategyId, toEnginePayload(config))) as { runId: string };
   const runId = startResp.runId;
   if (!runId) throw new Error('Config Discovery: backend did not return a runId');
 

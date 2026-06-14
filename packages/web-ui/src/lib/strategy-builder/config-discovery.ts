@@ -132,6 +132,59 @@ export function applyDelta(
   return merged;
 }
 
+// Translate a camelCase BacktestConfigFull into the wire payload the Python
+// backtest engine actually reads. MulticoreBacktestEngine pulls every swept
+// parameter from snake_case keys (e.g. backtest_config.get('tpsl_mode'),
+// .get('adaptive_sl', {}).get('volatility_lookback'), .get('max_bars_held')).
+// Sending camelCase-only — as the discovery runner originally did — meant the
+// engine fell back to its defaults for every scenario, so all 18 runs produced
+// identical metrics. We mirror handleStart in BacktestConfigDialog: emit both
+// casings so the API/store layer keeps its camelCase view while the engine sees
+// the snake_case overrides.
+export function toEnginePayload(config: BacktestConfigFull): Record<string, unknown> {
+  const sl = config.adaptiveSL;
+  return {
+    // camelCase fields consumed by the store/API layer
+    strategyId: config.strategyId,
+    startDate: config.startDate,
+    endDate: config.endDate,
+    initialCapital: config.initialCapital,
+    commissionPercentage: config.commissionPercentage,
+    slippagePercentage: config.slippagePercentage,
+    maxConcurrentPositions: config.maxConcurrentPositions,
+    timeframe: config.timeframe,
+    // snake_case fields consumed by MulticoreBacktestEngine
+    starting_capital: config.initialCapital,
+    commission_pct: config.commissionPercentage,
+    slippage_pct: config.slippagePercentage,
+    lookback_days: config.lookbackDays,
+    training_days: config.trainingDays,
+    testing_days: config.testingDays,
+    mode: config.mode === 'live_replay' ? 2 : 3,
+    tpsl_mode: config.tpslMode,
+    sl_adjustment_mode: config.slAdjustmentMode,
+    adaptive_sl_preset: config.adaptiveSLPreset,
+    adaptive_sl: sl
+      ? {
+          enabled: sl.enabled,
+          delay_enabled: sl.delayEnabled,
+          delay_bars: sl.delayBars,
+          emergency_sl_pct: sl.emergencySlPct,
+          volatility_lookback: sl.volatilityLookback,
+          volatility_multiplier: sl.volatilityMultiplier,
+          min_sl_pct: sl.minSlPct,
+          max_sl_pct: sl.maxSlPct,
+          use_structure_sl: sl.useStructureSl,
+        }
+      : undefined,
+    risk_per_trade_pct: config.riskPerTradePct,
+    min_risk_reward: config.minRiskRewardRatio,
+    max_bars_held: config.maxBarsHeld,
+    max_leverage: config.maxLeverage,
+    confluence_threshold: config.confluenceThreshold,
+  };
+}
+
 // One-at-a-time sweep: each axis varied independently, all others held at base.
 export function generateSingleAxisScenarios(ranges: ParameterRange[]): DiscoveryScenarioSpec[] {
   const scenarios: DiscoveryScenarioSpec[] = [];
