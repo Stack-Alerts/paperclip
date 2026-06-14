@@ -421,19 +421,25 @@ function getExitStrategyAnalysis(strategy: any): string {
   }
 
   let exitCount = 0;
-  let takeProfit1Count = 0;
-  let takeProfit2Count = 0;
-  let takeProfit3Count = 0;
-  let stopLossCount = 0;
+  let absoluteCount = 0;
+  let flexibleCount = 0;
+  let signalLevelCount = 0;
+  let blockLevelCount = 0;
+  let strategyLevelCount = 0;
 
   strategy.blocks.forEach((block: any) => {
-    if (block.blockType === 'exit' && block.data) {
+    if (block.type === 'exit_condition') {
       exitCount++;
-      const data = block.data as any;
-      if (data.tp1Enabled) takeProfit1Count++;
-      if (data.tp2Enabled) takeProfit2Count++;
-      if (data.tp3Enabled) takeProfit3Count++;
-      if (data.slEnabled) stopLossCount++;
+      const cfg = block.data?.exitConfig as any;
+      if (cfg) {
+        const mode = (cfg.exitMode ?? '').toUpperCase();
+        if (mode === 'FLEXIBLE') flexibleCount++;
+        else absoluteCount++;
+        const level = (cfg.bindingLevel ?? 'SIGNAL').toUpperCase();
+        if (level === 'STRATEGY') strategyLevelCount++;
+        else if (level === 'BLOCK') blockLevelCount++;
+        else signalLevelCount++;
+      }
     }
   });
 
@@ -441,13 +447,23 @@ function getExitStrategyAnalysis(strategy: any): string {
   lines.push('EXIT STRATEGY ANALYSIS');
   lines.push('='.repeat(60));
   lines.push('');
-  lines.push(`  Total Exit Blocks: ${exitCount}`);
-  lines.push(`  TP1 Configured: ${takeProfit1Count}`);
-  lines.push(`  TP2 Configured: ${takeProfit2Count}`);
-  lines.push(`  TP3 Configured: ${takeProfit3Count}`);
-  lines.push(`  Stop Loss Configured: ${stopLossCount}`);
+  lines.push(`  Total Exit Conditions: ${exitCount}`);
   lines.push('');
-  lines.push('Exit distribution is well-balanced across your strategy.');
+  if (exitCount > 0) {
+    lines.push('  Exit Mode Breakdown:');
+    lines.push(`    Absolute: ${absoluteCount}`);
+    lines.push(`    Flexible: ${flexibleCount}`);
+    lines.push('');
+    lines.push('  Binding Level Breakdown:');
+    lines.push(`    Signal-level: ${signalLevelCount}`);
+    lines.push(`    Block-level: ${blockLevelCount}`);
+    lines.push(`    Strategy-level: ${strategyLevelCount}`);
+    lines.push('');
+    lines.push('Exit distribution is well-balanced across your strategy.');
+  } else {
+    lines.push('  No exit conditions configured in strategy.');
+    lines.push('  Consider adding exit conditions to signal blocks.');
+  }
   return lines.join('\n');
 }
 
@@ -767,16 +783,32 @@ function getSignalDirectionAnalysis(strategy: any): string {
   const bearishKeywords = ['bearish', 'bear', 'short', 'sell', 'resistance', 'rejection', 'breakout_down', 'cross_down'];
 
   strategy.blocks.forEach((block: any) => {
-    if (block.blockType === 'signal' && block.data) {
-      const signalName = block.name || block.data.name || `Signal_${block.id}`;
-      const signalNameLower = signalName.toLowerCase();
-
-      if (bullishKeywords.some((kw) => signalNameLower.includes(kw))) {
-        bullishSignals.push(signalName);
-      } else if (bearishKeywords.some((kw) => signalNameLower.includes(kw))) {
-        bearishSignals.push(signalName);
+    // INDICATOR blocks hold the actual entry signals in block.data.signals[]
+    if (block.type === 'indicator' && block.data) {
+      const blockSignals = Array.isArray(block.data.signals) ? block.data.signals : [];
+      if (blockSignals.length > 0) {
+        blockSignals.forEach((sig: any) => {
+          const signalName = sig.name || `Signal_${block.id}`;
+          const signalNameLower = signalName.toLowerCase();
+          if (bullishKeywords.some((kw) => signalNameLower.includes(kw))) {
+            bullishSignals.push(signalName);
+          } else if (bearishKeywords.some((kw) => signalNameLower.includes(kw))) {
+            bearishSignals.push(signalName);
+          } else {
+            neutralSignals.push(signalName);
+          }
+        });
       } else {
-        neutralSignals.push(signalName);
+        // Block has no signals array — classify by block name
+        const signalName = (block.data.name as string | undefined) || `Block_${block.id}`;
+        const signalNameLower = signalName.toLowerCase();
+        if (bullishKeywords.some((kw) => signalNameLower.includes(kw))) {
+          bullishSignals.push(signalName);
+        } else if (bearishKeywords.some((kw) => signalNameLower.includes(kw))) {
+          bearishSignals.push(signalName);
+        } else {
+          neutralSignals.push(signalName);
+        }
       }
     }
   });
@@ -848,12 +880,12 @@ function getCompositionBreakdown(strategy: any): Array<{ label: string; count: n
   let riskCount = 0;
 
   strategy.blocks.forEach((block: any) => {
-    const blockType = block.blockType || '';
-    if (blockType === 'signal' || blockType.includes('entry')) {
+    const blockType = (block.type || block.blockType || '') as string;
+    if (blockType === 'indicator' || blockType === 'signal' || blockType.includes('entry')) {
       entryCount++;
-    } else if (blockType === 'exit' || blockType.includes('exit')) {
+    } else if (blockType === 'exit_condition' || blockType === 'exit' || blockType.includes('exit')) {
       exitCount++;
-    } else if (blockType === 'risk' || blockType.includes('risk') || blockType === 'money-management') {
+    } else if (blockType === 'risk_management' || blockType === 'risk' || blockType.includes('risk') || blockType === 'money-management') {
       riskCount++;
     }
   });
