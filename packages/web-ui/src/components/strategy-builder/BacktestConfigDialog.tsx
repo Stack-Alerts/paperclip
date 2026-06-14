@@ -30,6 +30,10 @@ import { AiRecommendationsPanel } from '@/components/backtest/ai-recommendations
 import { ComparePanel } from '@/components/backtest/compare/ComparePanel';
 import { BacktestProgressMeter } from '@/components/backtest/progress-meter';
 import { addRunRecord } from '@/lib/backtest-history';
+import { ConfigDiscoveryResultsDialog, type DiscoveryScenario } from './ConfigDiscoveryResultsDialog';
+import { runDiscovery } from '@/components/backtest/config-discovery/runDiscovery';
+import { generateSingleAxisScenarios, DEFAULT_PARAMETER_RANGES } from '@/lib/strategy-builder/config-discovery';
+import type { BacktestConfigFull } from '@/lib/strategy-builder/types';
 
 export interface BacktestConfigDialogProps {
   open: boolean;
@@ -1461,6 +1465,15 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
   const [minBarsHeld, setMinBarsHeld] = useState<ChipValue>(5);
   const [maxBarsHeld, setMaxBarsHeld] = useState<ChipValue>(200);
 
+  // Config Discovery state (BTCAAAAA-36305).
+  const [discoveryOpen, setDiscoveryOpen] = useState(false);
+  const [discoveryRunning, setDiscoveryRunning] = useState(false);
+  const [discoveryProgress, setDiscoveryProgress] = useState<{ current: number; total: number; message: string } | null>(null);
+  const [discoveryRows, setDiscoveryRows] = useState<DiscoveryScenario[]>([]);
+  // Maps a scenario's display description back to its config delta so Apply
+  // Config can reverse the swept params onto the live form.
+  const discoveryDeltaRef = useRef<Map<string, Record<string, number | string>>>(new Map());
+
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Seed timeframe from current strategy when dialog opens
@@ -1573,6 +1586,94 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
       result: backTestResult,
     });
   }, [backTestResult, currentStrategy, config, mode, tpSlConfig, slAdjustment, adaptivePreset, delayStopLoss, stopLossDelay, emergency, volatilityLookback, volatilityMultiplier, minStopLoss, maxStopLoss, marketStructureStop, maxRisk, minRiskReward, maxBarsHeld, lookbackDays, trainingDays, testingDays, leverage, confluence]);
+
+  // Build the current form state into a BacktestConfigFull (the discovery base).
+  const buildFullConfig = useCallback((strategyId: string): BacktestConfigFull => ({
+    strategyId,
+    startDate: config.startDate,
+    endDate: config.endDate,
+    initialCapital: config.initialCapital ?? 10000,
+    commissionPercentage: config.commissionPercentage,
+    slippagePercentage: config.slippagePercentage,
+    maxConcurrentPositions: config.maxConcurrentPositions,
+    timeframe: config.timeframe,
+    mode: mode === 'live-replay' ? 'live_replay' : 'historical',
+    tpslMode: tpSlConfig,
+    slAdjustmentMode: slAdjustment,
+    adaptiveSLPreset: adaptivePreset,
+    adaptiveSL: {
+      enabled: slAdjustment === 'Adaptive v2.0',
+      delayEnabled: delayStopLoss,
+      delayBars: Number(stopLossDelay),
+      emergencySlPct: Number(emergency),
+      volatilityLookback: Number(volatilityLookback),
+      volatilityMultiplier: Number(volatilityMultiplier),
+      minSlPct: Number(minStopLoss),
+      maxSlPct: Number(maxStopLoss),
+      useStructureSl: marketStructureStop,
+    },
+    riskPerTradePct: Number(maxRisk),
+    minRiskRewardRatio: Number(minRiskReward),
+    maxBarsHeld: Number(maxBarsHeld),
+    lookbackDays: Number(lookbackDays),
+    trainingDays: Number(trainingDays),
+    testingDays: Number(testingDays),
+    maxLeverage: Number(leverage),
+    confluenceThreshold: Number(confluence),
+  }), [config, mode, tpSlConfig, slAdjustment, adaptivePreset, delayStopLoss, stopLossDelay, emergency, volatilityLookback, volatilityMultiplier, minStopLoss, maxStopLoss, marketStructureStop, maxRisk, minRiskReward, maxBarsHeld, lookbackDays, trainingDays, testingDays, leverage, confluence]);
+
+  // Launch Config Discovery: sweep parameter axes, run a backtest per scenario
+  // (each naturally creating a Compare card), then open the ranked results.
+  const handleConfigDiscovery = useCallback(async () => {
+    if (!currentStrategy || discoveryRunning) return;
+    if (!config.startDate || !config.endDate) {
+      setDiscoveryProgress({ current: 0, total: 0, message: 'Set a start and end date before running discovery.' });
+      return;
+    }
+    const specs = generateSingleAxisScenarios(DEFAULT_PARAMETER_RANGES);
+    discoveryDeltaRef.current = new Map(specs.map(s => [s.description, s.configDelta]));
+    const base = buildFullConfig(currentStrategy.id);
+    setDiscoveryRunning(true);
+    setDiscoveryProgress({ current: 0, total: specs.length, message: 'Running baseline scenario…' });
+    setActiveTab('compare');
+    try {
+      const rows = await runDiscovery({
+        strategyId: currentStrategy.id,
+        strategyName: currentStrategy.name ?? 'Unnamed',
+        baseConfig: base,
+        onProgress: p => setDiscoveryProgress(p),
+      });
+      setDiscoveryRows(rows);
+      setDiscoveryOpen(true);
+    } catch (e) {
+      setDiscoveryProgress({
+        current: 0,
+        total: 0,
+        message: `Config Discovery failed: ${e instanceof Error ? e.message : 'unknown error'}`,
+      });
+    } finally {
+      setDiscoveryRunning(false);
+    }
+  }, [currentStrategy, discoveryRunning, config.startDate, config.endDate, buildFullConfig]);
+
+  // Apply a chosen discovery scenario's swept params back onto the live form.
+  const applyDiscoveryScenario = useCallback((scenario: DiscoveryScenario) => {
+    const delta = discoveryDeltaRef.current.get(scenario.scenario);
+    if (delta) {
+      for (const [key, value] of Object.entries(delta)) {
+        switch (key) {
+          case 'adaptiveSL.volatilityLookback': setVolatilityLookback(Number(value)); break;
+          case 'adaptiveSL.volatilityMultiplier': setVolatilityMultiplier(Number(value)); break;
+          case 'adaptiveSL.minSlPct': setMinStopLoss(Number(value)); break;
+          case 'adaptiveSL.maxSlPct': setMaxStopLoss(Number(value)); break;
+          case 'tpslMode': setTpSlConfig(value as 'Fibonacci' | 'Hybrid' | 'Fixed'); break;
+          case 'maxBarsHeld': setMaxBarsHeld(Number(value)); break;
+        }
+      }
+    }
+    setDiscoveryOpen(false);
+    setActiveTab('config');
+  }, []);
 
   const handleStart = useCallback(async () => {
     if (!currentStrategy) return;
@@ -2101,16 +2202,19 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
             <div className="flex items-center gap-2">
               <RichTooltip content={TT_CONFIG_DISCOVERY}>
                 <button
-                  disabled
-                  className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium disabled:cursor-not-allowed"
+                  onClick={handleConfigDiscovery}
+                  disabled={discoveryRunning || backTestInProgress || !currentStrategy}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     background: 'rgba(46, 140, 255, 0.10)',
                     border: '1px solid rgba(46, 140, 255, 0.30)',
-                    color: 'var(--text-muted)',
+                    color: discoveryRunning || backTestInProgress || !currentStrategy ? 'var(--text-muted)' : 'var(--accent-blue)',
                   }}
                 >
                   <Settings size={14} />
-                  Config Discovery
+                  {discoveryRunning && discoveryProgress
+                    ? `Discovering ${discoveryProgress.current}/${discoveryProgress.total}…`
+                    : 'Config Discovery'}
                 </button>
               </RichTooltip>
               <RichTooltip content={TT_VIEW_LIVE_RESULTS}>
@@ -2141,6 +2245,12 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
         </div>
       </div>
     </div>
+    <ConfigDiscoveryResultsDialog
+      open={discoveryOpen}
+      results={discoveryRows}
+      onApplyConfig={applyDiscoveryScenario}
+      onClose={() => setDiscoveryOpen(false)}
+    />
     </FontSizesContext.Provider>
   );
 }
