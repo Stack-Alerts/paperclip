@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppSidebar } from "@/components/AppSidebar";
+import { StatusBar } from "@/components/layout/StatusBar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { StatusBarProvider } from "@/contexts/StatusContext";
@@ -39,7 +40,10 @@ export default function RootLayout({
             <SidebarProvider>
               <AppSidebar />
               <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                {children}
+                <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                  {children}
+                </div>
+                <StatusBar />
               </main>
             </SidebarProvider>
           </StatusBarProvider>
