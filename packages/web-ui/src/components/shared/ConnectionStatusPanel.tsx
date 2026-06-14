@@ -131,6 +131,7 @@ export function ConnectionStatusPanel({ collapsed }: Props) {
           Next candle
         </span>
         <span
+          suppressHydrationWarning
           style={{
             fontSize: 10,
             color: 'var(--text-primary)',

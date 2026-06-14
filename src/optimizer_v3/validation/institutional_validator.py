@@ -1433,31 +1433,31 @@ class InstitutionalValidator:
         if not hasattr(config, 'blocks'):
             return
         
-        # Rule 49: Block names valid Python identifiers
+        # Rule 49: Block names convertible to a valid Python identifier
         for block in config.blocks:
-            if not self._is_valid_python_identifier(block.name):
+            if not self._is_valid_after_autoconvert(block.name):
                 self._add_issue(
                     severity=ValidationSeverity.WARNING,
                     category="NAUTILUS",
                     rule_id="NAUTILUS_002",
                     rule_name="Invalid Block Name",
-                    message=f"Block name '{block.name}' is not a valid Python identifier",
+                    message=f"Block name '{block.name}' cannot be converted to a valid Python identifier",
                     location=f"Block::{block.name}",
-                    suggestion="Use only letters, numbers, and underscores"
+                    suggestion="Use letters, numbers, spaces, hyphens, or underscores (spaces/hyphens are auto-converted)"
                 )
-            
-            # Rule 50: Signal names valid Python identifiers
+
+            # Rule 50: Signal names convertible to a valid Python identifier
             if hasattr(block, 'signals'):
                 for signal in block.signals:
-                    if not self._is_valid_python_identifier(signal.name):
+                    if not self._is_valid_after_autoconvert(signal.name):
                         self._add_issue(
                             severity=ValidationSeverity.WARNING,
                             category="NAUTILUS",
                             rule_id="NAUTILUS_003",
                             rule_name="Invalid Signal Name",
-                            message=f"Signal name '{signal.name}' is not a valid Python identifier",
+                            message=f"Signal name '{signal.name}' cannot be converted to a valid Python identifier",
                             location=f"Block::{block.name}::Signal::{signal.name}",
-                            suggestion="Use only letters, numbers, and underscores"
+                            suggestion="Use letters, numbers, spaces, hyphens, or underscores (spaces/hyphens are auto-converted)"
                         )
     
     def _is_valid_python_identifier(self, name: str) -> bool:
@@ -1465,6 +1465,20 @@ class InstitutionalValidator:
         if not name:
             return False
         return name.replace('_', '').isalnum() and not name[0].isdigit()
+
+    def _is_valid_after_autoconvert(self, name: str) -> bool:
+        """Check if a block/signal name yields a valid identifier after auto-conversion.
+
+        Block/signal names are persisted as Title Case with spaces (BTCAAAAA-34821,
+        e.g. "Asia Session 50 Percent"). The backend and code generator auto-convert
+        them to snake_case (app.py, nautilus_code_generator.py) exactly like strategy
+        names in Rule 48, so spaces and hyphens are safe. Only flag names that still
+        fail to form a valid identifier after that same conversion.
+        """
+        if not name:
+            return False
+        converted = name.strip().lower().replace(' ', '_').replace('-', '_')
+        return converted.replace('_', '').isalnum() and not converted[:1].isdigit()
     
     # =========================================================================
     # CATEGORY H: STRATEGY DIRECTION VALIDATION (4 rules) - Task 1.9.8, 1.9.8.1

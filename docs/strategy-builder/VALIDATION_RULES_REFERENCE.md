@@ -119,10 +119,16 @@ complexity_score = min(100, int(raw_score))
 | Rule ID | Name | Severity | Description |
 |---------|------|----------|-------------|
 | NAUTILUS_001 | Invalid Strategy Name | WARNING | Not a valid Python identifier |
-| NAUTILUS_002 | Invalid Block Name | WARNING | Not a valid Python identifier |
-| NAUTILUS_003 | Invalid Signal Name | WARNING | Not a valid Python identifier |
+| NAUTILUS_002 | Invalid Block Name | WARNING | Cannot be converted to a valid Python identifier |
+| NAUTILUS_003 | Invalid Signal Name | WARNING | Cannot be converted to a valid Python identifier |
 
 **Valid Python Identifier**: Letters, numbers, underscores only. Cannot start with number.
+
+**Note (NAUTILUS_002/003)**: Block and signal names are persisted as Title Case with
+spaces (e.g. "Asia Session 50 Percent"). The backend and code generator auto-convert
+these to snake_case, so spaces and hyphens are accepted — matching Rule 48 (strategy
+name). These rules only warn when a name still cannot form a valid identifier after
+that conversion (e.g. a leading digit or characters like `/ \ " ' : < > | * ?`).
 
 ---
 
