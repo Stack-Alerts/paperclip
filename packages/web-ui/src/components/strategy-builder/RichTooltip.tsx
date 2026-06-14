@@ -19,9 +19,28 @@ export interface TooltipContent {
 }
 
 // ─── Popup ────────────────────────────────────────────────────────────────────
-function TooltipPopup({ content, triggerRect }: { content: TooltipContent; triggerRect: DOMRect }) {
+// `anchorRect`, when supplied, pins the balloon to one consistent place (just
+// outside the right edge of the anchor element, vertically centred on it) and
+// draws an arrow whose vertical position tracks the hovered trigger row. Without
+// it, the popup follows the trigger directly (original behaviour). BTCAAAAA-36309.
+const ARROW = 7; // half-height of the balloon arrow, px
+
+function TooltipPopup({
+  content,
+  triggerRect,
+  anchorRect,
+}: {
+  content: TooltipContent;
+  triggerRect: DOMRect;
+  anchorRect?: DOMRect | null;
+}) {
   const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ left: number; top: number; opacity: number }>({ left: 0, top: 0, opacity: 0 });
+  const [pos, setPos] = useState<{
+    left: number;
+    top: number;
+    opacity: number;
+    arrow: { top: number; side: 'left' | 'right' } | null;
+  }>({ left: 0, top: 0, opacity: 0, arrow: null });
 
   useEffect(() => {
     const el = ref.current;
@@ -29,12 +48,28 @@ function TooltipPopup({ content, triggerRect }: { content: TooltipContent; trigg
     const { width: tw, height: th } = el.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
+
+    if (anchorRect) {
+      // Pinned balloon: prefer the right of the anchor, fall back to its left.
+      const fitsRight = anchorRect.right + tw + 16 <= vw;
+      const side: 'left' | 'right' = fitsRight ? 'left' : 'right';
+      const left = fitsRight
+        ? anchorRect.right + 12
+        : Math.max(8, anchorRect.left - tw - 12);
+      const center = anchorRect.top + anchorRect.height / 2;
+      const top = Math.max(8, Math.min(center - th / 2, vh - th - 8));
+      const triggerCenter = triggerRect.top + triggerRect.height / 2;
+      const arrowTop = Math.max(ARROW + 4, Math.min(triggerCenter - top, th - ARROW - 4));
+      setPos({ left, top, opacity: 1, arrow: { top: arrowTop, side } });
+      return;
+    }
+
     const cx = triggerRect.left + triggerRect.width / 2;
     const left = Math.max(8, Math.min(cx - tw / 2, vw - tw - 8));
     const showBelow = triggerRect.bottom + th + 12 <= vh || triggerRect.top < th + 12;
     const top = showBelow ? triggerRect.bottom + 8 : triggerRect.top - th - 8;
-    setPos({ left, top, opacity: 1 });
-  }, [triggerRect]);
+    setPos({ left, top, opacity: 1, arrow: null });
+  }, [triggerRect, anchorRect]);
 
   const hasSections = content.sections && content.sections.length > 0;
 
@@ -62,6 +97,24 @@ function TooltipPopup({ content, triggerRect }: { content: TooltipContent; trigg
         fontFamily: 'inherit',
       }}
     >
+      {/* Balloon arrow — a rotated square that pokes out of the edge nearest the
+          hovered row, with the two outward faces carrying the tooltip border. */}
+      {pos.arrow && (
+        <div
+          style={{
+            position: 'absolute',
+            top: pos.arrow.top - 6,
+            width: 12,
+            height: 12,
+            background: 'var(--tooltip-bg)',
+            transform: 'rotate(45deg)',
+            ...(pos.arrow.side === 'left'
+              ? { left: -6, borderLeft: '1px solid var(--tooltip-border)', borderBottom: '1px solid var(--tooltip-border)' }
+              : { right: -6, borderRight: '1px solid var(--tooltip-border)', borderTop: '1px solid var(--tooltip-border)' }),
+          }}
+        />
+      )}
+
       {/* Title */}
       <div style={{
         color: 'var(--tooltip-title)',
@@ -108,11 +161,15 @@ interface RichTooltipProps {
   content: TooltipContent;
   children: ReactElement;
   delay?: number;
+  // BTCAAAAA-36309: when provided, the balloon is pinned to a consistent spot
+  // beside this element and an arrow tracks the hovered trigger row.
+  anchorTo?: React.RefObject<HTMLElement | null>;
 }
 
-export function RichTooltip({ content, children }: RichTooltipProps) {
+export function RichTooltip({ content, children, anchorTo }: RichTooltipProps) {
   const { settings } = useTooltipSettings();
   const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -132,8 +189,12 @@ export function RichTooltip({ content, children }: RichTooltipProps) {
   const show = useCallback((e: React.MouseEvent<HTMLElement>) => {
     if (!settings.enabled) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    timerRef.current = setTimeout(() => setTriggerRect(rect), settings.delayMs);
-  }, [settings.enabled, settings.delayMs]);
+    const anchor = anchorTo?.current?.getBoundingClientRect() ?? null;
+    timerRef.current = setTimeout(() => {
+      setTriggerRect(rect);
+      setAnchorRect(anchor);
+    }, settings.delayMs);
+  }, [settings.enabled, settings.delayMs, anchorTo]);
 
   const hide = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -158,7 +219,7 @@ export function RichTooltip({ content, children }: RichTooltipProps) {
     <>
       {child}
       {mounted && triggerRect && createPortal(
-        <TooltipPopup content={content} triggerRect={triggerRect} />,
+        <TooltipPopup content={content} triggerRect={triggerRect} anchorRect={anchorRect} />,
         document.body,
       )}
     </>

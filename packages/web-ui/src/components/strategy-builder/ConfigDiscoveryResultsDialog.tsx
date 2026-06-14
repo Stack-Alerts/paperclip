@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { RichTooltip, type TooltipContent } from './RichTooltip';
 
 export interface DiscoveryScenario {
@@ -63,13 +63,29 @@ const BADGE_INLINE_STYLES: Record<string, React.CSSProperties> = {
   '': { background: 'var(--bg-card)', color: 'var(--text-secondary)' },
 };
 
-const BADGE_ICONS: Record<string, string> = {
-  gold: '🥇',
-  silver: '🥈',
-  bronze: '🥉',
-  baseline: '📌',
-  '': '',
-};
+// BTCAAAAA-36309: two-tone badge icons. The board flagged the full-colour emoji
+// medals as violating the Strategy Builder two-tone template (layered shapes that
+// inherit the badge colour via currentColor, with a lighter second tone). Medals
+// render a ribbon + disc; baseline renders a marker flag. Empty badge → no icon.
+function BadgeIcon({ badge }: { badge: string }) {
+  if (badge === '') return null;
+  if (badge === 'baseline') {
+    return (
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="flex-shrink-0" aria-hidden>
+        <line x1="4" y1="2" x2="4" y2="14.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <path d="M4 2.5 H12.5 L10.5 5.25 L12.5 8 H4 Z" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  // gold / silver / bronze medal — ribbon (two tones) + disc.
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="flex-shrink-0" aria-hidden>
+      <path d="M5 1.2 L8.2 6 L6 7.4 Z" fill="currentColor" fillOpacity="0.85" />
+      <path d="M11 1.2 L7.8 6 L10 7.4 Z" fill="currentColor" fillOpacity="0.5" />
+      <circle cx="8" cy="10.6" r="4.2" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  );
+}
 
 type SortKey = keyof DiscoveryScenario;
 
@@ -113,6 +129,10 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
   const [sortAsc, setSortAsc] = useState(true);
   const [minTrades, setMinTrades] = useState(minTradeCount);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  // BTCAAAAA-36309: anchor the per-row config tooltip to this scroll container so
+  // the balloon stays in one consistent place (vertically centred on the table)
+  // while its arrow tracks whichever row the mouse is over.
+  const tableScrollRef = useRef<HTMLDivElement>(null);
 
   const handleSort = useCallback(
     (key: SortKey) => {
@@ -220,7 +240,7 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
         </div>
 
         {/* Results Table */}
-        <div className="flex-1 overflow-auto">
+        <div ref={tableScrollRef} className="flex-1 overflow-auto">
           <table className="w-full text-sm border-collapse">
             <thead className="sticky top-0 z-10" style={{ background: 'var(--bg-card)' }}>
               <tr>
@@ -242,7 +262,7 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
             </thead>
             <tbody style={{ borderColor: 'var(--bg-card)' }}>
               {filtered.map((row, idx) => (
-                <RichTooltip key={idx} content={configTooltip(row)}>
+                <RichTooltip key={idx} content={configTooltip(row)} anchorTo={tableScrollRef}>
                 <tr
                   onClick={() => setSelectedIdx(idx === selectedIdx ? null : idx)}
                   className="cursor-pointer transition-colors"
@@ -269,10 +289,10 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
                   <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-secondary)' }}>{row.rank}</td>
                   <td className="px-3 py-2">
                     <span
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium"
                       style={BADGE_INLINE_STYLES[row.badge]}
                     >
-                      {BADGE_ICONS[row.badge]} {row.badge || '—'}
+                      <BadgeIcon badge={row.badge} /> {row.badge || '—'}
                     </span>
                   </td>
                   <td className="px-3 py-2 max-w-xs truncate" style={{ color: 'var(--text-secondary)' }}>{row.scenario}</td>
