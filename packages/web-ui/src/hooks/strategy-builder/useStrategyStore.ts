@@ -810,7 +810,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
       }
     }
 
-    set({ backTestInProgress: true, backTestProgress: 0, backTestResult: undefined, backTestLogs: [] });
+    set({ backTestInProgress: true, backTestProgress: 0, backTestResult: null, backTestLogs: [] });
     try {
       let startResp: { runId: string; status: string };
       try {
@@ -1135,9 +1135,10 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
           backTestLogs: freshLogs,
         });
       } else if (status.status === 'running') {
-        // Server still has the run mid-flight — reflect that in the UI but
-        // don't replace the snapshot (we don't have final metrics yet).
-        set({ backTestInProgress: true, backTestProgress: status.progress ?? 0 });
+        // Server still has the run mid-flight from a previous session.
+        // Do NOT set backTestInProgress=true — there is no active poll loop
+        // to reset it, which would permanently disable the Run Test button
+        // (BTCAAAAA-36104). The cached snapshot remains the displayed result.
       }
     } catch (err) {
       // 404 or network error: the cached snapshot is the source of truth

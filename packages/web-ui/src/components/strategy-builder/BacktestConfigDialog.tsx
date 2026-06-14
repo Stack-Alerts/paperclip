@@ -6,8 +6,7 @@ import { AppBrand } from '@/components/shared/AppBrand';
 import { ThemeSelector } from './ThemeSelector';
 import { useTooltipSettings } from './TooltipSettingsContext';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
-import { BacktestConfig, BacktestConfigFull, BacktestStatusMessage } from '@/lib/strategy-builder/types';
-import { getBacktestResults } from '@/lib/strategy-builder/api';
+import { BacktestConfig, BacktestConfigFull, BacktestResult, BacktestStatusMessage } from '@/lib/strategy-builder/types';
 import { RichTooltip, type TooltipContent } from './RichTooltip';
 import {
   TT_LOOKBACK, TT_TRAINING, TT_TESTING,
@@ -1962,51 +1961,11 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
         confluence_threshold: Number(confluence),
       };
 
-      // Start the backtest and get runId
-      const startResp = await runBacktest(fullConfig) as { runId: string };
-      const runId = startResp?.runId;
-      if (!runId) throw new Error('No runId returned from backtest start');
-
-      // Poll for results and logs until backtest is done
-      let attempts = 0;
-      const maxAttempts = 600; // 10 min at 1s intervals
-      const pollInterval = 1000;
-      const seenLogIds = new Set<string>();
-
-      while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
-        attempts++;
-
-        try {
-          const result = await getBacktestResults(currentStrategy.id, runId) as {
-            status: string;
-            logs?: Array<{ message: string; level: string; timestamp: string }>;
-          };
-
-          if (result?.logs) {
-            result.logs.forEach((log, idx) => {
-              const logId = `${runId}-${idx}`;
-              if (!seenLogIds.has(logId)) {
-                seenLogIds.add(logId);
-                setOutputLogs(prev => [
-                  ...prev,
-                  {
-                    message: log.message,
-                    level: log.level as BacktestStatusMessage['level'],
-                    timestamp: log.timestamp,
-                  },
-                ]);
-              }
-            });
-          }
-
-          if (result?.status === 'done' || result?.status === 'error') {
-            break;
-          }
-        } catch (pollErr) {
-          console.warn('Poll error:', pollErr);
-        }
-      }
+      // runBacktest in the store is a complete blocking poll — it sets backTestInProgress,
+      // updates backTestLogs/backTestProgress on each tick via the store, and returns the
+      // final BacktestResult only when the run is fully done or throws on error.
+      // The Live Output tab tails backTestLogs via a useEffect; no second poll is needed.
+      await runBacktest(fullConfig);
 
       setOutputLogs(prev => [
         ...prev,
