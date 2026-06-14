@@ -241,7 +241,11 @@ export interface TpSlAdjustments {
 // (server-side runs are not durable across restarts by default).
 export interface BacktestSession {
   strategyId: string;
-  runId: string;
+  // Present only once a backtest has actually run. A config-only session
+  // (user edited the config panel but never ran) persists the inputs with
+  // no runId / resultSnapshot / logs so the panel can be recalled per
+  // strategy across browser / server restarts (BTCAAAAA-36344).
+  runId?: string;
   // The narrow BacktestConfig fields the dialog binds to the date / capital
   // inputs (startDate, endDate, initialCapital, ...). The full BacktestConfigFull
   // below captures every field the run was dispatched with so re-running with
@@ -251,9 +255,9 @@ export interface BacktestSession {
   // Cached result snapshot — used as the source of truth when the server
   // has lost the in-memory run (most common after a server restart). When
   // the server still has the run, the live `getBacktestResults` call takes
-  // precedence and refreshes this snapshot.
-  resultSnapshot: BacktestResult;
-  logs: BacktestStatusMessage[];
+  // precedence and refreshes this snapshot. Absent for config-only sessions.
+  resultSnapshot?: BacktestResult;
+  logs?: BacktestStatusMessage[];
   // ISO 8601 — when the user switches between strategies the most recent
   // session per strategy wins.
   savedAt: string;
