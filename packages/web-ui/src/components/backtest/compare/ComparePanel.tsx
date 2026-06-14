@@ -531,7 +531,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [manageMode, setManageMode] = useState(false);
   const [markedIds, setMarkedIds] = useState<string[]>([]);
-  const [pendingDelete, setPendingDelete] = useState<'selected' | 'all' | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<'selected' | 'all' | 'keepTop3' | null>(null);
 
   const reload = useCallback(() => setRecords(loadAllRunRecords()), []);
   useEffect(() => { reload(); }, [reload, currentResult]);
@@ -595,9 +595,16 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
       setSelectedIds(prev => prev.filter(id => !drop.has(id)));
       setMarkedIds([]);
       setPendingDelete(null);
+    } else if (pendingDelete === 'keepTop3') {
+      const keep = new Set(records.filter(r => (rankings.get(r.runId)?.rank ?? Infinity) <= 3).map(r => r.runId));
+      const drop = records.filter(r => !keep.has(r.runId)).map(r => r.runId);
+      deleteRunRecords(drop);
+      setSelectedIds(prev => prev.filter(id => keep.has(id)));
+      setMarkedIds([]);
+      setPendingDelete(null);
     }
     reload();
-  }, [pendingDelete, markedIds, reload]);
+  }, [pendingDelete, markedIds, records, rankings, reload]);
 
   const handleSortClick = useCallback((key: SortKey) => {
     setSortKey(prev => {
@@ -749,6 +756,20 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
           </button>
           <span className="flex-1" />
           <button
+            onClick={() => setPendingDelete('keepTop3')}
+            disabled={records.length <= 3}
+            className="flex items-center gap-1 text-xs px-2 py-0.5 rounded"
+            title="Delete every run except the top 3 by rank"
+            style={{
+              color: records.length <= 3 ? 'var(--text-faint)' : 'var(--accent-blue)',
+              border: `1px solid ${records.length <= 3 ? 'var(--border)' : 'rgba(46,140,255,0.4)'}`,
+              background: records.length <= 3 ? 'transparent' : 'rgba(46,140,255,0.08)',
+              cursor: records.length <= 3 ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <Trophy size={11} />Keep top 3 only
+          </button>
+          <button
             onClick={() => setPendingDelete('all')}
             className="flex items-center gap-1 text-xs px-2 py-0.5 rounded"
             title="Delete every run in history"
@@ -771,6 +792,8 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
           <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
             {pendingDelete === 'all'
               ? `Permanently delete all ${records.length} saved run${records.length === 1 ? '' : 's'}? This cannot be undone.`
+              : pendingDelete === 'keepTop3'
+              ? `Keep only the top 3 ranked runs and permanently delete the other ${records.length - 3}? This cannot be undone.`
               : `Permanently delete ${markedIds.length} selected run${markedIds.length === 1 ? '' : 's'}? This cannot be undone.`}
           </span>
           <span className="flex-1" />
