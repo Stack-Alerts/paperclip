@@ -263,6 +263,19 @@ export interface BacktestSession {
   savedAt: string;
 }
 
+// Persisted record of one completed backtest run for the Compare tab.
+// A capped list (max 20 per strategy) is saved to localStorage key
+// `btcte:backtest_run_history` and surfaced in the Compare tab.
+export interface BacktestRunRecord {
+  runId: string;
+  strategyId: string;
+  strategyName: string;
+  savedAt: string; // ISO 8601
+  config: Omit<BacktestConfig, 'strategyId'>;
+  fullConfig: BacktestConfigFull;
+  result: BacktestResult;
+}
+
 // Backtest execution result
 export interface BacktestResult {
   id: string;

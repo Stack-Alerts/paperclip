@@ -29,6 +29,11 @@ import { MetricsPanel } from '@/components/backtest/metrics/MetricsPanel';
 import { AiRecommendationsPanel } from '@/components/backtest/ai-recommendations/AiRecommendationsPanel';
 import { ComparePanel } from '@/components/backtest/compare/ComparePanel';
 import { BacktestProgressMeter } from '@/components/backtest/progress-meter';
+import { addRunRecord } from '@/lib/backtest-history';
+import { ConfigDiscoveryResultsDialog, type DiscoveryScenario } from './ConfigDiscoveryResultsDialog';
+import { runDiscovery } from '@/components/backtest/config-discovery/runDiscovery';
+import { generateSingleAxisScenarios, DEFAULT_PARAMETER_RANGES } from '@/lib/strategy-builder/config-discovery';
+import type { BacktestConfigFull } from '@/lib/strategy-builder/types';
 
 export interface BacktestConfigDialogProps {
   open: boolean;
@@ -1460,6 +1465,16 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
   const [minBarsHeld, setMinBarsHeld] = useState<ChipValue>(5);
   const [maxBarsHeld, setMaxBarsHeld] = useState<ChipValue>(200);
 
+  // Config Discovery state (BTCAAAAA-36305).
+  const [discoveryOpen, setDiscoveryOpen] = useState(false);
+  const [discoveryAwaitingConfirm, setDiscoveryAwaitingConfirm] = useState(false);
+  const [discoveryRunning, setDiscoveryRunning] = useState(false);
+  const [discoveryProgress, setDiscoveryProgress] = useState<{ current: number; total: number; message: string } | null>(null);
+  const [discoveryRows, setDiscoveryRows] = useState<DiscoveryScenario[]>([]);
+  // Maps a scenario's display description back to its config delta so Apply
+  // Config can reverse the swept params onto the live form.
+  const discoveryDeltaRef = useRef<Map<string, Record<string, number | string>>>(new Map());
+
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Pull the persisted last session from the store. The store hydrates this
@@ -1684,6 +1699,209 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
 
   const patchConfig = useCallback((patch: Partial<Omit<BacktestConfig, 'strategyId'>>) => {
     setConfig(prev => ({ ...prev, ...patch }));
+  }, []);
+
+  // Apply a saved run's configuration back into the live form (Compare tab → Config).
+  // Reverses the fullConfig mapping built in the persist effect below.
+  const applyRunConfig = useCallback((record: import('@/lib/strategy-builder/types').BacktestRunRecord) => {
+    const fc = record.fullConfig;
+    if (!fc) return;
+    setConfig(prev => ({
+      ...prev,
+      startDate: fc.startDate ?? prev.startDate,
+      endDate: fc.endDate ?? prev.endDate,
+      initialCapital: fc.initialCapital ?? prev.initialCapital,
+      commissionPercentage: fc.commissionPercentage ?? prev.commissionPercentage,
+      slippagePercentage: fc.slippagePercentage ?? prev.slippagePercentage,
+      maxConcurrentPositions: fc.maxConcurrentPositions ?? prev.maxConcurrentPositions,
+      timeframe: fc.timeframe ?? prev.timeframe,
+    }));
+    setMode(fc.mode === 'live_replay' ? 'live-replay' : 'walk-forward');
+    if (fc.tpslMode) setTpSlConfig(fc.tpslMode as 'Fibonacci' | 'Hybrid' | 'Fixed');
+    if (fc.slAdjustmentMode) setSlAdjustment(fc.slAdjustmentMode as 'Adaptive v2.0' | 'Static');
+    if (fc.adaptiveSLPreset) setAdaptivePreset(fc.adaptiveSLPreset as AdaptivePresetName);
+    if (fc.adaptiveSL) {
+      setDelayStopLoss(fc.adaptiveSL.delayEnabled);
+      setStopLossDelay(fc.adaptiveSL.delayBars);
+      setEmergency(fc.adaptiveSL.emergencySlPct);
+      setVolatilityLookback(fc.adaptiveSL.volatilityLookback);
+      setVolatilityMultiplier(fc.adaptiveSL.volatilityMultiplier);
+      setMinStopLoss(fc.adaptiveSL.minSlPct);
+      setMaxStopLoss(fc.adaptiveSL.maxSlPct);
+      setMarketStructureStop(fc.adaptiveSL.useStructureSl);
+    }
+    if (fc.riskPerTradePct != null) setMaxRisk(fc.riskPerTradePct);
+    if (fc.minRiskRewardRatio != null) setMinRiskReward(fc.minRiskRewardRatio);
+    if (fc.maxBarsHeld != null) setMaxBarsHeld(fc.maxBarsHeld);
+    if (fc.lookbackDays != null) setLookbackDays(fc.lookbackDays);
+    if (fc.trainingDays != null) setTrainingDays(fc.trainingDays);
+    if (fc.testingDays != null) setTestingDays(fc.testingDays);
+    if (fc.maxLeverage != null) setLeverage(fc.maxLeverage);
+    if (fc.confluenceThreshold != null) setConfluence(fc.confluenceThreshold);
+    setActiveTab('config');
+  }, []);
+
+  // Persist each completed run to the compare-panel history.
+  const savedRunIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!backTestResult || !currentStrategy) return;
+    if (backTestResult.status !== 'completed') return;
+    if (savedRunIdRef.current === backTestResult.runId) return;
+    savedRunIdRef.current = backTestResult.runId;
+    const fc: import('@/lib/strategy-builder/types').BacktestConfigFull = {
+      strategyId: currentStrategy.id,
+      startDate: config.startDate,
+      endDate: config.endDate,
+      initialCapital: config.initialCapital ?? 10000,
+      commissionPercentage: config.commissionPercentage,
+      slippagePercentage: config.slippagePercentage,
+      maxConcurrentPositions: config.maxConcurrentPositions,
+      timeframe: config.timeframe,
+      mode: mode === 'live-replay' ? 'live_replay' : 'historical',
+      tpslMode: tpSlConfig,
+      slAdjustmentMode: slAdjustment,
+      adaptiveSLPreset: adaptivePreset,
+      adaptiveSL: {
+        enabled: slAdjustment === 'Adaptive v2.0',
+        delayEnabled: delayStopLoss,
+        delayBars: Number(stopLossDelay),
+        emergencySlPct: Number(emergency),
+        volatilityLookback: Number(volatilityLookback),
+        volatilityMultiplier: Number(volatilityMultiplier),
+        minSlPct: Number(minStopLoss),
+        maxSlPct: Number(maxStopLoss),
+        useStructureSl: marketStructureStop,
+      },
+      riskPerTradePct: Number(maxRisk),
+      minRiskRewardRatio: Number(minRiskReward),
+      maxBarsHeld: Number(maxBarsHeld),
+      lookbackDays: Number(lookbackDays),
+      trainingDays: Number(trainingDays),
+      testingDays: Number(testingDays),
+      maxLeverage: Number(leverage),
+      confluenceThreshold: Number(confluence),
+    };
+    addRunRecord({
+      runId: backTestResult.runId,
+      strategyId: currentStrategy.id,
+      strategyName: currentStrategy.name ?? 'Unnamed',
+      savedAt: new Date().toISOString(),
+      config: {
+        startDate: config.startDate,
+        endDate: config.endDate,
+        initialCapital: config.initialCapital ?? 10000,
+        commissionPercentage: config.commissionPercentage,
+        slippagePercentage: config.slippagePercentage,
+        maxConcurrentPositions: config.maxConcurrentPositions,
+        timeframe: config.timeframe,
+      },
+      fullConfig: fc,
+      result: backTestResult,
+    });
+  }, [backTestResult, currentStrategy, config, mode, tpSlConfig, slAdjustment, adaptivePreset, delayStopLoss, stopLossDelay, emergency, volatilityLookback, volatilityMultiplier, minStopLoss, maxStopLoss, marketStructureStop, maxRisk, minRiskReward, maxBarsHeld, lookbackDays, trainingDays, testingDays, leverage, confluence]);
+
+  // Build the current form state into a BacktestConfigFull (the discovery base).
+  const buildFullConfig = useCallback((strategyId: string): BacktestConfigFull => ({
+    strategyId,
+    startDate: config.startDate,
+    endDate: config.endDate,
+    initialCapital: config.initialCapital ?? 10000,
+    commissionPercentage: config.commissionPercentage,
+    slippagePercentage: config.slippagePercentage,
+    maxConcurrentPositions: config.maxConcurrentPositions,
+    timeframe: config.timeframe,
+    mode: mode === 'live-replay' ? 'live_replay' : 'historical',
+    tpslMode: tpSlConfig,
+    slAdjustmentMode: slAdjustment,
+    adaptiveSLPreset: adaptivePreset,
+    adaptiveSL: {
+      enabled: slAdjustment === 'Adaptive v2.0',
+      delayEnabled: delayStopLoss,
+      delayBars: Number(stopLossDelay),
+      emergencySlPct: Number(emergency),
+      volatilityLookback: Number(volatilityLookback),
+      volatilityMultiplier: Number(volatilityMultiplier),
+      minSlPct: Number(minStopLoss),
+      maxSlPct: Number(maxStopLoss),
+      useStructureSl: marketStructureStop,
+    },
+    riskPerTradePct: Number(maxRisk),
+    minRiskRewardRatio: Number(minRiskReward),
+    maxBarsHeld: Number(maxBarsHeld),
+    lookbackDays: Number(lookbackDays),
+    trainingDays: Number(trainingDays),
+    testingDays: Number(testingDays),
+    maxLeverage: Number(leverage),
+    confluenceThreshold: Number(confluence),
+  }), [config, mode, tpSlConfig, slAdjustment, adaptivePreset, delayStopLoss, stopLossDelay, emergency, volatilityLookback, volatilityMultiplier, minStopLoss, maxStopLoss, marketStructureStop, maxRisk, minRiskReward, maxBarsHeld, lookbackDays, trainingDays, testingDays, leverage, confluence]);
+
+  // Launch Config Discovery: sweep parameter axes, run a backtest per scenario
+  // (each naturally creating a Compare card), then open the ranked results.
+  // Step 1: clicking the Config Discovery button opens the modal in confirmation
+  // mode (BTCAAAAA-36311) — the sweep runs ~19 backtests and takes a while, so we
+  // require an explicit yes/no before kicking it off.
+  const handleConfigDiscovery = useCallback(() => {
+    if (!currentStrategy || discoveryRunning) return;
+    if (!config.startDate || !config.endDate) {
+      setDiscoveryProgress({ current: 0, total: 0, message: 'Set a start and end date before running discovery.' });
+      return;
+    }
+    setDiscoveryRows([]);
+    setDiscoveryProgress(null);
+    setDiscoveryAwaitingConfirm(true);
+    setDiscoveryOpen(true);
+  }, [currentStrategy, discoveryRunning, config.startDate, config.endDate]);
+
+  // Step 2: user confirmed — actually run the sweep, streaming each completed
+  // scenario into the already-open results modal.
+  const startDiscovery = useCallback(async () => {
+    if (!currentStrategy || discoveryRunning) return;
+    const specs = generateSingleAxisScenarios(DEFAULT_PARAMETER_RANGES);
+    discoveryDeltaRef.current = new Map(specs.map(s => [s.description, s.configDelta]));
+    const base = buildFullConfig(currentStrategy.id);
+    setDiscoveryAwaitingConfirm(false);
+    setDiscoveryRunning(true);
+    setDiscoveryProgress({ current: 0, total: specs.length, message: 'Running baseline scenario…' });
+    setActiveTab('compare');
+    setDiscoveryRows([]);
+    setDiscoveryOpen(true);
+    try {
+      const rows = await runDiscovery({
+        strategyId: currentStrategy.id,
+        strategyName: currentStrategy.name ?? 'Unnamed',
+        baseConfig: base,
+        onProgress: p => setDiscoveryProgress(p),
+        onRowsUpdate: rows => setDiscoveryRows(rows),
+      });
+      setDiscoveryRows(rows);
+    } catch (e) {
+      setDiscoveryProgress({
+        current: 0,
+        total: 0,
+        message: `Config Discovery failed: ${e instanceof Error ? e.message : 'unknown error'}`,
+      });
+    } finally {
+      setDiscoveryRunning(false);
+    }
+  }, [currentStrategy, discoveryRunning, buildFullConfig]);
+
+  // Apply a chosen discovery scenario's swept params back onto the live form.
+  const applyDiscoveryScenario = useCallback((scenario: DiscoveryScenario) => {
+    const delta = discoveryDeltaRef.current.get(scenario.scenario);
+    if (delta) {
+      for (const [key, value] of Object.entries(delta)) {
+        switch (key) {
+          case 'adaptiveSL.volatilityLookback': setVolatilityLookback(Number(value)); break;
+          case 'adaptiveSL.volatilityMultiplier': setVolatilityMultiplier(Number(value)); break;
+          case 'adaptiveSL.minSlPct': setMinStopLoss(Number(value)); break;
+          case 'adaptiveSL.maxSlPct': setMaxStopLoss(Number(value)); break;
+          case 'tpslMode': setTpSlConfig(value as 'Fibonacci' | 'Hybrid' | 'Fixed'); break;
+          case 'maxBarsHeld': setMaxBarsHeld(Number(value)); break;
+        }
+      }
+    }
+    setDiscoveryOpen(false);
+    setActiveTab('config');
   }, []);
 
   const handleStart = useCallback(async () => {
@@ -2110,7 +2328,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
             />
           )}
           {activeTab === 'compare' && (
-            <ComparePanel />
+            <ComparePanel currentResult={backTestResult ?? undefined} currentStrategyId={currentStrategy?.id} currentStrategyName={currentStrategy?.name} onApplyConfig={applyRunConfig} />
           )}
         </div>
 
@@ -2213,16 +2431,19 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
             <div className="flex items-center gap-2">
               <RichTooltip content={TT_CONFIG_DISCOVERY}>
                 <button
-                  disabled
-                  className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium disabled:cursor-not-allowed"
+                  onClick={handleConfigDiscovery}
+                  disabled={discoveryRunning || backTestInProgress || !currentStrategy}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     background: 'rgba(46, 140, 255, 0.10)',
                     border: '1px solid rgba(46, 140, 255, 0.30)',
-                    color: 'var(--text-muted)',
+                    color: discoveryRunning || backTestInProgress || !currentStrategy ? 'var(--text-muted)' : 'var(--accent-blue)',
                   }}
                 >
                   <Settings size={14} />
-                  Config Discovery
+                  {discoveryRunning && discoveryProgress
+                    ? `Discovering ${discoveryProgress.current}/${discoveryProgress.total}…`
+                    : 'Config Discovery'}
                 </button>
               </RichTooltip>
               <RichTooltip content={TT_VIEW_LIVE_RESULTS}>
@@ -2253,6 +2474,17 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
         </div>
       </div>
     </div>
+    <ConfigDiscoveryResultsDialog
+      open={discoveryOpen}
+      results={discoveryRows}
+      running={discoveryRunning}
+      progress={discoveryProgress}
+      awaitingConfirm={discoveryAwaitingConfirm}
+      scenarioCount={DEFAULT_PARAMETER_RANGES.reduce((n, r) => n + (r.values?.length ?? r.steps ?? 0), 0)}
+      onConfirm={startDiscovery}
+      onApplyConfig={applyDiscoveryScenario}
+      onClose={() => { setDiscoveryOpen(false); setDiscoveryAwaitingConfirm(false); }}
+    />
     </FontSizesContext.Provider>
   );
 }
