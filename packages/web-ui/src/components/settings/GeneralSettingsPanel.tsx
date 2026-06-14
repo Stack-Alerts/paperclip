@@ -29,6 +29,8 @@ export const GeneralSettingsPanel: React.FC = () => {
   const [draft, setDraft] = useState<AiSettings>(settings);
   const [hasChanges, setHasChanges] = useState(false);
   const [saved, setSaved] = useState(false);
+  // Whether the user has opted into typing a custom model id not in the list.
+  const [customModel, setCustomModel] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -37,6 +39,8 @@ export const GeneralSettingsPanel: React.FC = () => {
   }, [settings]);
 
   const meta = getProviderMeta(draft.provider);
+  const CUSTOM_MODEL = '__custom__';
+  const showCustomModel = customModel || !meta.models.includes(draft.model);
 
   const update = (patch: Partial<AiSettings>) => {
     setDraft((prev) => ({ ...prev, ...patch }));
@@ -51,7 +55,17 @@ export const GeneralSettingsPanel: React.FC = () => {
     const model = nextMeta.models.includes(draft.model)
       ? draft.model
       : nextMeta.defaultModel;
+    setCustomModel(false);
     update({ provider, model });
+  };
+
+  const handleModelSelect = (value: string) => {
+    if (value === CUSTOM_MODEL) {
+      setCustomModel(true);
+      return;
+    }
+    setCustomModel(false);
+    update({ model: value });
   };
 
   const handleApiKeyChange = (value: string) => {
@@ -113,22 +127,32 @@ export const GeneralSettingsPanel: React.FC = () => {
         {/* Model */}
         <div className="space-y-2">
           <Label htmlFor="ai-model">Model</Label>
-          <Input
+          <Select
             id="ai-model"
-            type="text"
-            list="ai-model-options"
-            value={draft.model}
-            onChange={(e) => update({ model: e.target.value })}
+            value={showCustomModel ? CUSTOM_MODEL : draft.model}
+            onChange={(e) => handleModelSelect(e.target.value)}
             disabled={!hydrated}
-            placeholder={meta.defaultModel}
-          />
-          <datalist id="ai-model-options">
+          >
             {meta.models.map((m) => (
-              <option key={m} value={m} />
+              <option key={m} value={m}>
+                {m}
+              </option>
             ))}
-          </datalist>
+            <option value={CUSTOM_MODEL}>Custom…</option>
+          </Select>
+          {showCustomModel && (
+            <Input
+              id="ai-model-custom"
+              type="text"
+              value={draft.model}
+              onChange={(e) => update({ model: e.target.value })}
+              disabled={!hydrated}
+              placeholder={meta.defaultModel}
+              autoComplete="off"
+            />
+          )}
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-            Pick a suggested model or type a custom one.
+            Pick an available model, or choose “Custom…” to enter one manually.
           </p>
         </div>
 

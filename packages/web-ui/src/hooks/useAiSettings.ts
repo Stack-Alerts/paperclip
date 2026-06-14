@@ -22,16 +22,26 @@ export interface AiProviderMeta {
   defaultModel: string;
 }
 
+// Full Claude model lineup, shared by the local Claude Code CLI and the
+// Anthropic API providers so every available model is selectable.
+export const CLAUDE_MODELS = [
+  'claude-opus-4-7',
+  'claude-opus-4-1',
+  'claude-sonnet-4-6',
+  'claude-haiku-4-5',
+  'claude-haiku-3-5',
+];
+
 // Mirrors the desktop (PyQt) Settings dialog provider catalog in
-// src/strategy_builder/ui/settings_dialog.py, plus the Claude Code CLI
-// subscription option requested on BTCAAAAA-36340.
+// src/strategy_builder/ui/settings_dialog.py, plus the local Claude Code CLI
+// option requested on BTCAAAAA-36340.
 export const AI_PROVIDERS: AiProviderMeta[] = [
   {
     id: 'claude-code',
-    label: 'Claude Code (CLI subscription)',
+    label: 'Claude Code (local CLI subscription)',
     requiresApiKey: false,
-    info: 'Uses your local Claude Code CLI session — no API key required.',
-    models: ['claude-sonnet-4-6', 'claude-opus-4-1', 'claude-haiku-3-5'],
+    info: 'Runs locally through your Claude Code CLI session — no API key required. Uses your existing Claude Code / Claude subscription.',
+    models: CLAUDE_MODELS,
     defaultModel: 'claude-sonnet-4-6',
   },
   {
@@ -39,7 +49,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     label: 'Anthropic API',
     requiresApiKey: true,
     info: 'Default pricing: $3.00/M input · $15.00/M output',
-    models: ['claude-sonnet-4-6', 'claude-opus-4-1', 'claude-haiku-3-5'],
+    models: CLAUDE_MODELS,
     defaultModel: 'claude-sonnet-4-6',
   },
   {
