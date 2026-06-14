@@ -53,7 +53,6 @@ get_test_pid() {
 
 echo "[stop-test] looking for ephemeral test instance on :3000..."
 
-local test_pid
 test_pid=$(get_test_pid || echo "")
 
 if [[ -z "$test_pid" ]]; then
