@@ -183,7 +183,7 @@ function CompareTable({
   children: React.ReactNode;
 }) {
   return (
-    <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+    <table className="w-full" style={{ borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       <colgroup>
         <col style={{ width: 160 }} />
         {colLabels.map((_, i) => <col key={i} />)}
@@ -678,13 +678,14 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
 
           {/* Run header cards — top border tinted per slot color */}
           <div
-            className="grid gap-2 p-3"
+            className="grid p-3"
             style={{
-              gridTemplateColumns: `repeat(${colCount}, 1fr)`,
+              gridTemplateColumns: `160px repeat(${colCount}, 1fr)`,
               background: 'var(--bg-elevated, var(--bg-deep))',
               borderBottom: '1px solid var(--border)',
             }}
           >
+            <div aria-hidden />
             {selectedRecords.map((r, i) => {
               const equityVals = (r.result.equityCurve ?? []).map((p: { value: number }) => p.value);
               return (
@@ -695,6 +696,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
                     background: 'var(--bg-card)',
                     border: '1px solid var(--border)',
                     borderLeft: `3px solid ${colColors[i]}`,
+                    marginRight: i < colCount - 1 ? 8 : 0,
                   }}
                 >
                   {/* Left: badge + name + dates */}
