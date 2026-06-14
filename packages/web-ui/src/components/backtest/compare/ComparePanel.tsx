@@ -209,8 +209,8 @@ function RankBadge({ rank }: { rank: number }) {
   // medal stands out against the card instead of fading into it.
   const palette: Record<number, { bg: string; fg: string; ring: string }> = {
     1: { bg: '#f5bf42', fg: '#1a1205', ring: 'rgba(245,191,66,0.55)' },
-    2: { bg: '#c2ccd6', fg: '#15191e', ring: 'rgba(194,204,214,0.55)' },
-    3: { bg: '#cd7f50', fg: '#1c0f06', ring: 'rgba(205,127,80,0.55)' },
+    2: { bg: '#9aa6b2', fg: '#10141a', ring: 'rgba(154,166,178,0.55)' },
+    3: { bg: '#b08544', fg: '#1c1206', ring: 'rgba(176,133,68,0.55)' },
   };
   const c = palette[rank] ?? { bg: 'var(--text-muted)', fg: 'var(--bg-deep)', ring: 'transparent' };
   return (
