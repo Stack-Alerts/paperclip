@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
+import { RichTooltip, type TooltipContent } from './RichTooltip';
 
 export interface DiscoveryScenario {
   rank: number;
@@ -19,14 +20,39 @@ export interface DiscoveryScenario {
   avgBars: number;
   maxDd: number;
   type: 'baseline' | 'discovery';
+  // BTCAAAAA-36309: full configuration of this run as label/value pairs, shown
+  // on row hover so each result exposes the exact config that produced it.
+  configDetail?: Array<[string, string]>;
+}
+
+export interface DiscoveryProgressState {
+  current: number;
+  total: number;
+  message: string;
 }
 
 export interface ConfigDiscoveryResultsDialogProps {
   open: boolean;
   results: DiscoveryScenario[];
   minTradeCount?: number;
+  // BTCAAAAA-36309: the dialog now opens the moment discovery starts and streams
+  // completed tests in. `running` + `progress` drive the inline progress bar.
+  running?: boolean;
+  progress?: DiscoveryProgressState | null;
   onApplyConfig: (scenario: DiscoveryScenario) => void;
   onClose: () => void;
+}
+
+// Build the hover tooltip for a result row from its captured config detail.
+function configTooltip(row: DiscoveryScenario): TooltipContent {
+  const hasDetail = !!row.configDetail && row.configDetail.length > 0;
+  return {
+    title: row.scenario,
+    sections: hasDetail
+      ? [{ header: 'Run configuration', items: row.configDetail!.map(([k, v]) => `${k}: ${v}`) }]
+      : undefined,
+    body: hasDetail ? undefined : 'Configuration details unavailable.',
+  };
 }
 
 const BADGE_INLINE_STYLES: Record<string, React.CSSProperties> = {
@@ -78,6 +104,8 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
   open,
   results,
   minTradeCount = 0,
+  running = false,
+  progress = null,
   onApplyConfig,
   onClose,
 }) => {
@@ -115,14 +143,24 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
   if (!open) return null;
 
   const selected = selectedIdx !== null ? filtered[selectedIdx] : null;
+  const progressPct =
+    !running
+      ? 100
+      : progress && progress.total > 0
+        ? Math.min(100, Math.round((progress.current / progress.total) * 100))
+        : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="rounded-lg shadow-2xl w-full max-w-6xl mx-4 max-h-[90vh] flex flex-col border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+      <div className="rounded-lg shadow-2xl w-full max-w-[92vw] mx-4 max-h-[90vh] flex flex-col border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between border-b px-6 py-4 flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
           <div>
             <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>Config Discovery Results</h2>
-            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{results.length} scenarios evaluated</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              {running
+                ? `${results.length} of ${progress?.total ?? '…'} scenarios completed`
+                : `${results.length} scenarios evaluated`}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -135,9 +173,11 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
           </button>
         </div>
 
-        {/* Filter Controls */}
+        {/* Filter + progress controls. Left: Min Trades slider. Right: config
+            count + a progress bar that fills the remaining width while discovery
+            runs (BTCAAAAA-36309). */}
         <div className="flex items-center gap-4 px-6 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--bg-card)' }}>
-          <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>Min Trades:</label>
+          <label className="text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>Min Trades:</label>
           <input
             type="range"
             min={0}
@@ -147,7 +187,36 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
             className="w-32"
           />
           <span className="text-xs w-8" style={{ color: 'var(--text-secondary)' }}>{minTrades}</span>
-          <span className="text-xs ml-2" style={{ color: 'var(--text-muted)' }}>{filtered.length} shown</span>
+          <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{filtered.length} shown</span>
+
+          <span className="text-xs whitespace-nowrap ml-2" style={{ color: 'var(--text-secondary)' }}>
+            {running ? progress?.total ?? results.length : results.length} configs
+          </span>
+
+          {/* Progress bar — claims the leftover horizontal space. */}
+          <div className="flex-1 flex items-center gap-2 min-w-0">
+            <div
+              className="flex-1 h-2 rounded-full overflow-hidden min-w-0"
+              style={{ background: 'var(--bg-card)' }}
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={progress?.total ?? 0}
+              aria-valuenow={progress?.current ?? 0}
+            >
+              <div
+                className="h-full rounded-full transition-[width] duration-300"
+                style={{
+                  width: progressPct + '%',
+                  background: running ? 'var(--accent-blue)' : 'var(--accent-green)',
+                }}
+              />
+            </div>
+            <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+              {running
+                ? `${progress?.current ?? 0}/${progress?.total ?? 0}`
+                : 'Complete'}
+            </span>
+          </div>
         </div>
 
         {/* Results Table */}
@@ -173,8 +242,8 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
             </thead>
             <tbody style={{ borderColor: 'var(--bg-card)' }}>
               {filtered.map((row, idx) => (
+                <RichTooltip key={idx} content={configTooltip(row)}>
                 <tr
-                  key={idx}
                   onClick={() => setSelectedIdx(idx === selectedIdx ? null : idx)}
                   className="cursor-pointer transition-colors"
                   style={
@@ -240,11 +309,12 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
                     </span>
                   </td>
                 </tr>
+                </RichTooltip>
               ))}
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={14} className="px-3 py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                    No scenarios match the current filter
+                    {running ? 'Running scenarios… completed tests will appear here.' : 'No scenarios match the current filter'}
                   </td>
                 </tr>
               )}

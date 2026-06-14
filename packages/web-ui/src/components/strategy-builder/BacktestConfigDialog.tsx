@@ -1636,15 +1636,19 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
     setDiscoveryRunning(true);
     setDiscoveryProgress({ current: 0, total: specs.length, message: 'Running baseline scenario…' });
     setActiveTab('compare');
+    // BTCAAAAA-36309: open the results modal immediately with an empty list so
+    // the progress bar shows and each completed test streams in live.
+    setDiscoveryRows([]);
+    setDiscoveryOpen(true);
     try {
       const rows = await runDiscovery({
         strategyId: currentStrategy.id,
         strategyName: currentStrategy.name ?? 'Unnamed',
         baseConfig: base,
         onProgress: p => setDiscoveryProgress(p),
+        onRowsUpdate: rows => setDiscoveryRows(rows),
       });
       setDiscoveryRows(rows);
-      setDiscoveryOpen(true);
     } catch (e) {
       setDiscoveryProgress({
         current: 0,
@@ -2248,6 +2252,8 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
     <ConfigDiscoveryResultsDialog
       open={discoveryOpen}
       results={discoveryRows}
+      running={discoveryRunning}
+      progress={discoveryProgress}
       onApplyConfig={applyDiscoveryScenario}
       onClose={() => setDiscoveryOpen(false)}
     />

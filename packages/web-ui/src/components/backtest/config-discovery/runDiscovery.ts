@@ -15,6 +15,7 @@ import {
   buildDiscoveryRows,
   type ParameterRange,
   type AggregatedScenario,
+  type ScenarioMetrics,
 } from '@/lib/strategy-builder/config-discovery';
 import type { DiscoveryScenario } from '@/components/strategy-builder/ConfigDiscoveryResultsDialog';
 import type { BacktestConfigFull, BacktestResult } from '@/lib/strategy-builder/types';
@@ -31,8 +32,42 @@ export interface RunDiscoveryOptions {
   baseConfig: BacktestConfigFull;
   ranges?: ParameterRange[];
   onProgress?: (p: DiscoveryProgress) => void;
+  // Live results stream (BTCAAAAA-36309): called after the baseline and after
+  // each scenario completes so the results dialog can show every finished test
+  // the moment it lands instead of waiting for the whole sweep.
+  onRowsUpdate?: (rows: DiscoveryScenario[]) => void;
   // Cancellation signal — checked between scenarios.
   shouldStop?: () => boolean;
+}
+
+// Flatten a run's config into the label/value pairs the results-dialog tooltip
+// renders (BTCAAAAA-36309: "details of all the configuration in the Run").
+function summarizeConfig(c: BacktestConfigFull): Array<[string, string]> {
+  const sl = c.adaptiveSL;
+  const pairs: Array<[string, string | number | undefined]> = [
+    ['Date range', c.startDate && c.endDate ? `${c.startDate} → ${c.endDate}` : undefined],
+    ['Timeframe', c.timeframe],
+    ['Mode', c.mode],
+    ['Initial capital', c.initialCapital != null ? `$${c.initialCapital.toLocaleString()}` : undefined],
+    ['TP/SL mode', c.tpslMode],
+    ['SL adjustment', c.slAdjustmentMode],
+    ['Adaptive SL preset', c.adaptiveSLPreset],
+    ['Vol lookback', sl ? `${sl.volatilityLookback} bars` : undefined],
+    ['Vol multiplier', sl ? `${sl.volatilityMultiplier}x` : undefined],
+    ['Min SL', sl ? `${sl.minSlPct}%` : undefined],
+    ['Max SL', sl ? `${sl.maxSlPct}%` : undefined],
+    ['Emergency SL', sl ? `${sl.emergencySlPct}%` : undefined],
+    ['Delay stop-loss', sl ? (sl.delayEnabled ? `on (${sl.delayBars} bars)` : 'off') : undefined],
+    ['Structure SL', sl ? (sl.useStructureSl ? 'on' : 'off') : undefined],
+    ['Risk per trade', c.riskPerTradePct != null ? `${c.riskPerTradePct}%` : undefined],
+    ['Min risk:reward', c.minRiskRewardRatio != null ? `${c.minRiskRewardRatio}x` : undefined],
+    ['Max leverage', c.maxLeverage != null ? `${c.maxLeverage}x` : undefined],
+    ['Max bars held', c.maxBarsHeld],
+    ['Confluence', c.confluenceThreshold],
+  ];
+  return pairs
+    .filter((p): p is [string, string | number] => p[1] !== undefined && p[1] !== '')
+    .map(([k, v]) => [k, String(v)]);
 }
 
 const POLL_INTERVAL_MS = 1000;
@@ -128,14 +163,31 @@ export async function runDiscovery(opts: RunDiscoveryOptions): Promise<Discovery
   const report = (current: number, message: string) =>
     opts.onProgress?.({ current, total, message });
 
+  // Per-scenario config so each finished row can surface its full configuration
+  // on hover. Keyed by the row's display `scenario` string built downstream.
+  const configByScenario = new Map<string, BacktestConfigFull>();
+  const attachConfig = (rows: DiscoveryScenario[]): DiscoveryScenario[] =>
+    rows.map(row => {
+      const cfg = configByScenario.get(row.scenario);
+      return cfg ? { ...row, configDetail: summarizeConfig(cfg) } : row;
+    });
+  // buildDiscoveryRows labels the baseline row with this exact scenario string.
+  const BASELINE_LABEL = '[BASELINE] Current config';
+  const emit = (metrics: ScenarioMetrics, aggregated: AggregatedScenario[]) =>
+    opts.onRowsUpdate?.(attachConfig(buildDiscoveryRows(metrics, aggregated)));
+
   // Baseline run (current config) — pinned comparison row + its own compare card.
   report(0, 'Running baseline scenario…');
   const baselineConfig: BacktestConfigFull = { ...opts.baseConfig, strategyId: opts.strategyId };
   const baselineResult = await runOne(baselineConfig);
   recordCompareCard(opts, 'Baseline', baselineConfig, baselineResult);
   const baselineMetrics = aggregateMetrics(baselineResult);
+  configByScenario.set(BASELINE_LABEL, baselineConfig);
 
   const aggregated: AggregatedScenario[] = [];
+  // Surface the baseline row immediately so the dialog is never empty.
+  emit(baselineMetrics, aggregated);
+
   for (let i = 0; i < specs.length; i++) {
     if (opts.shouldStop?.()) break;
     const spec = specs[i];
@@ -148,9 +200,12 @@ export async function runDiscovery(opts: RunDiscoveryOptions): Promise<Discovery
     const result = await runOne(scenarioConfig);
     // Each scenario run naturally creates a Compare card.
     recordCompareCard(opts, spec.description, scenarioConfig, result);
+    configByScenario.set(spec.description, scenarioConfig);
     aggregated.push({ spec, metrics: aggregateMetrics(result) });
+    // Push the freshly completed test into the live results list.
+    emit(baselineMetrics, aggregated);
   }
 
   report(total, 'Discovery complete');
-  return buildDiscoveryRows(baselineMetrics, aggregated);
+  return attachConfig(buildDiscoveryRows(baselineMetrics, aggregated));
 }
