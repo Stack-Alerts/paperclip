@@ -1475,6 +1475,46 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
     setConfig(prev => ({ ...prev, ...patch }));
   }, []);
 
+  // Apply a saved run's configuration back into the live form (Compare tab → Config).
+  // Reverses the fullConfig mapping built in the persist effect below.
+  const applyRunConfig = useCallback((record: import('@/lib/strategy-builder/types').BacktestRunRecord) => {
+    const fc = record.fullConfig;
+    if (!fc) return;
+    setConfig(prev => ({
+      ...prev,
+      startDate: fc.startDate ?? prev.startDate,
+      endDate: fc.endDate ?? prev.endDate,
+      initialCapital: fc.initialCapital ?? prev.initialCapital,
+      commissionPercentage: fc.commissionPercentage ?? prev.commissionPercentage,
+      slippagePercentage: fc.slippagePercentage ?? prev.slippagePercentage,
+      maxConcurrentPositions: fc.maxConcurrentPositions ?? prev.maxConcurrentPositions,
+      timeframe: fc.timeframe ?? prev.timeframe,
+    }));
+    setMode(fc.mode === 'live_replay' ? 'live-replay' : 'walk-forward');
+    if (fc.tpslMode) setTpSlConfig(fc.tpslMode as 'Fibonacci' | 'Hybrid' | 'Fixed');
+    if (fc.slAdjustmentMode) setSlAdjustment(fc.slAdjustmentMode as 'Adaptive v2.0' | 'Static');
+    if (fc.adaptiveSLPreset) setAdaptivePreset(fc.adaptiveSLPreset as AdaptivePresetName);
+    if (fc.adaptiveSL) {
+      setDelayStopLoss(fc.adaptiveSL.delayEnabled);
+      setStopLossDelay(fc.adaptiveSL.delayBars);
+      setEmergency(fc.adaptiveSL.emergencySlPct);
+      setVolatilityLookback(fc.adaptiveSL.volatilityLookback);
+      setVolatilityMultiplier(fc.adaptiveSL.volatilityMultiplier);
+      setMinStopLoss(fc.adaptiveSL.minSlPct);
+      setMaxStopLoss(fc.adaptiveSL.maxSlPct);
+      setMarketStructureStop(fc.adaptiveSL.useStructureSl);
+    }
+    if (fc.riskPerTradePct != null) setMaxRisk(fc.riskPerTradePct);
+    if (fc.minRiskRewardRatio != null) setMinRiskReward(fc.minRiskRewardRatio);
+    if (fc.maxBarsHeld != null) setMaxBarsHeld(fc.maxBarsHeld);
+    if (fc.lookbackDays != null) setLookbackDays(fc.lookbackDays);
+    if (fc.trainingDays != null) setTrainingDays(fc.trainingDays);
+    if (fc.testingDays != null) setTestingDays(fc.testingDays);
+    if (fc.maxLeverage != null) setLeverage(fc.maxLeverage);
+    if (fc.confluenceThreshold != null) setConfluence(fc.confluenceThreshold);
+    setActiveTab('config');
+  }, []);
+
   // Persist each completed run to the compare-panel history.
   const savedRunIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -1958,7 +1998,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
             />
           )}
           {activeTab === 'compare' && (
-            <ComparePanel currentResult={backTestResult ?? undefined} currentStrategyId={currentStrategy?.id} currentStrategyName={currentStrategy?.name} />
+            <ComparePanel currentResult={backTestResult ?? undefined} currentStrategyId={currentStrategy?.id} currentStrategyName={currentStrategy?.name} onApplyConfig={applyRunConfig} />
           )}
         </div>
 

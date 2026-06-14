@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, X, Plus, GitCompare, ChevronUp, ChevronDown, Minus, CheckCircle2 } from 'lucide-react';
+import { Search, X, Plus, GitCompare, ChevronUp, ChevronDown, Minus, CheckCircle2, Trophy, Download } from 'lucide-react';
 import { loadAllRunRecords, deleteRunRecord } from '@/lib/backtest-history';
 import type { BacktestRunRecord, BacktestResult, BacktestConfigFull } from '@/lib/strategy-builder/types';
 
@@ -9,6 +9,7 @@ export interface ComparePanelProps {
   currentResult?: BacktestResult;
   currentStrategyId?: string;
   currentStrategyName?: string;
+  onApplyConfig?: (record: BacktestRunRecord) => void;
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -184,8 +185,27 @@ function CompareTable({
 }
 
 // ── Run card ──────────────────────────────────────────────────────────────────
+function RankBadge({ rank }: { rank: number }) {
+  // #1 gold, #2 silver, #3 bronze, others muted.
+  const palette: Record<number, { bg: string; fg: string }> = {
+    1: { bg: 'rgba(245,191,66,0.15)', fg: '#f5bf42' },
+    2: { bg: 'rgba(180,190,200,0.15)', fg: '#b4bec8' },
+    3: { bg: 'rgba(205,127,80,0.15)', fg: '#cd7f50' },
+  };
+  const c = palette[rank] ?? { bg: 'var(--bg-deep)', fg: 'var(--text-muted)' };
+  return (
+    <span
+      className="flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 tabular-nums"
+      style={{ background: c.bg, color: c.fg }}
+      title={`Composite rank #${rank}`}
+    >
+      {rank <= 3 && <Trophy size={9} />}#{rank}
+    </span>
+  );
+}
+
 function RunCard({
-  record, selected, onSelect, onRemove, disabled, slotColor,
+  record, selected, onSelect, onRemove, disabled, slotColor, rank, onApply,
 }: {
   record: BacktestRunRecord;
   selected: boolean;
@@ -193,6 +213,8 @@ function RunCard({
   onRemove: () => void;
   disabled: boolean;
   slotColor?: string;
+  rank?: number;
+  onApply?: () => void;
 }) {
   const r = record.result;
   const equityVals = (r.equityCurve ?? []).map((p: { value: number }) => p.value);
@@ -223,15 +245,30 @@ function RunCard({
         {/* Header */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
-              {record.strategyName}
-            </p>
+            <div className="flex items-center gap-1.5">
+              {rank != null && <RankBadge rank={rank} />}
+              <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
+                {record.strategyName}
+              </p>
+            </div>
             <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
               {fmtDateTime(record.savedAt)}
             </p>
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {selected && <CheckCircle2 size={13} style={{ color: accentColor }} />}
+            {onApply && (
+              <button
+                onClick={e => { e.stopPropagation(); onApply(); }}
+                className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded"
+                title="Apply this run's configuration to the Config tab"
+                style={{ color: 'var(--accent-blue)', border: '1px solid rgba(46,140,255,0.35)', background: 'rgba(46,140,255,0.08)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(46,140,255,0.18)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(46,140,255,0.08)')}
+              >
+                <Download size={10} />Apply
+              </button>
+            )}
             <button
               onClick={e => { e.stopPropagation(); onRemove(); }}
               className="p-0.5 rounded"
@@ -286,12 +323,80 @@ function RunCard({
   );
 }
 
-// ── Sort helpers ──────────────────────────────────────────────────────────────
-type SortKey = 'date' | 'return' | 'winRate' | 'profit' | 'drawdown';
+// ── Ranking ───────────────────────────────────────────────────────────────────
+// Composite score across the loaded record set. Each metric is min-max
+// normalized over the set (0..1, where 1 is always "better"), then weighted.
+// Drawdown is inverted because lower is better. Returns a Map runId → {score, rank}.
+const RANK_WEIGHTS = {
+  return: 0.3,
+  sharpe: 0.2,
+  profitFactor: 0.2,
+  winRate: 0.15,
+  drawdown: 0.15,
+} as const;
 
-function sortRecords(records: BacktestRunRecord[], key: SortKey, dir: 'asc' | 'desc'): BacktestRunRecord[] {
+function safeNum(v: number | undefined | null): number {
+  return v != null && isFinite(v) ? v : 0;
+}
+
+export function computeRankings(records: BacktestRunRecord[]): Map<string, { score: number; rank: number }> {
+  const out = new Map<string, { score: number; rank: number }>();
+  if (records.length === 0) return out;
+
+  const metric = (r: BacktestRunRecord) => ({
+    ret: safeNum(r.result.returnPercentage),
+    sharpe: safeNum(r.result.sharpeRatio),
+    pf: safeNum(r.result.profitFactor),
+    wr: safeNum(r.result.winRate),
+    dd: safeNum(r.result.maxDrawdown),
+  });
+  const all = records.map(metric);
+  const norm = (vals: number[], v: number, invert = false): number => {
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    if (max === min) return 0.5;
+    const n = (v - min) / (max - min);
+    return invert ? 1 - n : n;
+  };
+  const rets = all.map(m => m.ret);
+  const sharpes = all.map(m => m.sharpe);
+  const pfs = all.map(m => m.pf);
+  const wrs = all.map(m => m.wr);
+  const dds = all.map(m => m.dd);
+
+  const scored = records.map((r, i) => {
+    const m = all[i];
+    const score =
+      norm(rets, m.ret) * RANK_WEIGHTS.return +
+      norm(sharpes, m.sharpe) * RANK_WEIGHTS.sharpe +
+      norm(pfs, m.pf) * RANK_WEIGHTS.profitFactor +
+      norm(wrs, m.wr) * RANK_WEIGHTS.winRate +
+      norm(dds, m.dd, true) * RANK_WEIGHTS.drawdown;
+    return { runId: r.runId, score };
+  });
+
+  const ordered = [...scored].sort((a, b) => b.score - a.score);
+  ordered.forEach((s, idx) => out.set(s.runId, { score: s.score, rank: idx + 1 }));
+  return out;
+}
+
+// ── Sort helpers ──────────────────────────────────────────────────────────────
+type SortKey = 'rank' | 'date' | 'return' | 'winRate' | 'profit' | 'drawdown';
+
+function sortRecords(
+  records: BacktestRunRecord[],
+  key: SortKey,
+  dir: 'asc' | 'desc',
+  rankings: Map<string, { score: number; rank: number }>,
+): BacktestRunRecord[] {
   return [...records].sort((a, b) => {
     let va = 0, vb = 0;
+    if (key === 'rank') {
+      // Lower rank number = better; "desc" surfaces the best run first.
+      va = rankings.get(a.runId)?.rank ?? Number.MAX_SAFE_INTEGER;
+      vb = rankings.get(b.runId)?.rank ?? Number.MAX_SAFE_INTEGER;
+      return dir === 'desc' ? va - vb : vb - va;
+    }
     if (key === 'date') { va = new Date(a.savedAt).getTime(); vb = new Date(b.savedAt).getTime(); }
     else if (key === 'return') { va = a.result.returnPercentage; vb = b.result.returnPercentage; }
     else if (key === 'winRate') { va = a.result.winRate; vb = b.result.winRate; }
@@ -362,15 +467,17 @@ function FullConfigSection({
 // ── Main component ─────────────────────────────────────────────────────────────
 const MAX_SELECTED = 3;
 
-export function ComparePanel({ currentResult }: ComparePanelProps) {
+export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps) {
   const [records, setRecords] = useState<BacktestRunRecord[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey>('date');
+  const [sortKey, setSortKey] = useState<SortKey>('rank');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const reload = useCallback(() => setRecords(loadAllRunRecords()), []);
   useEffect(() => { reload(); }, [reload, currentResult]);
+
+  const rankings = useMemo(() => computeRankings(records), [records]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -380,8 +487,8 @@ export function ComparePanel({ currentResult }: ComparePanelProps) {
           fmtDate(r.savedAt).toLowerCase().includes(q)
         )
       : records;
-    return sortRecords(base, sortKey, sortDir);
-  }, [records, search, sortKey, sortDir]);
+    return sortRecords(base, sortKey, sortDir, rankings);
+  }, [records, search, sortKey, sortDir, rankings]);
 
   const selectedRecords = useMemo(
     () => selectedIds.map(id => records.find(r => r.runId === id)).filter(Boolean) as BacktestRunRecord[],
@@ -478,6 +585,7 @@ export function ComparePanel({ currentResult }: ComparePanelProps) {
           )}
         </div>
         <div className="flex items-center gap-1">
+          <SortBtn k="rank" label="Rank" />
           <SortBtn k="date" label="Date" />
           <SortBtn k="return" label="Return" />
           <SortBtn k="winRate" label="Win%" />
@@ -522,8 +630,10 @@ export function ComparePanel({ currentResult }: ComparePanelProps) {
               record={record}
               selected={slotIdx >= 0}
               slotColor={slotIdx >= 0 ? RUN_COLORS[slotIdx] as string : undefined}
+              rank={rankings.get(record.runId)?.rank}
               onSelect={() => toggleSelect(record.runId)}
               onRemove={() => handleDelete(record.runId)}
+              onApply={onApplyConfig ? () => onApplyConfig(record) : undefined}
               disabled={selectedIds.length >= MAX_SELECTED && !selectedIds.includes(record.runId)}
             />
           );
@@ -584,6 +694,9 @@ export function ComparePanel({ currentResult }: ComparePanelProps) {
                       </span>
                       {i === 0 && (
                         <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-faint)' }}>baseline</span>
+                      )}
+                      {rankings.get(r.runId)?.rank != null && (
+                        <RankBadge rank={rankings.get(r.runId)!.rank} />
                       )}
                       <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
                         {r.strategyName}
