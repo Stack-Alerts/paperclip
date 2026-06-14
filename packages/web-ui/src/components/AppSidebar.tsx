@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { BtcWaveformLogo } from './shared/AppBrand';
 import { useSidebar } from '@/contexts/SidebarContext';
+import { SidebarDataStatus } from './SidebarDataStatus';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutGrid },
@@ -155,7 +156,20 @@ export function AppSidebar() {
       </nav>
 
       <div className="px-3 py-3" style={{ borderTop: '1px solid var(--border)' }}>
-        {!collapsed && (
+        {collapsed ? (
+          <div className="flex justify-center">
+            <span
+              title="Connected"
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: 'var(--status-connected)',
+                display: 'inline-block',
+              }}
+            />
+          </div>
+        ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span
               style={{
@@ -179,6 +193,8 @@ export function AppSidebar() {
           </div>
         )}
       </div>
+
+      <SidebarDataStatus collapsed={collapsed} />
     </aside>
   );
 }
