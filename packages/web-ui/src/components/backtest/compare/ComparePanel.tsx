@@ -225,7 +225,7 @@ function RankBadge({ rank }: { rank: number }) {
 }
 
 function RunCard({
-  record, selected, onSelect, onRemove, disabled, slotColor, rank, onApply,
+  record, selected, onSelect, onRemove, disabled, slotColor, rank, onApply, anySelected,
 }: {
   record: BacktestRunRecord;
   selected: boolean;
@@ -235,22 +235,32 @@ function RunCard({
   slotColor?: string;
   rank?: number;
   onApply?: () => void;
+  anySelected?: boolean;
 }) {
+  const [hovered, setHovered] = useState(false);
   const r = record.result;
   const equityVals = (r.equityCurve ?? []).map((p: { value: number }) => p.value);
   const profit = r.finalCapital - r.initialCapital;
   const accentColor = slotColor ?? (profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)');
 
+  // Once any run is selected, non-selected cards dim so the active comparison
+  // stands out among potentially dozens of cards; hovering re-illuminates the
+  // card under the cursor so it stays readable.
+  const dimmed = !!anySelected && !selected;
+  const opacity = dimmed && !hovered ? 0.4 : 1;
+
   return (
     <div
       onClick={disabled && !selected ? undefined : onSelect}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         position: 'relative',
         background: 'var(--bg-card)',
         border: '1px solid var(--border)',
         borderRadius: 6,
         padding: '10px 12px',
-        opacity: disabled && !selected ? 0.4 : 1,
+        opacity,
         cursor: disabled && !selected ? 'not-allowed' : 'pointer',
         transition: 'opacity 0.15s',
       }}
@@ -648,6 +658,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
               onSelect={() => toggleSelect(record.runId)}
               onRemove={() => handleDelete(record.runId)}
               onApply={onApplyConfig ? () => onApplyConfig(record) : undefined}
+              anySelected={selectedIds.length > 0}
               disabled={selectedIds.length >= MAX_SELECTED && !selectedIds.includes(record.runId)}
             />
           );
