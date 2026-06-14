@@ -33,7 +33,6 @@ import { addRunRecord } from '@/lib/backtest-history';
 import { ConfigDiscoveryResultsDialog, type DiscoveryScenario } from './ConfigDiscoveryResultsDialog';
 import { runDiscovery } from '@/components/backtest/config-discovery/runDiscovery';
 import { generateSingleAxisScenarios, DEFAULT_PARAMETER_RANGES } from '@/lib/strategy-builder/config-discovery';
-import type { BacktestConfigFull } from '@/lib/strategy-builder/types';
 
 export interface BacktestConfigDialogProps {
   open: boolean;
