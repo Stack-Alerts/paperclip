@@ -43,6 +43,25 @@ function colorReturn(v: number | undefined | null): string {
   return v >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
 }
 
+// Profit Factor = gross profit / gross loss. The web backtest endpoint omits
+// profitFactor from its metrics payload (defaults to 0), so when it is absent
+// recompute it from the per-trade pnl that the endpoint does return.
+function effectivePF(result: BacktestResult): number {
+  if (result.profitFactor != null && isFinite(result.profitFactor) && result.profitFactor > 0) {
+    return result.profitFactor;
+  }
+  const trades = result.trades ?? [];
+  if (trades.length === 0) return 0;
+  let grossProfit = 0, grossLoss = 0;
+  for (const t of trades) {
+    const pnl = t.pnl;
+    if (pnl > 0) grossProfit += pnl;
+    else if (pnl < 0) grossLoss += -pnl;
+  }
+  if (grossLoss === 0) return grossProfit > 0 ? Infinity : 0;
+  return grossProfit / grossLoss;
+}
+
 // ── Per-slot accent colors — blue / violet / amber ────────────────────────────
 const RUN_COLORS = [
   'var(--accent-blue)',
@@ -186,20 +205,21 @@ function CompareTable({
 
 // ── Run card ──────────────────────────────────────────────────────────────────
 function RankBadge({ rank }: { rank: number }) {
-  // #1 gold, #2 silver, #3 bronze, others muted.
-  const palette: Record<number, { bg: string; fg: string }> = {
-    1: { bg: 'rgba(245,191,66,0.15)', fg: '#f5bf42' },
-    2: { bg: 'rgba(180,190,200,0.15)', fg: '#b4bec8' },
-    3: { bg: 'rgba(205,127,80,0.15)', fg: '#cd7f50' },
+  // #1 gold, #2 silver, #3 bronze, others muted. Solid fills + dark text so the
+  // medal stands out against the card instead of fading into it.
+  const palette: Record<number, { bg: string; fg: string; ring: string }> = {
+    1: { bg: '#f5bf42', fg: '#1a1205', ring: 'rgba(245,191,66,0.55)' },
+    2: { bg: '#c2ccd6', fg: '#15191e', ring: 'rgba(194,204,214,0.55)' },
+    3: { bg: '#cd7f50', fg: '#1c0f06', ring: 'rgba(205,127,80,0.55)' },
   };
-  const c = palette[rank] ?? { bg: 'var(--bg-deep)', fg: 'var(--text-muted)' };
+  const c = palette[rank] ?? { bg: 'var(--text-muted)', fg: 'var(--bg-deep)', ring: 'transparent' };
   return (
     <span
-      className="flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 tabular-nums"
-      style={{ background: c.bg, color: c.fg }}
+      className="inline-flex items-center gap-0.5 text-[11px] font-extrabold px-2 py-0.5 rounded-md flex-shrink-0 tabular-nums"
+      style={{ background: c.bg, color: c.fg, boxShadow: `0 0 0 1.5px ${c.ring}` }}
       title={`Composite rank #${rank}`}
     >
-      {rank <= 3 && <Trophy size={9} />}#{rank}
+      {rank <= 3 && <Trophy size={11} strokeWidth={2.5} />}#{rank}
     </span>
   );
 }
@@ -257,7 +277,7 @@ function RunCard({
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {selected && <CheckCircle2 size={13} style={{ color: accentColor }} />}
-            {onApply && (
+            {onApply && selected && (
               <button
                 onClick={e => { e.stopPropagation(); onApply(); }}
                 className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded"
@@ -305,7 +325,7 @@ function RunCard({
             </div>
             <div className="flex gap-3">
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                PF <span style={{ color: 'var(--text-secondary)' }}>{r.profitFactor.toFixed(2)}</span>
+                PF <span style={{ color: 'var(--text-secondary)' }}>{(() => { const pf = effectivePF(r); return isFinite(pf) ? pf.toFixed(2) : '∞'; })()}</span>
               </span>
               <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
                 {fmtDate(record.config?.startDate ?? record.fullConfig?.startDate)}–{fmtDate(record.config?.endDate ?? record.fullConfig?.endDate)}
@@ -346,7 +366,7 @@ export function computeRankings(records: BacktestRunRecord[]): Map<string, { sco
   const metric = (r: BacktestRunRecord) => ({
     ret: safeNum(r.result.returnPercentage),
     sharpe: safeNum(r.result.sharpeRatio),
-    pf: safeNum(r.result.profitFactor),
+    pf: safeNum(effectivePF(r.result)),
     wr: safeNum(r.result.winRate),
     dd: safeNum(r.result.maxDrawdown),
   });
@@ -749,7 +769,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
                 <MetricRow isEven={true} label="Sharpe Ratio" values={selectedRecords.map(r => r.result.sharpeRatio)} colorFn={v => v != null && v >= 1 ? 'var(--accent-green)' : 'var(--text-secondary)'} />
                 <MetricRow isEven={false} label="Sortino Ratio" values={selectedRecords.map(r => r.result.sortino_ratio)} colorFn={v => v != null && v >= 1 ? 'var(--accent-green)' : 'var(--text-secondary)'} />
                 <MetricRow isEven={true} label="Calmar Ratio" values={selectedRecords.map(r => r.result.calmar_ratio ?? null)} colorFn={() => 'var(--text-secondary)'} />
-                <MetricRow isEven={false} label="Profit Factor" values={selectedRecords.map(r => r.result.profitFactor)} colorFn={v => v != null && v >= 1.5 ? 'var(--accent-green)' : v != null && v >= 1 ? 'var(--text-secondary)' : 'var(--accent-red)'} />
+                <MetricRow isEven={false} label="Profit Factor" values={selectedRecords.map(r => effectivePF(r.result))} fmtFn={v => isFinite(v) ? fmt(v) : '∞'} colorFn={v => v != null && v >= 1.5 ? 'var(--accent-green)' : v != null && v >= 1 ? 'var(--text-secondary)' : 'var(--accent-red)'} />
               </CompareTable>
             </div>
 
