@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, X, Plus, GitCompare, ChevronUp, ChevronDown, Minus, CheckCircle2, Trophy, Download } from 'lucide-react';
-import { loadAllRunRecords, deleteRunRecord } from '@/lib/backtest-history';
+import { Search, X, Plus, GitCompare, ChevronUp, ChevronDown, Minus, CheckCircle2, Trophy, Download, Trash2, CheckSquare, Square, ListChecks } from 'lucide-react';
+import { loadAllRunRecords, deleteRunRecord, deleteRunRecords, clearAllRunRecords } from '@/lib/backtest-history';
 import type { BacktestRunRecord, BacktestResult, BacktestConfigFull } from '@/lib/strategy-builder/types';
 
 export interface ComparePanelProps {
@@ -226,6 +226,7 @@ function RankBadge({ rank }: { rank: number }) {
 
 function RunCard({
   record, selected, onSelect, onRemove, disabled, slotColor, rank, onApply, anySelected,
+  manageMode, marked, onToggleMark, anyMarked,
 }: {
   record: BacktestRunRecord;
   selected: boolean;
@@ -236,6 +237,10 @@ function RunCard({
   rank?: number;
   onApply?: () => void;
   anySelected?: boolean;
+  manageMode?: boolean;
+  marked?: boolean;
+  onToggleMark?: () => void;
+  anyMarked?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
   const r = record.result;
@@ -243,39 +248,51 @@ function RunCard({
   const profit = r.finalCapital - r.initialCapital;
   const accentColor = slotColor ?? (profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)');
 
-  // Once any run is selected, non-selected cards dim so the active comparison
-  // stands out among potentially dozens of cards; hovering re-illuminates the
-  // card under the cursor so it stays readable.
-  const dimmed = !!anySelected && !selected;
+  // In manage mode the card is a delete-selection target; the left bar and
+  // dimming track the marked set instead of the compare selection.
+  const manage = !!manageMode;
+  const barShown = manage ? !!marked : selected;
+  const barColor = manage ? 'var(--accent-red)' : accentColor;
+
+  // Once a run is selected (compare) or marked (manage), non-active cards dim so
+  // the active set stands out among potentially dozens of cards; hovering
+  // re-illuminates the card under the cursor so it stays readable.
+  const dimmed = manage ? (!!anyMarked && !marked) : (!!anySelected && !selected);
   const opacity = dimmed && !hovered ? 0.4 : 1;
+  const inert = !manage && disabled && !selected;
 
   return (
     <div
-      onClick={disabled && !selected ? undefined : onSelect}
+      onClick={manage ? onToggleMark : (inert ? undefined : onSelect)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
         position: 'relative',
         background: 'var(--bg-card)',
-        border: '1px solid var(--border)',
+        border: marked ? '1px solid var(--accent-red)' : '1px solid var(--border)',
         borderRadius: 6,
         padding: '10px 12px',
         opacity,
-        cursor: disabled && !selected ? 'not-allowed' : 'pointer',
+        cursor: inert ? 'not-allowed' : 'pointer',
         transition: 'opacity 0.15s',
       }}
     >
-      {selected && (
+      {barShown && (
         <div style={{
           position: 'absolute', top: 0, left: 0, bottom: 0, width: 3,
-          background: accentColor, borderRadius: '6px 0 0 6px',
+          background: barColor, borderRadius: '6px 0 0 6px',
         }} />
       )}
-      <div style={{ paddingLeft: selected ? 6 : 0 }}>
+      <div style={{ paddingLeft: barShown ? 6 : 0 }}>
         {/* Header */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
+              {manage && (
+                marked
+                  ? <CheckSquare size={14} style={{ color: 'var(--accent-red)', flexShrink: 0 }} />
+                  : <Square size={14} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
+              )}
               {rank != null && <RankBadge rank={rank} />}
               <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
                 {fmtDateTime(record.savedAt)}
@@ -283,8 +300,8 @@ function RunCard({
             </div>
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {selected && <CheckCircle2 size={13} style={{ color: accentColor }} />}
-            {onApply && selected && (
+            {!manage && selected && <CheckCircle2 size={13} style={{ color: accentColor }} />}
+            {!manage && onApply && selected && (
               <button
                 onClick={e => { e.stopPropagation(); onApply(); }}
                 className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded"
@@ -296,16 +313,18 @@ function RunCard({
                 <Download size={10} />Apply
               </button>
             )}
-            <button
-              onClick={e => { e.stopPropagation(); onRemove(); }}
-              className="p-0.5 rounded"
-              title="Remove from history"
-              style={{ color: 'var(--text-faint)' }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent-red)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}
-            >
-              <X size={12} />
-            </button>
+            {!manage && (
+              <button
+                onClick={e => { e.stopPropagation(); onRemove(); }}
+                className="p-0.5 rounded"
+                title="Remove from history"
+                style={{ color: 'var(--text-faint)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent-red)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
         </div>
         {/* Metrics + sparkline */}
@@ -500,6 +519,9 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('rank');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [manageMode, setManageMode] = useState(false);
+  const [markedIds, setMarkedIds] = useState<string[]>([]);
+  const [pendingDelete, setPendingDelete] = useState<'selected' | 'all' | null>(null);
 
   const reload = useCallback(() => setRecords(loadAllRunRecords()), []);
   useEffect(() => { reload(); }, [reload, currentResult]);
@@ -522,6 +544,10 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
     [selectedIds, records],
   );
 
+  const filteredIds = useMemo(() => filtered.map(r => r.runId), [filtered]);
+  const markedSet = useMemo(() => new Set(markedIds), [markedIds]);
+  const allFilteredMarked = filteredIds.length > 0 && filteredIds.every(id => markedSet.has(id));
+
   const toggleSelect = useCallback((runId: string) => {
     setSelectedIds(prev => {
       if (prev.includes(runId)) return prev.filter(id => id !== runId);
@@ -535,6 +561,33 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
     setSelectedIds(prev => prev.filter(id => id !== runId));
     reload();
   }, [reload]);
+
+  const toggleMark = useCallback((runId: string) => {
+    setMarkedIds(prev => prev.includes(runId) ? prev.filter(id => id !== runId) : [...prev, runId]);
+  }, []);
+
+  const exitManageMode = useCallback(() => {
+    setManageMode(false);
+    setMarkedIds([]);
+    setPendingDelete(null);
+  }, []);
+
+  const confirmPendingDelete = useCallback(() => {
+    if (pendingDelete === 'all') {
+      clearAllRunRecords();
+      setSelectedIds([]);
+      setMarkedIds([]);
+      setPendingDelete(null);
+      setManageMode(false);
+    } else if (pendingDelete === 'selected') {
+      const drop = new Set(markedIds);
+      deleteRunRecords(markedIds);
+      setSelectedIds(prev => prev.filter(id => !drop.has(id)));
+      setMarkedIds([]);
+      setPendingDelete(null);
+    }
+    reload();
+  }, [pendingDelete, markedIds, reload]);
 
   const handleSortClick = useCallback((key: SortKey) => {
     setSortKey(prev => {
@@ -616,33 +669,117 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
           <SortBtn k="profit" label="Profit" />
           <SortBtn k="drawdown" label="DD" />
         </div>
+        <button
+          onClick={() => (manageMode ? exitManageMode() : setManageMode(true))}
+          className="flex items-center gap-1 text-xs px-2 py-1 rounded flex-shrink-0"
+          title={manageMode ? 'Exit selection mode' : 'Select multiple runs to delete'}
+          style={{
+            background: manageMode ? 'rgba(239,68,68,0.1)' : 'transparent',
+            border: `1px solid ${manageMode ? 'rgba(239,68,68,0.4)' : 'var(--border)'}`,
+            color: manageMode ? 'var(--accent-red)' : 'var(--text-muted)',
+          }}
+        >
+          {manageMode ? <X size={12} /> : <ListChecks size={12} />}
+          {manageMode ? 'Done' : 'Manage'}
+        </button>
       </div>
 
-      {/* ── Selection status ── */}
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Select up to <strong style={{ color: 'var(--text-secondary)' }}>{MAX_SELECTED}</strong> runs to compare
-        </span>
-        {selectedIds.length > 0 && (
-          <>
-            <span
-              className="text-xs px-2 py-0.5 rounded-full"
-              style={{ background: 'rgba(46,140,255,0.1)', color: 'var(--accent-blue)', border: '1px solid rgba(46,140,255,0.25)' }}
-            >
-              {selectedIds.length}/{MAX_SELECTED} selected
-            </span>
-            <button
-              onClick={() => setSelectedIds([])}
-              className="text-xs px-2 py-0.5 rounded"
-              style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
-            >
-              Clear all
-            </button>
-          </>
-        )}
-      </div>
+      {/* ── Selection / manage status ── */}
+      {!manageMode ? (
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Select up to <strong style={{ color: 'var(--text-secondary)' }}>{MAX_SELECTED}</strong> runs to compare
+          </span>
+          {selectedIds.length > 0 && (
+            <>
+              <span
+                className="text-xs px-2 py-0.5 rounded-full"
+                style={{ background: 'rgba(46,140,255,0.1)', color: 'var(--accent-blue)', border: '1px solid rgba(46,140,255,0.25)' }}
+              >
+                {selectedIds.length}/{MAX_SELECTED} selected
+              </span>
+              <button
+                onClick={() => setSelectedIds([])}
+                className="text-xs px-2 py-0.5 rounded"
+                style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+              >
+                Clear all
+              </button>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--accent-red)', border: '1px solid rgba(239,68,68,0.25)' }}>
+            {markedIds.length} selected
+          </span>
+          <button
+            onClick={() => setMarkedIds(allFilteredMarked ? [] : filteredIds)}
+            className="text-xs px-2 py-0.5 rounded"
+            style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+          >
+            {allFilteredMarked ? 'Deselect all' : `Select all${search ? ' shown' : ''}`}
+          </button>
+          <button
+            onClick={() => setPendingDelete('selected')}
+            disabled={markedIds.length === 0}
+            className="flex items-center gap-1 text-xs px-2 py-0.5 rounded"
+            style={{
+              color: markedIds.length === 0 ? 'var(--text-faint)' : 'var(--accent-red)',
+              border: `1px solid ${markedIds.length === 0 ? 'var(--border)' : 'rgba(239,68,68,0.4)'}`,
+              background: markedIds.length === 0 ? 'transparent' : 'rgba(239,68,68,0.08)',
+              cursor: markedIds.length === 0 ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <Trash2 size={11} />Delete selected{markedIds.length > 0 ? ` (${markedIds.length})` : ''}
+          </button>
+          <span className="flex-1" />
+          <button
+            onClick={() => setPendingDelete('all')}
+            className="flex items-center gap-1 text-xs px-2 py-0.5 rounded"
+            title="Delete every run in history"
+            style={{ color: 'var(--accent-red)', border: '1px solid rgba(239,68,68,0.4)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.12)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          >
+            <Trash2 size={11} />Clear all ({records.length})
+          </button>
+        </div>
+      )}
+
+      {/* ── Destructive-action confirmation ── */}
+      {pendingDelete && (
+        <div
+          className="flex flex-wrap items-center gap-2 mb-3 p-2.5 rounded"
+          style={{ border: '1px solid rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.06)' }}
+        >
+          <Trash2 size={13} style={{ color: 'var(--accent-red)', flexShrink: 0 }} />
+          <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            {pendingDelete === 'all'
+              ? `Permanently delete all ${records.length} saved run${records.length === 1 ? '' : 's'}? This cannot be undone.`
+              : `Permanently delete ${markedIds.length} selected run${markedIds.length === 1 ? '' : 's'}? This cannot be undone.`}
+          </span>
+          <span className="flex-1" />
+          <button
+            onClick={() => setPendingDelete(null)}
+            className="text-xs px-2.5 py-1 rounded"
+            style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={confirmPendingDelete}
+            className="flex items-center gap-1 text-xs px-2.5 py-1 rounded font-medium"
+            style={{ color: '#fff', background: 'var(--accent-red)', border: '1px solid var(--accent-red)' }}
+          >
+            <Trash2 size={11} />Delete
+          </button>
+        </div>
+      )}
 
       {/* ── Run cards ── */}
       <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>
@@ -660,6 +797,10 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
               onApply={onApplyConfig ? () => onApplyConfig(record) : undefined}
               anySelected={selectedIds.length > 0}
               disabled={selectedIds.length >= MAX_SELECTED && !selectedIds.includes(record.runId)}
+              manageMode={manageMode}
+              marked={markedSet.has(record.runId)}
+              onToggleMark={() => toggleMark(record.runId)}
+              anyMarked={markedIds.length > 0}
             />
           );
         })}

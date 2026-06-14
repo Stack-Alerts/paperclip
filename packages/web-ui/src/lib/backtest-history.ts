@@ -48,3 +48,12 @@ export function loadRunRecordsForStrategy(strategyId: string): BacktestRunRecord
 export function deleteRunRecord(runId: string): void {
   save(load().filter(r => r.runId !== runId));
 }
+
+export function deleteRunRecords(runIds: string[]): void {
+  const drop = new Set(runIds);
+  save(load().filter(r => !drop.has(r.runId)));
+}
+
+export function clearAllRunRecords(): void {
+  save([]);
+}
