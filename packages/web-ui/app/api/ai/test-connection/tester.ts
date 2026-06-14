@@ -150,11 +150,25 @@ async function testOllama(
   cfg: ConnectionTestConfig,
   deps: Required<TesterDeps>,
 ): Promise<ConnectionTestResult> {
-  const base = (cfg.ollamaBaseUrl || 'http://localhost:11434').replace(/\/+$/, '');
+  const raw = (cfg.ollamaBaseUrl || 'http://localhost:11434').replace(/\/+$/, '');
+  // The base URL is operator-supplied; constrain it to an http(s) origin so the
+  // server can't be steered into non-HTTP schemes (file:, etc.). Reaching
+  // localhost/LAN is intentional here — Ollama runs locally — so private-range
+  // hosts are allowed, but redirects are not followed (redirect: 'manual').
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return { ok: false, message: `"${raw}" is not a valid Ollama base URL.` };
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { ok: false, message: 'The Ollama base URL must use http or https.' };
+  }
+  const base = raw;
   let res: Response;
   try {
     res = await withTimeout(deps.timeoutMs, (signal) =>
-      deps.fetch(`${base}/api/tags`, { method: 'GET', signal }),
+      deps.fetch(`${base}/api/tags`, { method: 'GET', redirect: 'manual', signal }),
     );
   } catch (err) {
     if (isAbortError(err)) {
