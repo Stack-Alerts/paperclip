@@ -15,6 +15,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 
+interface TestResult {
+  ok: boolean;
+  message: string;
+  detail?: string;
+}
+
 /**
  * GeneralSettingsPanel — web port of the AI Configuration / API Keys sections
  * of the desktop Settings dialog (src/strategy_builder/ui/settings_dialog.py).
@@ -31,11 +37,15 @@ export const GeneralSettingsPanel: React.FC = () => {
   const [saved, setSaved] = useState(false);
   // Whether the user has opted into typing a custom model id not in the list.
   const [customModel, setCustomModel] = useState(false);
+  // Connection-test state for the saved provider/model.
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft(settings);
     setHasChanges(false);
+    setTestResult(null);
   }, [settings]);
 
   const meta = getProviderMeta(draft.provider);
@@ -46,6 +56,7 @@ export const GeneralSettingsPanel: React.FC = () => {
     setDraft((prev) => ({ ...prev, ...patch }));
     setHasChanges(true);
     setSaved(false);
+    setTestResult(null);
   };
 
   const handleProviderChange = (provider: AiProvider) => {
@@ -76,6 +87,33 @@ export const GeneralSettingsPanel: React.FC = () => {
     save(draft);
     setHasChanges(false);
     setSaved(true);
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch('/api/ai/test-connection', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: settings.provider,
+          model: settings.model,
+          apiKey: settings.apiKeys[settings.provider] ?? '',
+          ollamaBaseUrl: settings.ollamaBaseUrl,
+        }),
+      });
+      const data = (await res.json()) as TestResult;
+      setTestResult(data);
+    } catch (err) {
+      setTestResult({
+        ok: false,
+        message: 'Could not reach the connection-test endpoint.',
+        detail: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setTesting(false);
+    }
   };
 
   const handleReset = () => {
@@ -191,6 +229,44 @@ export const GeneralSettingsPanel: React.FC = () => {
             />
           </div>
         )}
+
+        {/* Connection test (operates on the saved settings) */}
+        <div className="space-y-2 pt-4 border-t" style={{ borderTopColor: 'var(--border-subtle)' }}>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={handleTest}
+              disabled={!hydrated || hasChanges || testing}
+            >
+              {testing ? 'Testing…' : 'Test Connection'}
+            </Button>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              {hasChanges
+                ? 'Save your settings to test the connection.'
+                : 'Sends a minimal request to verify the provider and model respond.'}
+            </p>
+          </div>
+          {testResult && (
+            <div
+              role="status"
+              className="text-xs rounded px-3 py-2"
+              style={{
+                color: testResult.ok ? 'var(--success, #15803d)' : 'var(--danger, #b91c1c)',
+                backgroundColor: 'var(--surface-subtle, rgba(127,127,127,0.08))',
+              }}
+            >
+              <span>{testResult.ok ? '✓ ' : '✗ '}{testResult.message}</span>
+              {testResult.detail && (
+                <span
+                  className="block mt-1 break-words"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  {testResult.detail}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Actions */}
         <div className="flex items-center gap-2 justify-end pt-4 border-t" style={{ borderTopColor: 'var(--border-subtle)' }}>
