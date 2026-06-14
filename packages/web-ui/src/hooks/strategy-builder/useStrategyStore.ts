@@ -1141,12 +1141,17 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
         // (BTCAAAAA-36104). The cached snapshot remains the displayed result.
       }
     } catch (err) {
-      // 404 or network error: the cached snapshot is the source of truth
-      // and hydrateFromLocalStorage already seeded backTestResult from it,
-      // so this is a graceful no-op.
-      const msg = err instanceof Error ? err.message : '';
-      if (!/\b404\b/.test(msg)) {
-        console.warn('restoreBacktestSession: backend unreachable, keeping cached snapshot', err);
+      // The cached snapshot is the source of truth and hydrateFromLocalStorage
+      // already seeded backTestResult from it, so this is a graceful no-op.
+      // Expected, non-actionable responses are silenced entirely:
+      //   404 — the in-memory run is gone (most often a server restart)
+      //   401/403 — no/insufficient auth (e.g. the test instance has no token),
+      //             so the live run simply can't be queried (BTCAAAAA-36361)
+      // Only genuinely unexpected failures (network errors, 5xx) are logged,
+      // and as a message rather than the full Error to avoid noisy stack traces.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/\b(401|403|404)\b/.test(msg)) {
+        console.warn(`restoreBacktestSession: backend unreachable, keeping cached snapshot (${msg})`);
       }
     }
   },
