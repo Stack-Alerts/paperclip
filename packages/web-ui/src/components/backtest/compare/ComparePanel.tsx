@@ -5,6 +5,12 @@ import { Search, X, Plus, GitCompare, ChevronUp, ChevronDown, Minus, CheckCircle
 import { loadAllRunRecords, deleteRunRecord, deleteRunRecords, clearAllRunRecords } from '@/lib/backtest-history';
 import type { BacktestRunRecord, BacktestResult, BacktestConfigFull } from '@/lib/strategy-builder/types';
 
+// ── Text-size control (parity with Live Output / Trades windows) ───────────────
+const FONT_SCALE_KEY = 'btcte:compare.fontScale';
+const FONT_SCALES = [0.9, 1, 1.15] as const;
+const FONT_SCALE_LABELS = ['Compact', 'Normal', 'Large'] as const;
+type FontScaleIdx = 0 | 1 | 2;
+
 export interface ComparePanelProps {
   currentResult?: BacktestResult;
   currentStrategyId?: string;
@@ -532,6 +538,16 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
   const [manageMode, setManageMode] = useState(false);
   const [markedIds, setMarkedIds] = useState<string[]>([]);
   const [pendingDelete, setPendingDelete] = useState<'selected' | 'all' | 'keepTop3' | null>(null);
+  const [fontScaleIdx, setFontScaleIdx] = useState<FontScaleIdx>(() => {
+    if (typeof window === 'undefined') return 1;
+    const n = parseInt(window.localStorage.getItem(FONT_SCALE_KEY) ?? '1', 10);
+    return (n === 0 || n === 1 || n === 2) ? n as FontScaleIdx : 1;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try { window.localStorage.setItem(FONT_SCALE_KEY, String(fontScaleIdx)); } catch { /* quota/private-mode */ }
+  }, [fontScaleIdx]);
 
   const reload = useCallback(() => setRecords(loadAllRunRecords()), []);
   useEffect(() => { reload(); }, [reload, currentResult]);
@@ -655,7 +671,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
   });
 
   return (
-    <div className="flex flex-col gap-0">
+    <div className="flex flex-col gap-0" style={{ zoom: FONT_SCALES[fontScaleIdx] }}>
 
       {/* ── Toolbar ── */}
       <div className="flex items-center gap-2 mb-3 flex-shrink-0">
@@ -685,6 +701,34 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
           <SortBtn k="winRate" label="Win%" />
           <SortBtn k="profit" label="Profit" />
           <SortBtn k="drawdown" label="DD" />
+        </div>
+        {/* Aa−/Aa+ text size — parity with Live Output / Trades windows */}
+        <div
+          role="group"
+          aria-label="Text size"
+          className="flex items-center rounded-[3px] overflow-hidden flex-shrink-0"
+          style={{ border: '1px solid var(--border)', background: 'transparent' }}
+        >
+          <button
+            onClick={() => setFontScaleIdx(i => Math.max(0, i - 1) as FontScaleIdx)}
+            disabled={fontScaleIdx === 0}
+            aria-label="Decrease text size"
+            title={`Text: ${FONT_SCALE_LABELS[fontScaleIdx]} — click to shrink`}
+            className="px-1.5 py-1 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <span style={{ fontSize: '9px' }}>A</span><span style={{ fontSize: '11px' }}>a</span><span style={{ marginLeft: 1, fontSize: '9px' }}>−</span>
+          </button>
+          <button
+            onClick={() => setFontScaleIdx(i => Math.min(2, i + 1) as FontScaleIdx)}
+            disabled={fontScaleIdx === 2}
+            aria-label="Increase text size"
+            title={`Text: ${FONT_SCALE_LABELS[fontScaleIdx]} — click to grow`}
+            className="px-1.5 py-1 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <span style={{ fontSize: '9px' }}>A</span><span style={{ fontSize: '12px' }}>a</span><span style={{ marginLeft: 1, fontSize: '9px' }}>+</span>
+          </button>
         </div>
         <button
           onClick={() => (manageMode ? exitManageMode() : setManageMode(true))}
