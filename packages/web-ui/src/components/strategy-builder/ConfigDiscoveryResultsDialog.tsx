@@ -202,7 +202,7 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="rounded-lg shadow-2xl w-full max-w-[92vw] mx-4 max-h-[90vh] flex flex-col border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+      <div className="rounded-lg shadow-2xl w-full max-w-[92vw] mx-4 h-[85vh] flex flex-col border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between border-b px-6 py-4 flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
           <div>
             <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>Config Discovery Results</h2>
