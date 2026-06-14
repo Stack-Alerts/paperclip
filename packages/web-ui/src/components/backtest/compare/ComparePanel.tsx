@@ -69,6 +69,16 @@ const RUN_COLORS = [
   '#f59e0b',
 ] as const;
 
+// ── Comparison-table styling ──────────────────────────────────────────────────
+// The old tables zebra-striped by dropping even rows to the near-black --bg-deep
+// over a --bg-card container, which read as harsh banding, and framed everything
+// in the faint --border so the table edges nearly vanished. These tokens soften
+// the stripe to a subtle theme-aware tint and give the frame/dividers real
+// presence while staying inside the Strategy Builder palette.
+const ROW_STRIPE = 'color-mix(in srgb, var(--text-secondary) 6%, transparent)';
+const ROW_DIVIDER = '1px solid color-mix(in srgb, var(--border) 65%, transparent)';
+const TABLE_FRAME = '1px solid var(--border-strong)';
+
 // ── Sparkline ─────────────────────────────────────────────────────────────────
 function Sparkline({ values, color, height = 40 }: { values: number[]; color: string; height?: number }) {
   if (values.length < 2) return <div style={{ height }} />;
@@ -124,8 +134,8 @@ function MetricRow({
   const baseVal = values[0] ?? null;
   const format = fmtFn ?? ((v: number) => fmt(v));
   return (
-    <tr style={{ background: isEven ? 'var(--bg-deep)' : 'transparent' }}>
-      <td className="py-2 pl-3 pr-4 text-xs" style={{ color: 'var(--text-muted)', width: 160 }}>
+    <tr style={{ background: isEven ? ROW_STRIPE : 'transparent', borderBottom: ROW_DIVIDER }}>
+      <td className="py-2 pl-3 pr-4 text-xs font-medium" style={{ color: 'var(--text-secondary)', width: 160 }}>
         {label}
       </td>
       {values.map((v, i) => {
@@ -154,8 +164,8 @@ function ConfigRow({
   const strs = values.map(v => (v == null || v === '') ? '—' : String(v));
   const allSame = strs.every(v => v === strs[0]);
   return (
-    <tr style={{ background: isEven ? 'var(--bg-deep)' : 'transparent' }}>
-      <td className="py-2 pl-3 pr-4 text-xs" style={{ color: 'var(--text-muted)', width: 160 }}>
+    <tr style={{ background: isEven ? ROW_STRIPE : 'transparent', borderBottom: ROW_DIVIDER }}>
+      <td className="py-2 pl-3 pr-4 text-xs font-medium" style={{ color: 'var(--text-secondary)', width: 160 }}>
         {label}
       </td>
       {strs.map((v, i) => (
@@ -164,7 +174,7 @@ function ConfigRow({
           className="py-2 px-3 text-xs text-center tabular-nums"
           style={{
             color: !allSame && i > 0 ? 'var(--accent-yellow, #f59e0b)' : 'var(--text-secondary)',
-            fontWeight: !allSame && i > 0 ? 500 : 400,
+            fontWeight: !allSame && i > 0 ? 600 : 400,
           }}
         >
           {v}
@@ -189,10 +199,10 @@ function CompareTable({
         {colLabels.map((_, i) => <col key={i} />)}
       </colgroup>
       <thead>
-        <tr style={{ borderBottom: '1px solid var(--border)' }}>
-          <th className="pb-1.5 pl-3" />
+        <tr style={{ borderBottom: '1px solid var(--border-strong)' }}>
+          <th className="pb-2 pt-1 pl-3" />
           {colLabels.map((l, i) => (
-            <th key={i} className="pb-1.5 px-3 text-xs font-semibold text-center" style={{ color: colColors[i] }}>
+            <th key={i} className="pb-2 pt-1 px-3 text-xs font-semibold text-center" style={{ color: colColors[i] }}>
               {l}
             </th>
           ))}
@@ -498,7 +508,7 @@ function FullConfigSection({
         {expanded ? 'Hide' : 'Show'} all configuration parameters
       </button>
       {expanded && (
-        <div className="mt-2 rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+        <div className="mt-2 rounded-md overflow-hidden" style={{ border: TABLE_FRAME }}>
           <CompareTable colLabels={colLabels} colColors={colColors}>
             {configRows.map((row, idx) => (
               <ConfigRow key={row.label} label={row.label} values={row.values} isEven={idx % 2 === 1} />
@@ -826,7 +836,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
 
       {/* ── Comparison dashboard ── */}
       {colCount >= 2 && (
-        <div className="mt-4 rounded" style={{ border: '1px solid var(--border)', background: 'var(--bg-card)', overflow: 'hidden' }}>
+        <div className="mt-4 rounded-md" style={{ border: TABLE_FRAME, background: 'var(--bg-card)', overflow: 'hidden' }}>
 
           {/* Run header cards — top border tinted per slot color */}
           <div
@@ -834,7 +844,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
             style={{
               gridTemplateColumns: `160px repeat(${colCount}, 1fr)`,
               background: 'var(--bg-elevated, var(--bg-deep))',
-              borderBottom: '1px solid var(--border)',
+              borderBottom: '1px solid var(--border-strong)',
             }}
           >
             <div aria-hidden />
@@ -898,7 +908,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
           <div className="p-3 overflow-x-auto">
 
             <SectionHeader title="Returns & Capital" />
-            <div className="rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+            <div className="rounded-md overflow-hidden" style={{ border: TABLE_FRAME }}>
               <CompareTable colLabels={colLabels} colColors={colColors}>
                 <MetricRow isEven={false} label="Total Return" values={selectedRecords.map(r => r.result.returnPercentage)} fmtFn={v => fmtPct(v)} colorFn={colorReturn} />
                 <MetricRow isEven={true} label="Net Profit" values={selectedRecords.map(r => r.result.finalCapital - r.result.initialCapital)} fmtFn={v => fmtUSD(v, true)} colorFn={v => v != null && v >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'} />
@@ -908,7 +918,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
             </div>
 
             <SectionHeader title="Risk Metrics" />
-            <div className="rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+            <div className="rounded-md overflow-hidden" style={{ border: TABLE_FRAME }}>
               <CompareTable colLabels={colLabels} colColors={colColors}>
                 <MetricRow isEven={false} label="Max Drawdown" values={selectedRecords.map(r => r.result.maxDrawdown * 100)} fmtFn={v => `${fmt(v)}%`} colorFn={() => 'var(--accent-orange, #f97316)'} higherIsBetter={false} />
                 <MetricRow isEven={true} label="Sharpe Ratio" values={selectedRecords.map(r => r.result.sharpeRatio)} colorFn={v => v != null && v >= 1 ? 'var(--accent-green)' : 'var(--text-secondary)'} />
@@ -919,7 +929,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
             </div>
 
             <SectionHeader title="Trade Statistics" />
-            <div className="rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+            <div className="rounded-md overflow-hidden" style={{ border: TABLE_FRAME }}>
               <CompareTable colLabels={colLabels} colColors={colColors}>
                 <MetricRow isEven={false} label="Total Trades" values={selectedRecords.map(r => r.result.totalTrades)} fmtFn={v => String(Math.round(v))} colorFn={() => 'var(--text-secondary)'} />
                 <MetricRow isEven={true} label="Win Rate" values={selectedRecords.map(r => r.result.winRate * 100)} fmtFn={v => `${fmt(v, 1)}%`} colorFn={v => v != null && v >= 50 ? 'var(--accent-green)' : 'var(--accent-red)'} />
@@ -933,8 +943,8 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
             <SectionHeader title="Configuration Differences" />
             {diffConfigRows.length === 0 ? (
               <div
-                className="flex items-center gap-2 py-3 px-3 rounded"
-                style={{ background: 'var(--bg-deep)', border: '1px solid var(--border)' }}
+                className="flex items-center gap-2 py-3 px-3 rounded-md"
+                style={{ background: ROW_STRIPE, border: TABLE_FRAME }}
               >
                 <Minus size={13} style={{ color: 'var(--text-faint)' }} />
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -942,7 +952,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
                 </p>
               </div>
             ) : (
-              <div className="rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+              <div className="rounded-md overflow-hidden" style={{ border: TABLE_FRAME }}>
                 <CompareTable colLabels={colLabels} colColors={colColors}>
                   {diffConfigRows.map((row, idx) => (
                     <ConfigRow key={row.label} label={row.label} values={row.values} isEven={idx % 2 === 1} />
