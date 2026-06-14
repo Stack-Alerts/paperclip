@@ -492,6 +492,17 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     await api.post('/data/repair', { timeframe });
   }, []);
 
+  const handleBackfillData = useCallback(async (gaps: import('./DataVerifyDialog').DataGapEntry[], timeframe: string): Promise<void> => {
+    if (!gaps.length) return;
+    const starts = gaps.map(g => g.gapStart).sort();
+    const ends = gaps.map(g => g.gapEnd).sort();
+    await api.post('/data/backfill', {
+      startDate: starts[0].slice(0, 10),
+      endDate: ends[ends.length - 1].slice(0, 10),
+      timeframe,
+    });
+  }, []);
+
   const handleValidate = useCallback(async () => {
     setCurrentStep(1);
     setActiveDialog('validation');
@@ -995,6 +1006,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         open={activeDialog === 'dataVerify'}
         onVerify={handleVerifyData}
         onRepair={handleRepairData}
+        onBackfill={handleBackfillData}
         onClose={close}
       />
 
