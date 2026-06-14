@@ -39,6 +39,12 @@ export interface ConfigDiscoveryResultsDialogProps {
   // completed tests in. `running` + `progress` drive the inline progress bar.
   running?: boolean;
   progress?: DiscoveryProgressState | null;
+  // BTCAAAAA-36311: when true the modal shows a yes/no confirmation gate instead
+  // of the results table — the sweep is long-running, so it only starts once the
+  // user confirms via onConfirm.
+  awaitingConfirm?: boolean;
+  scenarioCount?: number;
+  onConfirm?: () => void;
   onApplyConfig: (scenario: DiscoveryScenario) => void;
   onClose: () => void;
 }
@@ -106,6 +112,9 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
   minTradeCount = 0,
   running = false,
   progress = null,
+  awaitingConfirm = false,
+  scenarioCount = 0,
+  onConfirm,
   onApplyConfig,
   onClose,
 }) => {
@@ -141,6 +150,47 @@ export const ConfigDiscoveryResultsDialog: React.FC<ConfigDiscoveryResultsDialog
   }, [results, minTrades, sortKey, sortAsc]);
 
   if (!open) return null;
+
+  // Confirmation gate (BTCAAAAA-36311): the sweep runs scenarioCount scenarios
+  // plus a baseline and takes a while, so require an explicit yes/no first.
+  if (awaitingConfirm) {
+    const totalRuns = scenarioCount + 1;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+        <div className="rounded-lg shadow-2xl w-full max-w-md mx-4 border" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+          <div className="border-b px-6 py-4" style={{ borderColor: 'var(--border)' }}>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-secondary)' }}>Start Config Discovery?</h2>
+          </div>
+          <div className="px-6 py-5 space-y-3">
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Config Discovery will run <strong>{totalRuns}</strong> backtests (1 baseline + {scenarioCount} scenarios), one at a time.
+            </p>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              This can take a fair amount of time. Do you want to start now?
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 px-6 py-4 border-t" style={{ borderColor: 'var(--border)' }}>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded text-sm font-medium transition-colors"
+              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+            >
+              No, cancel
+            </button>
+            <button
+              onClick={() => onConfirm?.()}
+              className="px-4 py-2 rounded text-sm font-medium transition-colors"
+              style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
+            >
+              Yes, start
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const selected = selectedIdx !== null ? filtered[selectedIdx] : null;
   const progressPct =

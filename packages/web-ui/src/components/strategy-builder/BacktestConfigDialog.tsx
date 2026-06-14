@@ -1467,6 +1467,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
 
   // Config Discovery state (BTCAAAAA-36305).
   const [discoveryOpen, setDiscoveryOpen] = useState(false);
+  const [discoveryAwaitingConfirm, setDiscoveryAwaitingConfirm] = useState(false);
   const [discoveryRunning, setDiscoveryRunning] = useState(false);
   const [discoveryProgress, setDiscoveryProgress] = useState<{ current: number; total: number; message: string } | null>(null);
   const [discoveryRows, setDiscoveryRows] = useState<DiscoveryScenario[]>([]);
@@ -1624,20 +1625,32 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
 
   // Launch Config Discovery: sweep parameter axes, run a backtest per scenario
   // (each naturally creating a Compare card), then open the ranked results.
-  const handleConfigDiscovery = useCallback(async () => {
+  // Step 1: clicking the Config Discovery button opens the modal in confirmation
+  // mode (BTCAAAAA-36311) — the sweep runs ~19 backtests and takes a while, so we
+  // require an explicit yes/no before kicking it off.
+  const handleConfigDiscovery = useCallback(() => {
     if (!currentStrategy || discoveryRunning) return;
     if (!config.startDate || !config.endDate) {
       setDiscoveryProgress({ current: 0, total: 0, message: 'Set a start and end date before running discovery.' });
       return;
     }
+    setDiscoveryRows([]);
+    setDiscoveryProgress(null);
+    setDiscoveryAwaitingConfirm(true);
+    setDiscoveryOpen(true);
+  }, [currentStrategy, discoveryRunning, config.startDate, config.endDate]);
+
+  // Step 2: user confirmed — actually run the sweep, streaming each completed
+  // scenario into the already-open results modal.
+  const startDiscovery = useCallback(async () => {
+    if (!currentStrategy || discoveryRunning) return;
     const specs = generateSingleAxisScenarios(DEFAULT_PARAMETER_RANGES);
     discoveryDeltaRef.current = new Map(specs.map(s => [s.description, s.configDelta]));
     const base = buildFullConfig(currentStrategy.id);
+    setDiscoveryAwaitingConfirm(false);
     setDiscoveryRunning(true);
     setDiscoveryProgress({ current: 0, total: specs.length, message: 'Running baseline scenario…' });
     setActiveTab('compare');
-    // BTCAAAAA-36309: open the results modal immediately with an empty list so
-    // the progress bar shows and each completed test streams in live.
     setDiscoveryRows([]);
     setDiscoveryOpen(true);
     try {
@@ -1658,7 +1671,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
     } finally {
       setDiscoveryRunning(false);
     }
-  }, [currentStrategy, discoveryRunning, config.startDate, config.endDate, buildFullConfig]);
+  }, [currentStrategy, discoveryRunning, buildFullConfig]);
 
   // Apply a chosen discovery scenario's swept params back onto the live form.
   const applyDiscoveryScenario = useCallback((scenario: DiscoveryScenario) => {
@@ -2254,8 +2267,11 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
       results={discoveryRows}
       running={discoveryRunning}
       progress={discoveryProgress}
+      awaitingConfirm={discoveryAwaitingConfirm}
+      scenarioCount={DEFAULT_PARAMETER_RANGES.reduce((n, r) => n + (r.values?.length ?? r.steps ?? 0), 0)}
+      onConfirm={startDiscovery}
       onApplyConfig={applyDiscoveryScenario}
-      onClose={() => setDiscoveryOpen(false)}
+      onClose={() => { setDiscoveryOpen(false); setDiscoveryAwaitingConfirm(false); }}
     />
     </FontSizesContext.Provider>
   );
