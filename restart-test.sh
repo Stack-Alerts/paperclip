@@ -81,7 +81,6 @@ echo "[restart-test] stopping current test instance..."
 
 # Step 2: Verify port is free
 echo "[restart-test] verifying port :3000 is free..."
-local port_holder
 port_holder=$(get_port_holder 3000)
 if [[ -n "$port_holder" ]]; then
   echo "${YELLOW}[restart-test] ⚠ port :3000 still in use, force-killing PID $port_holder...${NC}"
@@ -94,7 +93,7 @@ echo
 
 # Step 3: Start test instance with optional branch switch
 echo "[restart-test] starting fresh test instance..."
-local start_test_args=""
+start_test_args=""
 if [[ -n "$BRANCH" ]]; then
   start_test_args="--branch $BRANCH"
 fi
