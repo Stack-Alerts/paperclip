@@ -1057,6 +1057,10 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     const { lastBacktestSession, currentStrategy } = get();
     if (!lastBacktestSession || !currentStrategy) return;
     if (lastBacktestSession.strategyId !== currentStrategy.id) return;
+    // Config-only session (user edited the panel but never ran a backtest):
+    // there is no server run to reconcile. The seeded config is already the
+    // source of truth, so this is a no-op (BTCAAAAA-36344).
+    if (!lastBacktestSession.runId || !lastBacktestSession.resultSnapshot) return;
     try {
       const status = (await apiGetBacktestResults(
         lastBacktestSession.strategyId,
@@ -1115,7 +1119,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
               level: (l.level as BacktestStatusMessage['level']) ?? 'INFO',
               timestamp: l.timestamp,
             }))
-          : lastBacktestSession.logs;
+          : lastBacktestSession.logs ?? [];
         const refreshed: BacktestSession = {
           ...lastBacktestSession,
           resultSnapshot: live,

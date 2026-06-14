@@ -1476,6 +1476,13 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
   // every render (which would clobber the user's in-progress edits).
   const seededForStrategyIdRef = useRef<string | null | undefined>(undefined);
 
+  // After seeding (or marking) a strategy, the persist effect fires once with
+  // the seed echo — and, on a strategy switch, with input state that still
+  // belongs to the *previous* strategy until the seed transition commits.
+  // We skip that single cycle so we never write one strategy's inputs under
+  // another strategy's id (BTCAAAAA-36344).
+  const seedEchoSkipRef = useRef<string | null>(null);
+
   // Seed all inputs from the persisted session when the dialog opens for a
   // strategy that has a saved session. Without this, the dialog always
   // opens on the default values and the user's last test/result/config is
@@ -1491,6 +1498,10 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
       // No saved session for this strategy — just mark as seeded so the
       // seeding block doesn't run again on every render.
       seededForStrategyIdRef.current = currentStrategy.id;
+      // Skip the next persist cycle: inputs still carry the previous
+      // strategy's values (nothing was seeded), so persisting now would
+      // write them under this strategy's id (BTCAAAAA-36344).
+      seedEchoSkipRef.current = currentStrategy.id;
       return;
     }
     // Batch all seed setState calls in startTransition so React treats them
@@ -1552,6 +1563,9 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
       }
     });
     seededForStrategyIdRef.current = currentStrategy.id;
+    // The seed setState calls above will trigger the persist effect once;
+    // skip that echo so we don't immediately re-write the just-seeded values.
+    seedEchoSkipRef.current = currentStrategy.id;
   }, [open, currentStrategy, lastBacktestSession]);
 
   // Persist the current dialog inputs to the store on every change so a
@@ -1598,16 +1612,32 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
       maxLeverage: Number(leverage),
       confluenceThreshold: Number(confluence),
     };
-    // Only persist once a session has been *actually* run (we need a
-    // resultSnapshot to bind to). Before the first run, the user has
-    // nothing to restore — and runBacktest writes the canonical session on
-    // success anyway.
-    if (!lastBacktestSession || lastBacktestSession.strategyId !== currentStrategy.id) {
+    // Skip the single cycle that follows a (re)seed: the inputs either still
+    // belong to the previous strategy (switch race) or are the just-seeded
+    // values being echoed back. Either way persisting now is wrong / churn
+    // (BTCAAAAA-36344).
+    if (seedEchoSkipRef.current === currentStrategy.id) {
+      seedEchoSkipRef.current = null;
       return;
     }
+    // Persist the config for THIS strategy on every edit — even before the
+    // first backtest run — so the panel is recalled per strategy across
+    // browser / server restarts (BTCAAAAA-36344). When a prior run exists for
+    // this strategy, preserve its runId / resultSnapshot / logs; otherwise
+    // write a config-only session (those fields stay undefined).
+    const prior =
+      lastBacktestSession && lastBacktestSession.strategyId === currentStrategy.id
+        ? lastBacktestSession
+        : undefined;
+    // Only fall back to the live store result/logs when they actually belong
+    // to the current strategy — never let another strategy's run leak in.
+    const liveResult =
+      backTestResultForSeed && backTestResultForSeed.strategyId === currentStrategy.id
+        ? backTestResultForSeed
+        : undefined;
     setLastBacktestSession({
       strategyId: currentStrategy.id,
-      runId: lastBacktestSession.runId,
+      runId: prior?.runId,
       config: {
         startDate: config.startDate,
         endDate: config.endDate,
@@ -1624,8 +1654,8 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
       // fullConfig (with snake_case fields) for the backend, so this is the
       // seed-only shape, not the wire shape. Assert to keep TypeScript happy.
       fullConfig: fullConfig as unknown as BacktestConfigFull,
-      resultSnapshot: lastBacktestSession.resultSnapshot ?? backTestResultForSeed,
-      logs: lastBacktestSession.logs ?? backTestLogsForSeed,
+      resultSnapshot: prior?.resultSnapshot ?? liveResult,
+      logs: prior?.logs ?? (liveResult ? backTestLogsForSeed : undefined),
       savedAt: new Date().toISOString(),
     });
     // We intentionally exclude lastBacktestSession/backTestResultForSeed/backTestLogsForSeed
