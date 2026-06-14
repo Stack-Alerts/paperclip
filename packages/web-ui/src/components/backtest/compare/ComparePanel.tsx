@@ -268,12 +268,9 @@ function RunCard({
             <div className="flex items-center gap-1.5">
               {rank != null && <RankBadge rank={rank} />}
               <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
-                {record.strategyName}
+                {fmtDateTime(record.savedAt)}
               </p>
             </div>
-            <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
-              {fmtDateTime(record.savedAt)}
-            </p>
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {selected && <CheckCircle2 size={13} style={{ color: accentColor }} />}
@@ -569,10 +566,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
   }
 
   const colCount = selectedRecords.length;
-  const colLabels = selectedRecords.map((r, i) => {
-    const name = r.strategyName.length > 16 ? r.strategyName.slice(0, 14) + '…' : r.strategyName;
-    return `Run ${i + 1} · ${name}`;
-  });
+  const colLabels = selectedRecords.map((_, i) => `Run ${i + 1}`);
   const colColors = selectedRecords.map((_, i) => RUN_COLORS[i] as string);
   const configRows = colCount >= 1 ? extractConfigRows(selectedRecords) : [];
   const diffConfigRows = configRows.filter(row => {
@@ -718,9 +712,6 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
                       {rankings.get(r.runId)?.rank != null && (
                         <RankBadge rank={rankings.get(r.runId)!.rank} />
                       )}
-                      <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
-                        {r.strategyName}
-                      </p>
                     </div>
                     <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
                       {fmtDate(r.result.startDate ?? r.config?.startDate ?? r.fullConfig?.startDate)}
