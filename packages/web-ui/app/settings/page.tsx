@@ -1,6 +1,6 @@
 'use client';
 
-import { SettingsPanel } from '@/components/settings/SettingsPanel';
+import { GeneralSettingsPanel } from '@/components/settings/GeneralSettingsPanel';
 import { StatusBarSettingsPanel } from '@/components/settings/StatusBarSettingsPanel';
 
 export default function SettingsPage() {
@@ -8,8 +8,8 @@ export default function SettingsPage() {
     <div className="flex-1 overflow-y-auto p-6" style={{ background: 'var(--app-bg)' }}>
       <h1 className="text-xl font-semibold mb-6" style={{ color: 'var(--text-primary)' }}>Settings</h1>
       <div className="space-y-6">
+        <GeneralSettingsPanel />
         <StatusBarSettingsPanel />
-        <SettingsPanel />
       </div>
     </div>
   );
