@@ -112,7 +112,7 @@ export function SidebarDataStatus({ collapsed }: { collapsed: boolean }) {
 
       {countdown !== null ? (
         <div style={{ fontSize: 10, color: 'var(--text-muted)', paddingLeft: 13 }}>
-          next in:{' '}
+          heartbeat in:{' '}
           <span style={{ fontVariantNumeric: 'tabular-nums' }}>{countdown}</span>
         </div>
       ) : isUpdating ? (
