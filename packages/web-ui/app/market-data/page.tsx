@@ -58,16 +58,25 @@ function NextCandleCountdown({ timeframe, lastCandleTs }: { timeframe: string; l
   if (!lastCandleTs) return <>—</>;
   const minutes: Record<string, number> = { '1m': 1, '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240, '1d': 1440 };
   const m = minutes[timeframe] ?? 15;
+  const intervalMs = m * 60_000;
   const lastMs = new Date(lastCandleTs.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(lastCandleTs) ? lastCandleTs : lastCandleTs + 'Z').getTime();
-  const closesAt = lastMs + m * 60_000;
-  const remainingMs = closesAt - now;
-  if (remainingMs <= 0) return <>closing…</>;
+  const nominalCloseMs = lastMs + intervalMs;
+  // The status row only refreshes every 60s, so lastCandleTs lags the wall clock
+  // by up to a full poll interval. Roll the close boundary forward so the display
+  // counts down to the *next* close instead of freezing on a bare "closing…".
+  const overshootMs = now - nominalCloseMs;
+  const rolledIntervals = overshootMs > 0 ? Math.floor(overshootMs / intervalMs) + 1 : 0;
+  const closesAt = nominalCloseMs + rolledIntervals * intervalMs;
+  const remainingMs = Math.max(0, closesAt - now);
   const totalSec = Math.floor(remainingMs / 1000);
   const hh = Math.floor(totalSec / 3600);
   const mm = Math.floor((totalSec % 3600) / 60);
   const ss = totalSec % 60;
   const pad = (n: number) => n.toString().padStart(2, '0');
-  return <>next close: {hh > 0 ? `${hh}:${pad(mm)}:${pad(ss)}` : `${mm}:${pad(ss)}`}</>;
+  const countdown = hh > 0 ? `${hh}:${pad(mm)}:${pad(ss)}` : `${mm}:${pad(ss)}`;
+  // While the shown bar has passed its nominal close (data refresh pending), label
+  // it as closing but keep the live countdown to the next close visible.
+  return <>{rolledIntervals > 0 ? `closing… next close: ${countdown}` : `next close: ${countdown}`}</>;
 }
 
 function StatusBadge({ status }: { status: string }) {
