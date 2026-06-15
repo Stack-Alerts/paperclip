@@ -8,14 +8,20 @@ the fix existed on a branch.
 
 ### Required flow for every fix or feature
 
-1. Commit your work to a feature branch.
+1. Commit your work to a feature branch, then **`git push`** it (the merge opens a PR from
+   the remote branch ref — a local-only commit never merges).
 2. In the closing Paperclip comment, include the exact line:
    ```
    Fix-SHA: <full 40-char git sha>
    ```
 3. Set the issue status to **`in_review`** — NOT `done`.
-4. The merge-dispatch routine (`1a1065ea`) will open a PR, squash-merge it to `main`,
-   and flip the issue to `done` automatically within 5 minutes.
+4. **Trigger the merge immediately** (primary path — do not wait for the periodic sweep):
+   ```
+   python3 scripts/merge_dispatch_routine.py --issue <issue-id>
+   ```
+   This opens a PR, squash-merges it to `main`, and flips the issue to `done`.
+   The periodic merge-dispatch routine (`1a1065ea`) is only a backup that sweeps anything
+   missed; it now acts on any `in_review` issue with a pushed Fix-SHA (no interaction gate).
 5. The Phase-3 closure-gate routine (`a6e59e24`) will reopen any issue where the
    Fix-SHA is not an ancestor of `origin/main`.
 

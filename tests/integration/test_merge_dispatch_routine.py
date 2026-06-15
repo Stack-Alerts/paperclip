@@ -3,15 +3,13 @@
 
 Verifies that the routine correctly:
 1. Finds in_review issues
-2. Checks for recent merge_request interactions
-3. Extracts Fix-SHA from comments
+2. Extracts Fix-SHA from comments
+3. Skips issues whose SHA is unpushed or already merged
 4. Creates and merges PRs
 5. Handles errors and escalates failures
 """
 
-import json
-from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -64,74 +62,105 @@ class TestFixSHAPattern:
         assert match is None
 
 
-class TestInteractionTimestamp:
-    """Test merge_request interaction timestamp parsing."""
+class TestMergeGate:
+    """Test that the routine acts on Fix-SHA without an interaction gate."""
 
-    def test_recent_interaction(self):
-        """Test that recent interactions are detected."""
+    def _load(self):
         import sys
         from pathlib import Path
 
         repo_root = Path(__file__).resolve().parent.parent.parent
         sys.path.insert(0, str(repo_root / "scripts"))
+        import merge_dispatch_routine
 
-        from merge_dispatch_routine import has_recent_merge_request_interaction
+        return merge_dispatch_routine
 
-        now = datetime.now(timezone.utc)
-        recent_time = (now - timedelta(minutes=30)).isoformat()
+    def test_skip_when_no_fix_sha(self):
+        """An in_review issue with no Fix-SHA is skipped, not failed."""
+        mod = self._load()
+        issue = {"id": "id", "identifier": "BTCAAAAA-1", "status": "in_review"}
+        with patch.object(mod, "fetch_issue_comments", return_value=[]):
+            result = mod.process_issue(issue)
+        assert result == {"issue": "BTCAAAAA-1", "action": "skip", "reason": "no_fix_sha"}
 
-        interactions = [
-            {
-                "kind": "merge_request",
-                "createdAt": recent_time,
-            }
-        ]
+    def test_skip_when_sha_not_pushed(self):
+        """A Fix-SHA that is neither local nor fetchable is skipped as push lag."""
+        mod = self._load()
+        sha = "a" * 40
+        issue = {"id": "id", "identifier": "BTCAAAAA-2", "status": "in_review"}
+        with patch.object(mod, "fetch_issue_comments", return_value=[{"body": f"Fix-SHA: {sha}"}]), \
+            patch.object(mod, "sha_exists_locally", return_value=False), \
+            patch.object(mod, "fetch_sha_from_remote", return_value=False):
+            result = mod.process_issue(issue)
+        assert result["action"] == "skip"
+        assert result["reason"] == "sha_not_pushed"
 
-        assert has_recent_merge_request_interaction(interactions) is True
+    def test_skip_when_already_merged(self):
+        """A Fix-SHA already on origin/main is skipped as already_merged."""
+        mod = self._load()
+        sha = "b" * 40
+        issue = {"id": "id", "identifier": "BTCAAAAA-3", "status": "in_review"}
+        with patch.object(mod, "fetch_issue_comments", return_value=[{"body": f"Fix-SHA: {sha}"}]), \
+            patch.object(mod, "sha_exists_locally", return_value=True), \
+            patch.object(mod, "is_ancestor_of_main", return_value=True):
+            result = mod.process_issue(issue)
+        assert result["action"] == "skip"
+        assert result["reason"] == "already_merged"
 
-    def test_old_interaction(self):
-        """Test that old interactions are not detected as recent."""
+    def test_skip_when_branch_not_pushed(self):
+        """A Fix-SHA present locally but on no remote branch is skipped as push lag."""
+        mod = self._load()
+        sha = "c" * 40
+        issue = {"id": "id", "identifier": "BTCAAAAA-4", "status": "in_review"}
+        with patch.object(mod, "fetch_issue_comments", return_value=[{"body": f"Fix-SHA: {sha}"}]), \
+            patch.object(mod, "sha_exists_locally", return_value=True), \
+            patch.object(mod, "is_ancestor_of_main", return_value=False), \
+            patch.object(mod, "find_branch_for_sha", return_value=None):
+            result = mod.process_issue(issue)
+        assert result["action"] == "skip"
+        assert result["reason"] == "branch_not_pushed"
+
+
+class TestAgentFinishDispatch:
+    """Test the --issue agent-finish single-issue dispatch path (board opt2)."""
+
+    def _load(self):
         import sys
         from pathlib import Path
 
         repo_root = Path(__file__).resolve().parent.parent.parent
         sys.path.insert(0, str(repo_root / "scripts"))
+        import merge_dispatch_routine
 
-        from merge_dispatch_routine import has_recent_merge_request_interaction
+        return merge_dispatch_routine
 
-        now = datetime.now(timezone.utc)
-        old_time = (now - timedelta(hours=2)).isoformat()
+    def test_dispatch_skips_non_in_review_issue(self):
+        """A single issue that is not in_review is skipped, not processed."""
+        mod = self._load()
+        issue = {"id": "x", "identifier": "BTCAAAAA-5", "status": "in_progress"}
+        with patch.object(mod, "fetch_issue", return_value=issue), \
+            patch.object(mod, "process_issue") as proc:
+            rc = mod.dispatch_for_issue("x")
+        assert rc == 0
+        proc.assert_not_called()
 
-        interactions = [
-            {
-                "kind": "merge_request",
-                "createdAt": old_time,
-            }
-        ]
+    def test_dispatch_processes_in_review_issue(self):
+        """A single in_review issue is routed through process_issue."""
+        mod = self._load()
+        issue = {"id": "x", "identifier": "BTCAAAAA-6", "status": "in_review"}
+        with patch.object(mod, "fetch_issue", return_value=issue), \
+            patch.object(mod, "process_issue", return_value={"issue": "BTCAAAAA-6", "action": "skip", "reason": "sha_not_pushed"}) as proc:
+            rc = mod.dispatch_for_issue("x")
+        assert rc == 0
+        proc.assert_called_once_with(issue)
 
-        assert has_recent_merge_request_interaction(interactions) is False
-
-    def test_non_merge_request_interaction(self):
-        """Test that non-merge_request interactions are ignored."""
-        import sys
-        from pathlib import Path
-
-        repo_root = Path(__file__).resolve().parent.parent.parent
-        sys.path.insert(0, str(repo_root / "scripts"))
-
-        from merge_dispatch_routine import has_recent_merge_request_interaction
-
-        now = datetime.now(timezone.utc)
-        recent_time = (now - timedelta(minutes=30)).isoformat()
-
-        interactions = [
-            {
-                "kind": "some_other_interaction",
-                "createdAt": recent_time,
-            }
-        ]
-
-        assert has_recent_merge_request_interaction(interactions) is False
+    def test_main_routes_issue_flag(self):
+        """main(['--issue', id]) delegates to dispatch_for_issue."""
+        mod = self._load()
+        with patch.object(mod, "dispatch_for_issue", return_value=0) as disp:
+            rc = mod.main(["--issue", "abc"])
+        assert rc == 0
+        disp.assert_called_once_with("abc")
 
 
 class TestSessionManagement:
@@ -215,14 +244,14 @@ class TestOutputFormat:
 
         from merge_dispatch_routine import process_issue
 
-        # Test with minimal issue (no merge_request interaction)
+        # Minimal issue with no Fix-SHA comment → skip
         issue = {
             "id": "test-id",
             "identifier": "BTCAAAAA-999",
             "status": "in_review",
         }
 
-        with patch("merge_dispatch_routine.fetch_issue_interactions", return_value=[]):
+        with patch("merge_dispatch_routine.fetch_issue_comments", return_value=[]):
             result = process_issue(issue)
 
         assert result["action"] in ["skip", "failed", "error", "merged"]

@@ -224,7 +224,13 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       if (diff < 500) {
         const interval = 15 * 60 * 1000;
         nextCheckRef.current = new Date((Math.floor(Date.now() / interval) + 1) * interval + 200);
-        countdownIdRef.current = status.emit('Checking data…', { duration: -1 });
+        // Reuse the single persistent entry across boundaries instead of emitting
+        // a fresh one each time, which would orphan never-dismissed status entries.
+        if (countdownIdRef.current) {
+          status.update(countdownIdRef.current, 'Checking data…');
+        } else {
+          countdownIdRef.current = status.emit('Checking data…', { duration: -1 });
+        }
         setTimeout(() => status.emit('Data check complete', { duration: 2000 }), 2000);
       } else {
         const mins = Math.floor(diff / 60000);
@@ -237,7 +243,16 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         }
       }
     }, 1000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      // The countdown is a persistent (duration: -1) status entry. Without an
+      // explicit dismiss it survives this window's unmount and freezes on the
+      // global status bar of every other page (BTCAAAAA-36517).
+      if (countdownIdRef.current) {
+        status.dismiss(countdownIdRef.current);
+        countdownIdRef.current = null;
+      }
+    };
   }, []);
 
   // Resizable splitter — persists position to localStorage.

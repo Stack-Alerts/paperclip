@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
-"""Phase 4a: Merge-dispatch routine — automatically open PRs and merge for in_review issues.
+"""Phase 4a: Merge-dispatch routine — backup sweep that opens PRs and merges in_review issues.
 
-When an issue has status=in_review with a merge_request interaction in the last hour
-and a parseable Fix-SHA in the close-out comment, this routine:
+This routine is the *backup* mechanism (the primary path is an agent-finish trigger that
+dispatches a merge immediately when an issue is set to in_review). It periodically sweeps
+every in_review issue and acts on any that carries a parseable Fix-SHA whose commit has been
+pushed to a remote branch but is not yet on origin/main:
 
-1. Confirms the SHA exists locally (fetch if needed)
-2. Finds the branch containing the SHA
-3. Opens a PR via GitHub API (CEO's GH_TOKEN)
-4. Merges the PR with squash
-5. Comments on source issue: 'Merged via PR #N at SHA <merge-sha>. Branch landed on origin/main.'
-6. Sets issue status to done
-7. On failure, escalates via BTCAAAAA-30033 routine
+1. Extracts the Fix-SHA from the close-out comment (no interaction gate)
+2. Confirms the SHA exists locally (fetch if needed); skips if not yet pushed (push lag)
+3. Skips if the SHA is already an ancestor of origin/main (merge already landed)
+4. Finds the pushed remote branch containing the SHA; skips if none (push lag)
+5. Opens a PR via GitHub API (CEO's GH_TOKEN)
+6. Merges the PR with squash
+7. Comments on source issue and sets status to done
+8. On failure, escalates via BTCAAAAA-30033 routine
+
+Historical note: this routine previously gated on a `merge_request` interaction created
+within the last hour. No agent or API could create that interaction (the interactions API
+only accepts suggest_tasks | ask_user_questions | request_confirmation |
+request_checkbox_confirmation), so the routine skipped every issue and merges never
+dispatched — the chronic PUSH_LAG. The gate was removed in BTCAAAAA-36522.
 
 Usage:
     python3 scripts/merge_dispatch_routine.py
@@ -28,7 +37,7 @@ import os
 import re
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -55,9 +64,6 @@ MERGE_DISPATCH_TRACKING = "BTCAAAAA-30048"  # This routine's tracking issue
 
 # Regex for Fix-SHA comment: line-anchored
 FIX_SHA_PATTERN = re.compile(r"^Fix-SHA: ([0-9a-f]{40})$", re.MULTILINE)
-
-# Interaction types we care about
-MERGE_REQUEST_INTERACTION = "merge_request"
 
 
 def _http_session() -> requests.Session:
@@ -110,22 +116,22 @@ def fetch_issue_comments(issue_id: str) -> list[dict[str, Any]]:
         sess.close()
 
 
-def fetch_issue_interactions(issue_id: str) -> list[dict[str, Any]]:
-    """Fetch interactions for an issue."""
+def fetch_issue(issue_id: str) -> dict[str, Any] | None:
+    """Fetch a single issue by id (used by the agent-finish trigger path)."""
     sess = _http_session()
     try:
         resp = sess.get(
-            f"{os.environ.get('PAPERCLIP_API_URL')}/api/issues/{issue_id}/interactions",
+            f"{os.environ.get('PAPERCLIP_API_URL')}/api/issues/{issue_id}",
             timeout=30,
         )
         resp.raise_for_status()
-        interactions = resp.json()
-        if isinstance(interactions, list):
-            return interactions
-        return []
+        issue = resp.json()
+        if isinstance(issue, dict):
+            return issue
+        return None
     except Exception as exc:
-        logger.error("Failed to fetch interactions for issue %s: %s", issue_id, exc)
-        return []
+        logger.error("Failed to fetch issue %s: %s", issue_id, exc)
+        return None
     finally:
         sess.close()
 
@@ -174,27 +180,6 @@ def extract_fix_sha_from_comments(comments: list[dict[str, Any]]) -> str | None:
         if match:
             return match.group(1)
     return None
-
-
-def has_recent_merge_request_interaction(interactions: list[dict[str, Any]]) -> bool:
-    """Check if issue has a merge_request interaction in the last hour."""
-    now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(hours=1)
-
-    for interaction in interactions:
-        if interaction.get("kind") != MERGE_REQUEST_INTERACTION:
-            continue
-
-        created_at = interaction.get("createdAt")
-        if created_at:
-            try:
-                created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-                if created_dt >= cutoff:
-                    return True
-            except (ValueError, AttributeError):
-                pass
-
-    return False
 
 
 def sha_exists_locally(sha: str) -> bool:
@@ -260,6 +245,21 @@ def find_branch_for_sha(sha: str) -> str | None:
     except Exception as exc:
         logger.error("Failed to find branch for SHA: %s", exc)
         return None
+
+
+def is_ancestor_of_main(sha: str) -> bool:
+    """Return True if SHA is already an ancestor of origin/main (merge already landed)."""
+    try:
+        result = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", sha, "origin/main"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            timeout=10,
+        )
+        return result.returncode == 0
+    except Exception as exc:
+        logger.error("Failed ancestry check for %s: %s", sha, exc)
+        return False
 
 
 def find_existing_pr(session: requests.Session, branch_name: str) -> dict | None:
@@ -396,21 +396,10 @@ def process_issue(issue: dict[str, Any]) -> dict[str, Any]:
     """Process a single in_review issue for merge dispatch."""
     issue_id = issue.get("id", "")
     issue_identifier = issue.get("identifier", "")
-    status = issue.get("status", "")
 
     logger.info("Processing issue %s", issue_identifier)
 
-    # Step 1: Check for merge_request interaction in last hour
-    interactions = fetch_issue_interactions(issue_id)
-    if not has_recent_merge_request_interaction(interactions):
-        logger.info("Issue %s has no recent merge_request interaction", issue_identifier)
-        return {
-            "issue": issue_identifier,
-            "action": "skip",
-            "reason": "no_merge_request_interaction",
-        }
-
-    # Step 2: Extract Fix-SHA from comments
+    # Step 1: Extract Fix-SHA from comments (primary trigger — no interaction gate)
     comments = fetch_issue_comments(issue_id)
     sha = extract_fix_sha_from_comments(comments)
     if not sha:
@@ -423,25 +412,38 @@ def process_issue(issue: dict[str, Any]) -> dict[str, Any]:
 
     logger.info("Issue %s has Fix-SHA %s", issue_identifier, sha[:8])
 
-    # Step 3: Confirm SHA exists locally, fetch if needed
+    # Step 2: Confirm SHA exists locally, fetch if needed.
+    # If still absent after a fetch, the commit has not been pushed yet (push lag) —
+    # skip quietly so a later sweep retries once the agent pushes.
     if not sha_exists_locally(sha):
         logger.info("SHA %s not found locally, fetching from remote", sha[:8])
         if not fetch_sha_from_remote(sha):
-            escalate_failure(issue_id, issue_identifier, sha, "SHA not found in remote")
+            logger.info("SHA %s not on remote yet (push lag) for %s", sha[:8], issue_identifier)
             return {
                 "issue": issue_identifier,
-                "action": "failed",
-                "reason": "sha_not_found",
+                "action": "skip",
+                "reason": "sha_not_pushed",
             }
 
-    # Step 4: Find branch containing SHA
-    branch = find_branch_for_sha(sha)
-    if not branch:
-        escalate_failure(issue_id, issue_identifier, sha, "Could not find branch containing SHA")
+    # Step 3: If the SHA already landed on origin/main, the merge is done —
+    # leave the closure gate to flip status; nothing to dispatch.
+    if is_ancestor_of_main(sha):
+        logger.info("SHA %s already on origin/main for %s", sha[:8], issue_identifier)
         return {
             "issue": issue_identifier,
-            "action": "failed",
-            "reason": "branch_not_found",
+            "action": "skip",
+            "reason": "already_merged",
+        }
+
+    # Step 4: Find the pushed remote branch containing the SHA.
+    # No remote branch means the commit is local-only (push lag) — skip, do not escalate.
+    branch = find_branch_for_sha(sha)
+    if not branch:
+        logger.info("No remote branch contains SHA %s for %s (push lag)", sha[:8], issue_identifier)
+        return {
+            "issue": issue_identifier,
+            "action": "skip",
+            "reason": "branch_not_pushed",
         }
 
     logger.info("Found branch %s for SHA %s", branch, sha[:8])
@@ -522,9 +524,49 @@ This issue is now marked as done.
     }
 
 
-def main() -> int:
-    """Main routine execution."""
-    logger.info("Starting merge-dispatch routine")
+def dispatch_for_issue(issue_id: str) -> int:
+    """Agent-finish trigger: dispatch a merge for a single just-finished issue.
+
+    Invoked at close-out (see CLAUDE.md) right after an agent sets an issue to in_review
+    with a Fix-SHA, so the merge is prompt instead of waiting for the periodic sweep.
+    """
+    logger.info("Agent-finish merge dispatch for issue %s", issue_id)
+    issue = fetch_issue(issue_id)
+    if not issue:
+        print(json.dumps({"issue": issue_id, "action": "error", "error": "issue_not_found"}))
+        return 1
+
+    if issue.get("status") != "in_review":
+        result = {"issue": issue.get("identifier", issue_id), "action": "skip",
+                  "reason": f"status_{issue.get('status')}"}
+        print(json.dumps(result, indent=2))
+        return 0
+
+    try:
+        result = process_issue(issue)
+    except Exception as e:
+        result = {"issue": issue.get("identifier", issue_id), "action": "error", "error": str(e)}
+
+    print(json.dumps(result, indent=2))
+    logger.info("Agent-finish dispatch result: %s", result.get("action"))
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Main routine execution.
+
+    With ``--issue <id>`` runs the agent-finish trigger for a single issue (primary path).
+    With no args, runs the periodic backup sweep over all in_review issues.
+    """
+    argv = sys.argv[1:] if argv is None else argv
+    if "--issue" in argv:
+        idx = argv.index("--issue")
+        if idx + 1 >= len(argv):
+            logger.error("--issue requires an issue id")
+            return 2
+        return dispatch_for_issue(argv[idx + 1])
+
+    logger.info("Starting merge-dispatch routine (backup sweep)")
 
     # Find all in_review issues
     issues = find_in_review_issues()
