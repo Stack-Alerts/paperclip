@@ -535,6 +535,30 @@ function FullConfigSection({
 // ── Main component ─────────────────────────────────────────────────────────────
 const MAX_SELECTED = 3;
 
+function SortBtn({ k, label, sortKey, sortDir, onSort }: {
+  k: SortKey;
+  label: string;
+  sortKey: SortKey;
+  sortDir: 'asc' | 'desc';
+  onSort: (key: SortKey) => void;
+}) {
+  const active = sortKey === k;
+  return (
+    <button
+      onClick={() => onSort(k)}
+      className="flex items-center gap-0.5 text-xs px-2 py-1 rounded"
+      style={{
+        background: active ? 'rgba(46,140,255,0.1)' : 'transparent',
+        border: `1px solid ${active ? 'rgba(46,140,255,0.35)' : 'var(--border)'}`,
+        color: active ? 'var(--accent-blue)' : 'var(--text-muted)',
+      }}
+    >
+      {label}
+      {active && (sortDir === 'desc' ? <ChevronDown size={10} /> : <ChevronUp size={10} />)}
+    </button>
+  );
+}
+
 export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps) {
   const [records, setRecords] = useState<BacktestRunRecord[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -556,6 +580,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
   }, [fontScaleIdx]);
 
   const reload = useCallback(() => setRecords(loadAllRunRecords()), []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- reloads persisted run records from localStorage when the current result changes
   useEffect(() => { reload(); }, [reload, currentResult]);
 
   const rankings = useMemo(() => computeRankings(records), [records]);
@@ -636,24 +661,6 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
     });
   }, []);
 
-  const SortBtn = ({ k, label }: { k: SortKey; label: string }) => {
-    const active = sortKey === k;
-    return (
-      <button
-        onClick={() => handleSortClick(k)}
-        className="flex items-center gap-0.5 text-xs px-2 py-1 rounded"
-        style={{
-          background: active ? 'rgba(46,140,255,0.1)' : 'transparent',
-          border: `1px solid ${active ? 'rgba(46,140,255,0.35)' : 'var(--border)'}`,
-          color: active ? 'var(--accent-blue)' : 'var(--text-muted)',
-        }}
-      >
-        {label}
-        {active && (sortDir === 'desc' ? <ChevronDown size={10} /> : <ChevronUp size={10} />)}
-      </button>
-    );
-  };
-
   // ── Empty state ──────────────────────────────────────────────────────────────
   if (records.length === 0) {
     return (
@@ -701,12 +708,12 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
           )}
         </div>
         <div className="flex items-center gap-1">
-          <SortBtn k="rank" label="Rank" />
-          <SortBtn k="date" label="Date" />
-          <SortBtn k="return" label="Return" />
-          <SortBtn k="winRate" label="Win%" />
-          <SortBtn k="profit" label="Profit" />
-          <SortBtn k="drawdown" label="DD" />
+          <SortBtn k="rank" label="Rank" sortKey={sortKey} sortDir={sortDir} onSort={handleSortClick} />
+          <SortBtn k="date" label="Date" sortKey={sortKey} sortDir={sortDir} onSort={handleSortClick} />
+          <SortBtn k="return" label="Return" sortKey={sortKey} sortDir={sortDir} onSort={handleSortClick} />
+          <SortBtn k="winRate" label="Win%" sortKey={sortKey} sortDir={sortDir} onSort={handleSortClick} />
+          <SortBtn k="profit" label="Profit" sortKey={sortKey} sortDir={sortDir} onSort={handleSortClick} />
+          <SortBtn k="drawdown" label="DD" sortKey={sortKey} sortDir={sortDir} onSort={handleSortClick} />
         </div>
         {/* Aa−/Aa+ text size — parity with Live Output / Trades windows */}
         <div

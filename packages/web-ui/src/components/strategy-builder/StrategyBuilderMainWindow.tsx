@@ -208,52 +208,9 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   const isModified = !!currentStrategy && strategySnapshot !== cleanSnapshot;
   const isSavingRef = useRef(false);
 
-  // Status bar countdown — aligns to real 15-minute UTC candle boundaries (+0.2 s)
-  const nextCheckRef = useRef<Date>(
-    (() => {
-      // eslint-disable-next-line react-hooks/purity
-      const now = Date.now();
-      const interval = 15 * 60 * 1000;
-      return new Date((Math.floor(now / interval) + 1) * interval + 200);
-    })()
-  );
-  const countdownIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const diff = Math.max(0, nextCheckRef.current.getTime() - Date.now());
-      if (diff < 500) {
-        const interval = 15 * 60 * 1000;
-        nextCheckRef.current = new Date((Math.floor(Date.now() / interval) + 1) * interval + 200);
-        // Reuse the single persistent entry across boundaries instead of emitting
-        // a fresh one each time, which would orphan never-dismissed status entries.
-        if (countdownIdRef.current) {
-          status.update(countdownIdRef.current, 'Checking data…');
-        } else {
-          countdownIdRef.current = status.emit('Checking data…', { duration: -1 });
-        }
-        setTimeout(() => status.emit('Data check complete', { duration: 2000 }), 2000);
-      } else {
-        const mins = Math.floor(diff / 60000);
-        const secs = Math.floor((diff % 60000) / 1000);
-        const text = `Next data check in ${mins}m ${secs}s`;
-        if (countdownIdRef.current) {
-          status.update(countdownIdRef.current, text);
-        } else {
-          countdownIdRef.current = status.emit(text, { duration: -1 });
-        }
-      }
-    }, 1000);
-    return () => {
-      clearInterval(timer);
-      // The countdown is a persistent (duration: -1) status entry. Without an
-      // explicit dismiss it survives this window's unmount and freezes on the
-      // global status bar of every other page (BTCAAAAA-36517).
-      if (countdownIdRef.current) {
-        status.dismiss(countdownIdRef.current);
-        countdownIdRef.current = null;
-      }
-    };
-  }, []);
+  // The "Next data check" status-bar countdown was removed (BTCAAAAA-36517):
+  // it duplicated the next-candle countdown already shown under the connection
+  // bar, and as a persistent global entry it froze on other pages after unmount.
 
   // Resizable splitter — persists position to localStorage.
   // SPLIT_MIN: percentage floor (keeps right panel readable on very wide monitors).

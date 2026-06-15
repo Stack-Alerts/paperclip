@@ -15,6 +15,7 @@ export function useNextCandleCountdown(): number {
   const [seconds, setSeconds] = useState(secondsToNext15m);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing to the real UTC clock on mount
     setSeconds(secondsToNext15m());
     const id = setInterval(() => setSeconds(secondsToNext15m()), 1000);
     return () => clearInterval(id);

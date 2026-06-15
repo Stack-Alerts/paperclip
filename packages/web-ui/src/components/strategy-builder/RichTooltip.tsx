@@ -186,6 +186,7 @@ export function RichTooltip({ content, children, anchorTo }: RichTooltipProps) {
     }
   }, [settings.enabled]);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- timerRef mutation inside the callback is intentional
   const show = useCallback((e: React.MouseEvent<HTMLElement>) => {
     if (!settings.enabled) return;
     const rect = e.currentTarget.getBoundingClientRect();

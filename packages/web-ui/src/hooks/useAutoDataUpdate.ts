@@ -91,6 +91,7 @@ export function useAutoDataUpdate(): AutoDataUpdateState {
       // Quick-retry once on failure (matches thick client _in_quick_retry guard)
       if (!inQuickRetryRef.current) {
         inQuickRetryRef.current = true;
+        // eslint-disable-next-line react-hooks/immutability -- intentional self-reference for the quick-retry recursion
         timerRef.current = setTimeout(() => runUpdate(reschedule), 12_000);
         setStatusMessage('Retrying in 12 s…');
         setIsUpdating(false);

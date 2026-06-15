@@ -6,7 +6,7 @@ import { AppBrand } from '@/components/shared/AppBrand';
 import { ThemeSelector } from './ThemeSelector';
 import { useTooltipSettings } from './TooltipSettingsContext';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
-import { BacktestConfig, BacktestConfigFull, BacktestResult, BacktestStatusMessage } from '@/lib/strategy-builder/types';
+import { BacktestConfig, BacktestConfigFull, BacktestStatusMessage } from '@/lib/strategy-builder/types';
 import { RichTooltip, type TooltipContent } from './RichTooltip';
 import {
   TT_LOOKBACK, TT_TRAINING, TT_TESTING,
