@@ -47,7 +47,11 @@ function BacktestConfigPopoutInner() {
   return (
     <Providers tooltips={buildTooltipMap()}>
       <TooltipSettingsProvider>
-        <div style={{ width: '100%', height: '100vh', background: 'var(--app-bg)' }}>
+        {/* height:100% (not 100vh) so the dialog fills only the space above the
+            global Status bar; 100vh overflowed the layout's flex area and the
+            Status bar clipped the footer Run Test / Cancel buttons
+            (BTCAAAAA-36504). */}
+        <div style={{ width: '100%', height: '100%', background: 'var(--app-bg)' }}>
           <BacktestConfigDialog
             open={true}
             onClose={handleClose}

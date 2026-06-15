@@ -2200,7 +2200,12 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
         {/* Vertical padding tightened from `py-4` → `py-2` (board revision
             2026-06-03) so the Config tab's 3-column grid fits without
             internal scroll at 1280×720. */}
-        <div className="flex-1 overflow-auto px-4 py-1" style={{ background: 'var(--bg-deep)' }}>
+        {/* min-h-0 lets this flex child shrink below its content's intrinsic
+            height so a tall tab (e.g. the Compare panel's run cards) scrolls
+            internally instead of pushing the footer action bar off-screen,
+            where the global Status bar clipped the Run Test / Cancel buttons
+            (BTCAAAAA-36504). */}
+        <div className="flex-1 min-h-0 overflow-auto px-4 py-1" style={{ background: 'var(--bg-deep)' }}>
           {activeTab === 'config' && (
             <ConfigTab
               config={config}
