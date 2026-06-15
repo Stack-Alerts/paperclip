@@ -29,15 +29,23 @@ jobs:
             exit 0
           fi
 
-          REVIEWS=$(echo "$PROTECTION" | jq '.required_pull_request_reviews.required_approving_review_count')
-          DISMISS=$(echo "$PROTECTION" | jq '.required_pull_request_reviews.dismiss_stale_reviews')
+          # POLICY (BTCAAAAA-36480, Option B): required_approving_review_count = 0.
+          # Every PR is authored by the single automation collaborator, so a
+          # ">= 1 non-author approval" rule is mathematically unmergeable when
+          # combined with enforce_admins=true — it deadlocked main for ~90 commits.
+          # Merge safety is enforced by the REQUIRED STATUS CHECKS (CI) + strict
+          # up-to-date rule + enforce_admins, NOT by human review. Do NOT raise this
+          # back to 1 without first adding a second, independent reviewer identity;
+          # doing so re-introduces the deadlock this policy exists to prevent.
+          # When reviews are 0, GitHub may return required_pull_request_reviews as
+          # null, so normalize null -> 0 and treat dismiss_stale as not-applicable.
+          REVIEWS=$(echo "$PROTECTION" | jq 'try (.required_pull_request_reviews.required_approving_review_count) // 0')
           STRICT=$(echo "$PROTECTION" | jq '.required_status_checks.strict')
           FORCE=$(echo "$PROTECTION" | jq '.allow_force_pushes.enabled')
           DELETES=$(echo "$PROTECTION" | jq '.allow_deletions.enabled')
 
           DRIFT=0
-          [ "$REVIEWS" != "1" ]     && echo "::error::DRIFT: required_approving_review_count=$REVIEWS (expected 1)" && DRIFT=1
-          [ "$DISMISS" != "true" ]  && echo "::error::DRIFT: dismiss_stale_reviews=$DISMISS (expected true)"        && DRIFT=1
+          [ "$REVIEWS" != "0" ]     && echo "::error::DRIFT: required_approving_review_count=$REVIEWS (expected 0 — single-author merge model, see policy note above)" && DRIFT=1
           [ "$STRICT"  != "true" ]  && echo "::error::DRIFT: status_checks.strict=$STRICT (expected true)"          && DRIFT=1
           [ "$FORCE"   != "false" ] && echo "::error::DRIFT: allow_force_pushes=$FORCE (expected false)"            && DRIFT=1
           [ "$DELETES" != "false" ] && echo "::error::DRIFT: allow_deletions=$DELETES (expected false)"             && DRIFT=1

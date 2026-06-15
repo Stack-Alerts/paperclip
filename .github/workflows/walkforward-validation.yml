@@ -1,37 +1,73 @@
 name: Walkforward Validation
 
+# BTCAAAAA-36465: a workflow-level `paths:` filter must NOT be used if any job
+# here is (or becomes) a REQUIRED status check on main — a path-filtered workflow
+# never triggers for unrelated PRs, leaving the required check pending forever and
+# deadlocking branch protection. Instead, trigger on every PR/push and gate the
+# heavy jobs behind a change-detection job. When the strategy paths are untouched
+# the jobs are skipped (a skipped required check satisfies protection) so the
+# expensive backtest still only runs when relevant files change — or on schedule.
 on:
   schedule:
     - cron: '0 6 * * *'
   push:
     branches: ["main", "master"]
-    paths:
-      - 'src/strategy_builder/testing/walkforward_test_engine.py'
-      - 'src/strategy_builder/core/**'
-      - 'src/strategy_builder/execution/**'
-      - 'src/strategies/**'
-      - 'tests/strategy_builder/testing/**'
-      - 'tests/strategies/**'
-      - '.github/workflows/walkforward-validation.yml'
   pull_request:
     branches: ["main", "master"]
-    paths:
-      - 'src/strategy_builder/testing/walkforward_test_engine.py'
-      - 'src/strategy_builder/core/**'
-      - 'src/strategy_builder/execution/**'
-      - 'src/strategies/**'
-      - 'tests/strategy_builder/testing/**'
-      - 'tests/strategies/**'
-      - '.github/workflows/walkforward-validation.yml'
   workflow_dispatch:
 
 env:
   PYTHONPATH: src
 
 jobs:
+  # ─── 0. Change detection ──────────────────────────────────────────────────
+  changes:
+    name: Detect walkforward-relevant changes
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@v4.2.0
+        with:
+          fetch-depth: 0
+
+      - name: Determine whether walkforward-relevant paths changed
+        id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # schedule / manual runs always execute the full validation
+          if [ "$EVENT_NAME" = "schedule" ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            FILES=$(gh pr view "$PR_NUMBER" --json files --jq '.files[].path' || echo "__ERROR__")
+          else
+            FILES=$(git diff --name-only "$BEFORE_SHA" "$AFTER_SHA" 2>/dev/null || echo "__ERROR__")
+          fi
+          echo "Changed files:"
+          echo "$FILES"
+          PATTERN='^(src/strategy_builder/testing/walkforward_test_engine\.py|src/strategy_builder/core/|src/strategy_builder/execution/|src/strategies/|tests/strategy_builder/testing/|tests/strategies/|\.github/workflows/walkforward-validation\.yml)'
+          if echo "$FILES" | grep -q '__ERROR__'; then
+            echo "Change detection failed; defaulting relevant=true (fail safe to run validation)."
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          elif echo "$FILES" | grep -qE "$PATTERN"; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+          fi
+
   walkforward-unit:
     name: Walkforward unit tests
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
 
     steps:
       - uses: actions/checkout@v4.2.0
@@ -55,6 +91,8 @@ jobs:
   walkforward-strategy:
     name: Walkforward strategy validation (real data)
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
 
     steps:
       - uses: actions/checkout@v4.2.0
