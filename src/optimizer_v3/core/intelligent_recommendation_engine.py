@@ -21,7 +21,7 @@ Date: 2026-01-23
 Sprint: 1.6 (Intelligent Recommendations - COMPLETE REBUILD Part 3/3)
 """
 
-from typing import List, Dict, Optional, Callable
+from typing import List, Dict, Optional, Callable, Tuple
 from dataclasses import dataclass, asdict
 from pathlib import Path
 import time
@@ -160,27 +160,50 @@ class IntelligentRecommendationEngine:
         if self.status_callback:
             self.status_callback(message)
     
+    # Minimum trade sample size for a recommendation to carry full confidence.
+    # Below this, recommendations are still emitted but flagged low-sample and
+    # their confidence is scaled down proportionally (no confident numbers on
+    # statistically thin evidence).
+    MIN_TRADES_FOR_CONFIDENT_REC = 30
+
     def generate_recommendations(
         self,
         strategy_config: Dict,
         backtest_results: Dict,
         metrics: Dict[str, Dict],
-        lookback_days: int = 180
+        lookback_days: int = 180,
+        signal_analysis: Optional[List[Dict]] = None,
     ) -> List[IntegratedRecommendation]:
         """
         Generate intelligent recommendations for strategy improvement
-        
+
         Args:
             strategy_config: Complete strategy configuration
             backtest_results: Backtest results with all metrics
             metrics: Metrics dict with values and ratings
             lookback_days: Days of backtest data
-        
+            signal_analysis: Optional list of OptimalParameterCalculator result
+                dicts (keys: signal_name, optimal_delay, min_delay, max_delay,
+                confidence, sample_size). When provided, computed RECHECK delays
+                are emitted instead of hardcoded defaults. When absent, no
+                timing recommendations are fabricated.
+
         Returns:
             List of integrated recommendations with AI enhancement
+
+        Raises:
+            RuntimeError: if generation fails. Failures are surfaced (not
+                swallowed) so a broken run is visible rather than masquerading
+                as "no recommendations".
         """
         start_time = time.time()
-        
+
+        # Trade sample size drives confidence gating (see MIN_TRADES_FOR_CONFIDENT_REC).
+        sample_size = int(
+            backtest_results.get('total_trades',
+                                 backtest_results.get('num_trades', 0)) or 0
+        )
+
         try:
             self._update_status("\n" + "="*80)
             self._update_status("🎯 STARTING INTELLIGENT RECOMMENDATION GENERATION")
@@ -233,9 +256,30 @@ class IntelligentRecommendationEngine:
                 metrics,
                 analysis_report,
                 intelligence_db,
-                strategy_direction=strategy_direction
+                strategy_direction=strategy_direction,
+                sample_size=sample_size,
             )
-            
+
+            # Emit RECHECK recommendations from computed signal analysis (if any).
+            # These use the OptimalParameterCalculator's statistically-derived
+            # delays — never hardcoded magic numbers. Absent analysis ⇒ none.
+            timing_recs = self._generate_timing_recommendations(
+                signal_analysis,
+                current_blocks=set(analysis_report.block_names),
+            )
+            if timing_recs:
+                preliminary_recs.extend(timing_recs)
+                self._update_status(
+                    f"   ✅ Added {len(timing_recs)} computed RECHECK recommendation(s)"
+                )
+
+            if sample_size < self.MIN_TRADES_FOR_CONFIDENT_REC:
+                self._update_status(
+                    f"   ⚠️ Low sample size ({sample_size} trades < "
+                    f"{self.MIN_TRADES_FOR_CONFIDENT_REC}): recommendations flagged "
+                    f"low-confidence"
+                )
+
             self._update_status(f"   ✅ Generated {len(preliminary_recs)} preliminary recommendations")
             
             # Step 4: AI Enhancement (if available)
@@ -301,9 +345,14 @@ class IntelligentRecommendationEngine:
             return integrated_recs
             
         except Exception as e:
+            # Surface the failure with a full traceback instead of silently
+            # returning [] — a swallowed error here is indistinguishable from
+            # "strategy is fine, no recommendations", which hid broken runs.
+            logger.exception("Recommendation generation failed")
             self._update_status(f"\n❌ ERROR: Recommendation generation failed: {str(e)}")
-            self._update_status(f"   Returning empty recommendations list")
-            return []
+            raise RuntimeError(
+                f"Recommendation generation failed: {e}"
+            ) from e
     
     def _create_strategy_object(self, strategy_config: Dict):
         """Create strategy object from config dict for analyzer"""
@@ -335,7 +384,8 @@ class IntelligentRecommendationEngine:
         metrics: Dict[str, Dict],
         analysis_report: StrategyAnalysisReport,
         intelligence_db: Dict[str, BlockIntelligence],
-        strategy_direction: Optional[str] = None
+        strategy_direction: Optional[str] = None,
+        sample_size: int = 0,
     ) -> List[Dict]:
         """
         Generate preliminary data-driven recommendations
@@ -405,26 +455,38 @@ class IntelligentRecommendationEngine:
                 
                 # Check if improves this metric
                 if metric_key in intel.primary_metrics:
-                    # B4-1: Use actual improvement estimate from PURPOSE_METRICS_MAP
+                    # B4-1: Use actual improvement estimate from PURPOSE_METRICS_MAP.
+                    # P0: do NOT fabricate a 0.10 fallback. If no empirical estimate
+                    # exists for this metric, improvement is None and the rec is
+                    # emitted as a qualitative suggestion (no fake numeric impact).
                     from src.optimizer_v3.core.block_intelligence_extractor import BlockIntelligenceExtractor
                     purpose_data = BlockIntelligenceExtractor.PURPOSE_METRICS_MAP.get(intel.purpose, {})
                     improvements_map = purpose_data.get('improvements', {})
-                    # Look up this specific metric's estimate; fall back to 0.10
-                    improvement = improvements_map.get(metric_key, 0.10)
-                    
+                    improvement = improvements_map.get(metric_key)  # None if absent
+
                     candidates.append({
                         'block_name': block_name,
                         'improvement': improvement,
                         'intel': intel
                     })
-            
+
             if candidates:
-                # Sort by improvement potential
-                best = max(candidates, key=lambda x: abs(x['improvement']))
-                
+                # Prefer candidates with a real empirical estimate; qualitative
+                # (improvement is None) candidates sort last.
+                best = max(
+                    candidates,
+                    key=lambda x: abs(x['improvement']) if x['improvement'] is not None else -1.0,
+                )
+
                 # B4-2: Mark this block as nominated
                 nominated_blocks.add(best['block_name'])
-                
+
+                confidence, warnings = self._gate_confidence(
+                    base_confidence=best['intel'].confidence,
+                    sample_size=sample_size,
+                    has_empirical_estimate=best['improvement'] is not None,
+                )
+
                 recommendations.append({
                     'action_type': 'ADD_BLOCK',
                     'block_name': best['block_name'],
@@ -432,10 +494,110 @@ class IntelligentRecommendationEngine:
                     'current_value': value,
                     'expected_improvement': best['improvement'],
                     'description': best['intel'].description,
-                    'confidence': best['intel'].confidence,
-                    'category': best['intel'].category
+                    'confidence': confidence,
+                    'category': best['intel'].category,
+                    'warnings': warnings,
                 })
-        
+
+        return recommendations
+
+    def _gate_confidence(
+        self,
+        base_confidence: float,
+        sample_size: int,
+        has_empirical_estimate: bool,
+    ) -> Tuple[float, List[str]]:
+        """
+        Apply sample-size and evidence gating to a recommendation's confidence.
+
+        Returns the adjusted confidence and a list of human-readable warnings
+        explaining any downgrade. Confidence is never fabricated upward — only
+        held or reduced.
+        """
+        warnings: List[str] = []
+        confidence = float(base_confidence)
+
+        if sample_size < self.MIN_TRADES_FOR_CONFIDENT_REC:
+            # Scale linearly with how close we are to the threshold, floored at
+            # 0.2 so a non-zero signal is still conveyed.
+            scale = max(0.2, sample_size / self.MIN_TRADES_FOR_CONFIDENT_REC) if sample_size > 0 else 0.2
+            confidence *= scale
+            warnings.append(
+                f"Low sample size: {sample_size} trades "
+                f"(< {self.MIN_TRADES_FOR_CONFIDENT_REC}). Treat as directional, "
+                f"not statistically validated."
+            )
+
+        if not has_empirical_estimate:
+            confidence = min(confidence, 0.5)
+            warnings.append(
+                "No empirical effect estimate available — qualitative suggestion only."
+            )
+
+        # Clamp to [0, 1]
+        confidence = max(0.0, min(1.0, confidence))
+        return confidence, warnings
+
+    def _generate_timing_recommendations(
+        self,
+        signal_analysis: Optional[List[Dict]],
+        current_blocks: set,
+    ) -> List[Dict]:
+        """
+        Build ADD_RECHECK recommendations from computed signal analysis.
+
+        Each entry in ``signal_analysis`` is an OptimalParameterCalculator
+        result dict. Only entries that clear the calculator's own sample-size
+        and confidence bar are emitted, and the RECHECK ``bar_delay`` is the
+        *computed* ``optimal_delay`` — never a hardcoded default. When
+        ``signal_analysis`` is None/empty, no timing recommendations are
+        fabricated.
+        """
+        recommendations: List[Dict] = []
+        if not signal_analysis:
+            return recommendations
+
+        for result in signal_analysis:
+            if not isinstance(result, dict):
+                continue
+
+            signal_name = result.get('signal_name')
+            optimal_delay = result.get('optimal_delay')
+            if not signal_name or optimal_delay is None:
+                continue
+
+            # Skip the calculator's own low-evidence sentinels.
+            method = result.get('method')
+            if method in ('default', 'low_sample'):
+                continue
+
+            sample_size = int(result.get('sample_size', 0) or 0)
+            if sample_size < self.MIN_TRADES_FOR_CONFIDENT_REC:
+                # The computed delay is not yet trustworthy; do not surface it as
+                # a confident recheck recommendation.
+                continue
+
+            # confidence may be Decimal from the calculator.
+            confidence = float(result.get('confidence', 0.0) or 0.0)
+
+            recommendations.append({
+                'action_type': 'ADD_RECHECK',
+                'block_name': signal_name,
+                'signal_name': signal_name,
+                'metric': 'timing',
+                'current_value': 0,
+                'expected_improvement': None,
+                'description': result.get('reasoning', ''),
+                'confidence': confidence,
+                'category': 'TIMING',
+                'warnings': [],
+                'configuration': {
+                    'bar_delay': int(optimal_delay),
+                    'min_delay': int(result.get('min_delay', optimal_delay)),
+                    'max_delay': int(result.get('max_delay', optimal_delay)),
+                },
+            })
+
         return recommendations
     
     def _convert_to_integrated_format(
@@ -477,29 +639,42 @@ class IntelligentRecommendationEngine:
                 # Data-driven recommendation (dict)
                 metric_key = rec.get('metric', '')
                 current_value = rec.get('current_value', 0)
-                improvement = rec.get('expected_improvement', 0)
-                expected_value = current_value * (1 + improvement) if improvement else current_value
-                
+                improvement = rec.get('expected_improvement')  # may be None (qualitative)
+
+                # P0: only project a numeric expected value/impact when a real
+                # empirical estimate exists. Otherwise present it qualitatively.
+                if improvement is not None:
+                    expected_value = current_value * (1 + improvement)
+                    expected_impact = {metric_key: f"{abs(improvement * 100):.0f}%"}
+                else:
+                    expected_value = current_value
+                    expected_impact = (
+                        {metric_key: "qualitative (no empirical estimate)"}
+                        if metric_key else {}
+                    )
+
+                # P0: confidence and warnings are gated upstream — carry them
+                # through instead of a blanket 0.75.
+                confidence = rec.get('confidence', 0.0)
+
                 integrated.append(IntegratedRecommendation(
                     type=rec.get('action_type', 'ADD_BLOCK'),
                     primary=(i == 0),  # First recommendation is primary
                     block_name=rec.get('block_name'),
-                    signal_name=None,
-                    configuration={},
+                    signal_name=rec.get('signal_name'),
+                    configuration=rec.get('configuration', {}) or {},
                     reasoning=rec.get('description', ''),
                     root_cause=self._get_root_cause_for_metric(
                         metric_key,
                         analysis_report
                     ),
-                    expected_impact={
-                        metric_key: f"{abs(improvement*100):.0f}%"
-                    },
-                    data_confidence=rec.get('confidence', 0.75),
+                    expected_impact=expected_impact,
+                    data_confidence=confidence,
                     ai_confidence=0.0,
-                    combined_confidence=rec.get('confidence', 0.75),
+                    combined_confidence=confidence,
                     ai_enhanced=False,
                     validated=True,
-                    warnings=[],
+                    warnings=rec.get('warnings', []) or [],
                     metric_targeted=metric_key,
                     current_value=current_value,
                     expected_value=expected_value

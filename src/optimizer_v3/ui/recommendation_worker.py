@@ -68,22 +68,25 @@ class RecommendationWorker(QThread):
             # Temporarily override engine's callback
             original_callback = self.engine.status_callback
             self.engine.status_callback = progress_callback
-            
-            # Generate recommendations (blocking call - but in background thread)
-            recommendations = self.engine.generate_recommendations(
-                strategy_config=self.strategy_config,
-                backtest_results=self.backtest_results,
-                metrics=self.metrics,
-                lookback_days=self.lookback_days
-            )
-            
-            # Restore original callback
-            self.engine.status_callback = original_callback
-            
+
+            try:
+                # Generate recommendations (blocking call - but in background thread)
+                recommendations = self.engine.generate_recommendations(
+                    strategy_config=self.strategy_config,
+                    backtest_results=self.backtest_results,
+                    metrics=self.metrics,
+                    lookback_days=self.lookback_days
+                )
+            finally:
+                # Always restore the original callback, even on failure, so an
+                # errored run does not leak this worker's callback onto a reused
+                # engine instance.
+                self.engine.status_callback = original_callback
+
             # Emit completion
             self.progress_update.emit("✅ Recommendations generated successfully", 100)
             self.recommendations_ready.emit(recommendations)
-            
+
         except Exception as e:
             error_msg = f"AI recommendation generation failed: {str(e)}"
             self.error_occurred.emit(error_msg)

@@ -511,3 +511,125 @@ class TestIntelligentRecommendationEngine:
             )
             text = engine.format_recommendation_text(rec)
             assert isinstance(text, str) and len(text) > 0
+
+
+class TestP0RecommendationGating:
+    """P0 (BTCAAAAA-36468): sample-size gating, no fabricated numbers,
+    computed RECHECK delays, and surfaced (not swallowed) failures."""
+
+    @pytest.fixture(scope="class", autouse=True)
+    def mock_openrouter(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = _MOCK_OPENROUTER_RESPONSE
+        mock_resp.raise_for_status = MagicMock()
+        with patch("requests.post", return_value=mock_resp):
+            yield mock_resp
+
+    @pytest.fixture(scope="class")
+    def engine(self, mock_openrouter):
+        from src.optimizer_v3.core.intelligent_recommendation_engine import (
+            IntelligentRecommendationEngine,
+        )
+        return IntelligentRecommendationEngine()
+
+    # ── _gate_confidence ────────────────────────────────────────────────────
+
+    def test_gate_confidence_low_sample_reduces_and_warns(self, engine):
+        """Below the threshold, confidence is scaled down and a warning added."""
+        conf, warnings = engine._gate_confidence(
+            base_confidence=0.9, sample_size=15, has_empirical_estimate=True
+        )
+        assert conf < 0.9
+        assert any("Low sample size" in w for w in warnings)
+
+    def test_gate_confidence_full_sample_unchanged(self, engine):
+        """At/above the threshold with an empirical estimate, confidence holds."""
+        conf, warnings = engine._gate_confidence(
+            base_confidence=0.8,
+            sample_size=engine.MIN_TRADES_FOR_CONFIDENT_REC,
+            has_empirical_estimate=True,
+        )
+        assert conf == pytest.approx(0.8)
+        assert warnings == []
+
+    def test_gate_confidence_no_empirical_estimate_capped(self, engine):
+        """Without an empirical estimate confidence is capped at 0.5 and warned."""
+        conf, warnings = engine._gate_confidence(
+            base_confidence=0.95,
+            sample_size=100,
+            has_empirical_estimate=False,
+        )
+        assert conf <= 0.5
+        assert any("qualitative" in w.lower() for w in warnings)
+
+    # ── _generate_timing_recommendations ────────────────────────────────────
+
+    def test_timing_recs_use_computed_delay(self, engine):
+        """A trustworthy calculator result yields ADD_RECHECK with computed delay."""
+        signal_analysis = [{
+            "signal_name": "BEARISH_CROSS",
+            "timeframe": "5m",
+            "optimal_delay": 18,
+            "min_delay": 12,
+            "max_delay": 25,
+            "confidence": 0.7,
+            "sample_size": 60,
+            "method": "recurrence",
+            "reasoning": "Recurs ~18 bars later",
+        }]
+        recs = engine._generate_timing_recommendations(
+            signal_analysis, current_blocks=set()
+        )
+        assert len(recs) == 1
+        assert recs[0]["action_type"] == "ADD_RECHECK"
+        assert recs[0]["configuration"]["bar_delay"] == 18
+
+    def test_timing_recs_skip_low_evidence(self, engine):
+        """Default/low_sample method or thin sample produces no timing rec."""
+        signal_analysis = [
+            {"signal_name": "A", "optimal_delay": 10, "method": "default",
+             "sample_size": 100, "confidence": 0.0, "reasoning": ""},
+            {"signal_name": "B", "optimal_delay": 12, "method": "recurrence",
+             "sample_size": 5, "confidence": 0.6, "reasoning": ""},
+            {"signal_name": "C", "optimal_delay": 8, "method": "low_sample",
+             "sample_size": 100, "confidence": 0.3, "reasoning": ""},
+        ]
+        recs = engine._generate_timing_recommendations(
+            signal_analysis, current_blocks=set()
+        )
+        assert recs == []
+
+    def test_timing_recs_none_input_no_fabrication(self, engine):
+        """No signal analysis ⇒ no fabricated timing recommendations."""
+        assert engine._generate_timing_recommendations(None, current_blocks=set()) == []
+        assert engine._generate_timing_recommendations([], current_blocks=set()) == []
+
+    # ── failure surfacing ───────────────────────────────────────────────────
+
+    def test_generation_failure_is_surfaced_not_swallowed(self, engine):
+        """A failure inside generation raises RuntimeError instead of returning []."""
+        with patch.object(
+            engine.strategy_analyzer,
+            "analyze_strategy",
+            side_effect=ValueError("boom"),
+        ):
+            with pytest.raises(RuntimeError):
+                engine.generate_recommendations(
+                    SAMPLE_STRATEGY, SAMPLE_BACKTEST, SAMPLE_METRICS
+                )
+
+    # ── end-to-end low-sample warning ───────────────────────────────────────
+
+    def test_low_sample_recs_carry_warning(self, engine):
+        """With a thin trade sample, emitted recs carry a low-sample warning."""
+        result = engine.generate_recommendations(
+            SAMPLE_STRATEGY, SAMPLE_BACKTEST, SAMPLE_METRICS
+        )
+        # SAMPLE_BACKTEST has 15 trades (< 30) → any data-driven rec should warn.
+        data_driven = [r for r in result if r.type == "ADD_BLOCK"]
+        if data_driven:
+            assert any(
+                any("sample size" in w.lower() for w in (r.warnings or []))
+                for r in data_driven
+            )
