@@ -3092,6 +3092,23 @@ async def update_data(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"Invalid date format: {exc}") from exc
 
+    # BTCAAAAA-36499: a date-only endDate ("2026-06-15") parses to 00:00:00 — the
+    # START of that day — so every candle from that day is excluded from the fetch
+    # window. For an endDate of *today* that silently drops the current day's
+    # trailing bars, which are exactly the "up to 1 day missing" gap the user is
+    # trying to fill: the historical bars up to midnight download fine (success),
+    # but the gap never clears and re-running reports success again. Interpret a
+    # date-only endDate as the END of that day, then clamp to now so we never
+    # request unformed future bars.
+    end_is_date_only = "T" not in body.endDate and " " not in body.endDate.strip()
+    now_utc = datetime.now(timezone.utc)
+    if end_dt.tzinfo is None:
+        end_dt = end_dt.replace(tzinfo=timezone.utc)
+    if end_is_date_only:
+        end_dt = end_dt + timedelta(days=1) - timedelta(seconds=1)
+    if end_dt > now_utc:
+        end_dt = now_utc
+
     def _run_update() -> dict:
         import requests as _requests
         try:
