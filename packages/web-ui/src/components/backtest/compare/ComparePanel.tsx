@@ -191,12 +191,16 @@ function ConfigRow({
 }
 
 // ── Table wrapper with per-run column headers ──────────────────────────────────
+// showHeader is opt-out: inside the comparison dashboard the run header cards
+// already label every column with a colored "Run N" badge, so repeating the
+// "Run 1 / Run 2 / Run 3" thead on each metric section is redundant clutter.
 function CompareTable({
-  colLabels, colColors, children,
+  colLabels, colColors, children, showHeader = true,
 }: {
   colLabels: string[];
   colColors: string[];
   children: React.ReactNode;
+  showHeader?: boolean;
 }) {
   return (
     <table className="w-full" style={{ borderCollapse: 'collapse', tableLayout: 'fixed' }}>
@@ -204,16 +208,18 @@ function CompareTable({
         <col style={{ width: 160 }} />
         {colLabels.map((_, i) => <col key={i} />)}
       </colgroup>
-      <thead>
-        <tr style={{ borderBottom: '1px solid var(--border-strong)' }}>
-          <th className="pb-2 pt-1 pl-3" />
-          {colLabels.map((l, i) => (
-            <th key={i} className="pb-2 pt-1 px-3 text-xs font-semibold text-center" style={{ color: colColors[i] }}>
-              {l}
-            </th>
-          ))}
-        </tr>
-      </thead>
+      {showHeader && (
+        <thead>
+          <tr style={{ borderBottom: '1px solid var(--border-strong)' }}>
+            <th className="pb-2 pt-1 pl-3" />
+            {colLabels.map((l, i) => (
+              <th key={i} className="pb-2 pt-1 px-3 text-xs font-semibold text-center" style={{ color: colColors[i] }}>
+                {l}
+              </th>
+            ))}
+          </tr>
+        </thead>
+      )}
       <tbody>{children}</tbody>
     </table>
   );
@@ -976,7 +982,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
 
             <SectionHeader title="Returns & Capital" />
             <div className="rounded-md overflow-hidden" style={{ border: TABLE_FRAME }}>
-              <CompareTable colLabels={colLabels} colColors={colColors}>
+              <CompareTable colLabels={colLabels} colColors={colColors} showHeader={false}>
                 <MetricRow isEven={false} label="Total Return" values={selectedRecords.map(r => r.result.returnPercentage)} fmtFn={v => fmtPct(v)} colorFn={colorReturn} />
                 <MetricRow isEven={true} label="Net Profit" values={selectedRecords.map(r => r.result.finalCapital - r.result.initialCapital)} fmtFn={v => fmtUSD(v, true)} colorFn={v => v != null && v >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'} />
                 <MetricRow isEven={false} label="Initial Capital" values={selectedRecords.map(r => r.result.initialCapital)} fmtFn={fmtUSD} colorFn={() => 'var(--text-secondary)'} />
@@ -986,7 +992,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
 
             <SectionHeader title="Risk Metrics" />
             <div className="rounded-md overflow-hidden" style={{ border: TABLE_FRAME }}>
-              <CompareTable colLabels={colLabels} colColors={colColors}>
+              <CompareTable colLabels={colLabels} colColors={colColors} showHeader={false}>
                 <MetricRow isEven={false} label="Max Drawdown" values={selectedRecords.map(r => r.result.maxDrawdown * 100)} fmtFn={v => `${fmt(v)}%`} colorFn={() => 'var(--accent-orange, #f97316)'} higherIsBetter={false} />
                 <MetricRow isEven={true} label="Sharpe Ratio" values={selectedRecords.map(r => r.result.sharpeRatio)} colorFn={v => v != null && v >= 1 ? 'var(--accent-green)' : 'var(--text-secondary)'} />
                 <MetricRow isEven={false} label="Sortino Ratio" values={selectedRecords.map(r => r.result.sortino_ratio)} colorFn={v => v != null && v >= 1 ? 'var(--accent-green)' : 'var(--text-secondary)'} />
@@ -997,7 +1003,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
 
             <SectionHeader title="Trade Statistics" />
             <div className="rounded-md overflow-hidden" style={{ border: TABLE_FRAME }}>
-              <CompareTable colLabels={colLabels} colColors={colColors}>
+              <CompareTable colLabels={colLabels} colColors={colColors} showHeader={false}>
                 <MetricRow isEven={false} label="Total Trades" values={selectedRecords.map(r => r.result.totalTrades)} fmtFn={v => String(Math.round(v))} colorFn={() => 'var(--text-secondary)'} />
                 <MetricRow isEven={true} label="Win Rate" values={selectedRecords.map(r => r.result.winRate * 100)} fmtFn={v => `${fmt(v, 1)}%`} colorFn={v => v != null && v >= 50 ? 'var(--accent-green)' : 'var(--accent-red)'} />
                 <MetricRow isEven={false} label="Winning Trades" values={selectedRecords.map(r => r.result.winningTrades)} fmtFn={v => String(Math.round(v))} colorFn={() => 'var(--accent-green)'} />
@@ -1020,7 +1026,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
               </div>
             ) : (
               <div className="rounded-md overflow-hidden" style={{ border: TABLE_FRAME }}>
-                <CompareTable colLabels={colLabels} colColors={colColors}>
+                <CompareTable colLabels={colLabels} colColors={colColors} showHeader={false}>
                   {diffConfigRows.map((row, idx) => (
                     <ConfigRow key={row.label} label={row.label} values={row.values} isEven={idx % 2 === 1} />
                   ))}
