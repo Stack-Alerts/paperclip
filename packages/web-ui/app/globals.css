@@ -357,3 +357,25 @@ body {
     box-shadow: 0 0 0 2px var(--accent-orange);
   }
 }
+
+/* ─── Probing blink for stale-data auto-update indicator ──────────────────── */
+@keyframes probing-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .data-probing-blink {
+    animation: probing-blink 1.4s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .data-probing-blink {
+    opacity: 0.7;
+  }
+}

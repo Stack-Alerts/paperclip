@@ -58,6 +58,9 @@ export function SidebarDataStatus({ collapsed }: { collapsed: boolean }) {
 
   const color = STATUS_COLOR[status] ?? 'var(--text-muted)';
   const label = isUpdating ? 'UPDATING' : (STATUS_LABEL[status] ?? 'STARTING');
+  // When data is stale the auto-updater keeps probing for fresh candles; surface
+  // that with a blinking "( probing )" suffix next to the STALE label.
+  const isStale = status === 'error';
 
   const lastCandleDate = parseApiTimestamp(lastCandleTs);
 
@@ -101,6 +104,14 @@ export function SidebarDataStatus({ collapsed }: { collapsed: boolean }) {
           }}
         >
           DATA {label}
+          {isStale && (
+            <span
+              className="data-probing-blink"
+              style={{ marginLeft: 4, fontWeight: 500, textTransform: 'none' }}
+            >
+              ( probing )
+            </span>
+          )}
         </span>
       </div>
 
