@@ -49,6 +49,65 @@ from src.optimizer_v3.core.ai_recommendation_enhancer import (
 )
 
 
+# Schema for ADJUST_PARAM recommendations: which top-level strategy
+# parameters the apply-path is allowed to mutate, what type they must
+# be coerced to, and the inclusive numeric range (min, max) the new
+# value must fall within.
+#
+# P2.3 — these bounds are conservative and reflect real-money safety:
+#   - TP/SL: anything outside [0.1%, 50%] is almost certainly a model
+#     bug (a 90% take-profit is data corruption, not a strategy).
+#   - Position size: below 0.01 (0.01%) is below exchange min qty on
+#     most pairs; above 1.0 (100% of bankroll) violates single-trade
+#     risk policy.
+#
+# Adding a new tunable = extend this dict; the apply-path picks the
+# validator up automatically.
+_ADJUSTABLE_PARAMETERS: Dict[str, Dict] = {
+    "take_profit_pct": {
+        "type": float,
+        "min": 0.1,
+        "max": 50.0,
+        "unit": "percent",
+    },
+    "stop_loss_pct": {
+        "type": float,
+        "min": 0.1,
+        "max": 50.0,
+        "unit": "percent",
+    },
+    "position_size_pct": {
+        "type": float,
+        "min": 0.01,
+        "max": 1.0,
+        "unit": "fraction_of_bankroll",
+    },
+}
+
+
+def _validate_adjust_param(name: str, value, schema_entry: Dict) -> Optional[str]:
+    """Return None if (name, value) is acceptable, else an error string.
+
+    P2.3 — applied at the engine boundary so a misbehaving model cannot
+    silently poison live strategy configs (real-money impact: HIGH).
+    """
+    if name not in _ADJUSTABLE_PARAMETERS:
+        return f"unknown parameter '{name}'"
+    spec = _ADJUSTABLE_PARAMETERS[name]
+    expected = spec["type"]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return f"parameter '{name}' must be numeric, got {type(value).__name__}"
+    coerced = expected(value)
+    if coerced != coerced:  # NaN
+        return f"parameter '{name}' is NaN"
+    if coerced < spec["min"] or coerced > spec["max"]:
+        return (
+            f"parameter '{name}' value {coerced} out of range "
+            f"[{spec['min']}, {spec['max']}] {spec.get('unit', '')}".rstrip()
+        )
+    return None
+
+
 @dataclass
 class IntegratedRecommendation:
     """Complete recommendation with all intelligence layers"""
@@ -813,6 +872,9 @@ class IntelligentRecommendationEngine:
 
                 if rec_type == "ADD_BLOCK":
                     block_name = getattr(rec, "block_name", None)
+                    configuration = getattr(rec, "configuration", {}) or {}
+                    signals = configuration.get("signals") or []
+
                     if not block_name:
                         self.log.warning(f"ADD_BLOCK rec has no block_name — skipping")
                         result["skipped"].append(rec)
@@ -825,11 +887,22 @@ class IntelligentRecommendationEngine:
                         result["skipped"].append(rec)
                         continue
 
-                    # Build minimal block dict from rec data
-                    new_block: Dict = {"name": block_name, "signals": []}
-                    configuration = getattr(rec, "configuration", {}) or {}
-                    if configuration:
-                        new_block["parameters"] = configuration
+                    # P2.3 — never apply an ADD_BLOCK with no signals.
+                    # An empty-signals block is a silent no-op (no entry/exit
+                    # trigger, takes up a name) and was the failure mode in
+                    # the original AI-recs apply-path.
+                    if not signals:
+                        self.log.warning(
+                            f"ADD_BLOCK skipped: block '{block_name}' has no signals "
+                            f"in configuration (would be a silent no-op)"
+                        )
+                        result["skipped"].append(rec)
+                        continue
+
+                    # Build block dict from rec data
+                    new_block: Dict = {"name": block_name, "signals": list(signals)}
+                    if configuration.get("parameters"):
+                        new_block["parameters"] = configuration["parameters"]
 
                     strategy_config.setdefault("blocks", []).append(new_block)
                     existing_block_names.add(block_name)
@@ -854,6 +927,23 @@ class IntelligentRecommendationEngine:
                         )
                         result["skipped"].append(rec)
                         continue
+
+                    # P2.3 — validate against the _ADJUSTABLE_PARAMETERS
+                    # schema: type, range, NaN, unknown-parameter. A model
+                    # suggesting e.g. take_profit_pct=120 or
+                    # position_size_pct="big" would otherwise mutate live
+                    # config unsafely.
+                    validation_err = _validate_adjust_param(param_name, new_value, None)
+                    if validation_err is not None:
+                        self.log.warning(
+                            f"ADJUST_PARAM rejected: {validation_err} — skipping"
+                        )
+                        result["skipped"].append(rec)
+                        continue
+
+                    # Coerce to the schema type (e.g. int → float)
+                    spec = _ADJUSTABLE_PARAMETERS[param_name]
+                    new_value = spec["type"](new_value)
 
                     old_value = strategy_config.get(param_name)
                     strategy_config[param_name] = new_value

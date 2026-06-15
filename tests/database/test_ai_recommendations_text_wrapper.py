@@ -30,10 +30,14 @@ class TestTextWrapperImplementation:
         
         # Count occurrences of text( in the source (simple but effective)
         text_wrapper_count = source.count('text(')
-        
-        # We added 8 text() wrappers for 8 SQL queries
-        assert text_wrapper_count >= 8, \
-            f"Expected at least 8 text() wrappers, found {text_wrapper_count}"
+
+        # Live SQL-emit paths use text(): create_recommendation (2: INSERT +
+        # strategy_versions version_number lookup), get_recommendation (1),
+        # get_strategy_recommendations (1), mark_applied (1) = 5.
+        # P2.2 removed the dead ORM-in-text() duplicates that had inflated
+        # the count to 8; the live count is 5.
+        assert text_wrapper_count >= 5, \
+            f"Expected at least 5 text() wrappers in live code paths, found {text_wrapper_count}"
         
         # Verify no raw SQL strings without text() wrapper
         # Look for execute with quoted SQL (should all have text() now)

@@ -65,7 +65,11 @@ class TestApplyAddBlock:
     def test_add_block_happy_path(self, engine):
         """ADD_BLOCK appends a new block dict to config['blocks']."""
         config = _make_strategy_config()
-        rec = _rec("ADD_BLOCK", block_name="ema_trend")
+        rec = _rec(
+            "ADD_BLOCK",
+            block_name="ema_trend",
+            configuration={"signals": [{"name": "EMA_CROSS"}]},
+        )
         result = engine.apply_recommendations(config, [rec])
 
         assert len(result["applied"]) == 1
@@ -96,22 +100,37 @@ class TestApplyAddBlock:
         assert len(result["skipped"]) == 1
         assert len(result["failed"]) == 0
 
+    def test_add_block_skips_when_no_signals(self, engine):
+        """P2.3 — ADD_BLOCK with empty/missing signals is skipped (silent no-op guard)."""
+        config = _make_strategy_config()
+        rec = _rec("ADD_BLOCK", block_name="empty_block", configuration={})
+        result = engine.apply_recommendations(config, [rec])
+
+        assert len(result["applied"]) == 0
+        assert len(result["skipped"]) == 1
+        block_names = [b["name"] for b in config["blocks"]]
+        assert "empty_block" not in block_names
+
     def test_add_block_carries_configuration(self, engine):
         """ADD_BLOCK should preserve configuration as parameters on the new block."""
         config = _make_strategy_config()
-        cfg = {"threshold": 0.5}
+        cfg = {"signals": [{"name": "VOL_SPIKE"}], "parameters": {"threshold": 0.5}}
         rec = _rec("ADD_BLOCK", block_name="volume_filter", configuration=cfg)
-        engine.apply_recommendations(config, [rec])
+        result = engine.apply_recommendations(config, [rec])
 
+        assert len(result["applied"]) == 1
         new_block = next(b for b in config["blocks"] if b["name"] == "volume_filter")
-        assert new_block.get("parameters") == cfg
+        assert new_block.get("parameters") == {"threshold": 0.5}
+        assert new_block.get("signals") == [{"name": "VOL_SPIKE"}]
 
     def test_add_multiple_blocks_sequentially(self, engine):
         """Multiple ADD_BLOCK recs for distinct blocks are all applied."""
         config = _make_strategy_config()
         recs = [
-            _rec("ADD_BLOCK", block_name="ema_trend"),
-            _rec("ADD_BLOCK", block_name="rsi_filter"),
+            _rec("ADD_BLOCK", block_name="ema_trend",
+                 configuration={"signals": [{"name": "EMA_CROSS"}]}),
+            _rec("ADD_BLOCK", block_name="rsi_filter",
+                 configuration={"signals": [{"name": "RSI_OB"}]}),
         ]
         result = engine.apply_recommendations(config, recs)
 
@@ -351,12 +370,26 @@ class TestApplyEdgeCases:
         assert "errors" in result
 
     def test_mixed_success_and_skip(self, engine):
-        """Mix of valid and skippable recs produces correct counts."""
+        """Mix of valid and skippable recs produces correct counts.
+
+        Note: P2.3 contract requires ADD_BLOCK.configuration to carry a
+        non-empty `signals` list, and ADJUST_PARAM.parameter_name to be in
+        the _ADJUSTABLE_PARAMETERS schema — otherwise the rec is skipped
+        (not applied) with a warning recorded in errors.
+        """
         config = _make_strategy_config()
         recs = [
-            _rec("ADD_BLOCK", block_name="ema_trend"),   # NEW — will be applied
-            _rec("ADD_BLOCK", block_name="hod"),          # duplicate — will be skipped
-            _rec("ADJUST_PARAM", parameter_name="tp", configuration={"new_value": 2.0}),  # applied
+            _rec(
+                "ADD_BLOCK",
+                block_name="ema_trend",
+                configuration={"signals": [{"name": "EMA_CROSS"}]},
+            ),                                              # NEW — will be applied
+            _rec("ADD_BLOCK", block_name="hod"),              # duplicate — will be skipped
+            _rec(
+                "ADJUST_PARAM",
+                parameter_name="stop_loss_pct",
+                configuration={"new_value": 2.0},
+            ),                                              # applied
         ]
         result = engine.apply_recommendations(config, recs)
 
