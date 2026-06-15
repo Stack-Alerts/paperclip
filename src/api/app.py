@@ -3134,9 +3134,16 @@ async def update_data(
                 results[tf] = {"success": False, "error": str(exc)}
 
         all_ok = all(v.get("success") for v in results.values())
+        total_bars = sum(v.get("bars_downloaded", 0) for v in results.values())
+        if not all_ok:
+            message = "Some timeframes failed — check errors"
+        elif total_bars == 0:
+            message = "Data already up to date — no new bars were available"
+        else:
+            message = f"Data update complete — {total_bars} new bars downloaded"
         return {
             "success": all_ok,
-            "message": "Data update complete" if all_ok else "Some timeframes failed — check errors",
+            "message": message,
             "results": results,
         }
 
