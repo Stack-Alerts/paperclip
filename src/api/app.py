@@ -963,6 +963,12 @@ class _UpdateSBStrategyRequest(BaseModel):
     tags: Optional[list] = None
     validationHistory: Optional[list] = None
     blocks: Optional[list] = None
+    # Strategy-level exit conditions (BTCAAAAA-36755). Persisted to the
+    # version row's `exit_conditions` JSONB column and surfaced on
+    # GET /strategy-builder/strategies as `exitConditions` at the top of
+    # the payload. Distinct from per-block / per-signal exits which live
+    # inside `blocks[].signals[].exit_conditions`.
+    exitConditions: Optional[list] = None
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -1596,6 +1602,14 @@ async def sb_update_strategy(
                 version_data["validation_history"] = body.validationHistory
             if body.blocks is not None:
                 version_data["blocks"] = body.blocks
+            # Strategy-level exit conditions (binding_level=STRATEGY) cannot
+            # round-trip via the per-block / per-signal `blocks` payload
+            # because they have no owning block or signal. The frontend
+            # extracts them separately and sends them here so the JSONB
+            # column mirrors what the user sees in the Strategy Builder
+            # (BTCAAAAA-36755).
+            if body.exitConditions is not None:
+                version_data["exit_conditions"] = body.exitConditions
 
             # Rename the parent strategy record so list views reflect the new
             # name even before the new version row is read back. Safe to call

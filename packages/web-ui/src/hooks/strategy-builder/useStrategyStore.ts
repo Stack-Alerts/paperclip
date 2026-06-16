@@ -23,7 +23,7 @@ import {
 } from '@/lib/strategy-builder/types';
 import { put as apiPut, post as apiPost, runBacktest as apiRunBacktest, getBacktestResults as apiGetBacktestResults, validateStrategy as validateStrategyAPI, autoFixStrategy as autoFixStrategyAPI, revertStrategy as revertStrategyAPI } from '@/lib/strategy-builder/api';
 import { validateStrategyLocal, enrichReportWithNarrative } from '@/lib/strategy-builder/validation';
-import { denormalizeBlocks } from '@/lib/strategy-builder/blocks';
+import { denormalizeBlocks, extractStrategyLevelExits } from '@/lib/strategy-builder/blocks';
 
 // Strategies loaded from the strategy-builder API have IDs of the form
 // "strategy_<hex>" (see StrategyDatabaseManager.create_strategy); locally
@@ -337,8 +337,16 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
         const newId = createResp.id;
         if (!newId) throw new Error('saveStrategy: backend did not return a new strategy ID');
 
-        // Now PUT with blocks denormalized to raw DB shape
+        // Now PUT with blocks denormalized to raw DB shape. Strategy-level
+        // exits (bindingLevel=STRATEGY) cannot round-trip via the per-block
+        // / per-signal `blocks` payload because the synthetic EXIT_CONDITION
+        // blocks that represent them have empty blockName + parentSignalName
+        // (the key `denormalizeBlocks` would use is `"::"`), so extract them
+        // separately and send as the top-level `exitConditions` field — the
+        // backend writes it to `strategy_versions.exit_conditions` JSONB
+        // (BTCAAAAA-36755).
         const rawBlocks = denormalizeBlocks(updated.blocks);
+        const exitConditions = extractStrategyLevelExits(updated.blocks);
         const saved = await apiPut<Strategy>(
           `/strategy-builder/strategies/${newId}`,
           {
@@ -348,6 +356,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
             tags: updated.tags,
             validationHistory: updated.validationHistory,
             blocks: rawBlocks,
+            exitConditions,
           },
         );
 
@@ -370,9 +379,12 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
         );
       }
     } else {
-      // Backend strategy → PUT with metadata + blocks
+      // Backend strategy → PUT with metadata + blocks. See the draft→backend
+      // path above for the why behind the separate `exitConditions` field
+      // (BTCAAAAA-36755).
       try {
         const rawBlocks = denormalizeBlocks(updated.blocks);
+        const exitConditions = extractStrategyLevelExits(updated.blocks);
         const saved = await apiPut<Strategy>(
           `/strategy-builder/strategies/${updated.id}`,
           {
@@ -382,6 +394,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
             tags: updated.tags,
             validationHistory: updated.validationHistory,
             blocks: rawBlocks,
+            exitConditions,
           },
         );
 

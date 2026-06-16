@@ -1,4 +1,4 @@
-import { Block, BlockType } from './types';
+import { Block, BlockType, PersistedExitCondition } from './types';
 
 // RawDBBlock represents the backend's canonical block shape (raw DB format)
 export interface RawDBSignal {
@@ -162,4 +162,54 @@ export function denormalizeBlocks(blocks: Block[]): RawDBBlock[] {
   }
 
   return result;
+}
+
+/**
+ * Extract strategy-level exit conditions (bindingLevel === 'STRATEGY') from
+ * the in-memory block list. Strategy-level exits are materialized as
+ * synthetic EXIT_CONDITION blocks in StrategyBuilderMainWindow with empty
+ * blockName and parentSignalName — `denormalizeBlocks` cannot fold them
+ * onto any owning signal (the key would be `"::"`), so they round-trip as
+ * a separate top-level `exitConditions` array on the strategy.
+ *
+ * Caller passes the result as `exitConditions` in the PUT
+ * `/strategy-builder/strategies/{id}` body; the backend persists it to
+ * the `strategy_versions.exit_conditions` JSONB column (BTCAAAAA-36755).
+ *
+ * Mirrors the persisted shape used by
+ * `src/strategy_builder/persistence/strategy_persistence.py:_exit_condition_to_dict`
+ * and surfaces in the API as `strategy.exitConditions` (camelCase list).
+ */
+export function extractStrategyLevelExits(blocks: Block[]): PersistedExitCondition[] {
+  const out: PersistedExitCondition[] = [];
+  for (const block of blocks) {
+    if (block.type !== BlockType.EXIT_CONDITION) continue;
+    const exitConfig = (block.data?.exitConfig as Record<string, unknown>) ?? {};
+    if ((exitConfig.bindingLevel as string | undefined) !== 'STRATEGY') continue;
+
+    const persisted: PersistedExitCondition = {
+      signal_name: exitConfig.signalName as string | undefined ?? '',
+      percentage: exitConfig.percentage as number | undefined,
+      exit_mode: exitConfig.exitMode as string | undefined,
+      tp_proximity_threshold: exitConfig.tpProximityThreshold as number | undefined,
+      reversal_trigger: exitConfig.reversalTrigger as boolean | undefined,
+      binding_level: 'STRATEGY',
+    };
+
+    // Recheck chain / recheck config — fold the editor-side `recheckEnabled`
+    // and `recheckBarDelay` fields into the persisted `recheck_config`
+    // shape so the server-side exit engine can re-validate without a
+    // second schema translation.
+    const recheckEnabled = exitConfig.recheckEnabled as boolean | undefined;
+    const recheckBarDelay = exitConfig.recheckBarDelay as number | undefined;
+    if (typeof recheckEnabled === 'boolean' || typeof recheckBarDelay === 'number') {
+      persisted.recheck_config = {
+        enabled: typeof recheckEnabled === 'boolean' ? recheckEnabled : false,
+        bar_delay: typeof recheckBarDelay === 'number' ? recheckBarDelay : 0,
+      };
+    }
+
+    out.push(persisted);
+  }
+  return out;
 }
