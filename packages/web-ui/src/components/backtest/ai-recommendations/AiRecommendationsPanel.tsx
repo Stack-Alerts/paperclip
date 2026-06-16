@@ -37,6 +37,13 @@ export interface AiRecommendationsPanelProps {
   strategy?: Strategy | null;
   backtestConfig?: Record<string, unknown> | null;
   disabled?: boolean;
+  /**
+   * Called with the updated strategy after a successful auto-apply. The
+   * parent decides how to refresh the strategy view (e.g. re-fetch from
+   * FastAPI, swap local state). Optional so the panel remains usable in
+   * read-only / preview contexts.
+   */
+  onStrategyUpdated?: (strategy: Strategy) => void;
 }
 
 function CollapsibleSection({
@@ -437,13 +444,16 @@ function ConfirmationModal({
   onCancel,
   onConfirmClearAll,
   onConfirmDelete,
+  onConfirmApplyAll,
 }: {
-  confirmation: { type: 'clear-all' | 'delete'; entryId?: string };
+  confirmation: { type: 'clear-all' | 'delete' | 'apply-all'; entryId?: string };
   onCancel: () => void;
   onConfirmClearAll: () => void;
   onConfirmDelete: () => void;
+  onConfirmApplyAll: () => void;
 }) {
   const isClearAll = confirmation.type === 'clear-all';
+  const isApplyAll = confirmation.type === 'apply-all';
   return (
     <div
       role="dialog"
@@ -462,12 +472,18 @@ function ConfirmationModal({
         onClick={(e) => e.stopPropagation()}
       >
         <p className="text-sm font-semibold mb-2">
-          {isClearAll ? 'Clear all history?' : 'Delete this entry?'}
+          {isClearAll
+            ? 'Clear all history?'
+            : isApplyAll
+              ? 'Apply all recommendations?'
+              : 'Delete this entry?'}
         </p>
         <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
           {isClearAll
             ? 'This will permanently remove all stored AI recommendation analyses from this browser. This action cannot be undone.'
-            : 'This will permanently remove the selected analysis from this browser. This action cannot be undone.'}
+            : isApplyAll
+              ? 'Send the current recommendation set to the AutoApply orchestrator. The Python service will classify each rec, snapshot the strategy, apply safe changes, and verify before persisting. The most recent history entry will be marked APPLIED.'
+              : 'This will permanently remove the selected analysis from this browser. This action cannot be undone.'}
         </p>
         <div className="flex items-center justify-end gap-2">
           <button
@@ -485,16 +501,28 @@ function ConfirmationModal({
           </button>
           <button
             type="button"
-            onClick={isClearAll ? onConfirmClearAll : onConfirmDelete}
+            onClick={
+              isClearAll
+                ? onConfirmClearAll
+                : isApplyAll
+                  ? onConfirmApplyAll
+                  : onConfirmDelete
+            }
             className="px-3 py-1.5 rounded text-xs font-medium"
             style={{
-              background: 'var(--accent-red, #f87171)',
+              background: isApplyAll
+                ? 'var(--accent-blue, #3b82f6)'
+                : 'var(--accent-red, #f87171)',
               color: '#fff',
-              border: '1px solid var(--accent-red, #f87171)',
+              border: `1px solid ${
+                isApplyAll
+                  ? 'var(--accent-blue, #3b82f6)'
+                  : 'var(--accent-red, #f87171)'
+              }`,
               cursor: 'pointer',
             }}
           >
-            {isClearAll ? 'Clear all' : 'Delete'}
+            {isClearAll ? 'Clear all' : isApplyAll ? 'Apply all' : 'Delete'}
           </button>
         </div>
       </div>
@@ -572,13 +600,13 @@ export function AiRecommendationsPanel({
   result,
   strategy,
   backtestConfig,
+  onStrategyUpdated,
 }: AiRecommendationsPanelProps = {}) {
   const hasTrades = (result?.trades?.length ?? 0) > 0;
   const { settings, hydrated: aiSettingsHydrated } = useAiSettings();
   const history = useAiRecsHistory();
 
   const [view, setView] = useState<View>('current');
-  const [analyzing, setAnalyzing] = useState(false);
   const [phase, setPhase] = useState<SendPhase>('idle');
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisDetail, setAnalysisDetail] = useState<string | null>(null);
@@ -587,8 +615,12 @@ export function AiRecommendationsPanel({
     recommendations: string;
     raw: string;
   } | null>(null);
+  const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [applyDetail, setApplyDetail] = useState<string | null>(null);
+  const [applySuccess, setApplySuccess] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<{
-    type: 'clear-all' | 'delete';
+    type: 'clear-all' | 'delete' | 'apply-all';
     entryId?: string;
   } | null>(null);
 
@@ -744,6 +776,7 @@ export function AiRecommendationsPanel({
     phase === 'idle' || phase === 'error'
       ? ''
       : PHASE_INFO[phase as Exclude<SendPhase, 'idle' | 'error'>].label;
+  const canApply = Boolean(strategy?.id) && !applying;
 
   const requestClearAll = useCallback(() => {
     if (history.entries.length === 0) return;
@@ -767,6 +800,88 @@ export function AiRecommendationsPanel({
     }
     setConfirmation(null);
   }, [confirmation, history]);
+
+  const requestApplyAll = useCallback(() => {
+    if (!strategy?.id || applying) return;
+    setApplyError(null);
+    setApplyDetail(null);
+    setApplySuccess(null);
+    setConfirmation({ type: 'apply-all' });
+  }, [strategy?.id, applying]);
+
+  // The orchestrator at src/optimizer_v3/ui/ai_recs_auto_apply.py is the
+  // authority on which recs are safe/destructive/unsupported (BTCAAAAA-36744).
+  // Today the webui does not surface a structured recs list yet (the panel
+  // shows raw text), so we send `recs: []` and the orchestrator returns an
+  // honest "applied_count == 0" / "Nothing to apply" response. The route
+  // still has to be exercised end-to-end so the FastAPI proxy + the
+  // rollback/verify pipeline stay wired up for the structured-rec UX that
+  // is the next iteration.
+  const handleApplyAll = useCallback(async () => {
+    if (!strategy?.id || applying) return;
+    const targetEntryId = history.hydrated ? history.entries[0]?.id : undefined;
+
+    setApplying(true);
+    setApplyError(null);
+    setApplyDetail(null);
+    setApplySuccess(null);
+
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+    };
+    if (typeof window !== 'undefined') {
+      const token = window.localStorage.getItem('auth_token');
+      if (token) headers['authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const res = await fetch('/api/ai/auto-apply', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          strategyId: strategy.id,
+          recs: [],
+          optInDestructiveIds: null,
+        }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        strategy?: Strategy;
+        dryRun?: { entries: unknown[]; applicable_count: number };
+        apply?: { applied: Array<{ rec_id: string }>; applied_count: number };
+        error?: string;
+        detail?: string;
+      };
+      if (!res.ok || !data.ok) {
+        setApplyError(data.error ?? `Auto-apply returned HTTP ${res.status}.`);
+        setApplyDetail(data.detail ?? null);
+        return;
+      }
+      const appliedCount = data.apply?.applied_count ?? 0;
+      setApplySuccess(
+        appliedCount > 0
+          ? `Applied ${appliedCount} recommendation${appliedCount === 1 ? '' : 's'} to “${strategy.name ?? strategy.id}”.`
+          : `Auto-apply ran with nothing to apply — the orchestrator returned 0 changes for “${strategy.name ?? strategy.id}”.`,
+      );
+      if (targetEntryId) {
+        history.updateStatus(targetEntryId, 'applied');
+      }
+      if (data.strategy && onStrategyUpdated) {
+        onStrategyUpdated(data.strategy);
+      }
+    } catch (err) {
+      setApplyError(
+        err instanceof Error ? err.message : 'The auto-apply request failed.',
+      );
+    } finally {
+      setApplying(false);
+    }
+  }, [strategy, applying, history, onStrategyUpdated]);
+
+  const confirmApplyAll = useCallback(() => {
+    setConfirmation(null);
+    void handleApplyAll();
+  }, [handleApplyAll]);
 
   const currentView = view;
 
@@ -871,6 +986,42 @@ export function AiRecommendationsPanel({
               {analysisDetail}
             </p>
           )}
+        </div>
+      )}
+
+      {/* Auto-apply error banner */}
+      {applyError && (
+        <div
+          className="rounded p-2 text-xs"
+          role="alert"
+          style={{
+            background: 'var(--bg-elevated)',
+            color: 'var(--accent-red, #f87171)',
+            border: '1px solid var(--accent-red, #f87171)',
+          }}
+        >
+          <p className="font-semibold">Auto-apply failed</p>
+          <p className="mt-1">{applyError}</p>
+          {applyDetail && (
+            <p className="mt-1" style={{ color: 'var(--text-faint)' }}>
+              {applyDetail}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Auto-apply success banner */}
+      {applySuccess && !applyError && (
+        <div
+          className="rounded p-2 text-xs"
+          role="status"
+          style={{
+            background: 'rgba(34, 197, 94, 0.12)',
+            color: '#4ade80',
+            border: '1px solid #4ade80',
+          }}
+        >
+          {applySuccess}
         </div>
       )}
 
@@ -1053,6 +1204,30 @@ export function AiRecommendationsPanel({
                 ? 'Retry'
                 : 'Approve & Send to AI'}
         </button>
+        <button
+          type="button"
+          onClick={requestApplyAll}
+          disabled={!canApply}
+          title={
+            applying
+              ? 'Sending the recommendation set to the AutoApply orchestrator…'
+              : !strategy?.id
+                ? 'Load a strategy first to enable auto-apply.'
+                : 'Send the current recommendation set to the AutoApply orchestrator. Marks the most recent history entry as APPLIED on success.'
+          }
+          className="px-3 py-1.5 rounded text-xs font-medium"
+          style={{
+            background: canApply ? 'var(--accent-green, #4ade80)' : 'var(--bg-card)',
+            color: canApply ? '#0a0a0a' : 'var(--text-faint)',
+            border: `1px solid ${
+              canApply ? 'var(--accent-green, #4ade80)' : 'var(--border)'
+            }`,
+            opacity: canApply ? 1 : 0.5,
+            cursor: canApply ? 'pointer' : 'not-allowed',
+          }}
+        >
+          {applying ? 'Applying…' : 'Apply all recommendations'}
+        </button>
       </div>
         </>
       ) : (
@@ -1072,6 +1247,7 @@ export function AiRecommendationsPanel({
           onCancel={cancelConfirmation}
           onConfirmClearAll={confirmClearAll}
           onConfirmDelete={confirmDelete}
+          onConfirmApplyAll={confirmApplyAll}
         />
       )}
     </div>
