@@ -1,10 +1,36 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import { BacktestResult, Strategy, Trade } from '@/lib/strategy-builder/types';
 import { useAiSettings } from '@/hooks/useAiSettings';
 import { useAiRecsHistory, AiRecsHistoryEntry, AiRecsHistoryStatus } from '@/hooks/useAiRecsHistory';
+
+type SendPhase =
+  | 'idle'
+  | 'building-request'
+  | 'sending'
+  | 'awaiting-provider'
+  | 'done'
+  | 'error';
+
+interface PhaseInfo {
+  percent: number;
+  label: string;
+}
+
+const PHASE_INFO: Record<Exclude<SendPhase, 'idle' | 'error'>, PhaseInfo> = {
+  'building-request': { percent: 15, label: 'Stage 1/4: Packaging request…' },
+  sending: { percent: 35, label: 'Stage 2/4: Sending to AI provider…' },
+  'awaiting-provider': { percent: 75, label: 'Stage 3/4: Awaiting provider response…' },
+  done: { percent: 100, label: 'Stage 4/4: Complete' },
+};
+
+const ACTIVE_PHASES: ReadonlySet<SendPhase> = new Set([
+  'building-request',
+  'sending',
+  'awaiting-provider',
+]);
 
 export interface AiRecommendationsPanelProps {
   result?: BacktestResult | null;
@@ -553,6 +579,7 @@ export function AiRecommendationsPanel({
 
   const [view, setView] = useState<View>('current');
   const [analyzing, setAnalyzing] = useState(false);
+  const [phase, setPhase] = useState<SendPhase>('idle');
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisDetail, setAnalysisDetail] = useState<string | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<{
@@ -565,6 +592,24 @@ export function AiRecommendationsPanel({
     entryId?: string;
   } | null>(null);
 
+  const abortRef = useRef<AbortController | null>(null);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
+      if (dismissTimerRef.current) {
+        clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const analyzing = ACTIVE_PHASES.has(phase);
+
   const handleExport = useCallback(() => {
     const payload = buildRequestPayload(result, strategy, backtestConfig);
     const blob = new Blob([payload], { type: 'application/json' });
@@ -576,14 +621,53 @@ export function AiRecommendationsPanel({
     URL.revokeObjectURL(url);
   }, [result, strategy, backtestConfig]);
 
+  const handleCancel = useCallback(() => {
+    if (!analyzing) return;
+    abortRef.current?.abort();
+  }, [analyzing]);
+
   const handleApproveAndSend = useCallback(async () => {
     if (!hasTrades || analyzing) return;
-    setAnalyzing(true);
     setAnalysisError(null);
     setAnalysisDetail(null);
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setPhase('building-request');
+    await new Promise((r) => setTimeout(r, 0));
+
+    let payload: unknown;
     try {
       const payloadJson = buildRequestPayload(result, strategy, backtestConfig);
-      const payload = JSON.parse(payloadJson) as unknown;
+      payload = JSON.parse(payloadJson) as unknown;
+    } catch (err) {
+      setAnalysisError(
+        err instanceof Error
+          ? `Failed to package request: ${err.message}`
+          : 'Failed to package request.',
+      );
+      setPhase('error');
+      abortRef.current = null;
+      return;
+    }
+
+    if (controller.signal.aborted) {
+      setAnalysisError('Request cancelled.');
+      setPhase('error');
+      abortRef.current = null;
+      return;
+    }
+
+    setPhase('sending');
+    await new Promise((r) => setTimeout(r, 0));
+
+    setPhase('awaiting-provider');
+
+    try {
       const res = await fetch('/api/ai/analyze', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -595,6 +679,7 @@ export function AiRecommendationsPanel({
           prompt: AI_RECS_PROMPT,
           payload,
         }),
+        signal: controller.signal,
       });
       const data = (await res.json()) as {
         ok: boolean;
@@ -607,6 +692,8 @@ export function AiRecommendationsPanel({
           data.error ?? `The analyze endpoint returned HTTP ${res.status}.`,
         );
         setAnalysisDetail(data.detail ?? null);
+        setPhase('error');
+        abortRef.current = null;
         return;
       }
       const parsed = parseAnalysisResponse(data.text ?? '');
@@ -620,12 +707,22 @@ export function AiRecommendationsPanel({
           ...(strategy?.name ? { strategyName: strategy.name } : {}),
         });
       }
+      setPhase('done');
+      abortRef.current = null;
+      dismissTimerRef.current = setTimeout(() => {
+        setPhase((current) => (current === 'done' ? 'idle' : current));
+        dismissTimerRef.current = null;
+      }, 1200);
     } catch (err) {
-      setAnalysisError(
-        err instanceof Error ? err.message : 'The analyze request failed.',
-      );
-    } finally {
-      setAnalyzing(false);
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setAnalysisError('Request cancelled.');
+      } else {
+        setAnalysisError(
+          err instanceof Error ? err.message : 'The analyze request failed.',
+        );
+      }
+      setPhase('error');
+      abortRef.current = null;
     }
   }, [
     hasTrades,
@@ -641,6 +738,12 @@ export function AiRecommendationsPanel({
   ]);
 
   const canSend = hasTrades && !analyzing && aiSettingsHydrated;
+  const showProgress = phase !== 'idle' && phase !== 'error';
+  const progressPercent = phase === 'idle' || phase === 'error' ? 0 : PHASE_INFO[phase as Exclude<SendPhase, 'idle' | 'error'>].percent;
+  const progressLabel =
+    phase === 'idle' || phase === 'error'
+      ? ''
+      : PHASE_INFO[phase as Exclude<SendPhase, 'idle' | 'error'>].label;
 
   const requestClearAll = useCallback(() => {
     if (history.entries.length === 0) return;
@@ -835,6 +938,61 @@ export function AiRecommendationsPanel({
         </div>
       )}
 
+      {/* Progress indicator — visible across building-request / sending / awaiting-provider / done */}
+      {showProgress && (
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-testid="ai-recs-progress"
+          className="rounded p-2 flex flex-col gap-1"
+          style={{
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border)',
+          }}
+        >
+          <div className="flex items-center justify-between text-xs">
+            <span
+              data-testid="ai-recs-progress-label"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              {progressLabel}
+            </span>
+            <span
+              data-testid="ai-recs-progress-percent"
+              style={{
+                color: 'var(--text-muted)',
+                fontFamily: 'var(--font-mono, monospace)',
+              }}
+            >
+              {progressPercent}%
+            </span>
+          </div>
+          <div
+            role="progressbar"
+            aria-valuenow={progressPercent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="AI recommendation request progress"
+            className="w-full h-1.5 rounded overflow-hidden"
+            style={{ background: 'var(--bg-card)' }}
+          >
+            <div
+              data-testid="ai-recs-progress-bar"
+              className="h-full rounded"
+              style={{
+                width: `${progressPercent}%`,
+                background:
+                  phase === 'done'
+                    ? 'var(--accent-green, #10b981)'
+                    : 'var(--accent-blue, #3b82f6)',
+                transition: 'width 200ms ease-out',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Action buttons */}
       <div className="flex items-center gap-2 justify-end mt-1">
         <button
@@ -852,6 +1010,23 @@ export function AiRecommendationsPanel({
         >
           Export to JSON
         </button>
+        {analyzing && (
+          <button
+            type="button"
+            onClick={handleCancel}
+            data-testid="ai-recs-cancel"
+            className="px-3 py-1.5 rounded text-xs font-medium"
+            style={{
+              background: 'var(--bg-card)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border)',
+              cursor: 'pointer',
+            }}
+            title="Cancel the in-flight AI request"
+          >
+            Cancel
+          </button>
+        )}
         <button
           type="button"
           onClick={handleApproveAndSend}
@@ -870,7 +1045,13 @@ export function AiRecommendationsPanel({
             cursor: canSend ? 'pointer' : 'not-allowed',
           }}
         >
-          {analyzing ? 'Sending…' : 'Approve & Send to AI'}
+          {analyzing
+            ? 'Sending…'
+            : phase === 'done'
+              ? 'Send Again'
+              : phase === 'error'
+                ? 'Retry'
+                : 'Approve & Send to AI'}
         </button>
       </div>
         </>
