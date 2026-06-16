@@ -223,6 +223,36 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   useEffect(() => {
     currentStrategyRef.current = currentStrategy;
   }, [currentStrategy]);
+
+  // BTCAAAAA-36689 (round 2): observe the store's `isValidating` flag and stamp
+  // `validationPassedSnapshot` whenever *any* validation path resolves to a
+  // passing result. `handleValidate` in this file stamps when the user clicks
+  // the stepper's Validate step, but the in-panel "Validate" button (and the
+  // panel's "undo re-validate" flow) call `store.validateStrategy()` directly
+  // and previously never set the snapshot, so the Validate step never turned
+  // green and Test/Optimize kept showing the "validation required" alert.
+  const isValidatingFromStore = useStrategyStore((s) => s.isValidating);
+  const wasValidatingRef = useRef(false);
+  useEffect(() => {
+    if (isValidatingFromStore) {
+      wasValidatingRef.current = true;
+      return;
+    }
+    if (!wasValidatingRef.current) return;
+    wasValidatingRef.current = false;
+    const after = currentStrategyRef.current;
+    if (after?.status !== StrategyStatus.VALID) return;
+    if (validationPassedSnapshot !== '') return;
+    const snap = JSON.stringify({
+      id: after.id,
+      blocks: after.blocks,
+      name: after.name,
+    });
+    if (snap !== '' && snap === strategySnapshot) {
+      setValidationPassedSnapshot(snap);
+    }
+  }, [isValidatingFromStore, strategySnapshot, validationPassedSnapshot]);
+
   const isValidatedAndPristine =
     !!currentStrategy &&
     validationPassedSnapshot !== '' &&
