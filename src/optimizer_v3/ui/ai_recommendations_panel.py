@@ -31,9 +31,10 @@ from pathlib import Path
 import sys
 from PyQt5.QtWidgets import (
     QMainWindow, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit,
-    QLabel, QTabWidget, QWidget, QSplitter, QCheckBox, QGroupBox, QSizePolicy, QFrame, QFileDialog, QMessageBox
+    QLabel, QTabWidget, QWidget, QSplitter, QCheckBox, QGroupBox, QSizePolicy, QFrame, QFileDialog, QMessageBox,
+    QProgressDialog
 )
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QTextOption
 
 import logging
@@ -81,6 +82,7 @@ class AIRecommendationsPanel(QWidget):
         self.response_data = {}
         self._ai_recommendations: List = []
         self._ai_analysis: Dict = {}
+        self._send_progress: Optional[QProgressDialog] = None
         
         # Setup UI first
         self._setup_ui()
@@ -1015,9 +1017,60 @@ PART 2: STRUCTURED DATA (JSON format for parsing)
             )
     
     def _approve_and_send(self):
-        """User approved - emit signal to send request"""
+        """User approved - show progress dialog, then emit signal to send request.
+
+        See ADR-0006-ai-recommendations-validation-integration.md: the prior
+        implementation emitted send_approved with no UI feedback, leaving the
+        user staring at a frozen "Send" button during the long-running request.
+        We now open a QProgressDialog with discrete stages and a progress bar
+        that the parent can drive via update_send_progress() / dismiss_send_progress().
+        """
+        if self._send_progress is not None:
+            # Re-entry guard: a send is already in flight.
+            logger.warning("AI send already in progress; ignoring duplicate approve")
+            return
+
+        self._send_progress = QProgressDialog(
+            "Sending AI recommendation request...",
+            None,  # no cancel button — long-running call has no safe abort
+            0,
+            100,
+            self,
+        )
+        self._send_progress.setWindowTitle("AI Recommendation Request")
+        self._send_progress.setWindowModality(Qt.WindowModal)
+        self._send_progress.setMinimumDuration(0)
+        self._send_progress.setValue(0)
+        self._send_progress.setLabelText("Stage 1/4: Packaging request...")
+        self._send_progress.show()
+
         # Emit signal with request data - actual API call happens in parent
         self.send_approved.emit(self.request_data)
+
+    def update_send_progress(self, percent: int, stage_label: str) -> None:
+        """Drive the progress dialog while the parent processes send_approved.
+
+        Args:
+            percent: 0-100 progress value
+            stage_label: Human-readable label for the current stage, e.g.
+                "Stage 2/4: Sending to AI provider..."
+        """
+        if self._send_progress is None:
+            return
+        self._send_progress.setValue(max(0, min(100, int(percent))))
+        self._send_progress.setLabelText(stage_label)
+
+    def dismiss_send_progress(self, success: bool = True, message: str = "") -> None:
+        """Close the progress dialog once the parent finishes (or errors out)."""
+        if self._send_progress is None:
+            return
+        if success and not message:
+            self._send_progress.setValue(100)
+            self._send_progress.setLabelText("Complete")
+        elif message:
+            self._send_progress.setLabelText(message)
+        QTimer.singleShot(400, self._send_progress.close)
+        self._send_progress = None
 
 
     def _toggle_request_preview(self):
