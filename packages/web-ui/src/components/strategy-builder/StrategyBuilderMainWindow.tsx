@@ -733,6 +733,51 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
           });
         });
       });
+      // Flatten strategy-level exit_conditions (Sprint 1.8) into the same
+      // synthetic EXIT_CONDITION blocks the signal-level flatten above
+      // produces. The Strategy Browser (StrategyBrowserDialog
+      // BlockHierarchyTree) reads these directly off `strategy.exitConditions`
+      // for the [STRATEGY]-tagged row it renders, but the StrategyBuilder
+      // canvas reuses `blocks` for the red ↳ exit pills + Library highlights,
+      // so the canvas also needs them materialised as EXIT_CONDITION blocks.
+      // Without this flatten the canvas showed zero strategy-level exits
+      // even though the Browser (after the _build_sb_strategy serializer
+      // fix) rendered all of them — the asymmetric state the board flagged
+      // on BTCAAAAA-36755 reopen (12:39Z "exit conditions I'm missing and
+      // not being listed"). bindingLevel: 'STRATEGY' is the marker that
+      // distinguishes these from signal/binding-level entries.
+      const strategyLevelExits = Array.isArray(
+        (strategy as { exitConditions?: unknown }).exitConditions
+      )
+        ? ((strategy as { exitConditions?: Array<Record<string, unknown>> }).exitConditions ?? [])
+        : [];
+      strategyLevelExits.forEach((ec, ei) => {
+        const exitSignalRaw = typeof ec.signal_name === 'string' ? ec.signal_name : '';
+        const exitSignalDisplay = exitSignalRaw
+          ? exitSignalRaw.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+          : 'Exit';
+        const rc = ec.recheck_config as Record<string, unknown> | undefined;
+        const exitConfig: Record<string, unknown> = {
+          signalName: exitSignalRaw,
+          percentage: typeof ec.percentage === 'number' ? ec.percentage : undefined,
+          exitMode: typeof ec.exit_mode === 'string' ? ec.exit_mode : undefined,
+          bindingLevel: 'STRATEGY',
+          tpProximityThreshold: typeof ec.tp_proximity_threshold === 'number' ? ec.tp_proximity_threshold : undefined,
+          reversalTrigger: typeof ec.reversal_trigger === 'number' ? ec.reversal_trigger : undefined,
+          recheckEnabled: rc && typeof rc === 'object' && typeof rc.enabled === 'boolean' ? rc.enabled : undefined,
+          recheckBarDelay: rc && typeof rc === 'object' && typeof rc.bar_delay === 'number' ? rc.bar_delay : undefined,
+        };
+        exitBlocks.push({
+          id: `exit-strategy-${strategy.versionId ?? strategy.id}-${ei}`,
+          type: BlockType.EXIT_CONDITION,
+          index: mainBlocks.length + exitBlocks.length,
+          data: {
+            name: exitSignalDisplay,
+            logic: 'EXIT',
+            exitConfig,
+          },
+        });
+      });
       const normalized: Strategy = {
         ...strategy,
         blocks: [...mainBlocks, ...exitBlocks],

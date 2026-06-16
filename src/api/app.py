@@ -910,6 +910,11 @@ def _build_sb_strategy(strategy_id: str, version: dict, tests: list) -> dict:
         "versionNumber": version.get("version_number"),
         "versionId": str(version["version_id"]) if version.get("version_id") else None,
         "blocks": version.get("blocks") or [],
+        # Strategy-level (Sprint 1.8) exit conditions live at the top of the
+        # version payload — block/signal-level exits are nested inside
+        # `blocks`. Surface them here so the webui Browser can render the
+        # full Sprint 1.8 hierarchy (BTCAAAAA-36755 reopened).
+        "exitConditions": version.get("exit_conditions") or [],
         "tags": version.get("tags") or [],
         "createdAt": _iso(version.get("created_at")),
         "updatedAt": _iso(version.get("timestamp") or version.get("created_at")),

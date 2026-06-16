@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect, type CSSProperties } from 'react';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
-import { Strategy, StrategyStatus, StrategyVersion, Block, BlockType } from '@/lib/strategy-builder/types';
+import { Strategy, StrategyStatus, StrategyVersion, Block, BlockType, PersistedExitCondition } from '@/lib/strategy-builder/types';
 import {
   deleteStrategyScoped, duplicateStrategyScoped,
   createStrategy, listStrategies, getStrategyVersions, loadStrategyVersion,
@@ -184,12 +184,37 @@ function recheckLabel(rc: DBRecheckConfig): string {
   return `RECHECK (WITHIN ${rc.bar_delay} bars)`;
 }
 
-function BlockHierarchyTree({ blocks }: { blocks: AnyBlock[] }) {
-  if (blocks.length === 0) {
+function BlockHierarchyTree({ blocks, strategyLevelExits = [] }: { blocks: AnyBlock[]; strategyLevelExits?: PersistedExitCondition[] }) {
+  const strategyExits = strategyLevelExits ?? [];
+  if (blocks.length === 0 && strategyExits.length === 0) {
     return <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>No blocks configured</p>;
   }
   return (
     <div className="space-y-2 font-mono text-xs">
+      {strategyExits.length > 0 && (
+        <div className="space-y-0.5">
+          <div className="font-semibold" style={{ color: '#81C784' }}>
+            Strategy-Level Exit Conditions:
+          </div>
+          {strategyExits.map((ec, ei) => (
+            <div key={`strategy-exit-${ei}`}>
+              <div className="ml-4" style={{ color: 'var(--accent-red)' }}>
+                └── EXIT: {ec.signal_name} - {ec.percentage != null ? Math.round(ec.percentage * 100) : 0}% {exitModeLabel(ec.exit_mode)} <span style={{ color: 'var(--text-muted)' }}>[STRATEGY]</span>
+              </div>
+              {ec.recheck_config?.enabled && (
+                <div className="ml-8" style={{ color: '#4ADE80' }}>
+                  └── RECHECK (WITHIN {ec.recheck_config.bar_delay} bars)
+                </div>
+              )}
+              {(ec.recheck_chain ?? []).filter(rc => rc.enabled).map((rc, ri) => (
+                <div key={ri} className="ml-8" style={{ color: '#60A5FA' }}>
+                  └── {recheckLabel(rc)}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
       {blocks.map((block, i) => {
         const b = block as Record<string, unknown>;
         const rawSignals = (b.signals ?? (b.data as Record<string, unknown> | undefined)?.signals ?? []) as DBSignal[];
@@ -387,11 +412,11 @@ function DetailsPanel({ strategy }: { strategy: Strategy }) {
           <Settings size={12} strokeWidth={1.5} />
           Configuration
         </div>
-        <BlockHierarchyTree blocks={strategy.blocks as AnyBlock[]} />
+        <BlockHierarchyTree blocks={strategy.blocks as AnyBlock[]} strategyLevelExits={strategy.exitConditions} />
         <p className="text-xs mt-2" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', color: 'var(--text-muted)' }}>
           {strategy.blocks.length} block{strategy.blocks.length !== 1 ? 's' : ''}
-          {entryBlocks.length > 0 || exitBlocks.length > 0
-            ? ` · ${entryBlocks.length} entry · ${exitBlocks.length} exit`
+          {entryBlocks.length > 0 || exitBlocks.length > 0 || (strategy.exitConditions?.length ?? 0) > 0
+            ? ` · ${entryBlocks.length} entry · ${exitBlocks.length} exit · ${strategy.exitConditions?.length ?? 0} strategy-level exit${(strategy.exitConditions?.length ?? 0) !== 1 ? 's' : ''}`
             : ''}
         </p>
       </div>

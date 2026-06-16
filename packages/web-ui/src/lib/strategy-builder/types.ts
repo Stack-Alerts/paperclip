@@ -74,6 +74,13 @@ export interface Strategy {
   validationStatus?: 'Pass' | 'Fail' | 'Un-Validated';
   versions?: StrategyVersion[];
   validationHistory?: ValidationFixEvent[];
+  // Strategy-level exit conditions (Sprint 1.8). Persisted at the top of
+  // the strategy_versions row's `exit_conditions` JSONB column and surfaced
+  // by /api/strategy-builder/strategies/{id}/versions/{versionId} (the
+  // _build_sb_strategy serializer in src/api/app.py). Distinct from block-
+  // level exits (block.exit_conditions) and signal-level exits
+  // (block.signals[].exit_conditions). BTCAAAAA-36755 reopened.
+  exitConditions?: PersistedExitCondition[];
 }
 
 // Strategy version snapshot for history/rollback
@@ -112,7 +119,8 @@ export interface BlockSignal {
   total_candles?: number;
 }
 
-// Exit condition configuration
+// Exit condition configuration (editor-side — used by ExitConditionDialog /
+// BlockSearchPanel / StrategyBlocksPanel for new/existing exit configs).
 export interface ExitCondition {
   signalName: string;
   bindingLevel: string;
@@ -121,6 +129,40 @@ export interface ExitCondition {
   tpThreshold?: number;
   reversal?: boolean;
   recheck?: boolean;
+}
+
+// Persisted shape of an exit-condition entry in the strategy_versions
+// `exit_conditions` JSONB column (or the nested `blocks[].exit_conditions`
+// / `blocks[].signals[].exit_conditions` columns). Mirrors
+// `_exit_condition_to_dict` in
+// src/strategy_builder/persistence/strategy_persistence.py:201-244 and is
+// what /api/strategy-builder/strategies returns in
+// `exitConditions` (top-level), `blocks[].exit_conditions` (block-level),
+// and `blocks[].signals[].exit_conditions` (signal-level). The thick-client
+// counts `version.get('exit_conditions', [])` at
+// src/strategy_builder/ui/strategy_browser_dialog.py:985 — the webui Strategy
+// Browser was previously dropping this top-level field, so strategy-level
+// exits were missing from the configuration panel (BTCAAAAA-36755 reopened).
+export interface PersistedExitCondition {
+  signal_name: string;
+  percentage?: number;
+  exit_mode?: string; // 'ABSOLUTE' | 'TP_AWARE' | ...
+  tp_proximity_threshold?: number;
+  reversal_trigger?: boolean;
+  binding_level?: 'STRATEGY' | 'BLOCK' | 'SIGNAL' | string;
+  recheck_config?: {
+    enabled?: boolean;
+    bar_delay?: number;
+    validation_mode?: string;
+    parent_signal?: string;
+  };
+  recheck_chain?: Array<{
+    enabled?: boolean;
+    bar_delay?: number;
+    validation_mode?: string;
+    parent_signal?: string;
+  }>;
+  parent_signal?: string;
 }
 
 // Block definition from library
