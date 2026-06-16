@@ -32,13 +32,19 @@ import sys
 from PyQt5.QtWidgets import (
     QMainWindow, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit,
     QLabel, QTabWidget, QWidget, QSplitter, QCheckBox, QGroupBox, QSizePolicy, QFrame, QFileDialog, QMessageBox,
-    QProgressDialog
+    QComboBox, QInputDialog, QProgressDialog, QScrollArea,
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QTextOption
 
 import logging
 logger = logging.getLogger(__name__)
+
+from src.optimizer_v3.state.ai_recs_history import (
+    AiRecsHistoryStore,
+    AiRecsRecord,
+    RecStatus,
+)
 
 
 # Import centralized styles
@@ -83,7 +89,12 @@ class AIRecommendationsPanel(QWidget):
         self._ai_recommendations: List = []
         self._ai_analysis: Dict = {}
         self._send_progress: Optional[QProgressDialog] = None
-        
+
+        # Persistent history store (BTCAAAAA-36742). Survives session close.
+        # Backed by ~/.btc_trade_engine/ai_recs_history.json by default.
+        self._history_store = AiRecsHistoryStore()
+        self._rec_cards: Dict[str, Dict[str, QWidget]] = {}
+
         # Setup UI first
         self._setup_ui()
         
@@ -168,23 +179,83 @@ class AIRecommendationsPanel(QWidget):
             f"color: {COLORS['text_primary']}; border: none; background: transparent;"
         )
         recs_layout.addWidget(recs_header)
-        
-        self.recs_text = QTextEdit()
-        self.recs_text.setReadOnly(True)
-        self.recs_text.setFont(create_font(9))
-        self.recs_text.setWordWrapMode(QTextOption.WrapMode.WordWrap)
-        self.recs_text.setStyleSheet(
-            f"QTextEdit {{ background-color: {COLORS['bg_dark']}; "
+
+        # ── Status filter + Clear All toolbar ─────────────────────────────
+        recs_toolbar = QHBoxLayout()
+        recs_toolbar.setSpacing(6)
+        filter_label = QLabel("Filter:")
+        filter_label.setStyleSheet(
+            f"color: {COLORS['text_muted']}; border: none; background: transparent;"
+        )
+        recs_toolbar.addWidget(filter_label)
+        self.recs_filter_combo = QComboBox()
+        self.recs_filter_combo.addItem("All", "all")
+        self.recs_filter_combo.addItem("New", RecStatus.NEW)
+        self.recs_filter_combo.addItem("Applied", RecStatus.APPLIED)
+        self.recs_filter_combo.addItem("Dismissed", RecStatus.DISMISSED)
+        self.recs_filter_combo.setStyleSheet(
+            f"QComboBox {{ background-color: {COLORS['bg_dark']}; "
             f"color: {COLORS['text_secondary']}; "
+            f"border: 1px solid {COLORS['border']}; padding: 2px 6px; }}"
+        )
+        self.recs_filter_combo.currentIndexChanged.connect(
+            lambda _idx: self._render_recs_panel()
+        )
+        recs_toolbar.addWidget(self.recs_filter_combo)
+
+        recs_toolbar.addStretch()
+
+        self.clear_history_btn = QPushButton("Clear History")
+        self.clear_history_btn.setStyleSheet(get_secondary_button_stylesheet())
+        self.clear_history_btn.clicked.connect(self._on_clear_history)
+        recs_toolbar.addWidget(self.clear_history_btn)
+        recs_layout.addLayout(recs_toolbar)
+
+        # ── Scrollable list of recommendation cards ──────────────────────
+        self.recs_scroll = QScrollArea()
+        self.recs_scroll.setWidgetResizable(True)
+        self.recs_scroll.setStyleSheet(
+            f"QScrollArea {{ background-color: {COLORS['bg_dark']}; "
             f"border: 1px solid {COLORS['border']}; }}"
         )
-        self.recs_text.setMinimumHeight(120)
-        self.recs_text.setMaximumHeight(250)
-        self.recs_text.setPlainText(
+        self.recs_scroll.setMinimumHeight(160)
+        self.recs_scroll.setMaximumHeight(320)
+
+        self.recs_container = QWidget()
+        self.recs_container.setStyleSheet("background: transparent;")
+        self.recs_container_layout = QVBoxLayout(self.recs_container)
+        self.recs_container_layout.setContentsMargins(4, 4, 4, 4)
+        self.recs_container_layout.setSpacing(6)
+        self.recs_container_layout.addStretch()
+
+        self.recs_scroll.setWidget(self.recs_container)
+        recs_layout.addWidget(self.recs_scroll)
+
+        # Placeholder shown when no records exist
+        self.recs_empty_label = QLabel(
             "No recommendations yet.\n\n"
-            "Recommendations will appear here after AI analysis completes."
+            "Recommendations will appear here after AI analysis completes.\n"
+            "History persists across sessions."
         )
-        recs_layout.addWidget(self.recs_text)
+        self.recs_empty_label.setAlignment(Qt.AlignCenter)
+        self.recs_empty_label.setStyleSheet(
+            f"color: {COLORS['text_muted']}; padding: 12px; "
+            f"background: transparent; border: none;"
+        )
+        self.recs_container_layout.insertWidget(0, self.recs_empty_label)
+
+        # Track the legacy attribute name as an alias so any stale callers
+        # (e.g. older test mocks) that read ``panel.recs_text`` still get a
+        # sensible no-op object instead of AttributeError. Real updates go
+        # through ``display_recommendations`` → ``_render_recs_panel``.
+        class _NoOpText:
+            def setPlainText(self, *args, **kwargs):  # noqa: D401
+                return None
+
+            def toPlainText(self, *args, **kwargs):
+                return ""
+
+        self.recs_text = _NoOpText()
         
         layout.addWidget(self.recs_frame)
         
@@ -1149,6 +1220,10 @@ PART 2: STRUCTURED DATA (JSON format for parsing)
         """
         Display AI recommendations in the Recommendations section.
 
+        Persists every batch to ``self._history_store`` and re-renders the
+        scrollable cards panel. The store outlives the Qt panel instance, so
+        closing and reopening the UI keeps the history visible (BTCAAAAA-36742).
+
         Args:
             recommendations: List of IntegratedRecommendation objects (or dicts)
         """
@@ -1159,54 +1234,262 @@ PART 2: STRUCTURED DATA (JSON format for parsing)
         logger.info(f"[AI Panel] Displaying {len(recommendations)} recommendations")
 
         if not recommendations:
-            self.recs_text.setPlainText(
-                "No recommendations generated.\n\n"
-                "Possible reasons:\n"
-                "- No strategy config available\n"
-                "- AI API key not configured (set OPENROUTER_API_KEY in .env)\n"
-                "- Backtest produced no trades\n\n"
-                "Data-driven recommendations are shown in the Metrics tab."
-            )
+            # No fresh batch — just re-render whatever history exists.
+            self._render_recs_panel()
             return
 
-        lines = []
-        for i, rec in enumerate(recommendations, 1):
-            # Support both object attributes and dict keys
-            if isinstance(rec, dict):
-                rec_type = rec.get('type', 'UNKNOWN')
-                block_name = rec.get('block_name', '')
-                signal_name = rec.get('signal_name', '')
-                reasoning = rec.get('reasoning', '')
-                confidence = rec.get('combined_confidence') or rec.get('confidence', 0)
-                impact = rec.get('expected_impact', {})
-                ai_enhanced = rec.get('ai_enhanced', False)
-            else:
-                rec_type = getattr(rec, 'type', 'UNKNOWN')
-                block_name = getattr(rec, 'block_name', '') or ''
-                signal_name = getattr(rec, 'signal_name', '') or ''
-                reasoning = getattr(rec, 'reasoning', '')
-                confidence = getattr(rec, 'combined_confidence', 0) or getattr(rec, 'confidence', 0)
-                impact = getattr(rec, 'expected_impact', {}) or {}
-                ai_enhanced = getattr(rec, 'ai_enhanced', False)
+        strategy_name = ""
+        snapshot_id = ""
+        try:
+            if isinstance(self.request_data, dict):
+                strategy_name = (
+                    self.request_data.get("strategy_config", {}).get("name", "")
+                    if isinstance(self.request_data.get("strategy_config"), dict)
+                    else ""
+                )
+                snapshot_id = self.request_data.get("snapshot_id", "") or ""
+        except Exception:
+            pass
 
-            source = "AI-ENHANCED" if ai_enhanced else "DATA-DRIVEN"
-            lines.append(f"#{i} [{source}] {rec_type}")
-            if block_name:
-                if signal_name:
-                    lines.append(f"   Target: {block_name} :: {signal_name}")
-                else:
-                    lines.append(f"   Target: {block_name}")
-            if confidence:
-                lines.append(f"   Confidence: {float(confidence):.0%}")
-            if reasoning:
-                lines.append(f"   Reasoning: {reasoning[:200]}{'...' if len(reasoning) > 200 else ''}")
-            if impact:
-                lines.append("   Expected Impact:")
-                for metric, delta in impact.items():
-                    lines.append(f"     {metric}: {delta}")
-            lines.append("")
+        try:
+            self._history_store.add_recommendations(
+                recommendations,
+                strategy_name=strategy_name,
+                source_snapshot_id=snapshot_id,
+            )
+        except Exception as exc:
+            logger.error("[AI Panel] Failed to persist recommendations: %s", exc)
 
-        self.recs_text.setPlainText("\n".join(lines))
+        self._render_recs_panel()
+
+    # ── Persistent history rendering (BTCAAAAA-36742) ─────────────────
+    def _render_recs_panel(self) -> None:
+        """Rebuild the scrollable cards panel from the history store."""
+        try:
+            records = self._history_store.all()
+        except Exception as exc:
+            logger.error("[AI Panel] Failed to load history: %s", exc)
+            records = []
+
+        # Apply the active filter
+        status_filter = "all"
+        if hasattr(self, "recs_filter_combo"):
+            try:
+                status_filter = self.recs_filter_combo.currentData() or "all"
+            except Exception:
+                status_filter = "all"
+        if status_filter != "all":
+            records = [r for r in records if r.status == status_filter]
+
+        # Wipe existing card widgets
+        for refs in list(self._rec_cards.values()):
+            card = refs.get("card") if isinstance(refs, dict) else None
+            if card is not None:
+                self.recs_container_layout.removeWidget(card)
+                card.setParent(None)
+                card.deleteLater()
+        self._rec_cards = {}
+
+        if hasattr(self, "recs_empty_label"):
+            self.recs_empty_label.setVisible(not records)
+
+        # Records are stored oldest-first; display newest first
+        for rec in reversed(records):
+            card, refs = self._build_rec_card(rec)
+            self.recs_container_layout.insertWidget(
+                self.recs_container_layout.count() - 1, card
+            )
+            self._rec_cards[rec.id] = refs
+
+    def _build_rec_card(self, record: AiRecsRecord):
+        """Build a QGroupBox card for one record. Returns (card, refs_dict)."""
+        card = QGroupBox()
+        card.setStyleSheet(get_groupbox_header_stylesheet())
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(8, 6, 8, 8)
+        card_layout.setSpacing(4)
+
+        # Title row: type + status pill
+        title_row = QHBoxLayout()
+        title_row.setSpacing(6)
+        title_label = QLabel(f"<b>{record.type}</b>")
+        title_label.setStyleSheet(
+            f"color: {COLORS['text_primary']}; background: transparent; border: none;"
+        )
+        title_row.addWidget(title_label)
+
+        strategy_label_text = f" · {record.strategy_name}" if record.strategy_name else ""
+        block_label_text = f" · {record.block_name}" if record.block_name else ""
+        subtitle_text = f"{strategy_label_text}{block_label_text}"
+        if subtitle_text:
+            subtitle_label = QLabel(subtitle_text.lstrip(" · "))
+            subtitle_label.setStyleSheet(
+                f"color: {COLORS['text_muted']}; background: transparent; border: none;"
+            )
+            title_row.addWidget(subtitle_label)
+        title_row.addStretch()
+
+        pill_colors = {
+            RecStatus.NEW: COLORS.get("info", "#3a7bd5"),
+            RecStatus.APPLIED: COLORS.get("success", "#2ecc71"),
+            RecStatus.DISMISSED: COLORS.get("text_muted", "#7f8c8d"),
+        }
+        pill = QLabel(f" {record.status.upper()} ")
+        pill.setStyleSheet(
+            f"color: white; background-color: {pill_colors.get(record.status, '#7f8c8d')}; "
+            f"border-radius: 6px; padding: 1px 6px; font-size: 10px;"
+        )
+        title_row.addWidget(pill)
+        card_layout.addLayout(title_row)
+
+        # Metadata line
+        try:
+            created_dt = datetime.fromisoformat(record.created_at.replace("Z", "+00:00"))
+            created_str = created_dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+        except Exception:
+            created_str = record.created_at or ""
+        meta_parts = [f"📅 {created_str}"]
+        if record.source_snapshot_id:
+            meta_parts.append(f"snapshot: {record.source_snapshot_id}")
+        if record.signal_name:
+            meta_parts.append(f"signal: {record.signal_name}")
+        if record.confidence:
+            meta_parts.append(f"confidence: {record.confidence:.0%}")
+        if record.ai_enhanced:
+            meta_parts.append("✨ AI-enhanced")
+        meta_label = QLabel("  ·  ".join(meta_parts))
+        meta_label.setStyleSheet(
+            f"color: {COLORS['text_muted']}; font-size: 11px; "
+            f"background: transparent; border: none;"
+        )
+        meta_label.setWordWrap(True)
+        card_layout.addWidget(meta_label)
+
+        # Reasoning
+        if record.reasoning:
+            reasoning_label = QLabel(record.reasoning)
+            reasoning_label.setWordWrap(True)
+            reasoning_label.setStyleSheet(
+                f"color: {COLORS['text_secondary']}; background: transparent; border: none;"
+            )
+            card_layout.addWidget(reasoning_label)
+
+        # Expected impact (compact key=value)
+        if record.expected_impact:
+            try:
+                impact_str = ", ".join(
+                    f"{k}: {v}" for k, v in list(record.expected_impact.items())[:4]
+                )
+                impact_label = QLabel(f"Expected impact — {impact_str}")
+                impact_label.setWordWrap(True)
+                impact_label.setStyleSheet(
+                    f"color: {COLORS['text_muted']}; font-size: 11px; "
+                    f"font-style: italic; background: transparent; border: none;"
+                )
+                card_layout.addWidget(impact_label)
+            except Exception:
+                pass
+
+        # User notes (read-only display; full editor on click)
+        notes_value = record.user_notes or ""
+        notes_label = QLabel(notes_value or "<i>(no notes)</i>")
+        notes_label.setWordWrap(True)
+        notes_label.setStyleSheet(
+            f"color: {COLORS['text_primary']}; background-color: {COLORS['bg_medium']}; "
+            f"border: 1px solid {COLORS['border']}; padding: 4px; font-size: 11px;"
+        )
+        card_layout.addWidget(notes_label)
+
+        # Action row: status transitions + edit notes
+        actions = QHBoxLayout()
+        actions.setSpacing(4)
+        actions.addStretch()
+
+        def make_btn(text, slot):
+            b = QPushButton(text)
+            b.setStyleSheet(get_secondary_button_stylesheet())
+            b.clicked.connect(slot)
+            return b
+
+        rec_id = record.id
+        if record.status != RecStatus.APPLIED:
+            actions.addWidget(
+                make_btn("Apply", lambda: self._on_status_change(rec_id, RecStatus.APPLIED))
+            )
+        if record.status != RecStatus.DISMISSED:
+            actions.addWidget(
+                make_btn(
+                    "Dismiss",
+                    lambda: self._on_status_change(rec_id, RecStatus.DISMISSED),
+                )
+            )
+        if record.status != RecStatus.NEW:
+            actions.addWidget(
+                make_btn("Reopen", lambda: self._on_status_change(rec_id, RecStatus.NEW))
+            )
+        actions.addWidget(
+            make_btn("Edit Notes", lambda: self._on_edit_notes(rec_id, notes_value))
+        )
+        card_layout.addLayout(actions)
+
+        refs = {
+            "card": card,
+            "notes_label": notes_label,
+            "pill": pill,
+        }
+        return card, refs
+
+    def _on_status_change(self, rec_id: str, new_status: str) -> None:
+        """Persist a status transition and re-render the panel."""
+        try:
+            self._history_store.update_status(rec_id, new_status)
+        except Exception as exc:
+            logger.error("[AI Panel] Failed to update status: %s", exc)
+            QMessageBox.warning(
+                self,
+                "Status update failed",
+                f"Could not update status: {exc}",
+            )
+            return
+        self._render_recs_panel()
+
+    def _on_edit_notes(self, rec_id: str, current: str) -> None:
+        """Open a multi-line text dialog and save user notes."""
+        new_text, accepted = QInputDialog.getMultiLineText(
+            self,
+            "Edit Notes",
+            "Notes for this recommendation:",
+            current or "",
+        )
+        if not accepted:
+            return
+        try:
+            self._history_store.update_notes(rec_id, new_text or "")
+        except Exception as exc:
+            logger.error("[AI Panel] Failed to save notes: %s", exc)
+            QMessageBox.warning(self, "Save notes failed", f"Could not save notes: {exc}")
+            return
+        self._render_recs_panel()
+
+    def _on_clear_history(self) -> None:
+        """Confirm with the user, then wipe the history file."""
+        confirm = QMessageBox.question(
+            self,
+            "Clear recommendation history?",
+            "This will permanently remove all stored recommendations and notes.\n"
+            "This action cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if confirm != QMessageBox.Yes:
+            return
+        try:
+            self._history_store.clear()
+        except Exception as exc:
+            logger.error("[AI Panel] Failed to clear history: %s", exc)
+            QMessageBox.warning(self, "Clear failed", f"Could not clear history: {exc}")
+            return
+        self._render_recs_panel()
 
 
 
