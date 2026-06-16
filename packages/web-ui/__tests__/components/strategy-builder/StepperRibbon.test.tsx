@@ -55,4 +55,31 @@ describe('StepperRibbon', () => {
     expect(screen.queryByLabelText('complete')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('error')).not.toBeInTheDocument();
   });
+
+  // BTCAAAAA-36689: the MainWindow uses `forceCompleteStepIds` to render the
+  // Validate step green when the strategy is validated AND pristine (no edits
+  // since validation passed). The ribbon must apply the override even when
+  // the step is not in completedSteps.
+  describe('forceCompleteStepIds (BTCAAAAA-36689)', () => {
+    it('renders the forced step as complete when not in completedSteps', () => {
+      renderRibbon({ forceCompleteStepIds: new Set([1]) });
+      // Only one ✓ mark should exist (the forced Validate step).
+      expect(screen.getAllByLabelText('complete')).toHaveLength(1);
+      expect(screen.getByText(/Validate/)).toBeInTheDocument();
+    });
+
+    it('errorSteps still take precedence over forceCompleteStepIds', () => {
+      renderRibbon({
+        forceCompleteStepIds: new Set([1]),
+        errorSteps: new Set([1]),
+      });
+      expect(screen.getByLabelText('error')).toBeInTheDocument();
+      expect(screen.queryByLabelText('complete')).not.toBeInTheDocument();
+    });
+
+    it('multiple forced IDs each render as complete', () => {
+      renderRibbon({ forceCompleteStepIds: new Set([0, 1, 2]) });
+      expect(screen.getAllByLabelText('complete')).toHaveLength(3);
+    });
+  });
 });

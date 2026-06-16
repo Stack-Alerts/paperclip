@@ -148,6 +148,11 @@ export interface StepperRibbonProps {
   currentStep: number;
   completedSteps?: Set<number>;
   errorSteps?: Set<number>;
+  // BTCAAAAA-36689: forced-complete steps. Rendered green even if not in
+  // completedSteps — used to show the Validate step as already-validated
+  // when the user reopens a strategy that has been validated and the
+  // strategy state has not been modified since.
+  forceCompleteStepIds?: Set<number>;
   onStepClick?: (step: number) => void;
   inline?: boolean;
 }
@@ -156,11 +161,13 @@ export function StepperRibbon({
   currentStep,
   completedSteps = new Set(),
   errorSteps = new Set(),
+  forceCompleteStepIds,
   onStepClick,
   inline = false,
 }: StepperRibbonProps) {
   const getStatus = (id: number): StepStatus => {
     if (errorSteps.has(id)) return 'error';
+    if (forceCompleteStepIds?.has(id)) return 'complete';
     if (completedSteps.has(id)) return 'complete';
     if (id === currentStep) return 'active';
     return 'pending';

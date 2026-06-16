@@ -38,6 +38,7 @@ type DialogKey =
   | 'adminPin'
   | 'quickPreview'
   | 'logViewer'
+  | 'validationRequiredAlert'
   | null;
 
 // ---------------------------------------------------------------------------
@@ -208,6 +209,25 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   const isModified = !!currentStrategy && strategySnapshot !== cleanSnapshot;
   const isSavingRef = useRef(false);
 
+  // BTCAAAAA-36689: snapshot of the strategy the last time validation actually
+  // passed. While `strategySnapshot === validationPassedSnapshot`, the user has
+  // not modified the strategy since validation succeeded — so the Validate step
+  // can render as already-complete (green) and Test/Optimize can open without a
+  // re-prompt. Any block / name change invalidates this match and forces a
+  // re-validate before backtest.
+  const [validationPassedSnapshot, setValidationPassedSnapshot] = useState<string>('');
+  // Ref mirrors currentStrategy so async `.then()` callbacks (e.g. the post-load
+  // re-validate in handleStrategySelect) read the freshest strategy object
+  // instead of the closure-captured one from the moment the callback was queued.
+  const currentStrategyRef = useRef<Strategy | null>(currentStrategy);
+  useEffect(() => {
+    currentStrategyRef.current = currentStrategy;
+  }, [currentStrategy]);
+  const isValidatedAndPristine =
+    !!currentStrategy &&
+    validationPassedSnapshot !== '' &&
+    strategySnapshot === validationPassedSnapshot;
+
   // The "Next data check" status-bar countdown was removed (BTCAAAAA-36517):
   // it duplicated the next-candle countdown already shown under the connection
   // bar, and as a persistent global entry it froze on other pages after unmount.
@@ -377,6 +397,9 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     try {
       const forked = await saveStrategyAsNew(pendingSaveMode.newName);
       setCleanSnapshot(JSON.stringify({ id: forked.id, blocks: forked.blocks, name: forked.name }));
+      // BTCAAAAA-36689: the new fork has a fresh strategy id — the previous
+      // pristine-validation stamp was for the prior id and must not carry over.
+      setValidationPassedSnapshot('');
       status.emit(`Saved as new strategy v${(forked as { versionNumber?: number }).versionNumber ?? 1}`, { duration: 2500 });
       setPendingSaveMode(null);
     } catch {
@@ -421,6 +444,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     setCurrentStep(0);
     setCompletedSteps(new Set());
     setErrorSteps(new Set());
+    setValidationPassedSnapshot('');
     setLoadedHistoricalVersion(false);
     // Focus the Name input on the next paint after StrategyInfoPanel remounts
     // its uncontrolled input on the new strategy id.
@@ -478,6 +502,14 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   const handleValidate = useCallback(async () => {
     setCurrentStep(1);
     setActiveDialog('validation');
+    // Capture the snapshot the user is validating *now*. After the async
+    // validate resolves we compare this captured string against the *then-current*
+    // strategySnapshot — if they match, no edit landed during the round-trip and
+    // the strategy is still pristine. We must capture BEFORE the await because
+    // otherwise the second read happens after React's commit, and an in-flight
+    // edit during the await would compare post-edit vs post-edit (always equal)
+    // and falsely mark the strategy as pristine-validated.
+    const snapshotAtValidation = strategySnapshot;
     try {
       // Historical versions must use the local validator because the backend's
       // POST /validate endpoint always validates against the latest stored
@@ -485,10 +517,31 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       await validateStrategy({ localOnly: loadedHistoricalVersion });
       setCompletedSteps(prev => new Set([...prev, 1]));
       setErrorSteps(prev => { const s = new Set(prev); s.delete(1); return s; });
+      // Only mark the strategy as "validated & pristine" if validation actually
+      // passed. validateStrategy throws on transport errors but may resolve with
+      // a non-valid status when issues are found, so check the strategy state
+      // directly. Read via ref so we see the post-validate object, not the
+      // closure-captured pre-validate one.
+      const statusAfter = currentStrategyRef.current?.status;
+      if (statusAfter === StrategyStatus.VALID) {
+        // Only stamp the snapshot if the strategy hasn't changed during the
+        // round-trip. An in-flight block edit that lands between the capture
+        // and the post-await check would otherwise let the user backtest a
+        // never-validated modification.
+        if (strategySnapshot === snapshotAtValidation) {
+          setValidationPassedSnapshot(snapshotAtValidation);
+        }
+      } else {
+        // Validation reported issues — clear any prior "pristine" stamp so the
+        // Validate step visually reverts to needing-action and the Test/Optimize
+        // gate re-engages.
+        setValidationPassedSnapshot('');
+      }
     } catch {
       setErrorSteps(prev => new Set([...prev, 1]));
+      setValidationPassedSnapshot('');
     }
-  }, [validateStrategy, loadedHistoricalVersion]);
+  }, [validateStrategy, loadedHistoricalVersion, strategySnapshot]);
 
   const handleQuickPreview = useCallback(async () => {
     if (!currentStrategy || backTestInProgress) return;
@@ -659,6 +712,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       setCurrentStep(0);
       setCompletedSteps(new Set());
       setErrorSteps(new Set());
+      setValidationPassedSnapshot('');
       close();
       // Re-run validation against the just-loaded version so the validation
       // panel shows live issues for *this* version, not stale issues from the
@@ -673,10 +727,38 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       const isHistorical = selectOpts?.historicalVersion === true;
       setLoadedHistoricalVersion(isHistorical);
       if (typeof newId === 'string' && newId.startsWith('strategy_')) {
-        validateStrategy({ localOnly: isHistorical }).catch(console.error);
+        // BTCAAAAA-36689: when the post-load re-validate resolves, if validation
+        // passed AND the user hasn't modified the strategy in the meantime, mark
+        // it as "validated & pristine" so the Validate step renders green and the
+        // Test/Optimize step opens without a re-prompt. Read the post-validate
+        // status from the ref (the closure-captured `normalized` predates the
+        // validate mutation) and compare the just-loaded snapshot against the
+        // current strategySnapshot — they should match immediately after load
+        // (cleanSnapshot was just set above), and a subsequent user edit would
+        // cause the mismatch we want.
+        const snapshotAtLoad = JSON.stringify({
+          id: normalized.id,
+          blocks: normalized.blocks,
+          name: normalized.name,
+        });
+        validateStrategy({ localOnly: isHistorical })
+          .then(() => {
+            const statusAfter = currentStrategyRef.current?.status;
+            if (statusAfter === StrategyStatus.VALID) {
+              // Re-read strategySnapshot (closure value) at the time of decision.
+              // Any edit landed between load and now would have changed the
+              // strategySnapshot via the useMemo dep on currentStrategy, so
+              // equality with snapshotAtLoad confirms pristine.
+              // (We compare via the same JSON shape the useMemo uses.)
+              if (strategySnapshot === snapshotAtLoad) {
+                setValidationPassedSnapshot(snapshotAtLoad);
+              }
+            }
+          })
+          .catch(console.error);
       }
     },
-    [close, setCurrentStrategy, validateStrategy]
+    [close, setCurrentStrategy, validateStrategy, strategySnapshot]
   );
 
   // Pop In: receive state from a popped-out Strategy Browser window and
@@ -808,7 +890,17 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         <MenuDropdown
           label="Tools"
           items={[
-            { label: 'Backtest…',      onClick: () => open('backtestConfig') },
+            // BTCAAAAA-36689: Backtest… shares the same validation gate as
+            // the stepper's Test/Optimize button. Without a clean validation
+            // pass the user is routed through the alert dialog, not the
+            // backtest config.
+            { label: 'Backtest…',      onClick: () => {
+                if (!isValidatedAndPristine) {
+                  setActiveDialog('validationRequiredAlert');
+                  return;
+                }
+                open('backtestConfig');
+              } },
             { label: 'Validate…',      onClick: handleValidate },
             { label: 'Update Data…',   onClick: () => open('dataUpdate') },
             { label: 'Verify Data…',   onClick: () => open('dataVerify') },
@@ -871,11 +963,26 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             currentStep={currentStep}
             completedSteps={completedSteps}
             errorSteps={errorSteps}
+            // BTCAAAAA-36689: when the strategy is validated AND pristine (no
+            // edits since validation passed), force the Validate step green so
+            // it visually communicates "no action needed" and Test/Optimize
+            // becomes a one-click open. Any block/name edit invalidates the
+            // match (see useMemo on currentStrategy) and the step reverts to
+            // needing attention.
+            forceCompleteStepIds={isValidatedAndPristine ? new Set([1]) : undefined}
             onStepClick={(id) => {
               setCurrentStep(id);
               if (id === 1) {
                 handleValidate();
               } else if (id === 2) {
+                // BTCAAAAA-36689: Test/Optimize requires a clean validation
+                // pass. If the user has modified the strategy since the last
+                // successful validation, route them through the validation
+                // page with a message instead of opening the backtest config.
+                if (!isValidatedAndPristine) {
+                  setActiveDialog('validationRequiredAlert');
+                  return;
+                }
                 open('backtestConfig');
               }
             }}
@@ -1034,6 +1141,23 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         message="Institutional-grade algorithmic trading platform."
         icon="ℹ️"
         onClose={close}
+      />
+
+      {/* BTCAAAAA-36689: shown when the user attempts to open Test/Optimize
+          (via the stepper or Tools > Backtest…) without a clean validation
+          pass. Closing the alert drops them on the Validate step with the
+          validation dialog open so the re-validate is a single click away. */}
+      <AlertDialog
+        open={activeDialog === 'validationRequiredAlert'}
+        title="Validation Required"
+        heading="Validate before backtesting"
+        message="This strategy has changes that have not been validated. Run validation first, then continue to backtest."
+        icon="⚠️"
+        onClose={() => {
+          setActiveDialog(null);
+          setCurrentStep(1);
+          setActiveDialog('validation');
+        }}
       />
 
       <QuestionDialog
