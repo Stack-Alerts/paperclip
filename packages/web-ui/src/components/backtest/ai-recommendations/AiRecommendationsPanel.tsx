@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { BacktestResult, Strategy, Trade } from '@/lib/strategy-builder/types';
+import { useAiSettings } from '@/hooks/useAiSettings';
 
 export interface AiRecommendationsPanelProps {
   result?: BacktestResult | null;
@@ -164,12 +165,41 @@ function buildRequestPayload(
   );
 }
 
+/** Split a model response into DIAGNOSIS / RECOMMENDATIONS sections. */
+function parseAnalysisResponse(text: string): {
+  diagnosis: string;
+  recommendations: string;
+  raw: string;
+} {
+  const diagnosisMatch = text.match(
+    /DIAGNOSIS\s*:\s*([\s\S]*?)(?=\n\s*RECOMMENDATIONS\s*:|$)/i,
+  );
+  const recommendationsMatch = text.match(
+    /RECOMMENDATIONS\s*:\s*([\s\S]*?)$/i,
+  );
+  return {
+    diagnosis: diagnosisMatch?.[1]?.trim() ?? '',
+    recommendations: recommendationsMatch?.[1]?.trim() ?? '',
+    raw: text,
+  };
+}
+
 export function AiRecommendationsPanel({
   result,
   strategy,
   backtestConfig,
 }: AiRecommendationsPanelProps = {}) {
   const hasTrades = (result?.trades?.length ?? 0) > 0;
+  const { settings, hydrated: aiSettingsHydrated } = useAiSettings();
+
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisDetail, setAnalysisDetail] = useState<string | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<{
+    diagnosis: string;
+    recommendations: string;
+    raw: string;
+  } | null>(null);
 
   const handleExport = useCallback(() => {
     const payload = buildRequestPayload(result, strategy, backtestConfig);
@@ -182,6 +212,62 @@ export function AiRecommendationsPanel({
     URL.revokeObjectURL(url);
   }, [result, strategy, backtestConfig]);
 
+  const handleApproveAndSend = useCallback(async () => {
+    if (!hasTrades || analyzing) return;
+    setAnalyzing(true);
+    setAnalysisError(null);
+    setAnalysisDetail(null);
+    try {
+      const payloadJson = buildRequestPayload(result, strategy, backtestConfig);
+      const payload = JSON.parse(payloadJson) as unknown;
+      const res = await fetch('/api/ai/analyze', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: settings.provider,
+          model: settings.model,
+          apiKey: settings.apiKeys[settings.provider],
+          ollamaBaseUrl: settings.ollamaBaseUrl,
+          prompt:
+            'Analyze this trading strategy backtest and return a diagnosis and concrete, actionable recommendations.',
+          payload,
+        }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        text?: string;
+        error?: string;
+        detail?: string;
+      };
+      if (!res.ok || !data.ok) {
+        setAnalysisError(
+          data.error ?? `The analyze endpoint returned HTTP ${res.status}.`,
+        );
+        setAnalysisDetail(data.detail ?? null);
+        return;
+      }
+      setAiAnalysis(parseAnalysisResponse(data.text ?? ''));
+    } catch (err) {
+      setAnalysisError(
+        err instanceof Error ? err.message : 'The analyze request failed.',
+      );
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [
+    hasTrades,
+    analyzing,
+    result,
+    strategy,
+    backtestConfig,
+    settings.provider,
+    settings.model,
+    settings.apiKeys,
+    settings.ollamaBaseUrl,
+  ]);
+
+  const canSend = hasTrades && !analyzing && aiSettingsHydrated;
+
   return (
     <div className="flex flex-col gap-3">
       {/* Strategy Diagnosis */}
@@ -189,11 +275,21 @@ export function AiRecommendationsPanel({
         <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>
           STRATEGY DIAGNOSIS
         </p>
-        <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
-          {result
-            ? 'Awaiting AI analysis. Use “Approve & Send to AI” below once the request preview is verified.'
-            : 'Run a backtest first, then use “Approve & Send to AI” to receive a strategy diagnosis.'}
-        </p>
+        {aiAnalysis?.diagnosis ? (
+          <p className="text-xs whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
+            {aiAnalysis.diagnosis}
+          </p>
+        ) : aiAnalysis?.raw ? (
+          <p className="text-xs whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
+            {aiAnalysis.raw}
+          </p>
+        ) : (
+          <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
+            {result
+              ? 'Awaiting AI analysis. Use “Approve & Send to AI” below once the request preview is verified.'
+              : 'Run a backtest first, then use “Approve & Send to AI” to receive a strategy diagnosis.'}
+          </p>
+        )}
       </div>
 
       {/* Recommendations */}
@@ -201,12 +297,41 @@ export function AiRecommendationsPanel({
         <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>
           RECOMMENDATIONS
         </p>
-        <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
-          {result
-            ? 'No recommendations yet. Recommendations appear here after AI analysis completes.'
-            : 'No results yet. Run a backtest to generate recommendations.'}
-        </p>
+        {aiAnalysis?.recommendations ? (
+          <p className="text-xs whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
+            {aiAnalysis.recommendations}
+          </p>
+        ) : (
+          <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
+            {aiAnalysis
+              ? 'No structured recommendations in the response. See Strategy Diagnosis above for the full reply.'
+              : result
+                ? 'No recommendations yet. Recommendations appear here after AI analysis completes.'
+                : 'No results yet. Run a backtest to generate recommendations.'}
+          </p>
+        )}
       </div>
+
+      {/* Analysis error banner */}
+      {analysisError && (
+        <div
+          className="rounded p-2 text-xs"
+          role="alert"
+          style={{
+            background: 'var(--bg-elevated)',
+            color: 'var(--accent-red, #f87171)',
+            border: '1px solid var(--accent-red, #f87171)',
+          }}
+        >
+          <p className="font-semibold">AI analysis failed</p>
+          <p className="mt-1">{analysisError}</p>
+          {analysisDetail && (
+            <p className="mt-1" style={{ color: 'var(--text-faint)' }}>
+              {analysisDetail}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Request Preview header */}
       <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
@@ -291,18 +416,23 @@ export function AiRecommendationsPanel({
         </button>
         <button
           type="button"
-          disabled={!hasTrades}
-          title="AI backend endpoint not yet connected — export to JSON and use the Python client to send."
+          onClick={handleApproveAndSend}
+          disabled={!canSend}
+          title={
+            analyzing
+              ? 'Sending the request preview to the configured AI provider…'
+              : 'Send the request preview to the configured AI provider and display the diagnosis and recommendations.'
+          }
           className="px-3 py-1.5 rounded text-xs font-medium"
           style={{
-            background: hasTrades ? 'var(--accent-blue, #3b82f6)' : 'var(--bg-card)',
-            color: hasTrades ? '#fff' : 'var(--text-faint)',
+            background: canSend ? 'var(--accent-blue, #3b82f6)' : 'var(--bg-card)',
+            color: canSend ? '#fff' : 'var(--text-faint)',
             border: '1px solid var(--border)',
-            opacity: hasTrades ? 1 : 0.5,
-            cursor: hasTrades ? 'pointer' : 'not-allowed',
+            opacity: canSend ? 1 : 0.5,
+            cursor: canSend ? 'pointer' : 'not-allowed',
           }}
         >
-          Approve &amp; Send to AI
+          {analyzing ? 'Sending…' : 'Approve & Send to AI'}
         </button>
       </div>
     </div>
