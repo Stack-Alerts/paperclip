@@ -286,3 +286,44 @@ BTCAAAAA-33697).
 - **[BTCAAAAA-33696](/BTCAAAAA/issues/BTCAAAAA-33696)** — Watchdog fixes (systemd WatchdogSec=, uvicorn diagnostics)
 - **[BTCAAAAA-31132](/BTCAAAAA/issues/BTCAAAAA-31132)** — Original split of start.sh into start-dev.sh and start-test.sh
 - **[BTCAAAAA-31234](/BTCAAAAA/issues/BTCAAAAA-31234)** — Wrapper PATH design
+
+## Mandatory Heartbeat Exit — Disposition Checklist (BTCAAAAA-36752)
+
+Every agent in this company MUST end every heartbeat with exactly one final
+disposition. This is the safety net for the paperclip skill's Step 8 checklist
+— same rules, distilled for cross-agent consistency regardless of which skill
+subset loads in a given run. The `paperclip` skill is the source of truth for
+the full procedure; this section is the minimum invariant.
+
+Before you exit ANY heartbeat, make exactly one of these API calls with the
+`X-Paperclip-Run-Id: $PAPERCLIP_RUN_ID` header:
+
+| Disposition       | When to use                                                                                  | PATCH payload (one of)                                                                                                                  |
+| ----------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `done`            | Work is complete, verification recorded, no follow-up remains.                               | `{"status":"done","comment":"<what was done and why>"}`                                                                                |
+| `in_review`       | A real reviewer path exists (board user, approval, typed participant, pending interaction).    | `{"status":"in_review","comment":"<what is ready and who reviews>"}`                                                                   |
+| `blocked`         | Cannot continue until first-class `blockedByIssueIds` resolve or a named owner acts.         | `{"status":"blocked","blockedByIssueIds":["<id>"],"comment":"<blocker + named unblock owner/action>"}`                                   |
+| Delegated follow-up | Next work belongs in a new issue, not on this one.                                         | `POST /api/companies/{companyId}/issues` with `parentId` + `goalId`, then close parent or leave it `in_progress` with explicit monitor. |
+| `in_progress`     | ONLY if a live continuation path exists: active run, queued continuation, or monitor.         | `{"status":"in_progress","comment":"<what is done, what remains, who/what wakes you>"}`                                                |
+
+**Non-negotiable rules:**
+
+- NEVER exit a heartbeat with the run still in flight and no status update.
+  A comment or a "Remaining" bullet is **evidence**, not a disposition — the
+  recovery watchdog will flag it as `clear_next_step` and auto-create a
+  corrective run.
+- The four disposition calls are mutually exclusive. Pick one; do not stack
+  status changes in a single PATCH.
+- If you discover the work belongs to a different agent, do NOT post a comment
+  and exit — use `POST /api/companies/{companyId}/issues` to create a child
+  issue with `parentId` + `goalId` so the wake handoff is structured.
+- If you hit a turn or time limit, PATCH the most accurate status you can with
+  a `comment` that names what's done and what's next — `in_progress` is valid
+  here only when an active run or monitor will resume you.
+
+**Why this is here:** [BTCAAAAA-36752](/BTCAAAAA/issues/BTCAAAAA-36752) —
+the disposition-miss recovery pattern from the Perplexity research paper is a
+real risk in this company. The `paperclip` skill already enforces this in
+Step 8, but agents that load a reduced skill subset or suffer context drift
+in long sessions can still skip the final PATCH. This block is the last-line
+defense loaded from the workspace itself.
