@@ -34,9 +34,18 @@ release_lock() {
 
 check_uncommitted_changes() {
     cd "$REPO_ROOT"
-    local status=$(git status --porcelain 2>/dev/null | grep -v "^??" || true)
-    if [ -n "$status" ]; then
-        warn "Uncommitted changes detected, skipping reset this cycle"
+    # Filter out `.claude/worktrees/**` — worktrees are not part of the main
+    # repo and must not gate dev-server resets. Untracked worktree entries
+    # appear as collapsed `? <dir>` lines from `git status --porcelain`.
+    local status
+    status=$(git status --porcelain --untracked-files=no 2>/dev/null || true)
+    local untracked
+    untracked=$(git status --porcelain 2>/dev/null \
+        | awk '/^\?\?/ {print $2}' \
+        | grep -v '^\.claude/worktrees/' \
+        || true)
+    if [ -n "$status" ] || [ -n "$untracked" ]; then
+        warn "Uncommitted changes detected (ignoring .claude/worktrees/**), skipping reset this cycle"
         return 1
     fi
     return 0
@@ -60,12 +69,25 @@ get_current_sha() {
 
 kill_dev_server() {
     log "Checking for dev server on port $DEV_SERVER_PORT..."
-    local pids=$(lsof -ti :$DEV_SERVER_PORT 2>/dev/null || true)
+    # Only target the actual LISTEN-state listener; -ti alone also matches
+    # ESTABLISHED client connections (e.g. the user's browser) which would
+    # kill the wrong process.
+    local pids
+    pids=$(lsof -i :$DEV_SERVER_PORT -sTCP:LISTEN -t 2>/dev/null || true)
     if [ -n "$pids" ]; then
-        log "Found dev server processes: $pids"
+        log "Found dev server listener(s): $pids"
         kill -9 $pids 2>/dev/null || true
-        sleep 2
-        log "Killed dev server"
+        # Wait for the OS to recycle the port before re-binding.
+        sleep 3
+        local remaining
+        remaining=$(lsof -i :$DEV_SERVER_PORT -sTCP:LISTEN -t 2>/dev/null || true)
+        if [ -n "$remaining" ]; then
+            warn "Listener still bound on :$DEV_SERVER_PORT (PIDs: $remaining) after kill"
+        else
+            log "Killed dev server listener; port :$DEV_SERVER_PORT is free"
+        fi
+    else
+        log "No dev server listener on :$DEV_SERVER_PORT"
     fi
 }
 
@@ -77,11 +99,13 @@ clean_turbopack_cache() {
 
 start_dev_server() {
     log "Starting dev server..."
-    cd "$REPO_ROOT"
-    nohup bash -c "cd '$REPO_ROOT' && pnpm dev" > /tmp/dev-server.log 2>&1 &
+    if [ ! -d "$WEB_UI_DIR" ]; then
+        error "Web UI directory not found: $WEB_UI_DIR"
+    fi
+    nohup bash -c "cd '$WEB_UI_DIR' && pnpm dev" > /tmp/dev-server.log 2>&1 &
     local pid=$!
-    log "Dev server started with PID $pid"
-    
+    log "Dev server started with PID $pid (cwd=$WEB_UI_DIR)"
+
     log "Waiting for dev server..."
     local max_attempts=30
     local attempt=0
