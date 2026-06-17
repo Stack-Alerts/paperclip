@@ -33,6 +33,28 @@ function computeActualStale(tf: string, f: TimeframeFreshness): boolean {
   return d.getTime() / 1000 < expectedLastClosedOpen;
 }
 
+// Detect the "data source archive lag" pattern: the freshness card is stale AND
+// the last bar timestamp is exactly the prior-day 00:00:00Z (i.e. the daily
+// archive's last bar, not a real 15m/1h close). This is the tell that the
+// `/data/update` updater is sourcing from the LakeAPI daily archive and not
+// falling through to Binance REST for the trailing intraday window — the
+// underlying data-pipeline bug tracked separately. Surfacing it in the UI
+// explains the "Update Data → success → no change" loop to the user.
+function isArchiveLagged(tf: string, f: TimeframeFreshness): boolean {
+  if (tf === '1d') return false; // 1d bars are legitimately anchored to 00:00Z
+  if (!f.lastBarTs) return false;
+  const d = parseApiTimestamp(f.lastBarTs);
+  if (!d) return false;
+  // Must be on a UTC midnight boundary
+  if (d.getUTCHours() !== 0 || d.getUTCMinutes() !== 0 || d.getUTCSeconds() !== 0) return false;
+  // Must be a prior UTC day (not today's midnight, which is a normal in-flight anchor)
+  const todayUtc = new Date();
+  const todayMidnightUtc = Date.UTC(
+    todayUtc.getUTCFullYear(), todayUtc.getUTCMonth(), todayUtc.getUTCDate(), 0, 0, 0,
+  );
+  return d.getTime() < todayMidnightUtc;
+}
+
 function formatAge(seconds: number | null): string {
   if (seconds === null) return '—';
   if (seconds < 60) return `${Math.round(seconds)}s`;
@@ -199,6 +221,13 @@ export default function MarketDataPage() {
   // threshold for 1d which falsely flags the normal last-closed-daily-bar as stale).
   const anyActuallyStale = Object.entries(timeframes).some(([tf, f]) => computeActualStale(tf, f));
   const anyIssue = status?.anyGaps || anyActuallyStale;
+  // Detect the LakeAPI daily-archive lag pattern: 15m and/or 1h stuck on a prior
+  // day's 00:00Z bar. The presence of this pattern is what makes the "Update
+  // Data → success → no change" loop reproducible.
+  const archiveLaggedTfs = (['15m', '1h'] as const).filter(
+    (tf) => timeframes[tf] && isArchiveLagged(tf, timeframes[tf]),
+  );
+  const anyArchiveLagged = archiveLaggedTfs.length > 0;
 
   return (
     <div className="flex-1 overflow-y-auto p-6" style={{ background: 'var(--app-bg)' }}>
@@ -243,6 +272,54 @@ export default function MarketDataPage() {
         </div>
       )}
 
+      {/* Data Source Lag Notice — explains the "Update Data → success → no change" loop */}
+      {anyArchiveLagged && (
+        <section
+          className="mb-6 p-4 rounded-lg text-sm"
+          style={{
+            background: 'var(--bg-panel)',
+            border: '1px solid var(--color-warning)',
+            color: 'var(--text-primary)',
+          }}
+        >
+          <div className="flex items-start gap-2 mb-2">
+            <span
+              className="font-semibold uppercase text-xs tracking-wide mt-0.5"
+              style={{ color: 'var(--color-warning)' }}
+            >
+              ⚠ Data source archive lag
+            </span>
+          </div>
+          <p className="mb-2" style={{ color: 'var(--text-secondary)' }}>
+            The {archiveLaggedTfs.join(' and ')} timeframe{archiveLaggedTfs.length === 1 ? '' : 's'}
+            {' '}last bar{archiveLaggedTfs.length === 1 ? ' is' : 's are'} the{' '}
+            <span className="font-mono">
+              {timeframes[archiveLaggedTfs[0]]?.lastBarTs
+                ? formatLocalShort(timeframes[archiveLaggedTfs[0]].lastBarTs)
+                : '—'}
+            </span>
+            {' '}midnight snapshot from the LakeAPI daily archive. That archive is published
+            once per UTC day, so <em>Update Data</em> re-fetches the same daily bar
+            and cannot advance the trailing intraday window — which is also why{' '}
+            <em>Re-run Verification</em> reports <code>totalGaps: 0</code> (no internal
+            holes in the stored range) at the same time the freshness card shows{' '}
+            <em>STALE</em> (the stored range ends ~1 day behind real-time).
+          </p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Trailing intraday bars exist on Binance; surfacing them requires a
+            backend change to fall through from the LakeAPI archive to Binance
+            REST for the trailing window. Tracked on{' '}
+            <a
+              href="/BTCAAAAA/issues/BTCAAAAA-36376"
+              style={{ color: 'var(--accent-blue)' }}
+            >
+              BTCAAAAA-36376
+            </a>{' '}
+            (cross-scope backend fix pending board authorization).
+          </p>
+        </section>
+      )}
+
       {/* OHLCV Freshness Section */}
       <section className="mb-6">
         <h2 className="text-sm font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--text-muted)' }}>
@@ -265,7 +342,22 @@ export default function MarketDataPage() {
                   <span className="font-mono text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                     {tf}
                   </span>
-                  <StatusDot stale={stale} />
+                  <div className="flex items-center gap-1.5">
+                    {f && isArchiveLagged(tf, f) && (
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded font-medium uppercase"
+                        style={{
+                          background: 'var(--bg-panel-raised)',
+                          color: 'var(--color-warning)',
+                          border: '1px solid var(--color-warning)',
+                        }}
+                        title="Last bar is the daily archive's midnight snapshot; trailing intraday bars require a backend fix."
+                      >
+                        archive
+                      </span>
+                    )}
+                    <StatusDot stale={stale} />
+                  </div>
                 </div>
                 {f ? (
                   <>
