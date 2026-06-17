@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { AiRecommendationsPanel } from '@/components/backtest/ai-recommendations/AiRecommendationsPanel';
 import type { BacktestResult, Strategy, Trade } from '@/lib/strategy-builder/types';
 
@@ -211,5 +211,254 @@ describe('AiRecommendationsPanel — progress UI (BTCAAAAA-36777)', () => {
     await waitFor(() => {
       expect(screen.getByText(/Request cancelled\./)).toBeInTheDocument();
     });
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// AC8: countdown ETA shown next to the progress percent during awaiting-provider
+// ──────────────────────────────────────────────────────────────────────────
+describe('AiRecommendationsPanel — AC8 countdown (BTCAAAAA-36873)', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('shows ~Ns ETA next to the percent while waiting for provider', async () => {
+    const fetchMock = jest.fn().mockImplementation(
+      () => new Promise(() => {}),
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Approve & Send to AI/i }));
+    fireEvent.click(screen.getByTestId('opt-goal-confirm'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-recs-progress-label').textContent).toMatch(/Stage 3\/4/);
+    });
+
+    expect(screen.getByTestId('ai-recs-progress-eta').textContent).toBe('~30s');
+
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(screen.getByTestId('ai-recs-progress-eta').textContent).toBe('~25s');
+  });
+
+  it('does not show an ETA outside the awaiting-provider phase', () => {
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+    expect(screen.queryByTestId('ai-recs-progress-eta')).toBeNull();
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// AC9: Export to JSON is gated on admin role
+// ──────────────────────────────────────────────────────────────────────────
+describe('AiRecommendationsPanel — AC9 admin gate (BTCAAAAA-36873)', () => {
+  function setAuthToken(token: string | null) {
+    if (token === null) {
+      window.localStorage.removeItem('auth_token');
+    } else {
+      window.localStorage.setItem('auth_token', token);
+    }
+  }
+
+  // Build a JWT-like "header.payload.sig" string with a base64url JSON payload.
+  function makeJwt(claims: Record<string, unknown>): string {
+    const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' }));
+    const payload = btoa(JSON.stringify(claims))
+      .replace(/=/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_');
+    return `${header}.${payload}.sig`;
+  }
+
+  it('disables Export to JSON when no auth_token is present', () => {
+    setAuthToken(null);
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+    const exportBtn = screen.getByRole('button', { name: /Export to JSON/i });
+    expect(exportBtn).toBeDisabled();
+    expect(exportBtn.getAttribute('title')).toMatch(/admin/i);
+  });
+
+  it('disables Export to JSON when auth_token has no admin claim', () => {
+    setAuthToken(makeJwt({ sub: 'u1', role: 'viewer' }));
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+    const exportBtn = screen.getByRole('button', { name: /Export to JSON/i });
+    expect(exportBtn).toBeDisabled();
+  });
+
+  it('enables Export to JSON when auth_token has admin=true', () => {
+    setAuthToken(makeJwt({ sub: 'u1', admin: true }));
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+    const exportBtn = screen.getByRole('button', { name: /Export to JSON/i });
+    expect(exportBtn).toBeEnabled();
+  });
+
+  it('enables Export to JSON when auth_token has role=admin', () => {
+    setAuthToken(makeJwt({ sub: 'u1', role: 'admin' }));
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+    const exportBtn = screen.getByRole('button', { name: /Export to JSON/i });
+    expect(exportBtn).toBeEnabled();
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// AC10: success banner auto-dismisses after 3s with opacity fade
+// ──────────────────────────────────────────────────────────────────────────
+describe('AiRecommendationsPanel — AC10 auto-dismiss (BTCAAAAA-36873)', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('hides the applySuccess banner after ~3s and starts faded first', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true, apply: { applied: [], applied_count: 1 } }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('ai-recs-apply-all'));
+    // Confirm the apply-all confirmation modal.
+    fireEvent.click(screen.getByRole('button', { name: /^Apply all$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-recs-apply-success')).toBeInTheDocument();
+    });
+
+    // After 2.7s the banner should still be visible (fade hasn't started yet).
+    act(() => {
+      jest.advanceTimersByTime(2700);
+    });
+    expect(screen.getByTestId('ai-recs-apply-success')).toBeInTheDocument();
+    expect(screen.getByTestId('ai-recs-apply-success').style.opacity).toBe('1');
+
+    // After 3s total the banner should be fully dismissed.
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+    expect(screen.queryByTestId('ai-recs-apply-success')).toBeNull();
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// AC11: Apply-all moved to the bottom of the right pane
+// ──────────────────────────────────────────────────────────────────────────
+describe('AiRecommendationsPanel — AC11 apply-all footer (BTCAAAAA-36873)', () => {
+  it('renders a single Apply-all button in the right pane', () => {
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+    const applyAllButtons = screen.getAllByTestId('ai-recs-apply-all');
+    expect(applyAllButtons).toHaveLength(1);
+  });
+
+  it('still gates the button on having a strategy loaded', () => {
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={null}
+        backtestConfig={{}}
+      />,
+    );
+    const applyAll = screen.getByTestId('ai-recs-apply-all');
+    expect(applyAll).toBeDisabled();
+    expect(applyAll.getAttribute('title')).toMatch(/Load a strategy/);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// AC12: Strategy diagnosis renders as compare-style cards
+// ──────────────────────────────────────────────────────────────────────────
+describe('AiRecommendationsPanel — AC12 diagnosis cards (BTCAAAAA-36873)', () => {
+  function strategyWithBlocks(): Strategy {
+    return {
+      ...makeStrategy(),
+      blocks: [
+        { id: 'b1', type: 'RSI', index: 0, data: {} },
+        { id: 'b2', type: 'EMA_CROSS', index: 1, data: {} },
+      ] as unknown as Strategy['blocks'],
+    };
+  }
+
+  it('renders one block card per strategy block', () => {
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={strategyWithBlocks()}
+        backtestConfig={{}}
+      />,
+    );
+    const blockCards = screen.getAllByTestId('ai-recs-block-card');
+    expect(blockCards).toHaveLength(2);
+    expect(blockCards[0]).toHaveTextContent('RSI');
+    expect(blockCards[1]).toHaveTextContent('EMA_CROSS');
+  });
+
+  it('shows the empty-state copy when the strategy has no blocks', () => {
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+    expect(screen.queryByTestId('ai-recs-block-card')).toBeNull();
+    expect(screen.getByText(/No building blocks on the current strategy/i)).toBeInTheDocument();
   });
 });

@@ -26,6 +26,44 @@ const PHASE_INFO: Record<Exclude<SendPhase, 'idle' | 'error'>, PhaseInfo> = {
   done: { percent: 100, label: 'Stage 4/4: Complete' },
 };
 
+// AC8: rough ETA shown next to the percent while we are waiting for the
+// provider to respond. 30s is a conservative default for first-token latency
+// across the providers the webui currently routes through.
+const AWAITING_PROVIDER_ETA_SECONDS = 30;
+
+// AC10: how long the green "Applied" banner stays visible before fading out.
+const APPLY_SUCCESS_DISMISS_MS = 3000;
+
+/**
+ * AC9: best-effort admin-role detection. The webui does not yet have a
+ * server-issued roles endpoint, so we parse the auth_token (a JWT) for an
+ * `admin` / `role` claim. Anything we cannot prove admin = locked out.
+ */
+function readIsAdminFromAuthToken(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const token = window.localStorage.getItem('auth_token');
+    if (!token) return false;
+    const parts = token.split('.');
+    if (parts.length < 2) return false;
+    const payload = parts[1];
+    const padded = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const json = atob(padded + '==='.slice((padded.length + 3) % 4));
+    const claims = JSON.parse(json) as Record<string, unknown>;
+    if (claims.admin === true) return true;
+    if (claims.is_admin === true) return true;
+    const role = claims.role;
+    if (typeof role === 'string' && role.toLowerCase() === 'admin') return true;
+    const roles = claims.roles;
+    if (Array.isArray(roles) && roles.some((r) => typeof r === 'string' && r.toLowerCase() === 'admin')) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 const ACTIVE_PHASES: ReadonlySet<SendPhase> = new Set([
   'building-request',
   'sending',
@@ -1334,6 +1372,7 @@ export function AiRecommendationsPanel({
   const [applyError, setApplyError] = useState<string | null>(null);
   const [applyDetail, setApplyDetail] = useState<string | null>(null);
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
+  const [applySuccessVisible, setApplySuccessVisible] = useState(true);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{
     ok: boolean;
@@ -1348,8 +1387,34 @@ export function AiRecommendationsPanel({
   const [activeRec, setActiveRec] = useState<ActiveRec | null>(null);
   const [optimizationGoal, setOptimizationGoal] = useState<string | null>(null);
 
+  // AC9: admin gate for Export to JSON. Computed once on mount from the
+  // auth_token claim; a fresh login would remount the panel through key
+  // changes elsewhere so we do not need to live-observe it.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    setIsAdmin(readIsAdminFromAuthToken());
+  }, []);
+
+  // AC8: countdown for the awaiting-provider phase. Resets to the full
+  // ETA whenever we enter the phase, ticks once per second while we are
+  // inside it, and clears when we leave.
+  const [awaitingEta, setAwaitingEta] = useState<number | null>(null);
+  useEffect(() => {
+    if (phase !== 'awaiting-provider') {
+      setAwaitingEta(null);
+      return;
+    }
+    setAwaitingEta(AWAITING_PROVIDER_ETA_SECONDS);
+    const interval = setInterval(() => {
+      setAwaitingEta((prev) => (prev === null ? null : Math.max(0, prev - 1)));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [phase]);
+
   const abortRef = useRef<AbortController | null>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const applySuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const applySuccessFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
@@ -1361,8 +1426,62 @@ export function AiRecommendationsPanel({
         clearTimeout(dismissTimerRef.current);
         dismissTimerRef.current = null;
       }
+      if (applySuccessTimerRef.current) {
+        clearTimeout(applySuccessTimerRef.current);
+        applySuccessTimerRef.current = null;
+      }
+      if (applySuccessFadeTimerRef.current) {
+        clearTimeout(applySuccessFadeTimerRef.current);
+        applySuccessFadeTimerRef.current = null;
+      }
     };
   }, []);
+
+  // AC10: auto-dismiss the apply success banner after 3 seconds. We flip
+  // the "visible" flag first to drive the opacity fade, then clear the
+  // message on a second timer.
+  useEffect(() => {
+    if (!applySuccess) {
+      setApplySuccessVisible(true);
+      if (applySuccessTimerRef.current) {
+        clearTimeout(applySuccessTimerRef.current);
+        applySuccessTimerRef.current = null;
+      }
+      if (applySuccessFadeTimerRef.current) {
+        clearTimeout(applySuccessFadeTimerRef.current);
+        applySuccessFadeTimerRef.current = null;
+      }
+      return;
+    }
+    setApplySuccessVisible(true);
+    if (applySuccessFadeTimerRef.current) {
+      clearTimeout(applySuccessFadeTimerRef.current);
+    }
+    if (applySuccessTimerRef.current) {
+      clearTimeout(applySuccessTimerRef.current);
+    }
+    // AC10: keep the banner fully opaque for the full 3s window, then flip
+    // visibility to drive the 300ms CSS opacity fade, then clear the message
+    // 300ms after that so the element is removed once the fade has had time
+    // to play out.
+    applySuccessFadeTimerRef.current = setTimeout(() => {
+      setApplySuccessVisible(false);
+    }, APPLY_SUCCESS_DISMISS_MS);
+    applySuccessTimerRef.current = setTimeout(() => {
+      setApplySuccess(null);
+      setApplySuccessVisible(true);
+    }, APPLY_SUCCESS_DISMISS_MS);
+    return () => {
+      if (applySuccessFadeTimerRef.current) {
+        clearTimeout(applySuccessFadeTimerRef.current);
+        applySuccessFadeTimerRef.current = null;
+      }
+      if (applySuccessTimerRef.current) {
+        clearTimeout(applySuccessTimerRef.current);
+        applySuccessTimerRef.current = null;
+      }
+    };
+  }, [applySuccess]);
 
   const analyzing = ACTIVE_PHASES.has(phase);
 
@@ -1850,10 +1969,13 @@ export function AiRecommendationsPanel({
         <div
           className="rounded p-2 text-xs"
           role="status"
+          data-testid="ai-recs-apply-success"
           style={{
             background: 'rgba(34, 197, 94, 0.12)',
             color: '#4ade80',
             border: '1px solid #4ade80',
+            opacity: applySuccessVisible ? 1 : 0,
+            transition: 'opacity 300ms ease-out',
           }}
         >
           {applySuccess}
@@ -1950,14 +2072,28 @@ export function AiRecommendationsPanel({
             >
               {progressLabel}
             </span>
-            <span
-              data-testid="ai-recs-progress-percent"
-              style={{
-                color: 'var(--text-muted)',
-                fontFamily: 'var(--font-mono, monospace)',
-              }}
-            >
-              {progressPercent}%
+            <span className="flex items-center gap-2">
+              {phase === 'awaiting-provider' && awaitingEta !== null && (
+                <span
+                  data-testid="ai-recs-progress-eta"
+                  aria-live="off"
+                  style={{
+                    color: 'var(--text-muted)',
+                    fontFamily: 'var(--font-mono, monospace)',
+                  }}
+                >
+                  ~{awaitingEta}s
+                </span>
+              )}
+              <span
+                data-testid="ai-recs-progress-percent"
+                style={{
+                  color: 'var(--text-muted)',
+                  fontFamily: 'var(--font-mono, monospace)',
+                }}
+              >
+                {progressPercent}%
+              </span>
             </span>
           </div>
           <div
@@ -2006,14 +2142,21 @@ export function AiRecommendationsPanel({
         <button
           type="button"
           onClick={handleExport}
-          disabled={!hasTrades}
+          disabled={!hasTrades || !isAdmin}
+          title={
+            !isAdmin
+              ? 'Export to JSON requires an admin login.'
+              : !hasTrades
+                ? 'Run a backtest with trades to enable Export to JSON.'
+                : 'Download the request payload as JSON.'
+          }
           className="px-3 py-1.5 rounded text-xs font-medium"
           style={{
             background: 'var(--bg-card)',
-            color: hasTrades ? 'var(--text-secondary)' : 'var(--text-faint)',
+            color: hasTrades && isAdmin ? 'var(--text-secondary)' : 'var(--text-faint)',
             border: '1px solid var(--border)',
-            opacity: hasTrades ? 1 : 0.5,
-            cursor: hasTrades ? 'pointer' : 'not-allowed',
+            opacity: hasTrades && isAdmin ? 1 : 0.5,
+            cursor: hasTrades && isAdmin ? 'pointer' : 'not-allowed',
           }}
         >
           Export to JSON
@@ -2061,30 +2204,6 @@ export function AiRecommendationsPanel({
                 ? 'Retry'
                 : 'Approve & Send to AI'}
         </button>
-        <button
-          type="button"
-          onClick={requestApplyAll}
-          disabled={!canApply}
-          title={
-            applying
-              ? 'Sending the recommendation set to the AutoApply orchestrator…'
-              : !strategy?.id
-                ? 'Load a strategy first to enable auto-apply.'
-                : 'Send the current recommendation set to the AutoApply orchestrator. Marks the most recent history entry as APPLIED on success.'
-          }
-          className="px-3 py-1.5 rounded text-xs font-medium"
-          style={{
-            background: canApply ? 'var(--accent-green, #4ade80)' : 'var(--bg-card)',
-            color: canApply ? '#0a0a0a' : 'var(--text-faint)',
-            border: `1px solid ${
-              canApply ? 'var(--accent-green, #4ade80)' : 'var(--border)'
-            }`,
-            opacity: canApply ? 1 : 0.5,
-            cursor: canApply ? 'pointer' : 'not-allowed',
-          }}
-        >
-          {applying ? 'Applying…' : 'Apply all recommendations'}
-        </button>
       </div>
       {testResult && (
         <div
@@ -2125,7 +2244,11 @@ export function AiRecommendationsPanel({
   // ── RIGHT pane: diagnosis + per-rec cards ──
   const rightPane = (
     <div className="flex flex-col gap-3">
-      {/* Strategy Diagnosis */}
+      {/* AC12: Strategy Diagnosis redesigned as compare-style cards.
+          The diagnosis prose stays (top summary card), and the
+          building blocks + configuration options that will be applied
+          render as a card grid, matching the ComparePanel visual
+          language (rounded card, accent border, dimmed-on-empty). */}
       <div
         className="rounded p-3"
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
@@ -2156,6 +2279,114 @@ export function AiRecommendationsPanel({
               ? 'Awaiting AI analysis. Use “Approve & Send to AI” below once the request preview is verified.'
               : 'Run a backtest first, then use “Approve & Send to AI” to receive a strategy diagnosis.'}
           </p>
+        )}
+      </div>
+
+      {/* AC12: Building blocks that will be applied (compare-card grid) */}
+      <div
+        className="rounded p-3"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+      >
+        <p
+          className="text-xs font-semibold uppercase tracking-wide mb-2"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          BUILDING BLOCKS
+          <span
+            className="ml-1.5 text-[10px] font-normal"
+            style={{ color: 'var(--text-faint)' }}
+          >
+            ({strategy?.blocks?.length ?? 0})
+          </span>
+        </p>
+        {(strategy?.blocks?.length ?? 0) === 0 ? (
+          <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
+            No building blocks on the current strategy.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {(strategy?.blocks ?? []).map((block) => (
+              <div
+                key={block.id}
+                data-testid="ai-recs-block-card"
+                className="rounded p-2 text-[11px]"
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border)',
+                  borderTop: '2px solid var(--accent-blue, #3b82f6)',
+                }}
+              >
+                <p
+                  className="font-semibold truncate"
+                  style={{ color: 'var(--text-secondary)' }}
+                  title={String(block.type)}
+                >
+                  {String(block.type)}
+                </p>
+                <p
+                  className="text-[10px] mt-0.5"
+                  style={{ color: 'var(--text-faint)' }}
+                >
+                  index #{block.index}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* AC12: Configuration options that will be applied (compare-card grid) */}
+      <div
+        className="rounded p-3"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+      >
+        <p
+          className="text-xs font-semibold uppercase tracking-wide mb-2"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          CONFIGURATION OPTIONS
+          <span
+            className="ml-1.5 text-[10px] font-normal"
+            style={{ color: 'var(--text-faint)' }}
+          >
+            ({parsedRecs.reduce((n, r) => n + r.suggestedParams.length, 0)})
+          </span>
+        </p>
+        {parsedRecs.length === 0 ? (
+          <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
+            Configuration options appear here after AI analysis completes.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {parsedRecs.flatMap((rec) =>
+              rec.suggestedParams.map((p, idx) => (
+                <div
+                  key={`${rec.id}:${idx}`}
+                  data-testid="ai-recs-config-card"
+                  className="rounded p-2 text-[11px]"
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border)',
+                    borderTop: '2px solid var(--accent-green, #4ade80)',
+                  }}
+                  title={`From: ${rec.title}`}
+                >
+                  <p
+                    className="font-mono font-semibold truncate"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    {p.key}
+                  </p>
+                  <p
+                    className="font-mono text-[10px] mt-0.5 truncate"
+                    style={{ color: 'var(--text-faint)' }}
+                  >
+                    = {p.value}
+                  </p>
+                </div>
+              )),
+            )}
+          </div>
         )}
       </div>
 
@@ -2199,6 +2430,41 @@ export function AiRecommendationsPanel({
             />
           ))
         )}
+      </div>
+
+      {/* AC11: Apply-all moved to a sticky footer at the bottom of the right pane */}
+      <div
+        className="sticky bottom-0 pt-3 -mb-3"
+        style={{
+          background:
+            'linear-gradient(to top, var(--bg-card) 70%, rgba(0,0,0,0))',
+        }}
+      >
+        <button
+          type="button"
+          onClick={requestApplyAll}
+          disabled={!canApply}
+          data-testid="ai-recs-apply-all"
+          title={
+            applying
+              ? 'Sending the recommendation set to the AutoApply orchestrator…'
+              : !strategy?.id
+                ? 'Load a strategy first to enable auto-apply.'
+                : 'Send the current recommendation set to the AutoApply orchestrator. Marks the most recent history entry as APPLIED on success.'
+          }
+          className="w-full px-3 py-2 rounded text-xs font-semibold"
+          style={{
+            background: canApply ? 'var(--accent-green, #4ade80)' : 'var(--bg-card)',
+            color: canApply ? '#0a0a0a' : 'var(--text-faint)',
+            border: `1px solid ${
+              canApply ? 'var(--accent-green, #4ade80)' : 'var(--border)'
+            }`,
+            opacity: canApply ? 1 : 0.5,
+            cursor: canApply ? 'pointer' : 'not-allowed',
+          }}
+        >
+          {applying ? 'Applying…' : 'Apply all recommendations'}
+        </button>
       </div>
     </div>
   );
