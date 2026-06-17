@@ -34,6 +34,80 @@ const AWAITING_PROVIDER_ETA_SECONDS = 30;
 // AC10: how long the green "Applied" banner stays visible before fading out.
 const APPLY_SUCCESS_DISMISS_MS = 3000;
 
+// AC21: per-strategy AI recommendations cache. Lives in sessionStorage so the
+// recs + applied-state survive tab navigation, parent re-renders, and the AI
+// panel remounting. AC22: only cleared on explicit user rerun
+// (handleApproveAndSendClick → runApproveAndSend, and loadHistoryIntoCurrent
+// when the user explicitly loads a different history entry). Keyed by
+// strategyId so switching strategies does not bleed stale recs.
+const AI_RECS_CACHE_KEY = 'ai_recs_v3_cache_v1';
+const AI_RECS_CACHE_VERSION = 1;
+
+interface CachedAnalysis {
+  version: number;
+  strategyId: string | null;
+  diagnosis: string;
+  recommendations: string;
+  raw: string;
+  appliedRecIds: string[];
+  // JSON-stringified Strategy per applied rec, so we can locally roll back
+  // (AC18) without a server round-trip. Server-persisted rollback is a
+  // follow-up backend ticket; this snapshot keeps the UX honest in the
+  // meantime.
+  preApplySnapshots: Array<[string, Strategy]>;
+  analysisTimestamp: string;
+}
+
+function readRecsCache(): CachedAnalysis | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(AI_RECS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<CachedAnalysis>;
+    if (parsed.version !== AI_RECS_CACHE_VERSION) return null;
+    if (
+      typeof parsed.diagnosis !== 'string' ||
+      typeof parsed.recommendations !== 'string' ||
+      typeof parsed.raw !== 'string'
+    ) {
+      return null;
+    }
+    return {
+      version: parsed.version,
+      strategyId: parsed.strategyId ?? null,
+      diagnosis: parsed.diagnosis,
+      recommendations: parsed.recommendations,
+      raw: parsed.raw,
+      appliedRecIds: Array.isArray(parsed.appliedRecIds)
+        ? parsed.appliedRecIds.filter((s): s is string => typeof s === 'string')
+        : [],
+      preApplySnapshots: Array.isArray(parsed.preApplySnapshots)
+        ? (parsed.preApplySnapshots as Array<[string, Strategy]>)
+        : [],
+      analysisTimestamp:
+        typeof parsed.analysisTimestamp === 'string'
+          ? parsed.analysisTimestamp
+          : new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeRecsCache(cache: CachedAnalysis | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!cache) {
+      window.sessionStorage.removeItem(AI_RECS_CACHE_KEY);
+      return;
+    }
+    window.sessionStorage.setItem(AI_RECS_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Quota / private-mode failures are silent — the panel still works,
+    // the recs just won't survive a refresh.
+  }
+}
+
 /**
  * AC9: best-effort admin-role detection. The webui does not yet have a
  * server-issued roles endpoint, so we parse the auth_token (a JWT) for an
@@ -513,16 +587,13 @@ function ConfirmationModal({
   onCancel,
   onConfirmClearAll,
   onConfirmDelete,
-  onConfirmApplyAll,
 }: {
-  confirmation: { type: 'clear-all' | 'delete' | 'apply-all'; entryId?: string };
+  confirmation: { type: 'clear-all' | 'delete'; entryId?: string };
   onCancel: () => void;
   onConfirmClearAll: () => void;
   onConfirmDelete: () => void;
-  onConfirmApplyAll: () => void;
 }) {
   const isClearAll = confirmation.type === 'clear-all';
-  const isApplyAll = confirmation.type === 'apply-all';
   return (
     <div
       role="dialog"
@@ -541,18 +612,12 @@ function ConfirmationModal({
         onClick={(e) => e.stopPropagation()}
       >
         <p className="text-sm font-semibold mb-2">
-          {isClearAll
-            ? 'Clear all history?'
-            : isApplyAll
-              ? 'Apply all recommendations?'
-              : 'Delete this entry?'}
+          {isClearAll ? 'Clear all history?' : 'Delete this entry?'}
         </p>
         <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
           {isClearAll
             ? 'This will permanently remove all stored AI recommendation analyses from this browser. This action cannot be undone.'
-            : isApplyAll
-              ? 'Send the current recommendation set to the AutoApply orchestrator. The Python service will classify each rec, snapshot the strategy, apply safe changes, and verify before persisting. The most recent history entry will be marked APPLIED.'
-              : 'This will permanently remove the selected analysis from this browser. This action cannot be undone.'}
+            : 'This will permanently remove the selected analysis from this browser. This action cannot be undone.'}
         </p>
         <div className="flex items-center justify-end gap-2">
           <button
@@ -570,28 +635,16 @@ function ConfirmationModal({
           </button>
           <button
             type="button"
-            onClick={
-              isClearAll
-                ? onConfirmClearAll
-                : isApplyAll
-                  ? onConfirmApplyAll
-                  : onConfirmDelete
-            }
+            onClick={isClearAll ? onConfirmClearAll : onConfirmDelete}
             className="px-3 py-1.5 rounded text-xs font-medium"
             style={{
-              background: isApplyAll
-                ? 'var(--accent-blue, #3b82f6)'
-                : 'var(--accent-red, #f87171)',
+              background: 'var(--accent-red, #f87171)',
               color: '#fff',
-              border: `1px solid ${
-                isApplyAll
-                  ? 'var(--accent-blue, #3b82f6)'
-                  : 'var(--accent-red, #f87171)'
-              }`,
+              border: '1px solid var(--accent-red, #f87171)',
               cursor: 'pointer',
             }}
           >
-            {isClearAll ? 'Clear all' : isApplyAll ? 'Apply all' : 'Delete'}
+            {isClearAll ? 'Clear all' : 'Delete'}
           </button>
         </div>
       </div>
@@ -806,6 +859,12 @@ interface ParsedRec {
   title: string;
   summary: string;
   raw: string;
+  /**
+   * Coarse classification surfaced on the card and forwarded to the
+   * auto-apply orchestrator. Defaults to 'recommendation' because the
+   * AI output rarely carries an explicit "Type:" line per rec.
+   */
+  type: string;
   /** Optional fields extracted from "Confidence: …" / "Rationale: …" lines. */
   confidence?: string;
   rationale?: string;
@@ -899,6 +958,7 @@ function parseSingleRec(block: string, index: number): ParsedRec {
     title: deriveTitle(block, index),
     summary: deriveSummary(block),
     raw: block.trim(),
+    type: tryExtractField(block, 'Type') ?? 'recommendation',
     confidence: tryExtractField(block, 'Confidence'),
     rationale: tryExtractField(block, 'Rationale'),
     suggestedParams: parseSuggestedParams(block),
@@ -1380,7 +1440,7 @@ export function AiRecommendationsPanel({
     detail?: string;
   } | null>(null);
   const [confirmation, setConfirmation] = useState<{
-    type: 'clear-all' | 'delete' | 'apply-all';
+    type: 'clear-all' | 'delete';
     entryId?: string;
   } | null>(null);
   const [goalModalOpen, setGoalModalOpen] = useState(false);
@@ -1394,6 +1454,70 @@ export function AiRecommendationsPanel({
   useEffect(() => {
     setIsAdmin(readIsAdminFromAuthToken());
   }, []);
+
+  // AC15-AC22: per-tile toggle state. Each card knows whether its rec has
+  // been applied (and thus should render in the "on" / enabled state), what
+  // the strategy looked like right before that apply (so AC18 rollback can
+  // restore it locally), and whether an apply is currently in flight for
+  // that specific rec so we can show per-tile spinners. Per-tile errors
+  // surface under the failing card rather than collapsing into a single
+  // global banner.
+  const [appliedRecIds, setAppliedRecIds] = useState<string[]>([]);
+  const [preApplySnapshots, setPreApplySnapshots] = useState<Array<[string, Strategy]>>([]);
+  const [perTileApplying, setPerTileApplying] = useState<string[]>([]);
+  const [perTileError, setPerTileError] = useState<Record<string, string>>({});
+
+  // AC21: hydrate from the sessionStorage cache on mount so the recs
+  // survive a tab switch or a remount of the panel. The cache is also
+  // keyed by strategyId so a different strategy does not bleed recs.
+  // AC22: we do NOT clear on prop-driven re-renders — the only clear
+  // paths are explicit user actions (rerun / load-different-history).
+  const cacheHydratedRef = useRef(false);
+  useEffect(() => {
+    if (cacheHydratedRef.current) return;
+    if (typeof window === 'undefined') return;
+    cacheHydratedRef.current = true;
+    const cached = readRecsCache();
+    if (!cached) return;
+    // If the cached strategy differs from the currently mounted strategy,
+    // do not rehydrate — the recs are scoped to that other strategy.
+    if (
+      cached.strategyId !== null &&
+      strategy?.id &&
+      cached.strategyId !== strategy.id
+    ) {
+      return;
+    }
+    setAiAnalysis({
+      diagnosis: cached.diagnosis,
+      recommendations: cached.recommendations,
+      raw: cached.raw,
+    });
+    setAppliedRecIds(cached.appliedRecIds);
+    setPreApplySnapshots(cached.preApplySnapshots);
+  }, [strategy?.id]);
+
+  // AC21: persist recs + applied state to sessionStorage on change. Done in
+  // a single effect so we only touch storage when something actually
+  // changed. Errors are silent (readRecsCache handles the read side).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!cacheHydratedRef.current) return;
+    if (!aiAnalysis) {
+      writeRecsCache(null);
+      return;
+    }
+    writeRecsCache({
+      version: AI_RECS_CACHE_VERSION,
+      strategyId: strategy?.id ?? null,
+      diagnosis: aiAnalysis.diagnosis,
+      recommendations: aiAnalysis.recommendations,
+      raw: aiAnalysis.raw,
+      appliedRecIds,
+      preApplySnapshots,
+      analysisTimestamp: new Date().toISOString(),
+    });
+  }, [aiAnalysis, appliedRecIds, preApplySnapshots, strategy?.id]);
 
   // AC8: countdown for the awaiting-provider phase. Resets to the full
   // ETA whenever we enter the phase, ticks once per second while we are
@@ -1703,6 +1827,138 @@ export function AiRecommendationsPanel({
     setActiveRec(null);
   }, []);
 
+  // AC15-AC20: per-tile toggle. A click on an "off" card applies just that
+  // rec through the orchestrator (one-element recs array), captures the
+  // pre-apply strategy snapshot for AC18 rollback, and flips the card into
+  // its enabled state. A click on an "on" card rolls back to the snapshot
+  // locally (AC18) — server-side rollback is a follow-up backend ticket
+  // since webui-only phase forbids backend touches.
+  //
+  // Apply runs are independent per-rec (AC19) so multiple cards can be
+  // toggled in parallel; per-tile spinners and per-tile errors keep the UX
+  // honest about which rec is in flight or failed.
+  const handleToggleRec = useCallback(
+    async (rec: ParsedRec) => {
+      if (!strategy?.id) return;
+      const isCurrentlyApplied = appliedRecIds.includes(rec.id);
+      if (isCurrentlyApplied) {
+        // AC18: rollback path. Locally restore the pre-apply strategy and
+        // drop the rec from the applied set. The server still has the
+        // applied state until the follow-up backend rollback endpoint
+        // ships; we surface that in the card's tooltip so the user is not
+        // misled about persistence.
+        const snapshotEntry = preApplySnapshots.find(([id]) => id === rec.id);
+        if (snapshotEntry && onStrategyUpdated) {
+          onStrategyUpdated(snapshotEntry[1]);
+        }
+        setAppliedRecIds((prev) => prev.filter((id) => id !== rec.id));
+        setPreApplySnapshots((prev) => prev.filter(([id]) => id !== rec.id));
+        return;
+      }
+
+      // Apply path. Snapshot first so AC18 rollback is always reversible
+      // even if the orchestrator fails or returns a malformed body.
+      setPerTileApplying((prev) => [...prev, rec.id]);
+      setPerTileError((prev) => {
+        if (!(rec.id in prev)) return prev;
+        const next = { ...prev };
+        delete next[rec.id];
+        return next;
+      });
+      setPreApplySnapshots((prev) => [...prev, [rec.id, strategy]]);
+
+      const headers: Record<string, string> = {
+        'content-type': 'application/json',
+      };
+      if (typeof window !== 'undefined') {
+        const token = window.localStorage.getItem('auth_token');
+        if (token) headers['authorization'] = `Bearer ${token}`;
+      }
+
+      try {
+        const res = await fetch('/api/ai/auto-apply', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            strategyId: strategy.id,
+            recs: [
+              {
+                rec_id: rec.id,
+                type: rec.type,
+                ...(rec.raw ? { raw: rec.raw } : {}),
+              },
+            ],
+            optInDestructiveIds: null,
+          }),
+        });
+        const data = (await res.json()) as {
+          ok: boolean;
+          strategy?: Strategy;
+          error?: string;
+          detail?: string;
+        };
+        if (!res.ok || !data.ok) {
+          // Drop the snapshot — apply failed, nothing to roll back from.
+          setPreApplySnapshots((prev) =>
+            prev.filter(([id]) => id !== rec.id),
+          );
+          setPerTileError((prev) => ({
+            ...prev,
+            [rec.id]:
+              data.error ?? `Auto-apply returned HTTP ${res.status}.`,
+          }));
+          return;
+        }
+        setAppliedRecIds((prev) =>
+          prev.includes(rec.id) ? prev : [...prev, rec.id],
+        );
+        if (data.strategy && onStrategyUpdated) {
+          onStrategyUpdated(data.strategy);
+        }
+      } catch (err) {
+        setPreApplySnapshots((prev) =>
+          prev.filter(([id]) => id !== rec.id),
+        );
+        setPerTileError((prev) => ({
+          ...prev,
+          [rec.id]:
+            err instanceof Error
+              ? err.message
+              : 'The auto-apply request failed.',
+        }));
+      } finally {
+        setPerTileApplying((prev) => prev.filter((id) => id !== rec.id));
+      }
+    },
+    [strategy, appliedRecIds, preApplySnapshots, onStrategyUpdated],
+  );
+
+  // AC22: explicit rerun invalidates the per-tile apply state because the
+  // new analysis may have a different rec set / different rec ids. The
+  // cache-write effect (above) will overwrite the sessionStorage entry on
+  // the next render with the new aiAnalysis + empty applied state. We
+  // track a ref of the previous aiAnalysis so the very first non-null
+  // value (whether from cache hydration or the initial run) does not
+  // trip the "reset" branch — only an actual transition from a prior
+  // analysis to a different one should wipe the toggle state.
+  const lastAiAnalysisRef = useRef<typeof aiAnalysis>(null);
+  useEffect(() => {
+    const prev = lastAiAnalysisRef.current;
+    lastAiAnalysisRef.current = aiAnalysis;
+    if (!aiAnalysis) return;
+    if (prev === null) return;
+    if (
+      prev.diagnosis === aiAnalysis.diagnosis &&
+      prev.recommendations === aiAnalysis.recommendations &&
+      prev.raw === aiAnalysis.raw
+    ) {
+      return;
+    }
+    setAppliedRecIds([]);
+    setPreApplySnapshots([]);
+    setPerTileError({});
+  }, [aiAnalysis]);
+
   // AC3: history Load → hydrate current analysis view AND set first parsed
   // rec as the active rec so the user can re-send with that context.
   const loadHistoryIntoCurrent = useCallback(
@@ -1740,7 +1996,6 @@ export function AiRecommendationsPanel({
     phase === 'idle' || phase === 'error'
       ? ''
       : PHASE_INFO[phase as Exclude<SendPhase, 'idle' | 'error'>].label;
-  const canApply = Boolean(strategy?.id) && !applying;
 
   const requestClearAll = useCallback(() => {
     if (history.entries.length === 0) return;
@@ -1764,88 +2019,6 @@ export function AiRecommendationsPanel({
     }
     setConfirmation(null);
   }, [confirmation, history]);
-
-  const requestApplyAll = useCallback(() => {
-    if (!strategy?.id || applying) return;
-    setApplyError(null);
-    setApplyDetail(null);
-    setApplySuccess(null);
-    setConfirmation({ type: 'apply-all' });
-  }, [strategy?.id, applying]);
-
-  // The orchestrator at src/optimizer_v3/ui/ai_recs_auto_apply.py is the
-  // authority on which recs are safe/destructive/unsupported (BTCAAAAA-36744).
-  // Today the webui does not surface a structured recs list yet (the panel
-  // shows raw text), so we send `recs: []` and the orchestrator returns an
-  // honest "applied_count == 0" / "Nothing to apply" response. The route
-  // still has to be exercised end-to-end so the FastAPI proxy + the
-  // rollback/verify pipeline stay wired up for the structured-rec UX that
-  // is the next iteration.
-  const handleApplyAll = useCallback(async () => {
-    if (!strategy?.id || applying) return;
-    const targetEntryId = history.hydrated ? history.entries[0]?.id : undefined;
-
-    setApplying(true);
-    setApplyError(null);
-    setApplyDetail(null);
-    setApplySuccess(null);
-
-    const headers: Record<string, string> = {
-      'content-type': 'application/json',
-    };
-    if (typeof window !== 'undefined') {
-      const token = window.localStorage.getItem('auth_token');
-      if (token) headers['authorization'] = `Bearer ${token}`;
-    }
-
-    try {
-      const res = await fetch('/api/ai/auto-apply', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          strategyId: strategy.id,
-          recs: [],
-          optInDestructiveIds: null,
-        }),
-      });
-      const data = (await res.json()) as {
-        ok: boolean;
-        strategy?: Strategy;
-        dryRun?: { entries: unknown[]; applicable_count: number };
-        apply?: { applied: Array<{ rec_id: string }>; applied_count: number };
-        error?: string;
-        detail?: string;
-      };
-      if (!res.ok || !data.ok) {
-        setApplyError(data.error ?? `Auto-apply returned HTTP ${res.status}.`);
-        setApplyDetail(data.detail ?? null);
-        return;
-      }
-      const appliedCount = data.apply?.applied_count ?? 0;
-      setApplySuccess(
-        appliedCount > 0
-          ? `Applied ${appliedCount} recommendation${appliedCount === 1 ? '' : 's'} to “${strategy.name ?? strategy.id}”.`
-          : `Auto-apply ran with nothing to apply — the orchestrator returned 0 changes for “${strategy.name ?? strategy.id}”.`,
-      );
-      if (targetEntryId) {
-        history.updateStatus(targetEntryId, 'applied');
-      }
-      if (data.strategy && onStrategyUpdated) {
-        onStrategyUpdated(data.strategy);
-      }
-    } catch (err) {
-      setApplyError(
-        err instanceof Error ? err.message : 'The auto-apply request failed.',
-      );
-    } finally {
-      setApplying(false);
-    }
-  }, [strategy, applying, history, onStrategyUpdated]);
-
-  const confirmApplyAll = useCallback(() => {
-    setConfirmation(null);
-    void handleApplyAll();
-  }, [handleApplyAll]);
 
   const currentView = view;
 
@@ -2241,14 +2414,21 @@ export function AiRecommendationsPanel({
     </div>
   );
 
-  // ── RIGHT pane: diagnosis + per-rec cards ──
+  // ── RIGHT pane: per-rec Compare-style toggle cards (AC15-AC22) ──
+  //
+  // v3 redesign: each ParsedRec renders as its own card in the same
+  // visual language as ComparePanel RunCard. Clicking the card toggles
+  // the rec's apply state — applied cards have a green accent + ON badge;
+  // unapplied cards are dimmed. Per-tile apply/rollback (AC18) goes
+  // through the existing /api/ai/auto-apply orchestrator with a single
+  // rec payload, so AC20 (real strategy save) is preserved. Rollback is
+  // local-only against the snapshot we capture before each apply (server
+  // rollback is a follow-up backend ticket; see AC18 inline notes).
   const rightPane = (
     <div className="flex flex-col gap-3">
-      {/* AC12: Strategy Diagnosis redesigned as compare-style cards.
-          The diagnosis prose stays (top summary card), and the
-          building blocks + configuration options that will be applied
-          render as a card grid, matching the ComparePanel visual
-          language (rounded card, accent border, dimmed-on-empty). */}
+      {/* Diagnosis card: compact summary at the top so the grid below has
+          room. The detailed prose is still rendered in full; we just do
+          not crowd it next to the per-rec cards. */}
       <div
         className="rounded p-3"
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
@@ -2282,190 +2462,180 @@ export function AiRecommendationsPanel({
         )}
       </div>
 
-      {/* AC12: Building blocks that will be applied (compare-card grid) */}
-      <div
-        className="rounded p-3"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-      >
-        <p
-          className="text-xs font-semibold uppercase tracking-wide mb-2"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          BUILDING BLOCKS
-          <span
-            className="ml-1.5 text-[10px] font-normal"
-            style={{ color: 'var(--text-faint)' }}
-          >
-            ({strategy?.blocks?.length ?? 0})
-          </span>
-        </p>
-        {(strategy?.blocks?.length ?? 0) === 0 ? (
-          <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
-            No building blocks on the current strategy.
-          </p>
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            {(strategy?.blocks ?? []).map((block) => (
-              <div
-                key={block.id}
-                data-testid="ai-recs-block-card"
-                className="rounded p-2 text-[11px]"
-                style={{
-                  background: 'var(--bg-elevated)',
-                  border: '1px solid var(--border)',
-                  borderTop: '2px solid var(--accent-blue, #3b82f6)',
-                }}
-              >
-                <p
-                  className="font-semibold truncate"
-                  style={{ color: 'var(--text-secondary)' }}
-                  title={String(block.type)}
-                >
-                  {String(block.type)}
-                </p>
-                <p
-                  className="text-[10px] mt-0.5"
-                  style={{ color: 'var(--text-faint)' }}
-                >
-                  index #{block.index}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* AC12: Configuration options that will be applied (compare-card grid) */}
-      <div
-        className="rounded p-3"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-      >
-        <p
-          className="text-xs font-semibold uppercase tracking-wide mb-2"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          CONFIGURATION OPTIONS
-          <span
-            className="ml-1.5 text-[10px] font-normal"
-            style={{ color: 'var(--text-faint)' }}
-          >
-            ({parsedRecs.reduce((n, r) => n + r.suggestedParams.length, 0)})
-          </span>
-        </p>
-        {parsedRecs.length === 0 ? (
-          <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
-            Configuration options appear here after AI analysis completes.
-          </p>
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            {parsedRecs.flatMap((rec) =>
-              rec.suggestedParams.map((p, idx) => (
-                <div
-                  key={`${rec.id}:${idx}`}
-                  data-testid="ai-recs-config-card"
-                  className="rounded p-2 text-[11px]"
-                  style={{
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border)',
-                    borderTop: '2px solid var(--accent-green, #4ade80)',
-                  }}
-                  title={`From: ${rec.title}`}
-                >
-                  <p
-                    className="font-mono font-semibold truncate"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    {p.key}
-                  </p>
-                  <p
-                    className="font-mono text-[10px] mt-0.5 truncate"
-                    style={{ color: 'var(--text-faint)' }}
-                  >
-                    = {p.value}
-                  </p>
-                </div>
-              )),
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Per-Recommendation cards (AC2 + AC4) */}
+      {/* AC15: RECOMMENDATIONS header + card grid (ComparePanel layout). */}
       <div className="flex flex-col gap-2">
-        <p
-          className="text-xs font-semibold uppercase tracking-wide"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          RECOMMENDATIONS
-          {parsedRecs.length > 0 && (
-            <span
-              className="ml-1.5 text-[10px] font-normal"
-              style={{ color: 'var(--text-faint)' }}
-            >
-              ({parsedRecs.length})
-            </span>
-          )}
-        </p>
-        {parsedRecs.length === 0 ? (
+        <div className="flex items-baseline justify-between">
           <p
-            className="text-xs"
-            style={{ color: 'var(--text-faint)' }}
+            className="text-xs font-semibold uppercase tracking-wide"
+            style={{ color: 'var(--text-muted)' }}
           >
-            {aiAnalysis
-              ? aiAnalysis.recommendations
-                ? 'No structured recommendations in the response. See Strategy Diagnosis above for the full reply.'
-                : 'No recommendations yet. Recommendations appear here after AI analysis completes.'
-              : result
-                ? 'No recommendations yet. Recommendations appear here after AI analysis completes.'
-                : 'No results yet. Run a backtest to generate recommendations.'}
+            RECOMMENDATIONS
+            {parsedRecs.length > 0 && (
+              <span
+                className="ml-1.5 text-[10px] font-normal"
+                style={{ color: 'var(--text-faint)' }}
+              >
+                ({parsedRecs.length} · {appliedRecIds.length} applied)
+              </span>
+            )}
           </p>
+        </div>
+        {parsedRecs.length === 0 ? (
+          <div
+            className="rounded p-3"
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderTop: '3px solid var(--accent-blue, #3b82f6)',
+            }}
+          >
+            <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
+              {aiAnalysis
+                ? aiAnalysis.recommendations
+                  ? 'No structured recommendations in the response. See Strategy Diagnosis above for the full reply.'
+                  : 'No recommendations yet. Recommendations appear here after AI analysis completes.'
+                : result
+                  ? 'No recommendations yet. Recommendations appear here after AI analysis completes.'
+                  : 'No results yet. Run a backtest to generate recommendations.'}
+            </p>
+          </div>
         ) : (
-          parsedRecs.map((rec) => (
-            <RecommendationCard
-              key={rec.id}
-              rec={rec}
-              isActive={activeRec?.id === rec.id}
-              onApply={handleApplyRec}
-              onClear={handleClearActiveRec}
-            />
-          ))
+          <div
+            className="grid gap-2"
+            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}
+          >
+            {parsedRecs.map((rec) => {
+              const isApplied = appliedRecIds.includes(rec.id);
+              const isApplyingThis = perTileApplying.includes(rec.id);
+              const errMsg = perTileError[rec.id];
+              return (
+                <button
+                  key={rec.id}
+                  type="button"
+                  role="switch"
+                  aria-checked={isApplied}
+                  aria-busy={isApplyingThis}
+                  disabled={!strategy?.id || isApplyingThis}
+                  onClick={() => handleToggleRec(rec)}
+                  data-testid="ai-recs-toggle-card"
+                  data-rec-id={rec.id}
+                  data-applied={isApplied ? 'true' : 'false'}
+                  title={
+                    isApplyingThis
+                      ? 'Sending this recommendation to the orchestrator…'
+                      : isApplied
+                        ? 'Click to roll back this recommendation (local rollback — server-side undo is a follow-up backend ticket).'
+                        : 'Click to apply this recommendation to the strategy.'
+                  }
+                  className="rounded p-2 text-left text-[11px] flex flex-col gap-1.5"
+                  style={{
+                    background: isApplied
+                      ? 'rgba(74, 222, 128, 0.06)'
+                      : 'var(--bg-elevated)',
+                    border: '1px solid var(--border)',
+                    borderTop: `3px solid ${
+                      isApplied
+                        ? 'var(--accent-green, #4ade80)'
+                        : 'var(--accent-blue, #3b82f6)'
+                    }`,
+                    opacity: !strategy?.id ? 0.5 : 1,
+                    cursor:
+                      !strategy?.id || isApplyingThis ? 'not-allowed' : 'pointer',
+                    transition: 'opacity 120ms ease, border-color 120ms ease',
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-1.5">
+                    <p
+                      className="font-semibold truncate flex-1"
+                      style={{ color: 'var(--text-secondary)' }}
+                      title={rec.title}
+                    >
+                      {rec.title}
+                    </p>
+                    <span
+                      className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+                      style={{
+                        background: isApplied
+                          ? 'var(--accent-green, #4ade80)'
+                          : 'var(--bg-card)',
+                        color: isApplied ? '#0a0a0a' : 'var(--text-faint)',
+                        border: `1px solid ${
+                          isApplied
+                            ? 'var(--accent-green, #4ade80)'
+                            : 'var(--border)'
+                        }`,
+                      }}
+                      data-testid="ai-recs-toggle-badge"
+                    >
+                      {isApplyingThis ? '…' : isApplied ? 'ON' : 'OFF'}
+                    </span>
+                  </div>
+
+                  {/* AC17: how this rec sets up / adjusts the building block.
+                      We surface the rec type + the first few suggested params
+                      so the user sees exactly what would change. */}
+                  <p
+                    className="text-[10px] truncate"
+                    style={{ color: 'var(--text-faint)' }}
+                    title={`type: ${rec.type}`}
+                  >
+                    {rec.type}
+                  </p>
+                  {rec.suggestedParams.length > 0 && (
+                    <ul
+                      className="flex flex-col gap-0.5"
+                      data-testid="ai-recs-toggle-params"
+                    >
+                      {rec.suggestedParams.slice(0, 4).map((p, idx) => (
+                        <li
+                          key={`${rec.id}:p:${idx}`}
+                          className="font-mono text-[10px] truncate"
+                          style={{ color: 'var(--text-secondary)' }}
+                          title={`${p.key} = ${p.value}`}
+                        >
+                          {p.key} = {p.value}
+                        </li>
+                      ))}
+                      {rec.suggestedParams.length > 4 && (
+                        <li
+                          className="text-[10px]"
+                          style={{ color: 'var(--text-faint)' }}
+                        >
+                          + {rec.suggestedParams.length - 4} more…
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                  {rec.rationale && (
+                    <p
+                      className="text-[10px] line-clamp-2"
+                      style={{ color: 'var(--text-faint)' }}
+                      title={rec.rationale}
+                    >
+                      {rec.rationale}
+                    </p>
+                  )}
+
+                  {/* AC20 error surface: per-tile, not a global banner. */}
+                  {errMsg && (
+                    <p
+                      className="text-[10px] mt-0.5"
+                      style={{ color: 'var(--accent-red, #ef4444)' }}
+                      data-testid="ai-recs-toggle-error"
+                      role="alert"
+                    >
+                      {errMsg}
+                    </p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* AC11: Apply-all moved to a sticky footer at the bottom of the right pane */}
-      <div
-        className="sticky bottom-0 pt-3 -mb-3"
-        style={{
-          background:
-            'linear-gradient(to top, var(--bg-card) 70%, rgba(0,0,0,0))',
-        }}
-      >
-        <button
-          type="button"
-          onClick={requestApplyAll}
-          disabled={!canApply}
-          data-testid="ai-recs-apply-all"
-          title={
-            applying
-              ? 'Sending the recommendation set to the AutoApply orchestrator…'
-              : !strategy?.id
-                ? 'Load a strategy first to enable auto-apply.'
-                : 'Send the current recommendation set to the AutoApply orchestrator. Marks the most recent history entry as APPLIED on success.'
-          }
-          className="w-full px-3 py-2 rounded text-xs font-semibold"
-          style={{
-            background: canApply ? 'var(--accent-green, #4ade80)' : 'var(--bg-card)',
-            color: canApply ? '#0a0a0a' : 'var(--text-faint)',
-            border: `1px solid ${
-              canApply ? 'var(--accent-green, #4ade80)' : 'var(--border)'
-            }`,
-            opacity: canApply ? 1 : 0.5,
-            cursor: canApply ? 'pointer' : 'not-allowed',
-          }}
-        >
-          {applying ? 'Applying…' : 'Apply all recommendations'}
-        </button>
-      </div>
+      {/* Per-tile saves are now the action surface (AC20). No more
+          sticky "Apply all" footer — apply is per-card. */}
     </div>
   );
 
@@ -2528,7 +2698,6 @@ export function AiRecommendationsPanel({
           onCancel={cancelConfirmation}
           onConfirmClearAll={confirmClearAll}
           onConfirmDelete={confirmDelete}
-          onConfirmApplyAll={confirmApplyAll}
         />
       )}
 
