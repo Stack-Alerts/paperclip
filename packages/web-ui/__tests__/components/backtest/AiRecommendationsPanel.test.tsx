@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, cleanup, within } from '@testing-library/react';
 import { AiRecommendationsPanel } from '@/components/backtest/ai-recommendations/AiRecommendationsPanel';
 import type { BacktestResult, Strategy, Trade } from '@/lib/strategy-builder/types';
 
@@ -642,6 +642,199 @@ describe('AiRecommendationsPanel — AC21/AC22 retention (BTCAAAAA-36873 v3)', (
           String(url).includes('/api/ai/analyze'),
         ).length;
       expect(analyzeCallsAfter).toBeGreaterThan(analyzeCalls);
+    });
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// BTCAAAAA-36917 v4 UX: empty state should let the user preview the v3
+// redesign and load a demo payload *without* polluting the
+// `ai_recs_v3_cache_v1` sessionStorage cache. The cache is reserved for
+// genuine /api/ai/analyze results and must never carry preview/demo data —
+// otherwise a future remount could hydrate the demo payload instead of a
+// real re-run, and AC21's strategy-scoping invariant would be silently
+// undermined.
+// ──────────────────────────────────────────────────────────────────────────
+describe('AiRecommendationsPanel — empty-state preview + demo (BTCAAAAA-36917 v4)', () => {
+  // Same response shape used by the AC21/22 retention tests above. Defined
+  // locally because the AC21/22 helpers are scoped to their own describe
+  // arrow body and not visible here. The shape produces 2 numbered recs so
+  // the positive-control test can wait on `getAllByTestId(...).length === 2`.
+  const SAMPLE_TEXT =
+    'DIAGNOSIS: The strategy overshoots on high-volatility regimes.\n\n' +
+    'RECOMMENDATIONS:\n' +
+    '1. Reduce position size\n' +
+    '   Type: signal\n' +
+    '   Rationale: cap exposure\n' +
+    '   - **maxAllocation**: 15\n\n' +
+    '2. Tighten stop-loss\n' +
+    '   Type: risk\n' +
+    '   Rationale: cut losers early\n' +
+    '   - **stopLossPct**: 1.5';
+
+  function makeAnalyzeFetchMock() {
+    return jest.fn().mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/ai/analyze')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ ok: true, text: SAMPLE_TEXT }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          strategy: makeStrategy(),
+          apply: { applied: [{ rec_id: 'rec-0-ignored' }], applied_count: 1 },
+        }),
+      });
+    });
+  }
+
+  // Never-resolving fetch so the empty state cannot accidentally auto-run
+  // an analysis during these tests. The only /api/ai/analyze calls that
+  // happen must come from explicit "Send Again" clicks in the test body.
+  function makeNeverResolvingFetchMock(): jest.Mock {
+    return jest.fn().mockImplementation(
+      () => new Promise(() => {}),
+    );
+  }
+
+  function renderEmptyPanel() {
+    global.fetch = makeNeverResolvingFetchMock() as unknown as typeof fetch;
+    return render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+  }
+
+  beforeEach(() => {
+    // Defensive: clear any state the previous describe block left behind.
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+  });
+
+  it('v4: empty state surfaces both preview and demo affordances', () => {
+    renderEmptyPanel();
+
+    // The two affordances are rendered together so the user can choose how
+    // to explore the redesign.
+    const actions = screen.getByTestId('ai-recs-empty-actions');
+    expect(actions).toBeInTheDocument();
+    expect(within(actions).getByTestId('ai-recs-preview-btn')).toBeInTheDocument();
+    expect(within(actions).getByTestId('ai-recs-demo-btn')).toBeInTheDocument();
+  });
+
+  it('v4: "Preview the new layout" renders a static card without writing to the cache', async () => {
+    renderEmptyPanel();
+
+    fireEvent.click(screen.getByTestId('ai-recs-preview-btn'));
+
+    // The static preview card appears; the v3 toggle grid does NOT (no
+    // aiAnalysis state change, so no recs to toggle).
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-recs-preview-card')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('ai-recs-toggle-card')).toBeNull();
+    // The empty-state button group is hidden once preview is open.
+    expect(screen.queryByTestId('ai-recs-empty-actions')).toBeNull();
+
+    // The preview card carries the same v3 visual contract (badge + params)
+    // so the user sees the actual compare-style layout.
+    expect(screen.getAllByTestId('ai-recs-toggle-badge')).toHaveLength(1);
+    expect(screen.getByTestId('ai-recs-toggle-params')).toBeInTheDocument();
+
+    // Hard contract: preview must NEVER land in sessionStorage, even though
+    // the persistence effect could re-run after a re-render.
+    expect(window.sessionStorage.getItem('ai_recs_v3_cache_v1')).toBeNull();
+  });
+
+  it('v4: "Load demo data" seeds 3 sample recommendations without writing to the cache', async () => {
+    renderEmptyPanel();
+
+    fireEvent.click(screen.getByTestId('ai-recs-demo-btn'));
+
+    // The v3 toggle grid hydrates with 3 hardcoded sample recs. We assert
+    // count only (not identity) so the sample payload can evolve without
+    // breaking this contract test.
+    await waitFor(() => {
+      expect(screen.getAllByTestId('ai-recs-toggle-card').length).toBeGreaterThanOrEqual(2);
+    });
+    const cards = screen.getAllByTestId('ai-recs-toggle-card');
+    expect(cards.length).toBe(3);
+
+    // Exit-demo affordance is the only way back to the empty state; it must
+    // be visible whenever demoMode is true.
+    expect(screen.getByTestId('ai-recs-exit-demo-btn')).toBeInTheDocument();
+
+    // Hard contract: demo data must NEVER land in sessionStorage. The
+    // persistence effect fires (aiAnalysis changed) but the demoMode guard
+    // inside it must short-circuit before the setItem call.
+    expect(window.sessionStorage.getItem('ai_recs_v3_cache_v1')).toBeNull();
+  });
+
+  it('v4: "Exit demo" returns the panel to the empty state and never writes the cache', async () => {
+    renderEmptyPanel();
+
+    fireEvent.click(screen.getByTestId('ai-recs-demo-btn'));
+    await waitFor(() => {
+      expect(screen.getAllByTestId('ai-recs-toggle-card')).toHaveLength(3);
+    });
+
+    fireEvent.click(screen.getByTestId('ai-recs-exit-demo-btn'));
+
+    // Empty state is restored: toggle cards gone, exit button gone, both
+    // empty-state affordances back. The preview/demo reset inside the
+    // click handler also nulls aiAnalysis so the persistence effect
+    // cannot accidentally persist the now-cleared demo payload.
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-recs-empty-actions')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('ai-recs-toggle-card')).toBeNull();
+    expect(screen.queryByTestId('ai-recs-exit-demo-btn')).toBeNull();
+    expect(screen.getByTestId('ai-recs-preview-btn')).toBeInTheDocument();
+    expect(screen.getByTestId('ai-recs-demo-btn')).toBeInTheDocument();
+
+    // Still no cache pollution after exit.
+    expect(window.sessionStorage.getItem('ai_recs_v3_cache_v1')).toBeNull();
+  });
+
+  it('v4: a subsequent real /api/ai/analyze call clears preview/demo state and DOES write the cache (positive control)', async () => {
+    renderEmptyPanel();
+
+    // Open preview, then trigger a real analysis. The preview flag must be
+    // cleared by the runApproveAndSend success path so the user does not
+    // see a stale preview card on top of their real results.
+    fireEvent.click(screen.getByTestId('ai-recs-preview-btn'));
+    expect(screen.getByTestId('ai-recs-preview-card')).toBeInTheDocument();
+
+    // Swap in a working analyze mock and drive a real analysis.
+    const fetchMock = makeAnalyzeFetchMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    fireEvent.click(screen.getByRole('button', { name: /Approve & Send to AI/i }));
+    fireEvent.click(screen.getByTestId('opt-goal-confirm'));
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('ai-recs-toggle-card')).toHaveLength(2);
+    });
+
+    // Preview card is gone; preview/demo flags reset before the real
+    // setAiAnalysis call.
+    expect(screen.queryByTestId('ai-recs-preview-card')).toBeNull();
+    expect(screen.queryByTestId('ai-recs-empty-actions')).toBeNull();
+
+    // Positive control: the cache mechanism itself works for a real
+    // analysis — the demoMode guard is what kept preview/demo out, not a
+    // broken persistence path.
+    await waitFor(() => {
+      const raw = window.sessionStorage.getItem('ai_recs_v3_cache_v1');
+      expect(raw).not.toBeNull();
     });
   });
 });

@@ -34,6 +34,41 @@ const AWAITING_PROVIDER_ETA_SECONDS = 30;
 // AC10: how long the green "Applied" banner stays visible before fading out.
 const APPLY_SUCCESS_DISMISS_MS = 3000;
 
+// BTCAAAAA-36917 v4 UX: hardcoded sample payload for the empty-state
+// "Preview the new layout" + "Load demo data" affordances. The preview card
+// renders a single rec without touching aiAnalysis so the v3 cache stays
+// clean; the demo path populates aiAnalysis but is guarded inside the cache
+// persistence effect so the demo data never leaks into sessionStorage.
+const SAMPLE_DIAGNOSIS =
+  "Strategy shows modest profitability with a healthy win rate, but a long "
+  + "drawdown between Apr-Jun suggests the trend filter is too tight in "
+  + "ranging markets. Consider relaxing the EMA window or adding a "
+  + "volatility regime detector.";
+
+const SAMPLE_RECOMMENDATIONS =
+  "1. Widen the EMA trend filter window\n"
+  + "   Type: signal\n"
+  + "   Rationale: 50-period EMA is too restrictive in the current chop; "
+  + "wider window lets more setups through.\n"
+  + "   Confidence: high\n"
+  + "   - **ema_window**: 100\n"
+  + "   - **min_atr**: 250\n"
+  + "\n"
+  + "2. Add volatility regime block\n"
+  + "   Type: building-block\n"
+  + "   Rationale: regime detector reduces whipsaw losses during low-vol "
+  + "consolidation.\n"
+  + "   Confidence: medium\n"
+  + "   - **atr_period**: 14\n"
+  + "   - **regime_threshold**: 0.6\n"
+  + "\n"
+  + "3. Tighten the stop loss to 1.5x ATR\n"
+  + "   Type: risk\n"
+  + "   Rationale: fixed-percent stop gives back too much during the recent "
+  + "high-volatility leg.\n"
+  + "   Confidence: high\n"
+  + "   - **stop_atr_multiple**: 1.5\n";
+
 // AC21: per-strategy AI recommendations cache. Lives in sessionStorage so the
 // recs + applied-state survive tab navigation, parent re-renders, and the AI
 // panel remounting. AC22: only cleared on explicit user rerun
@@ -1447,6 +1482,15 @@ export function AiRecommendationsPanel({
   const [activeRec, setActiveRec] = useState<ActiveRec | null>(null);
   const [optimizationGoal, setOptimizationGoal] = useState<string | null>(null);
 
+  // BTCAAAAA-36917 v4 UX: empty-state preview/demo affordances.
+  // previewMode renders a single static card inline (no aiAnalysis touch —
+  // the v3 sessionStorage cache stays empty).
+  // demoMode populates aiAnalysis with hardcoded sample data; the cache
+  // persistence effect below early-returns while demoMode is true, so the
+  // demo payload never leaks into sessionStorage.
+  const [previewMode, setPreviewMode] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
+
   // AC9: admin gate for Export to JSON. Computed once on mount from the
   // auth_token claim; a fresh login would remount the panel through key
   // changes elsewhere so we do not need to live-observe it.
@@ -1500,9 +1544,14 @@ export function AiRecommendationsPanel({
   // AC21: persist recs + applied state to sessionStorage on change. Done in
   // a single effect so we only touch storage when something actually
   // changed. Errors are silent (readRecsCache handles the read side).
+  // BTCAAAAA-36917 v4 UX: while demoMode is true we deliberately skip the
+  // cache write so the demo payload never lands in sessionStorage. The
+  // effect re-fires when demoMode flips back to false and resumes normal
+  // persistence.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!cacheHydratedRef.current) return;
+    if (demoMode) return;
     if (!aiAnalysis) {
       writeRecsCache(null);
       return;
@@ -1517,7 +1566,7 @@ export function AiRecommendationsPanel({
       preApplySnapshots,
       analysisTimestamp: new Date().toISOString(),
     });
-  }, [aiAnalysis, appliedRecIds, preApplySnapshots, strategy?.id]);
+  }, [aiAnalysis, appliedRecIds, preApplySnapshots, strategy?.id, demoMode]);
 
   // AC8: countdown for the awaiting-provider phase. Resets to the full
   // ETA whenever we enter the phase, ticks once per second while we are
@@ -1748,6 +1797,10 @@ export function AiRecommendationsPanel({
           return;
         }
         const parsed = parseAnalysisResponse(data.text ?? '');
+        // BTCAAAAA-36917 v4 UX: real AI response — clear any preview/demo
+        // affordances so the user lands on the genuine analysis.
+        setPreviewMode(false);
+        setDemoMode(false);
         setAiAnalysis(parsed);
         if (history.hydrated) {
           history.add({
@@ -1963,6 +2016,10 @@ export function AiRecommendationsPanel({
   // rec as the active rec so the user can re-send with that context.
   const loadHistoryIntoCurrent = useCallback(
     (entry: AiRecsHistoryEntry) => {
+      // BTCAAAAA-36917 v4 UX: user explicitly loaded a history entry —
+      // dismiss any active preview/demo state first.
+      setPreviewMode(false);
+      setDemoMode(false);
       setAiAnalysis({
         diagnosis: entry.diagnosis,
         recommendations: entry.recommendations,
@@ -2479,6 +2536,31 @@ export function AiRecommendationsPanel({
               </span>
             )}
           </p>
+          {/* BTCAAAAA-36917 v4 UX: surfaced only when demoMode is true so
+              the user can return to a clean empty state without a page
+              reload. Clicking it nulls aiAnalysis + resets both flags. */}
+          {demoMode && (
+            <button
+              type="button"
+              onClick={() => {
+                setDemoMode(false);
+                setPreviewMode(false);
+                setAiAnalysis(null);
+              }}
+              className="text-[10px] underline"
+              style={{
+                background: 'transparent',
+                color: 'var(--text-faint)',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+              data-testid="ai-recs-exit-demo-btn"
+              title="Clear the demo data and return to the empty state."
+            >
+              Exit demo
+            </button>
+          )}
         </div>
         {parsedRecs.length === 0 ? (
           <div
@@ -2498,6 +2580,159 @@ export function AiRecommendationsPanel({
                   ? 'No recommendations yet. Recommendations appear here after AI analysis completes.'
                   : 'No results yet. Run a backtest to generate recommendations.'}
             </p>
+
+            {/* BTCAAAAA-36917 v4 UX: empty-state preview + demo affordances.
+                Visible whenever parsedRecs is empty. Preview renders one
+                static card inline without touching aiAnalysis; Demo
+                populates aiAnalysis with the hardcoded sample payload
+                (the cache persistence effect skips writes while demoMode
+                is true, so neither path pollutes sessionStorage). */}
+            {!previewMode && !demoMode && (
+              <div
+                className="mt-2 flex flex-wrap gap-2"
+                data-testid="ai-recs-empty-actions"
+              >
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode(true)}
+                  className="px-2 py-1 text-[11px] rounded"
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                    cursor: 'pointer',
+                  }}
+                  data-testid="ai-recs-preview-btn"
+                  title="Show one sample card so you can see the v3 layout without running a backtest."
+                >
+                  Preview the new layout
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDemoMode(true);
+                    setAiAnalysis({
+                      diagnosis: SAMPLE_DIAGNOSIS,
+                      recommendations: SAMPLE_RECOMMENDATIONS,
+                      raw: `DIAGNOSIS: ${SAMPLE_DIAGNOSIS}\n\nRECOMMENDATIONS: ${SAMPLE_RECOMMENDATIONS}`,
+                    });
+                  }}
+                  className="px-2 py-1 text-[11px] rounded"
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                    cursor: 'pointer',
+                  }}
+                  data-testid="ai-recs-demo-btn"
+                  title="Seed sample diagnosis + recommendations to explore the v3 toggle-card grid."
+                >
+                  Load demo data
+                </button>
+              </div>
+            )}
+
+            {previewMode && (
+              <div className="mt-2 flex flex-col gap-2">
+                <div
+                  className="rounded p-2 text-left text-[11px] flex flex-col gap-1.5"
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border)',
+                    borderTop: '3px solid var(--accent-blue, #3b82f6)',
+                    opacity: 0.85,
+                  }}
+                  data-testid="ai-recs-preview-card"
+                  data-preview-rec="1"
+                  aria-label="Preview of a v3 toggle-card (sample data)"
+                >
+                  <div className="flex items-start justify-between gap-1.5">
+                    <p
+                      className="font-semibold truncate flex-1"
+                      style={{ color: 'var(--text-secondary)' }}
+                      title="Widen the EMA trend filter window"
+                    >
+                      Widen the EMA trend filter window
+                    </p>
+                    <span
+                      className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+                      style={{
+                        background: 'var(--bg-card)',
+                        color: 'var(--text-faint)',
+                        border: '1px solid var(--border)',
+                      }}
+                      data-testid="ai-recs-toggle-badge"
+                    >
+                      OFF
+                    </span>
+                  </div>
+                  <p
+                    className="text-[10px] truncate"
+                    style={{ color: 'var(--text-faint)' }}
+                    title="type: signal"
+                  >
+                    signal
+                  </p>
+                  <ul
+                    className="flex flex-col gap-0.5"
+                    data-testid="ai-recs-toggle-params"
+                  >
+                    <li
+                      className="font-mono text-[10px] truncate"
+                      style={{ color: 'var(--text-secondary)' }}
+                      title="ema_window = 100"
+                    >
+                      ema_window = 100
+                    </li>
+                  </ul>
+                  <p
+                    className="text-[10px] line-clamp-2"
+                    style={{ color: 'var(--text-faint)' }}
+                    title="50-period EMA is too restrictive in the current chop; wider window lets more setups through."
+                  >
+                    50-period EMA is too restrictive in the current chop; wider window lets more setups through.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode(false)}
+                    className="px-2 py-1 text-[11px] rounded"
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--text-faint)',
+                      border: '1px solid var(--border)',
+                      cursor: 'pointer',
+                    }}
+                    data-testid="ai-recs-preview-close"
+                  >
+                    Hide preview
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreviewMode(false);
+                      setDemoMode(true);
+                      setAiAnalysis({
+                        diagnosis: SAMPLE_DIAGNOSIS,
+                        recommendations: SAMPLE_RECOMMENDATIONS,
+                        raw: `DIAGNOSIS: ${SAMPLE_DIAGNOSIS}\n\nRECOMMENDATIONS: ${SAMPLE_RECOMMENDATIONS}`,
+                      });
+                    }}
+                    className="px-2 py-1 text-[11px] rounded"
+                    style={{
+                      background: 'var(--bg-elevated)',
+                      color: 'var(--text-secondary)',
+                      border: '1px solid var(--border)',
+                      cursor: 'pointer',
+                    }}
+                    data-testid="ai-recs-demo-btn-inline"
+                  >
+                    Load demo data instead
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div
