@@ -619,6 +619,12 @@ export function AiRecommendationsPanel({
   const [applyError, setApplyError] = useState<string | null>(null);
   const [applyDetail, setApplyDetail] = useState<string | null>(null);
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    ok: boolean;
+    message: string;
+    detail?: string;
+  } | null>(null);
   const [confirmation, setConfirmation] = useState<{
     type: 'clear-all' | 'delete' | 'apply-all';
     entryId?: string;
@@ -652,6 +658,36 @@ export function AiRecommendationsPanel({
     a.click();
     URL.revokeObjectURL(url);
   }, [result, strategy, backtestConfig]);
+
+  const handleTestConnection = useCallback(async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch('/api/ai/test-connection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: settings.provider,
+          model: settings.model,
+          apiKey: settings.apiKeys?.[settings.provider] ?? '',
+          ollamaBaseUrl: settings.ollamaBaseUrl,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setTestResult({
+        ok: !!res.ok && data?.ok !== false,
+        message: data?.message ?? (res.ok ? 'Connection succeeded.' : `Request failed (${res.status}).`),
+        detail: data?.detail,
+      });
+    } catch (err) {
+      setTestResult({
+        ok: false,
+        message: err instanceof Error ? err.message : 'Network error contacting /api/ai/test-connection.',
+      });
+    } finally {
+      setTesting(false);
+    }
+  }, [settings]);
 
   const handleCancel = useCallback(() => {
     if (!analyzing) return;
@@ -1148,6 +1184,22 @@ export function AiRecommendationsPanel({
       <div className="flex items-center gap-2 justify-end mt-1">
         <button
           type="button"
+          onClick={handleTestConnection}
+          disabled={!aiSettingsHydrated || testing}
+          title="Verifies the saved AI provider/model respond to a minimal live request."
+          className="px-3 py-1.5 rounded text-xs font-medium"
+          style={{
+            background: 'var(--bg-card)',
+            color: aiSettingsHydrated && !testing ? 'var(--text-secondary)' : 'var(--text-faint)',
+            border: '1px solid var(--border)',
+            opacity: aiSettingsHydrated && !testing ? 1 : 0.5,
+            cursor: aiSettingsHydrated && !testing ? 'pointer' : 'not-allowed',
+          }}
+        >
+          {testing ? 'Testing…' : 'Test Connection'}
+        </button>
+        <button
+          type="button"
           onClick={handleExport}
           disabled={!hasTrades}
           className="px-3 py-1.5 rounded text-xs font-medium"
@@ -1229,6 +1281,39 @@ export function AiRecommendationsPanel({
           {applying ? 'Applying…' : 'Apply all recommendations'}
         </button>
       </div>
+      {testResult && (
+        <div
+          role="status"
+          data-testid="ai-test-result"
+          className="rounded p-2 text-xs"
+          style={{
+            background: testResult.ok
+              ? 'rgba(34, 197, 94, 0.1)'
+              : 'rgba(239, 68, 68, 0.1)',
+            color: testResult.ok
+              ? 'var(--accent-green, #22c55e)'
+              : 'var(--accent-red, #ef4444)',
+            border: `1px solid ${
+              testResult.ok
+                ? 'var(--accent-green, #22c55e)'
+                : 'var(--accent-red, #ef4444)'
+            }`,
+          }}
+        >
+          <span className="font-semibold">
+            {testResult.ok ? '✓ ' : '✗ '}
+          </span>
+          {testResult.message}
+          {testResult.detail && (
+            <span
+              className="block mt-1"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {testResult.detail}
+            </span>
+          )}
+        </div>
+      )}
         </>
       ) : (
         <HistoryView

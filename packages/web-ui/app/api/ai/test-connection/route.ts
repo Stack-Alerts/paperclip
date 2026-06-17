@@ -24,10 +24,18 @@ const CLI_TIMEOUT_MS = 60_000;
 /** Run a minimal Claude Code CLI generation to prove the provider+model work. */
 function runClaudeCli(model: string): Promise<ConnectionTestResult> {
   return new Promise((resolve) => {
+    // The current @types/node omits `stdio` from ExecFileOptions, but the
+    // runtime supports it. Cast the options so we can close stdin — Claude
+    // Code CLI otherwise waits 3s, emits a stderr warning, and exits non-zero.
+    const execOptions = {
+      timeout: CLI_TIMEOUT_MS,
+      maxBuffer: 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'] as const,
+    };
     execFile(
       'claude',
       ['--print', '--model', model, 'Reply with the single word: pong'],
-      { timeout: CLI_TIMEOUT_MS, maxBuffer: 1024 * 1024 },
+      execOptions as Parameters<typeof execFile>[2],
       (error, stdout, stderr) => {
         if (error) {
           const errno = (error as NodeJS.ErrnoException).code;
@@ -50,11 +58,11 @@ function runClaudeCli(model: string): Promise<ConnectionTestResult> {
           resolve({
             ok: false,
             message: `Claude Code returned an error for model ${model}.`,
-            detail: (stderr || error.message).trim().slice(0, 300),
+            detail: ((stderr as string) || error.message).trim().slice(0, 300),
           });
           return;
         }
-        const out = (stdout || '').trim();
+        const out = (stdout as string || '').trim();
         if (out) {
           resolve({
             ok: true,
@@ -66,7 +74,7 @@ function runClaudeCli(model: string): Promise<ConnectionTestResult> {
         resolve({
           ok: false,
           message: 'Claude Code ran but produced no output.',
-          detail: (stderr || '').trim().slice(0, 300),
+          detail: (stderr as string || '').trim().slice(0, 300),
         });
       },
     );
