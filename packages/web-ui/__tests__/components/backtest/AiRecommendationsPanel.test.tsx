@@ -119,6 +119,10 @@ describe('AiRecommendationsPanel — progress UI (BTCAAAAA-36777)', () => {
     const sendButton = screen.getByRole('button', { name: /Approve & Send to AI/i });
     fireEvent.click(sendButton);
 
+    // AC7 (BTCAAAAA-36873): the click now opens the optimization-goal modal
+    // first; the actual fetch only fires after the user confirms a goal.
+    fireEvent.click(screen.getByTestId('opt-goal-confirm'));
+
     await waitFor(() => {
       expect(screen.getByTestId('ai-recs-progress-label').textContent).toMatch(
         /Stage 3\/4/,
@@ -146,6 +150,9 @@ describe('AiRecommendationsPanel — progress UI (BTCAAAAA-36777)', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /Approve & Send to AI/i }));
+
+    // AC7 (BTCAAAAA-36873): confirm the optimization goal first.
+    fireEvent.click(screen.getByTestId('opt-goal-confirm'));
 
     await waitFor(() => {
       expect(screen.getByText(/AI analysis failed/)).toBeInTheDocument();
@@ -181,6 +188,9 @@ describe('AiRecommendationsPanel — progress UI (BTCAAAAA-36777)', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /Approve & Send to AI/i }));
+
+    // AC7 (BTCAAAAA-36873): confirm the optimization goal first.
+    fireEvent.click(screen.getByTestId('opt-goal-confirm'));
 
     await waitFor(() => {
       expect(screen.getByTestId('ai-recs-cancel')).toBeInTheDocument();
