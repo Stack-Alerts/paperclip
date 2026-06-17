@@ -24,6 +24,7 @@ import { ThemeSelector } from './ThemeSelector';
 import { Plus, FolderOpen, Save, Play, ChevronDown } from 'lucide-react';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { AppBrand } from '@/components/shared/AppBrand';
+import { WindowBreadcrumb } from '@/components/shared/WindowBreadcrumb';
 import { status } from '@/lib/status';
 
 type DialogKey =
@@ -999,11 +1000,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 
         {/* Strategy name + dirty indicator */}
         {mounted && currentStrategy && (
-          <span className="ml-auto text-xs truncate max-w-xs pr-2" style={{ color: 'var(--text-secondary)' }}>
-            BTC Trade Engine — Strategy Builder —{' '}
-            <span style={{ color: 'var(--text-secondary)' }}>{currentStrategy.name}</span>
-            {isModified && <span className="ml-1" style={{ color: 'var(--accent-orange)' }} title="Unsaved changes">●</span>}
-          </span>
+          <WindowBreadcrumb page="Strategy Builder" item={currentStrategy.name} itemDirty={isModified} />
         )}
       </div>
 

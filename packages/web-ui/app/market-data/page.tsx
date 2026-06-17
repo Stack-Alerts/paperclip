@@ -13,6 +13,7 @@ import {
   parseApiTimestamp,
 } from '@/lib/data-management/api';
 import type { DataStatusResponse, TimeframeVerifyResult, TimeframeFreshness } from '@/lib/data-management/api';
+import { WindowBreadcrumb } from '@/components/shared/WindowBreadcrumb';
 
 // The backend uses a fixed 90 000 s (25 h) threshold for the 1d timeframe,
 // which flags the last *closed* daily candle as stale once it's past 01:00 UTC
@@ -230,7 +231,14 @@ export default function MarketDataPage() {
   const anyArchiveLagged = archiveLaggedTfs.length > 0;
 
   return (
-    <div className="flex-1 overflow-y-auto p-6" style={{ background: 'var(--app-bg)' }}>
+    <>
+      <div
+        className="flex items-center border-b px-3 py-1.5 flex-shrink-0"
+        style={{ background: 'var(--bg-deep)', borderColor: 'var(--border)' }}
+      >
+        <WindowBreadcrumb page="Market Data" />
+      </div>
+      <div className="flex-1 overflow-y-auto p-6" style={{ background: 'var(--app-bg)' }}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -667,6 +675,7 @@ export default function MarketDataPage() {
         result={updateResult}
         autoMode={false}
       />
-    </div>
+      </div>
+    </>
   );
 }
