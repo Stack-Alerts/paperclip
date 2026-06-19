@@ -258,5 +258,80 @@ class TestOutputFormat:
         assert "issue" in result
 
 
+class TestEscalationRouting:
+    """Regression test for BTCAAAAA-36598: escalation comments must go to source issue, not BTCAAAAA-30033."""
+
+    def _load(self):
+        import sys
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        sys.path.insert(0, str(repo_root / "scripts"))
+        import merge_dispatch_routine
+
+        return merge_dispatch_routine
+
+    def test_escalation_posts_to_source_issue_not_30033(self):
+        """escalate_failure must post to issue_id (source), never to BTCAAAAA-30033."""
+        mod = self._load()
+        source_issue_id = "test-source-uuid-1234"
+        calls = []
+
+        def capture_comment(issue_id: str, body: str, idempotency_key=None) -> bool:
+            calls.append({"issue_id": issue_id, "body": body, "key": idempotency_key})
+            return True
+
+        with patch.object(mod, "comment_on_issue", side_effect=capture_comment):
+            mod.escalate_failure(source_issue_id, "BTCAAAAA-99999", "a" * 40, "Failed to merge PR #99")
+
+        assert len(calls) == 1
+        assert calls[0]["issue_id"] == source_issue_id, (
+            f"Escalation posted to '{calls[0]['issue_id']}' instead of source issue '{source_issue_id}'"
+        )
+        # Must never post to the token-gap routine
+        assert "30033" not in calls[0]["issue_id"], (
+            "Escalation must NOT post to BTCAAAAA-30033 (token-gap routine)"
+        )
+
+    def test_escalation_includes_idempotency_key(self):
+        """escalate_failure must pass a non-empty idempotency_key to prevent double-posting."""
+        mod = self._load()
+        calls = []
+
+        def capture_comment(issue_id: str, body: str, idempotency_key=None) -> bool:
+            calls.append({"issue_id": issue_id, "key": idempotency_key})
+            return True
+
+        with patch.object(mod, "comment_on_issue", side_effect=capture_comment):
+            mod.escalate_failure("uuid-abc", "BTCAAAAA-77777", "b" * 40, "No valid GitHub token")
+
+        assert calls[0]["key"], "idempotency_key must be set to prevent duplicate escalation comments"
+
+    def test_process_issue_escalation_routes_to_source_on_pr_failure(self):
+        """process_issue must escalate to source issue when PR creation fails."""
+        mod = self._load()
+        sha = "c" * 40
+        issue = {"id": "source-issue-uuid", "identifier": "BTCAAAAA-55555", "status": "in_review"}
+        escalated_to = []
+
+        def capture_escalation(issue_id, identifier, sha, reason):
+            escalated_to.append(issue_id)
+
+        with patch.object(mod, "fetch_issue_comments", return_value=[{"body": f"Fix-SHA: {sha}"}]), \
+             patch.object(mod, "sha_exists_locally", return_value=True), \
+             patch.object(mod, "is_ancestor_of_main", return_value=False), \
+             patch.object(mod, "find_branch_for_sha", return_value="fix/BTCAAAAA-55555"), \
+             patch.object(mod, "resolve_gh_token", return_value="fake-token"), \
+             patch.object(mod, "find_existing_pr", return_value=None), \
+             patch.object(mod, "create_pr", return_value=None), \
+             patch.object(mod, "escalate_failure", side_effect=capture_escalation):
+            result = mod.process_issue(issue)
+
+        assert result["action"] == "failed"
+        assert escalated_to == ["source-issue-uuid"], (
+            f"Escalation went to '{escalated_to}' instead of source issue 'source-issue-uuid'"
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

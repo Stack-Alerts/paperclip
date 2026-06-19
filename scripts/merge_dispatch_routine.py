@@ -59,8 +59,9 @@ logger = logging.getLogger("merge_dispatch")
 REPO_OWNER = "Stack-Alerts"
 REPO_NAME = "BTC-Trade-Engine-PaperClip"
 GITHUB_API_BASE = "https://api.github.com"
-TRACKING_ISSUE = "BTCAAAAA-30033"  # Escalation issue
 MERGE_DISPATCH_TRACKING = "BTCAAAAA-30048"  # This routine's tracking issue
+# Note: BTCAAAAA-30033 is the token-gap routine. It is NOT the escalation target
+# for merge-dispatch failures — failure comments must go to the SOURCE ISSUE thread.
 
 # Regex for Fix-SHA comment: line-anchored
 FIX_SHA_PATTERN = re.compile(r"^Fix-SHA: ([0-9a-f]{40})$", re.MULTILINE)
@@ -378,13 +379,20 @@ def merge_pr(session: requests.Session, pr_number: int) -> dict | None:
         return None
 
 
-def comment_on_issue(issue_id: str, body: str) -> bool:
-    """Post a comment to an issue."""
+def comment_on_issue(issue_id: str, body: str, idempotency_key: str | None = None) -> bool:
+    """Post a comment to an issue.
+
+    idempotency_key: when provided, the API deduplicates re-posts within a run
+    (prevents double-escalation comments if the routine retries a failed issue).
+    """
     sess = _http_session()
     try:
+        payload: dict[str, Any] = {"body": body}
+        if idempotency_key:
+            payload["idempotencyKey"] = idempotency_key
         resp = sess.post(
             f"{os.environ.get('PAPERCLIP_API_URL')}/api/issues/{issue_id}/comments",
-            json={"body": body},
+            json=payload,
             timeout=30,
         )
         resp.raise_for_status()
@@ -421,17 +429,22 @@ def update_issue_status(issue_id: str, status: str, comment: str = "") -> bool:
 
 
 def escalate_failure(issue_id: str, issue_identifier: str, sha: str, reason: str) -> None:
-    """Escalate a merge-dispatch failure to the escalation routine."""
+    """Post a failure escalation comment to the SOURCE ISSUE thread.
+
+    Must NOT post to BTCAAAAA-30033 (token-gap routine) — that caused misrouted
+    comments on unrelated threads (BTCAAAAA-36598).
+    """
     try:
         body = f"""**Merge-Dispatch Failure Escalation**
 
-Source issue: [{issue_identifier}](/BTCAAAAA/issues/{issue_identifier})
 Fix-SHA: {sha[:8]}
 Reason: {reason}
 
-This issue requires manual intervention from the merge-dispatch routine ([BTCAAAAA-30048](/BTCAAAAA/issues/BTCAAAAA-30048)).
+Manual intervention required. Routine: [{MERGE_DISPATCH_TRACKING}](/BTCAAAAA/issues/{MERGE_DISPATCH_TRACKING}).
 """
-        comment_on_issue(TRACKING_ISSUE, body)
+        # Idempotency key prevents double-posting if the routine retries this issue
+        idempotency_key = f"escalation:{issue_id}:{sha[:8]}:{reason[:40]}"
+        comment_on_issue(issue_id, body, idempotency_key=idempotency_key)
     except Exception as exc:
         logger.error("Failed to escalate failure: %s", exc)
 
