@@ -894,17 +894,18 @@ interface ParsedRec {
   title: string;
   summary: string;
   raw: string;
-  /**
-   * Coarse classification surfaced on the card and forwarded to the
-   * auto-apply orchestrator. Defaults to 'recommendation' because the
-   * AI output rarely carries an explicit "Type:" line per rec.
-   */
+  /** Structured type extracted from "Type:" line (e.g. ADJUST_PARAM, ADD_SIGNAL). */
   type: string;
   /** Optional fields extracted from "Confidence: …" / "Rationale: …" lines. */
   confidence?: string;
   rationale?: string;
   /** Key:value parameter suggestions extracted from the block. */
   suggestedParams: Array<{ key: string; value: string }>;
+  // Structured fields forwarded to the auto-apply orchestrator.
+  block?: string;
+  signal?: string;
+  parameter?: string;
+  suggestedValue?: string;
 }
 
 /**
@@ -988,6 +989,7 @@ function deriveSummary(block: string, maxLen = 220): string {
 }
 
 function parseSingleRec(block: string, index: number): ParsedRec {
+  const rawSignal = tryExtractField(block, 'Signal');
   return {
     id: `rec-${index}-${simpleHash(block)}`,
     title: deriveTitle(block, index),
@@ -997,6 +999,10 @@ function parseSingleRec(block: string, index: number): ParsedRec {
     confidence: tryExtractField(block, 'Confidence'),
     rationale: tryExtractField(block, 'Rationale'),
     suggestedParams: parseSuggestedParams(block),
+    block: tryExtractField(block, 'Block'),
+    signal: rawSignal && !/^n\/a$/i.test(rawSignal) ? rawSignal : undefined,
+    parameter: tryExtractField(block, 'Parameter'),
+    suggestedValue: tryExtractField(block, 'Suggested Value'),
   };
 }
 
@@ -1172,173 +1178,6 @@ interface ActiveRec {
   suggestedParams: Array<{ key: string; value: string }>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function RecommendationCard({
-  rec,
-  isActive,
-  onApply,
-  onClear,
-}: {
-  rec: ParsedRec;
-  isActive: boolean;
-  onApply: (rec: ParsedRec) => void;
-  onClear: () => void;
-}) {
-  const [showFull, setShowFull] = useState(false);
-  return (
-    <div
-      data-testid={`rec-card-${rec.id}`}
-      className="rounded p-3 flex flex-col gap-2"
-      style={{
-        background: isActive ? 'var(--accent-blue-soft)' : 'var(--bg-card)',
-        border: `1px solid ${isActive ? 'var(--accent-blue)' : 'var(--border)'}`,
-      }}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <p
-            className="text-xs font-semibold"
-            style={{ color: 'var(--text-secondary)' }}
-            title={rec.title}
-          >
-            {rec.title}
-          </p>
-          {rec.confidence && (
-            <span
-              className="text-[10px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5 self-start"
-              style={{
-                background: 'var(--bg-elevated)',
-                color: 'var(--text-muted)',
-                border: '1px solid var(--border)',
-                fontFamily: 'var(--font-mono, monospace)',
-              }}
-            >
-              Confidence: {rec.confidence}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {isActive ? (
-            <button
-              type="button"
-              onClick={onClear}
-              data-testid={`rec-clear-${rec.id}`}
-              className="px-2 py-1 rounded text-[10px] font-medium"
-              style={{
-                background: 'var(--bg-elevated)',
-                color: 'var(--text-muted)',
-                border: '1px solid var(--border)',
-                cursor: 'pointer',
-              }}
-            >
-              <X size={10} style={{ display: 'inline', marginRight: 4 }} />
-              Clear
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onApply(rec)}
-              data-testid={`rec-apply-${rec.id}`}
-              title="Load this recommendation into the active analysis form. It will be included in the next send."
-              className="px-2 py-1 rounded text-[10px] font-medium"
-              style={{
-                background: 'var(--accent-blue)',
-                color: 'var(--text-on-accent)',
-                border: '1px solid var(--accent-blue)',
-                cursor: 'pointer',
-              }}
-            >
-              Apply
-            </button>
-          )}
-        </div>
-      </div>
-
-      {rec.summary && (
-        <p
-          className="text-xs whitespace-pre-wrap"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          {rec.summary}
-        </p>
-      )}
-
-      {rec.suggestedParams.length > 0 && (
-        <div
-          className="rounded p-2"
-          style={{
-            background: 'var(--bg-elevated)',
-            border: '1px solid var(--border)',
-          }}
-        >
-          <p
-            className="text-[10px] font-semibold uppercase tracking-wide mb-1"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            Suggested parameters
-          </p>
-          <ul className="flex flex-col gap-0.5">
-            {rec.suggestedParams.map((p) => (
-              <li
-                key={p.key}
-                className="text-[11px]"
-                style={{
-                  color: 'var(--text-secondary)',
-                  fontFamily: 'var(--font-mono, monospace)',
-                }}
-              >
-                <span style={{ color: 'var(--text-faint)' }}>{p.key}</span>
-                <span style={{ color: 'var(--text-muted)' }}> = </span>
-                <span>{p.value}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => setShowFull((v) => !v)}
-        data-testid={`rec-show-full-${rec.id}`}
-        className="text-[10px] cursor-pointer self-start"
-        style={{ color: 'var(--text-faint)' }}
-      >
-        {showFull ? '− Hide full payload' : '+ Show full payload'}
-      </button>
-
-      {showFull && (
-        <div className="flex flex-col gap-2">
-          {rec.rationale && (
-            <div>
-              <p
-                className="text-[10px] font-semibold uppercase tracking-wide mb-1"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                Rationale
-              </p>
-              <p
-                className="text-xs whitespace-pre-wrap"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                {rec.rationale}
-              </p>
-            </div>
-          )}
-          <div>
-            <p
-              className="text-[10px] font-semibold uppercase tracking-wide mb-1"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              Model output
-            </p>
-            <PreviewText text={rec.raw} />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Split layout (AC1) ───────────────────────────────────────────────────
 
 const SPLIT_MIN = 30;
@@ -1371,12 +1210,13 @@ function SplitPanel({
   });
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
-  const splitPersistedOnce = useRef(false);
+  const hasMountedRef = useRef(false);
 
-  // Persist split on change; skip the first render (initial value already loaded).
+  // Persist split on change (skip the initial mount so we don't echo
+  // the value we just read from localStorage back immediately).
   useEffect(() => {
-    if (!splitPersistedOnce.current) {
-      splitPersistedOnce.current = true;
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
       return;
     }
     if (typeof window === 'undefined') return;
@@ -1500,12 +1340,6 @@ export function AiRecommendationsPanel({
     recommendations: string;
     raw: string;
   } | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [applying, setApplying] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [applyError, setApplyError] = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [applyDetail, setApplyDetail] = useState<string | null>(null);
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
   const [applySuccessVisible, setApplySuccessVisible] = useState(true);
   const [testing, setTesting] = useState(false);
@@ -1904,19 +1738,6 @@ export function AiRecommendationsPanel({
     setGoalModalOpen(false);
   }, []);
 
-  // AC2: per-rec Apply → loads into active form.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleApplyRec = useCallback((rec: ParsedRec) => {
-    setActiveRec({
-      id: rec.id,
-      title: rec.title,
-      raw: rec.raw,
-      ...(rec.confidence ? { confidence: rec.confidence } : {}),
-      ...(rec.rationale ? { rationale: rec.rationale } : {}),
-      suggestedParams: rec.suggestedParams,
-    });
-  }, []);
-
   const handleClearActiveRec = useCallback(() => {
     setActiveRec(null);
   }, []);
@@ -1975,11 +1796,16 @@ export function AiRecommendationsPanel({
           headers,
           body: JSON.stringify({
             strategyId: strategy.id,
+            strategy,
             recs: [
               {
                 rec_id: rec.id,
                 type: rec.type,
                 ...(rec.raw ? { raw: rec.raw } : {}),
+                ...(rec.block ? { block: rec.block } : {}),
+                ...(rec.signal ? { signal: rec.signal } : {}),
+                ...(rec.parameter ? { parameter: rec.parameter } : {}),
+                ...(rec.suggestedValue ? { suggestedValue: rec.suggestedValue } : {}),
               },
             ],
             optInDestructiveIds: null,
@@ -2214,29 +2040,8 @@ export function AiRecommendationsPanel({
         </div>
       )}
 
-      {/* Auto-apply error banner */}
-      {applyError && (
-        <div
-          className="rounded p-2 text-xs"
-          role="alert"
-          style={{
-            background: 'var(--bg-elevated)',
-            color: 'var(--accent-red)',
-            border: '1px solid var(--accent-red)',
-          }}
-        >
-          <p className="font-semibold">Auto-apply failed</p>
-          <p className="mt-1">{applyError}</p>
-          {applyDetail && (
-            <p className="mt-1" style={{ color: 'var(--text-faint)' }}>
-              {applyDetail}
-            </p>
-          )}
-        </div>
-      )}
-
       {/* Auto-apply success banner */}
-      {applySuccess && !applyError && (
+      {applySuccess && (
         <div
           className="rounded p-2 text-xs"
           role="status"

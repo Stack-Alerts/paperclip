@@ -114,7 +114,7 @@ class TestVerifyShaOnMain:
 
     @patch("subprocess.run")
     def test_fetches_origin_main(self, mock_run):
-        """Should fetch origin/main before checking ancestor."""
+        """Should fetch origin/main before checking ancestor (default skip_fetch=False)."""
         mock_run.return_value = Mock(returncode=0)
         verify_sha_on_main("0123456789abcdef0123456789abcdef01234567")
 
@@ -122,6 +122,17 @@ class TestVerifyShaOnMain:
         first_call = mock_run.call_args_list[0]
         assert first_call[0][0][0] == "git"
         assert first_call[0][0][1] == "fetch"
+
+    @patch("subprocess.run")
+    def test_skip_fetch_skips_git_fetch(self, mock_run):
+        """Should skip git fetch when skip_fetch=True (pre-fetched by main loop)."""
+        mock_run.return_value = Mock(returncode=0)
+        verify_sha_on_main("0123456789abcdef0123456789abcdef01234567", skip_fetch=True)
+
+        # With skip_fetch=True, only one subprocess call (merge-base), no fetch
+        assert mock_run.call_count == 1
+        only_call = mock_run.call_args_list[0]
+        assert only_call[0][0][1] == "merge-base"
 
 
 class TestComputeActionHash:

@@ -1,0 +1,11 @@
+[Unit]
+Description=Merge-dispatch routine execution handler timer (every 5 minutes)
+Documentation=https://github.com/Stack-Alerts/BTC-Trade-Engine-PaperClip
+
+[Timer]
+OnCalendar=*:0/5
+RandomizedDelaySec=30
+Persistent=false
+
+[Install]
+WantedBy=timers.target

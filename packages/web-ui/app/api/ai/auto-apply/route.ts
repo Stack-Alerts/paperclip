@@ -4,17 +4,14 @@ import {
   type AutoApplyRequest,
 } from './orchestrator';
 
-// Server-side proxy — must run on Node so the global fetch can reach
-// the FastAPI service on the host network.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const DEFAULT_BASE_URL = 'http://localhost:8765';
 
 interface IncomingBody {
   strategyId?: unknown;
   recs?: unknown;
   optInDestructiveIds?: unknown;
+  strategy?: unknown;
 }
 
 function isRecArray(value: unknown): value is AutoApplyRec[] {
@@ -75,7 +72,6 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || DEFAULT_BASE_URL;
   const req: AutoApplyRequest = {
     strategyId: body.strategyId,
     recs,
@@ -83,13 +79,9 @@ export async function POST(request: Request): Promise<Response> {
       body.optInDestructiveIds === undefined
         ? null
         : (body.optInDestructiveIds as string[] | null),
+    strategy: (body.strategy as AutoApplyRequest['strategy']) ?? null,
   };
 
-  // Forward the caller's JWT so FastAPI's Depends(require_jwt) accepts the
-  // request. We pass the raw header through unchanged — Next.js hands us
-  // whatever the client sent (typically "Bearer eyJ...").
-  const authHeader = request.headers.get('authorization');
-
-  const result = await runAutoApply(req, { fetch, baseUrl, authHeader });
+  const result = await runAutoApply(req);
   return Response.json(result);
 }

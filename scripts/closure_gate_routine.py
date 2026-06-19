@@ -25,8 +25,10 @@ import json
 import logging
 import os
 import re
+import signal
 import subprocess
 import sys
+import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -51,6 +53,16 @@ logger = logging.getLogger("closure_gate")
 # auth-boundary 403s when multiple agents with different boundaries run this routine)
 TRACKING_ISSUE = os.environ.get("PAPERCLIP_TASK_ID", "BTCAAAAA-36131")
 API_TIMEOUT = 30
+
+# Hard wall-clock limit for the entire routine run (seconds). Prevents the
+# routine from hanging forever if a subprocess or HTTP call blocks beyond its
+# individual timeout. Signal-based on Unix; thread-timer fallback elsewhere.
+ROUTINE_TIMEOUT_SECONDS = 480  # 8 minutes
+
+# Maximum API calls allowed for unfiled-deferral follow-up lookups across the
+# entire run. Each per-issue deferral paragraph can trigger one call per
+# candidate ticket ref; without a budget the nested loop is O(issues × paras × refs).
+MAX_DEFERRAL_API_CALLS = 50
 
 # State file to track closure-gate actions
 CLOSURE_GATE_STATE_FILE = REPO_ROOT / "data" / "closure_gate_actions.json"
@@ -494,6 +506,7 @@ def followup_links_to_source(
 def detect_unfiled_deferrals(
     issue: dict[str, Any],
     comments: list[dict[str, Any]],
+    api_call_counter: list[int] | None = None,
 ) -> list[dict[str, Any]]:
     """Detect closure paragraphs that promise follow-up work without filing it.
 
@@ -544,6 +557,15 @@ def detect_unfiled_deferrals(
 
             valid = False
             for ref in candidate_refs:
+                if api_call_counter is not None:
+                    if api_call_counter[0] >= MAX_DEFERRAL_API_CALLS:
+                        logger.warning(
+                            "Deferral API call budget (%d) exhausted; skipping remaining refs for issue %s",
+                            MAX_DEFERRAL_API_CALLS,
+                            source_identifier,
+                        )
+                        break
+                    api_call_counter[0] += 1
                 followup = fetch_issue_by_identifier(ref)
                 if followup and followup_links_to_source(
                     followup, source_id, source_identifier, source_project_id
@@ -567,17 +589,54 @@ def detect_unfiled_deferrals(
 # === End Unfiled Deferral Detection ===
 
 
-def verify_sha_on_main(sha: str) -> bool:
-    """Verify that SHA is an ancestor of origin/main using git."""
+def fetch_origin_main() -> bool:
+    """Fetch origin/main once and return success.
+
+    Call this once before the per-issue loop so verify_sha_on_main() can be
+    called with skip_fetch=True and avoid N redundant network round-trips.
+    Sets GIT_TERMINAL_PROMPT=0 to prevent git from blocking on credentials
+    in a headless environment.
+    """
     try:
-        # Fetch origin to ensure we have latest
+        env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
         subprocess.run(
             ["git", "fetch", "origin", "main"],
             cwd=REPO_ROOT,
             capture_output=True,
-            timeout=30,
+            timeout=60,
             check=False,
+            env=env,
         )
+        logger.info("git fetch origin main completed")
+        return True
+    except subprocess.TimeoutExpired:
+        logger.warning("git fetch origin main timed out after 60s; proceeding with local state")
+        return False
+    except Exception as exc:
+        logger.warning("git fetch origin main failed: %s; proceeding with local state", exc)
+        return False
+
+
+def verify_sha_on_main(sha: str, skip_fetch: bool = False) -> bool:
+    """Verify that SHA is an ancestor of origin/main using git.
+
+    Args:
+        sha: 40-char commit SHA to verify.
+        skip_fetch: When True, skip the `git fetch origin main` step.
+            Set to True when fetch_origin_main() has already been called
+            once for the current run to avoid N redundant fetches.
+    """
+    try:
+        if not skip_fetch:
+            env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+            subprocess.run(
+                ["git", "fetch", "origin", "main"],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                timeout=60,
+                check=False,
+                env=env,
+            )
 
         # Run git merge-base --is-ancestor
         result = subprocess.run(
@@ -728,6 +787,8 @@ def process_issue(
     issue: dict[str, Any],
     state: dict[str, Any],
     deferral_flags: list[dict[str, Any]] | None = None,
+    skip_git_fetch: bool = False,
+    api_call_counter: list[int] | None = None,
 ) -> tuple[str, bool]:
     """Process a single done issue.
 
@@ -759,7 +820,7 @@ def process_issue(
     # not yet been tagged with a Fix-SHA.
     if deferral_flags is not None:
         try:
-            deferral_flags.extend(detect_unfiled_deferrals(issue, comments))
+            deferral_flags.extend(detect_unfiled_deferrals(issue, comments, api_call_counter))
         except Exception as exc:
             logger.error(
                 "Unfiled-deferral check failed for issue %s: %s",
@@ -817,7 +878,7 @@ def process_issue(
         return "flag_fabrication", False
 
     # Verify SHA is on main
-    if verify_sha_on_main(sha):
+    if verify_sha_on_main(sha, skip_fetch=skip_git_fetch):
         logger.info("Issue %s SHA %s is on main", issue_identifier, sha[:8])
         return "verified", True
     else:
@@ -852,11 +913,48 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _install_global_timeout(seconds: int) -> None:
+    """Install a hard wall-clock timeout so the routine cannot hang forever.
+
+    Uses SIGALRM on Unix (preferred — kills the process cleanly after `seconds`).
+    Falls back to a daemon thread timer on platforms without SIGALRM (e.g. Windows).
+    The 8-minute wall-clock limit covers the case where a subprocess or HTTP
+    connection silently blocks beyond its individual timeout — the root cause of
+    the 2026-05-30 execution hang (BTCAAAAA-32133).
+    """
+    if hasattr(signal, "SIGALRM"):
+        def _alarm_handler(signum: int, frame: object) -> None:
+            logger.error(
+                "GLOBAL TIMEOUT: routine exceeded %ds wall-clock limit; aborting",
+                seconds,
+            )
+            sys.exit(2)
+
+        signal.signal(signal.SIGALRM, _alarm_handler)
+        signal.alarm(seconds)
+        logger.info("Global timeout set: %ds (SIGALRM)", seconds)
+    else:
+        def _thread_abort() -> None:
+            logger.error(
+                "GLOBAL TIMEOUT: routine exceeded %ds wall-clock limit; aborting",
+                seconds,
+            )
+            os._exit(2)  # noqa: SLF001 — daemon thread, no cleanup needed
+
+        timer = threading.Timer(seconds, _thread_abort)
+        timer.daemon = True
+        timer.start()
+        logger.info("Global timeout set: %ds (thread timer)", seconds)
+
+
 def main(argv: list[str] | None = None) -> None:
     """Main routine execution."""
     args = _parse_args(argv)
     hours = args.backfill_days * 24 if args.backfill_days else 24
     logger.info("Starting closure-gate routine (window=%dh)", hours)
+
+    # Install global wall-clock timeout before any I/O to prevent indefinite hangs.
+    _install_global_timeout(ROUTINE_TIMEOUT_SECONDS)
 
     # Load previous state
     state = load_state()
@@ -864,6 +962,15 @@ def main(argv: list[str] | None = None) -> None:
 
     # Find done issues
     done_issues = find_done_issues(hours=hours)
+
+    # Fetch origin/main ONCE before the per-issue loop so verify_sha_on_main()
+    # can skip redundant fetches. Without this, N issues with Fix-SHAs triggered
+    # N sequential `git fetch` network calls — the primary hang vector in
+    # BTCAAAAA-32133.
+    fetch_origin_main()
+
+    # Shared mutable counter limits total deferral API calls across all issues.
+    api_call_counter: list[int] = [0]
 
     stats = {
         "verified": 0,
@@ -875,7 +982,11 @@ def main(argv: list[str] | None = None) -> None:
     deferral_flags: list[dict[str, Any]] = []
 
     for issue in done_issues:
-        action_type, success = process_issue(issue, state, deferral_flags)
+        action_type, success = process_issue(
+            issue, state, deferral_flags,
+            skip_git_fetch=True,
+            api_call_counter=api_call_counter,
+        )
         if action_type == "verified":
             stats["verified"] += 1
         elif action_type == "reopened":

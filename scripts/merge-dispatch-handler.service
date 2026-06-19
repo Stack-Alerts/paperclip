@@ -1,0 +1,13 @@
+[Unit]
+Description=Merge-dispatch routine execution handler — auto-processes pending execution issues
+Documentation=https://github.com/Stack-Alerts/BTC-Trade-Engine-PaperClip
+Wants=merge-dispatch-handler.timer
+
+[Service]
+Type=oneshot
+ExecStart=%h/projects/BTC-Trade-Engine-PaperClip/venv/bin/python %h/projects/BTC-Trade-Engine-PaperClip/scripts/merge_dispatch_execution_handler.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

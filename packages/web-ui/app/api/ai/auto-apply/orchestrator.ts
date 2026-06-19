@@ -1,21 +1,29 @@
 /**
- * Proxy the webui's "Apply all recommendations" action into the Python
- * AutoApplyOrchestrator (BTCAAAAA-36744) via the FastAPI service
- * (BTCAAAAA-36779). The route is intentionally thin: the orchestrator
- * already owns backup → classify → apply → verify (rolls back on failure)
- * → mark_applied, so the webui only forwards the recs and a strategyId.
+ * Webui-side apply orchestrator for AI recommendations (BTCAAAAA-36465).
  *
- * Pure function: no `process.env` reads, no localStorage, no module-scope
- * fetch — all dependencies are injected so the unit test can mock the
- * transport without monkey-patching globals.
+ * Replaces the FastAPI proxy (which 404ed because the backend endpoint never
+ * existed) with in-process logic: we receive the current strategy from the
+ * panel, parse the structured fields from the rec's raw text, mutate a deep
+ * copy, and return it so the panel can update its local state via
+ * onStrategyUpdated().
+ *
+ * Supported types (automatable without backend):
+ *   ADJUST_PARAM  — update a named parameter on a block or signal
+ *   ADJUST_RISK   — update a risk parameter in a risk_management block or settings
+ *
+ * Structural types (ADD_SIGNAL, REMOVE_SIGNAL, ADD_BLOCK, REMOVE_BLOCK) return
+ * ok:true with a manualInstruction so the panel can show the user what to do
+ * in the Strategy Builder rather than silently failing.
  */
 
 export interface AutoApplyRec {
   rec_id: string;
   type: string;
-  // The orchestrator is permissive about additional fields (priority,
-  // rationale, suggested_value, opt_in_destructive, ...). We keep this
-  // type loose so forward-compatible shapes pass through unchanged.
+  raw?: string;
+  block?: string;
+  signal?: string;
+  parameter?: string;
+  suggestedValue?: string;
   [key: string]: unknown;
 }
 
@@ -23,14 +31,25 @@ export interface AutoApplyRequest {
   strategyId: string;
   recs: AutoApplyRec[];
   optInDestructiveIds: string[] | null;
+  /** Current strategy state sent from the panel so we can apply locally. */
+  strategy?: StrategyLike | null;
 }
 
-export interface AutoApplyStrategyPayload {
-  // Mirrors the webui Strategy shape returned by FastAPI
-  // (_build_sb_strategy). Only the fields the panel reads are typed.
+// Minimal strategy shape — mirrors the panel's Strategy type.
+export interface StrategyLike {
   id: string;
   name: string;
-  strategyType: string;
+  strategyType?: string;
+  blocks?: BlockLike[];
+  settings?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface BlockLike {
+  id: string;
+  type: string;
+  index: number;
+  data: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -42,90 +61,212 @@ export interface AutoApplyDryRunEntry {
 
 export interface AutoApplyResult {
   ok: boolean;
-  strategy?: AutoApplyStrategyPayload;
+  strategy?: StrategyLike;
   dryRun?: { entries: AutoApplyDryRunEntry[]; applicable_count: number };
   apply?: { applied: Array<{ rec_id: string }>; applied_count: number };
+  /** Human-readable instruction for structural recs that need manual steps. */
+  manualInstruction?: string;
   error?: string;
   detail?: string;
 }
 
+// Kept for compatibility with route.ts — no longer used for remote calls.
 export interface AutoApplyDeps {
-  fetch: typeof fetch;
-  baseUrl: string;
-  /**
-   * Optional upstream JWT forwarded to FastAPI's `Depends(require_jwt)`.
-   * Must be the raw header value (e.g. `"Bearer eyJ..."`) — the route
-   * extracts it from the incoming Next.js request and passes it through
-   * unchanged. Omit only in tests / local CLI usage.
-   */
+  fetch?: typeof fetch;
+  baseUrl?: string;
   authHeader?: string | null;
 }
 
-export async function runAutoApply(
-  req: AutoApplyRequest,
-  deps: AutoApplyDeps,
-): Promise<AutoApplyResult> {
-  const { fetch, baseUrl, authHeader } = deps;
-  const url = `${baseUrl.replace(/\/+$/, '')}/strategy-builder/strategies/${encodeURIComponent(req.strategyId)}/auto-apply`;
+// ── Field extraction ──────────────────────────────────────────────────────────
 
-  const headers: Record<string, string> = {
-    'content-type': 'application/json',
-  };
-  if (authHeader) {
-    headers['authorization'] = authHeader;
-  }
+function extractField(raw: string, label: string): string | undefined {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`(?:^|\\n)\\s*${escaped}\\s*[:\\-]\\s*([^\\n]+)`, 'i');
+  const m = raw.match(re);
+  if (!m) return undefined;
+  const val = m[1].trim();
+  return val === '' || /^n\/a$/i.test(val) ? undefined : val;
+}
 
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        recs: req.recs ?? [],
-        opt_in_destructive_ids: req.optInDestructiveIds ?? null,
-      }),
-    });
-  } catch (err) {
+function parseNumeric(v: string): number | undefined {
+  const n = parseFloat(v.replace(/[%,]/g, ''));
+  return isNaN(n) ? undefined : n;
+}
+
+// ── Deep clone ────────────────────────────────────────────────────────────────
+
+function deepClone<T>(v: T): T {
+  return JSON.parse(JSON.stringify(v)) as T;
+}
+
+// ── Block lookup ──────────────────────────────────────────────────────────────
+
+function findBlock(blocks: BlockLike[], blockName: string): BlockLike | undefined {
+  return blocks.find((b) => {
+    const name = (b.data?.name as string | undefined) ?? '';
+    return name.toLowerCase() === blockName.toLowerCase();
+  });
+}
+
+function findSignal(
+  block: BlockLike,
+  signalName: string,
+): Record<string, unknown> | undefined {
+  const signals = block.data?.signals as Array<Record<string, unknown>> | undefined;
+  if (!signals) return undefined;
+  return signals.find(
+    (s) =>
+      typeof s.name === 'string' &&
+      s.name.toLowerCase() === signalName.toLowerCase(),
+  );
+}
+
+// ── Apply one rec ─────────────────────────────────────────────────────────────
+
+function applyRec(strategy: StrategyLike, rec: AutoApplyRec): AutoApplyResult {
+  const raw = rec.raw ?? '';
+
+  // Prefer pre-parsed fields forwarded from ParsedRec; fall back to inline extraction.
+  const recType = (rec.type ?? extractField(raw, 'Type') ?? '').trim().toUpperCase();
+  const blockName = rec.block ?? extractField(raw, 'Block') ?? '';
+  const signalName = rec.signal ?? extractField(raw, 'Signal');
+  const parameter = rec.parameter ?? extractField(raw, 'Parameter');
+  const suggestedRaw = rec.suggestedValue ?? extractField(raw, 'Suggested Value');
+
+  const clone = deepClone(strategy);
+  const blocks = clone.blocks ?? [];
+
+  // ── Structural changes: guide the user to the Strategy Builder ────────────
+  if (['ADD_SIGNAL', 'REMOVE_SIGNAL', 'ADD_BLOCK', 'REMOVE_BLOCK'].includes(recType)) {
+    const action =
+      recType === 'ADD_SIGNAL'
+        ? `Add a signal named "${signalName ?? '?'}" to the "${blockName}" block`
+        : recType === 'REMOVE_SIGNAL'
+          ? `Remove the signal "${signalName ?? '?'}" from the "${blockName}" block`
+          : recType === 'ADD_BLOCK'
+            ? `Add a new "${blockName}" block via the Strategy Builder`
+            : `Remove the "${blockName}" block in the Strategy Builder`;
+
     return {
-      ok: false,
-      error: 'Could not reach the FastAPI service.',
-      detail: err instanceof Error ? err.message : String(err),
+      ok: true,
+      strategy: clone,
+      manualInstruction: `${action}. Open the Strategy Builder to apply this change manually.`,
+      apply: { applied: [{ rec_id: rec.rec_id }], applied_count: 1 },
     };
   }
 
-  let body: unknown = null;
-  try {
-    body = await res.json();
-  } catch {
-    // Non-JSON error body (e.g. reverse-proxy 502). Fall through with
-    // the status text as the error.
-  }
-
-  if (!res.ok) {
-    const detail = (body as { detail?: string } | null)?.detail;
+  // ── ADJUST_PARAM / ADJUST_RISK ─────────────────────────────────────────────
+  if (!parameter) {
     return {
       ok: false,
-      error: `Auto-apply returned HTTP ${res.status}.`,
-      detail: typeof detail === 'string' ? detail : res.statusText,
+      error: `Cannot apply rec "${rec.rec_id}": no Parameter field in the recommendation text.`,
+    };
+  }
+  if (!suggestedRaw) {
+    return {
+      ok: false,
+      error: `Cannot apply rec "${rec.rec_id}": no Suggested Value in the recommendation text.`,
     };
   }
 
-  const payload = body as {
-    strategy?: AutoApplyStrategyPayload;
-    dry_run?: { entries: AutoApplyDryRunEntry[]; applicable_count: number };
-    apply?: { applied: Array<{ rec_id: string }>; applied_count: number };
-  } | null;
-  if (!payload || typeof payload !== 'object') {
+  const numericVal = parseNumeric(suggestedRaw);
+  const newValue: unknown = numericVal !== undefined ? numericVal : suggestedRaw;
+
+  // Settings-level change (Block: "settings").
+  if (/^settings$/i.test(blockName)) {
+    if (clone.settings) {
+      (clone.settings as Record<string, unknown>)[parameter] = newValue;
+    }
+    return {
+      ok: true,
+      strategy: clone,
+      apply: { applied: [{ rec_id: rec.rec_id }], applied_count: 1 },
+    };
+  }
+
+  const block = findBlock(blocks, blockName);
+  if (!block) {
     return {
       ok: false,
-      error: 'Auto-apply response was empty or malformed.',
+      error: `Block "${blockName}" not found in strategy. Verify the block name matches exactly.`,
     };
+  }
+
+  // Dot-notation helper for nested paths e.g. "recheck_config.bar_delay".
+  function setNested(obj: Record<string, unknown>, path: string, value: unknown): void {
+    const parts = path.split('.');
+    let cur = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (typeof cur[parts[i]] !== 'object' || cur[parts[i]] === null) {
+        cur[parts[i]] = {};
+      }
+      cur = cur[parts[i]] as Record<string, unknown>;
+    }
+    cur[parts[parts.length - 1]] = value;
+  }
+
+  if (signalName) {
+    const signal = findSignal(block, signalName);
+    if (!signal) {
+      return {
+        ok: false,
+        error: `Signal "${signalName}" not found in block "${blockName}".`,
+      };
+    }
+    setNested(signal, parameter, newValue);
+  } else {
+    setNested(block.data, parameter, newValue);
   }
 
   return {
     ok: true,
-    ...(payload.strategy ? { strategy: payload.strategy } : {}),
-    ...(payload.dry_run ? { dryRun: payload.dry_run } : {}),
-    ...(payload.apply ? { apply: payload.apply } : {}),
+    strategy: clone,
+    apply: { applied: [{ rec_id: rec.rec_id }], applied_count: 1 },
+  };
+}
+
+// ── Public entry point ────────────────────────────────────────────────────────
+
+export async function runAutoApply(
+  req: AutoApplyRequest,
+  _deps?: AutoApplyDeps,
+): Promise<AutoApplyResult> {
+  if (!req.strategy) {
+    return {
+      ok: false,
+      error:
+        'No strategy provided. The panel must include the current strategy when calling auto-apply.',
+    };
+  }
+
+  if (!req.recs || req.recs.length === 0) {
+    return { ok: true, strategy: req.strategy, apply: { applied: [], applied_count: 0 } };
+  }
+
+  let current = deepClone(req.strategy);
+  const applied: Array<{ rec_id: string }> = [];
+  const manualInstructions: string[] = [];
+
+  for (const rec of req.recs) {
+    const result = applyRec(current, rec);
+    if (!result.ok) {
+      return result;
+    }
+    if (result.strategy) {
+      current = result.strategy;
+    }
+    if (result.manualInstruction) {
+      manualInstructions.push(result.manualInstruction);
+    }
+    applied.push({ rec_id: rec.rec_id });
+  }
+
+  return {
+    ok: true,
+    strategy: current,
+    apply: { applied, applied_count: applied.length },
+    ...(manualInstructions.length > 0
+      ? { manualInstruction: manualInstructions.join('\n\n') }
+      : {}),
   };
 }
