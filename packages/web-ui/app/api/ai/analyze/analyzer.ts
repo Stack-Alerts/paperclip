@@ -326,21 +326,51 @@ export async function analyze(
   }
 }
 
-/** Strip the DIAGNOSIS:/RECOMMENDATIONS: sections from the model output. */
+/** Split the DIAGNOSIS / RECOMMENDATIONS sections from the model output.
+ *
+ * Handles plain text as well as common AI formatting deviations:
+ * - Markdown bold: **DIAGNOSIS:** / **RECOMMENDATIONS:**
+ * - Markdown headings: ## DIAGNOSIS / ## RECOMMENDATIONS
+ * - No headers: falls back to numbered-list split
+ */
 export function parseAnalysisResponse(text: string): {
   diagnosis: string;
   recommendations: string;
   raw: string;
 } {
-  const diagnosisMatch = text.match(
+  const normalized = text
+    .replace(/\*{1,2}\s*(DIAGNOSIS)\s*\*{1,2}/gi, '$1:')
+    .replace(/\*{1,2}\s*(RECOMMENDATIONS)\s*\*{1,2}/gi, '$1:')
+    .replace(/^#{1,6}\s+(DIAGNOSIS)\s*[:\-]?\s*$/gim, 'DIAGNOSIS:')
+    .replace(/^#{1,6}\s+(RECOMMENDATIONS)\s*[:\-]?\s*$/gim, 'RECOMMENDATIONS:');
+
+  const diagnosisMatch = normalized.match(
     /DIAGNOSIS\s*:\s*([\s\S]*?)(?=\n\s*RECOMMENDATIONS\s*:|$)/i,
   );
-  const recommendationsMatch = text.match(
+  const recommendationsMatch = normalized.match(
     /RECOMMENDATIONS\s*:\s*([\s\S]*?)$/i,
   );
-  return {
-    diagnosis: diagnosisMatch?.[1]?.trim() ?? '',
-    recommendations: recommendationsMatch?.[1]?.trim() ?? '',
-    raw: text,
-  };
+
+  let diagnosis = diagnosisMatch?.[1]?.trim() ?? '';
+  let recommendations = recommendationsMatch?.[1]?.trim() ?? '';
+
+  if (!diagnosis && !recommendations) {
+    const idx = text.search(/(?:^|\n)\s*1[.)]\s+/);
+    if (idx > 0) {
+      diagnosis = text.slice(0, idx).trim();
+      recommendations = text.slice(idx).trim();
+    } else {
+      diagnosis = text.trim();
+    }
+  }
+
+  if (diagnosis && !recommendations) {
+    const idx = diagnosis.search(/\n\s*1[.)]\s+/);
+    if (idx > 0) {
+      recommendations = diagnosis.slice(idx).trim();
+      diagnosis = diagnosis.slice(0, idx).trim();
+    }
+  }
+
+  return { diagnosis, recommendations, raw: text };
 }

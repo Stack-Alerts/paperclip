@@ -1109,23 +1109,58 @@ function buildRequestPayload(
   );
 }
 
-/** Split a model response into DIAGNOSIS / RECOMMENDATIONS sections. */
+/** Split a model response into DIAGNOSIS / RECOMMENDATIONS sections.
+ *
+ * Handles the expected plain format as well as common AI deviations:
+ * - Markdown bold: **DIAGNOSIS:** / **RECOMMENDATIONS:**
+ * - Markdown headings: ## DIAGNOSIS / ## RECOMMENDATIONS
+ * - No section headers: falls back to numbered-list split
+ */
 function parseAnalysisResponse(text: string): {
   diagnosis: string;
   recommendations: string;
   raw: string;
 } {
-  const diagnosisMatch = text.match(
+  // Normalise markdown bold/italic/header decoration so the regex below only
+  // needs to handle the plain-text `DIAGNOSIS:` / `RECOMMENDATIONS:` form.
+  const normalized = text
+    .replace(/\*{1,2}\s*(DIAGNOSIS)\s*\*{1,2}/gi, '$1:')
+    .replace(/\*{1,2}\s*(RECOMMENDATIONS)\s*\*{1,2}/gi, '$1:')
+    .replace(/^#{1,6}\s+(DIAGNOSIS)\s*[:\-]?\s*$/gim, 'DIAGNOSIS:')
+    .replace(/^#{1,6}\s+(RECOMMENDATIONS)\s*[:\-]?\s*$/gim, 'RECOMMENDATIONS:');
+
+  const diagnosisMatch = normalized.match(
     /DIAGNOSIS\s*:\s*([\s\S]*?)(?=\n\s*RECOMMENDATIONS\s*:|$)/i,
   );
-  const recommendationsMatch = text.match(
+  const recommendationsMatch = normalized.match(
     /RECOMMENDATIONS\s*:\s*([\s\S]*?)$/i,
   );
-  return {
-    diagnosis: diagnosisMatch?.[1]?.trim() ?? '',
-    recommendations: recommendationsMatch?.[1]?.trim() ?? '',
-    raw: text,
-  };
+
+  let diagnosis = diagnosisMatch?.[1]?.trim() ?? '';
+  let recommendations = recommendationsMatch?.[1]?.trim() ?? '';
+
+  // Fallback A: neither header found — split at the first numbered list item.
+  if (!diagnosis && !recommendations) {
+    const idx = text.search(/(?:^|\n)\s*1[.)]\s+/);
+    if (idx > 0) {
+      diagnosis = text.slice(0, idx).trim();
+      recommendations = text.slice(idx).trim();
+    } else {
+      diagnosis = text.trim();
+    }
+  }
+
+  // Fallback B: DIAGNOSIS found but no RECOMMENDATIONS header — check if the
+  // captured diagnosis text itself contains a numbered list and split it out.
+  if (diagnosis && !recommendations) {
+    const idx = diagnosis.search(/\n\s*1[.)]\s+/);
+    if (idx > 0) {
+      recommendations = diagnosis.slice(idx).trim();
+      diagnosis = diagnosis.slice(0, idx).trim();
+    }
+  }
+
+  return { diagnosis, recommendations, raw: text };
 }
 
 interface ActiveRec {
@@ -2571,15 +2606,36 @@ export function AiRecommendationsPanel({
               borderTop: '3px solid var(--accent-blue)',
             }}
           >
-            <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
-              {aiAnalysis
-                ? aiAnalysis.recommendations
-                  ? 'No structured recommendations in the response. See Strategy Diagnosis above for the full reply.'
-                  : 'No recommendations yet. Recommendations appear here after AI analysis completes.'
-                : result
+            {/* When there IS recommendations text but parsing didn't split it
+                into individual cards, show the raw text rather than an empty
+                placeholder. The user gets readable content; the toggle-card
+                feature message explains why cards aren't showing. */}
+            {aiAnalysis?.recommendations ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                  Could not split into individual toggle-cards. Showing the raw recommendations below.
+                </p>
+                <pre
+                  className="text-xs rounded p-2 overflow-auto max-h-64 whitespace-pre-wrap break-words"
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                    fontFamily: 'var(--font-mono, monospace)',
+                  }}
+                >
+                  {aiAnalysis.recommendations}
+                </pre>
+              </div>
+            ) : (
+              <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
+                {aiAnalysis
                   ? 'No recommendations yet. Recommendations appear here after AI analysis completes.'
-                  : 'No results yet. Run a backtest to generate recommendations.'}
-            </p>
+                  : result
+                    ? 'No recommendations yet. Recommendations appear here after AI analysis completes.'
+                    : 'No results yet. Run a backtest to generate recommendations.'}
+              </p>
+            )}
 
             {/* BTCAAAAA-36917 v4 UX: empty-state preview + demo affordances.
                 Visible whenever parsedRecs is empty. Preview renders one
