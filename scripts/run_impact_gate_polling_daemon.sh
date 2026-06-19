@@ -22,12 +22,15 @@ if [ -f "$REPO_ROOT/.env" ]; then
 fi
 
 # Validate required environment variables
-for var in PAPERCLIP_API_URL PAPERCLIP_API_KEY PAPERCLIP_BOARD_API_KEY PAPERCLIP_COMPANY_ID; do
+for var in PAPERCLIP_API_URL PAPERCLIP_API_KEY PAPERCLIP_COMPANY_ID; do
     if [ -z "${!var}" ]; then
         echo "Error: $var not set" >&2
         exit 1
     fi
 done
+
+# PAPERCLIP_BOARD_API_KEY is optional — Python client falls back to PAPERCLIP_API_KEY
+export PAPERCLIP_BOARD_API_KEY="${PAPERCLIP_BOARD_API_KEY:-$PAPERCLIP_API_KEY}"
 
 # Set Python path
 export PYTHONPATH="${REPO_ROOT}/src:${PYTHONPATH}"

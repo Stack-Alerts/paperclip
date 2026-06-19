@@ -962,6 +962,24 @@ class MulticoreBacktestEngine:
         Returns:
             Dict: Backtest results with trades, metrics, etc.
         """
+        mode = int(backtest_config.get('mode', 1) or 1)
+
+        # Mode 3: Live-Replay — trim to most recent testing_days of bars
+        if mode == 3:
+            bars = self._slice_recent_bars(bars, backtest_config)
+            if not bars:
+                return {
+                    'trades': [], 'total_bars': 0, 'total_signals': 0,
+                    'errors': ['Mode 3: no bars after slicing to testing window'],
+                    'messages': [], 'metrics': {},
+                }
+
+        # Mode 2: Rolling Walk-Forward — 3 equal segments merged
+        if mode == 2:
+            return self._run_rolling_walkforward(
+                bars, strategy_config, backtest_config, progress_callback
+            )
+
         # Determine trade side
         side = 'SHORT' if strategy_config.get('strategy_type') == 'Bearish' else 'LONG'
         
@@ -1054,7 +1072,9 @@ class MulticoreBacktestEngine:
         merged_results['metrics'] = metrics
 
         # BTCAAAAA-25803: Write per-trade trace CSV with full signal context
-        write_trade_trace_csv(merged_results.get('trades', []))
+        # Suppressed when called as a sub-run from _run_rolling_walkforward (mode 2).
+        if not backtest_config.get('_skip_csv_write'):
+            write_trade_trace_csv(merged_results.get('trades', []))
 
         if progress_callback:
             progress_callback(100, 100, "Multicore backtest complete!")
@@ -1098,4 +1118,79 @@ class MulticoreBacktestEngine:
             'total_pnl': total_pnl,
             'avg_pnl': avg_pnl,
             'total_bars': total_bars
+        }
+
+    def _slice_recent_bars(self, bars: List[Bar], backtest_config: dict) -> List[Bar]:
+        """Mode 3: return only the most recent testing_days worth of bars."""
+        testing_days = int(backtest_config.get('testing_days', 0) or 0)
+        timeframe = str(backtest_config.get('timeframe', '15m') or '15m').lower()
+        bpd_map = {
+            '1m': 1440, '5m': 288, '15m': 96, '30m': 48,
+            '1h': 24, '4h': 6, '1d': 1,
+        }
+        bpd = bpd_map.get(timeframe, 96)
+        if testing_days > 0:
+            n = min(len(bars), max(1, testing_days * bpd))
+        else:
+            n = max(1, len(bars) // 3)
+        return bars[-n:]
+
+    def _run_rolling_walkforward(
+        self,
+        bars: List[Bar],
+        strategy_config: dict,
+        backtest_config: dict,
+        progress_callback: Optional[Callable],
+    ) -> Dict[str, Any]:
+        """Mode 2: divide bars into 3 equal segments and run each independently.
+
+        Each segment starts with a fresh indicator state, so trade entry
+        timestamps will differ from the single-pass Mode 1 result even when
+        the total data range is the same.
+        """
+        total_bars = len(bars)
+        seg_size = max(1, total_bars // 3)
+        segments = [
+            bars[:seg_size],
+            bars[seg_size: 2 * seg_size],
+            bars[2 * seg_size:],
+        ]
+        sub_config = dict(backtest_config, mode=1, _skip_csv_write=True)
+
+        sub_results = []
+        for idx, seg_bars in enumerate(segments):
+            if not seg_bars:
+                continue
+            pct_base = idx * 30
+
+            def _sub_cb(cur: int, tot: int, msg: str, _base: int = pct_base) -> None:
+                if progress_callback:
+                    progress_callback(min(90, _base + cur * 30 // (tot or 1)), 100, msg)
+
+            sub_results.append(
+                self.run_backtest(seg_bars, strategy_config, sub_config, _sub_cb)
+            )
+
+        all_trades = [t for r in sub_results for t in r.get('trades', [])]
+        metrics = self._calculate_metrics(all_trades, total_bars)
+        write_trade_trace_csv(all_trades)
+
+        if progress_callback:
+            progress_callback(100, 100, 'Mode 2 rolling walk-forward complete!')
+
+        merged_sdb: Dict[str, Any] = {}
+        for r in sub_results:
+            for blk, sigs in (r.get('signal_dates_by_block') or {}).items():
+                blk_d = merged_sdb.setdefault(blk, {})
+                for sig, dates in sigs.items():
+                    blk_d.setdefault(sig, []).extend(dates)
+
+        return {
+            'trades': all_trades,
+            'metrics': metrics,
+            'errors': [e for r in sub_results for e in r.get('errors', [])],
+            'messages': [m for r in sub_results for m in r.get('messages', [])],
+            'total_bars': total_bars,
+            'total_signals': sum(r.get('total_signals', 0) for r in sub_results),
+            'signal_dates_by_block': merged_sdb,
         }

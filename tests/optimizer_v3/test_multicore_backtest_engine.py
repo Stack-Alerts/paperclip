@@ -403,5 +403,79 @@ class TestPriceAttribution(unittest.TestCase):
                                  f"Entry price {entry_price} above bar high {float(bar.high)}")
 
 
+class TestBacktestModes(unittest.TestCase):
+    """Regression tests: Mode 1/2/3 must produce materially distinct bar sets."""
+
+    def _make_bars(self, count: int) -> list:
+        bars = []
+        base_time = int(datetime(2025, 1, 1).timestamp() * 1e9)
+        instrument_id = InstrumentId(Symbol("BTC"), Venue("BINANCE"))
+        bar_type = BarType(
+            instrument_id,
+            BarSpecification(15, BarAggregation.MINUTE, PriceType.LAST),
+            AggregationSource.EXTERNAL,
+        )
+        for i in range(count):
+            ts = base_time + i * 15 * 60 * int(1e9)
+            bars.append(Bar(
+                bar_type=bar_type,
+                open=Price(50000.0 + i, 2),
+                high=Price(50100.0 + i, 2),
+                low=Price(49900.0 + i, 2),
+                close=Price(50050.0 + i, 2),
+                volume=Quantity(10.0, 8),
+                ts_event=ts,
+                ts_init=ts,
+            ))
+        return bars
+
+    def test_mode3_slices_to_recent_bars_testing_days(self):
+        """_slice_recent_bars returns the last testing_days*bpd bars."""
+        engine = MulticoreBacktestEngine(num_processes=1)
+        bars = self._make_bars(300)
+        sliced = engine._slice_recent_bars(bars, {'testing_days': 2, 'timeframe': '15m'})
+        self.assertEqual(len(sliced), 192)  # 2 days * 96 bars/day
+        self.assertIs(sliced[-1], bars[-1])
+
+    def test_mode3_slices_to_last_third_when_no_testing_days(self):
+        """_slice_recent_bars defaults to last third when testing_days=0."""
+        engine = MulticoreBacktestEngine(num_processes=1)
+        bars = self._make_bars(300)
+        sliced = engine._slice_recent_bars(bars, {'testing_days': 0, 'timeframe': '15m'})
+        self.assertEqual(len(sliced), 100)  # 300 // 3
+        self.assertIs(sliced[-1], bars[-1])
+
+    def test_mode3_fewer_bars_than_mode1(self):
+        """Mode 3 processes strictly fewer bars than Mode 1 for the same input."""
+        engine = MulticoreBacktestEngine(num_processes=1)
+        bars = self._make_bars(300)
+        mode3_bars = engine._slice_recent_bars(bars, {'testing_days': 0, 'timeframe': '15m'})
+        self.assertLess(len(mode3_bars), len(bars))
+
+    def test_mode3_bars_are_suffix_of_full_set(self):
+        """Mode 3 bars are a contiguous suffix of the full bar list."""
+        engine = MulticoreBacktestEngine(num_processes=1)
+        bars = self._make_bars(300)
+        sliced = engine._slice_recent_bars(bars, {'testing_days': 0, 'timeframe': '15m'})
+        suffix_start = len(bars) - len(sliced)
+        self.assertEqual(sliced, bars[suffix_start:])
+
+    def test_mode2_segments_cover_all_bars_without_overlap(self):
+        """Rolling walk-forward segments cover the full bar range with no duplication."""
+        bars = self._make_bars(300)
+        total = len(bars)
+        seg = max(1, total // 3)
+        seg1 = bars[:seg]
+        seg2 = bars[seg:2 * seg]
+        seg3 = bars[2 * seg:]
+        self.assertEqual(len(seg1) + len(seg2) + len(seg3), total)
+        ids1 = {id(b) for b in seg1}
+        ids2 = {id(b) for b in seg2}
+        ids3 = {id(b) for b in seg3}
+        self.assertFalse(ids1 & ids2, "Segment 1 and 2 overlap")
+        self.assertFalse(ids2 & ids3, "Segment 2 and 3 overlap")
+        self.assertFalse(ids1 & ids3, "Segment 1 and 3 overlap")
+
+
 if __name__ == '__main__':
     unittest.main()

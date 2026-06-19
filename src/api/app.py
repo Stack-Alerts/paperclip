@@ -1901,6 +1901,13 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
         _append_backtest_log(run_id, f"📊 Loading bars for NautilusTrader...", level='SYSTEM')
         _append_backtest_log(run_id, f"Timeframe: {timeframe}", level='SYSTEM')
         _append_backtest_log(run_id, f"Range: {config['startDate']} to {config['endDate']}", level='SYSTEM')
+        _mode = int(config.get("mode") or 1)
+        _mode_labels = {
+            1: "Mode 1 — Historical Walk-Forward",
+            2: "Mode 2 — Rolling Walk-Forward (3 segments)",
+            3: "Mode 3 — Live-Replay (most recent window)",
+        }
+        _append_backtest_log(run_id, f"Testing Mode: {_mode_labels.get(_mode, f'Mode {_mode}')}", level='SYSTEM')
 
         def _load_progress(current: int, total: int, msg: str) -> None:
             pct = int((current / total) * 25) if total else 0
