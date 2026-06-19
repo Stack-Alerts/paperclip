@@ -317,8 +317,8 @@ const STATUS_LABELS: Record<AiRecsHistoryStatus, string> = {
 
 const STATUS_COLORS: Record<AiRecsHistoryStatus, { bg: string; fg: string; border: string }> = {
   new: { bg: 'var(--bg-elevated)', fg: 'var(--text-muted)', border: 'var(--border)' },
-  applied: { bg: 'rgba(34, 197, 94, 0.12)', fg: '#4ade80', border: '#4ade80' },
-  dismissed: { bg: 'rgba(248, 113, 113, 0.12)', fg: '#f87171', border: '#f87171' },
+  applied: { bg: 'var(--accent-green-soft)', fg: 'var(--accent-green-on)', border: 'var(--accent-green-on)' },
+  dismissed: { bg: 'var(--accent-red-soft)', fg: 'var(--accent-red-on)', border: 'var(--accent-red-on)' },
 };
 
 function StatusBadge({ status }: { status: AiRecsHistoryStatus }) {
@@ -482,9 +482,9 @@ function HistoryCard({
           title="Load this analysis into the current view — diagnoses, recommendations, and the first rec become the active rec."
           className="px-2 py-1 rounded text-[10px] font-medium"
           style={{
-            background: 'var(--accent-blue, #3b82f6)',
-            color: '#fff',
-            border: '1px solid var(--accent-blue, #3b82f6)',
+            background: 'var(--accent-blue)',
+            color: 'var(--text-on-accent)',
+            border: '1px solid var(--accent-blue)',
             cursor: 'pointer',
           }}
         >
@@ -497,9 +497,9 @@ function HistoryCard({
           className="px-2 py-1 rounded text-[10px] font-medium"
           style={{
             background:
-              entry.status === 'applied' ? 'rgba(34, 197, 94, 0.12)' : 'var(--bg-elevated)',
-            color: entry.status === 'applied' ? '#4ade80' : 'var(--text-secondary)',
-            border: '1px solid #4ade80',
+              entry.status === 'applied' ? 'var(--accent-green-soft)' : 'var(--bg-elevated)',
+            color: entry.status === 'applied' ? 'var(--accent-green-on)' : 'var(--text-secondary)',
+            border: '1px solid var(--accent-green-on)',
             cursor: entry.status === 'applied' ? 'default' : 'pointer',
             opacity: entry.status === 'applied' ? 0.7 : 1,
           }}
@@ -513,9 +513,9 @@ function HistoryCard({
           className="px-2 py-1 rounded text-[10px] font-medium"
           style={{
             background:
-              entry.status === 'dismissed' ? 'rgba(248, 113, 113, 0.12)' : 'var(--bg-elevated)',
-            color: entry.status === 'dismissed' ? '#f87171' : 'var(--text-secondary)',
-            border: '1px solid #f87171',
+              entry.status === 'dismissed' ? 'var(--accent-red-soft)' : 'var(--bg-elevated)',
+            color: entry.status === 'dismissed' ? 'var(--accent-red-on)' : 'var(--text-secondary)',
+            border: '1px solid var(--accent-red-on)',
             cursor: entry.status === 'dismissed' ? 'default' : 'pointer',
             opacity: entry.status === 'dismissed' ? 0.7 : 1,
           }}
@@ -634,7 +634,7 @@ function ConfirmationModal({
       role="dialog"
       aria-modal="true"
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0, 0, 0, 0.6)' }}
+      style={{ background: 'var(--overlay-scrim)' }}
       onClick={onCancel}
     >
       <div
@@ -673,9 +673,9 @@ function ConfirmationModal({
             onClick={isClearAll ? onConfirmClearAll : onConfirmDelete}
             className="px-3 py-1.5 rounded text-xs font-medium"
             style={{
-              background: 'var(--accent-red, #f87171)',
-              color: '#fff',
-              border: '1px solid var(--accent-red, #f87171)',
+              background: 'var(--accent-red)',
+              color: 'var(--text-on-negative)',
+              border: '1px solid var(--accent-red)',
               cursor: 'pointer',
             }}
           >
@@ -759,7 +759,7 @@ function OptimizationGoalModal({
       aria-labelledby="opt-goal-modal-title"
       data-testid="opt-goal-modal"
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0, 0, 0, 0.6)' }}
+      style={{ background: 'var(--overlay-scrim)' }}
       onClick={onCancel}
     >
       <div
@@ -792,7 +792,7 @@ function OptimizationGoalModal({
                 className="flex items-start gap-2 rounded p-2 cursor-pointer"
                 style={{
                   background: isSelected ? 'var(--bg-elevated)' : 'transparent',
-                  border: `1px solid ${isSelected ? 'var(--accent-blue, #3b82f6)' : 'var(--border)'}`,
+                  border: `1px solid ${isSelected ? 'var(--accent-blue)' : 'var(--border)'}`,
                 }}
               >
                 <input
@@ -803,7 +803,7 @@ function OptimizationGoalModal({
                   onChange={() => setSelected(opt.id)}
                   data-testid={`opt-goal-${opt.id}`}
                   className="mt-1"
-                  style={{ accentColor: 'var(--accent-blue, #3b82f6)' }}
+                  style={{ accentColor: 'var(--accent-blue)' }}
                 />
                 <span className="flex flex-col gap-0.5">
                   <span
@@ -871,8 +871,8 @@ function OptimizationGoalModal({
             data-testid="opt-goal-confirm"
             className="px-3 py-1.5 rounded text-xs font-medium"
             style={{
-              background: canConfirm ? 'var(--accent-blue, #3b82f6)' : 'var(--bg-elevated)',
-              color: canConfirm ? '#fff' : 'var(--text-faint)',
+              background: canConfirm ? 'var(--accent-blue)' : 'var(--bg-elevated)',
+              color: canConfirm ? 'var(--text-on-accent)' : 'var(--text-faint)',
               border: '1px solid var(--border)',
               opacity: canConfirm ? 1 : 0.5,
               cursor: canConfirm ? 'pointer' : 'not-allowed',
@@ -1154,8 +1154,8 @@ function RecommendationCard({
       data-testid={`rec-card-${rec.id}`}
       className="rounded p-3 flex flex-col gap-2"
       style={{
-        background: isActive ? 'rgba(59, 130, 246, 0.08)' : 'var(--bg-card)',
-        border: `1px solid ${isActive ? 'var(--accent-blue, #3b82f6)' : 'var(--border)'}`,
+        background: isActive ? 'var(--accent-blue-soft)' : 'var(--bg-card)',
+        border: `1px solid ${isActive ? 'var(--accent-blue)' : 'var(--border)'}`,
       }}
     >
       <div className="flex items-start justify-between gap-2">
@@ -1206,9 +1206,9 @@ function RecommendationCard({
               title="Load this recommendation into the active analysis form. It will be included in the next send."
               className="px-2 py-1 rounded text-[10px] font-medium"
               style={{
-                background: 'var(--accent-blue, #3b82f6)',
-                color: '#fff',
-                border: '1px solid var(--accent-blue, #3b82f6)',
+                background: 'var(--accent-blue)',
+                color: 'var(--text-on-accent)',
+                border: '1px solid var(--accent-blue)',
                 cursor: 'pointer',
               }}
             >
@@ -2088,15 +2088,15 @@ export function AiRecommendationsPanel({
           data-testid="active-rec-banner"
           className="rounded p-2 text-xs flex flex-col gap-1"
           style={{
-            background: 'rgba(59, 130, 246, 0.08)',
-            border: '1px solid var(--accent-blue, #3b82f6)',
+            background: 'var(--accent-blue-soft)',
+            border: '1px solid var(--accent-blue)',
             color: 'var(--text-secondary)',
           }}
         >
           <div className="flex items-center justify-between gap-2">
             <span
               className="text-[10px] font-semibold uppercase tracking-wide"
-              style={{ color: 'var(--accent-blue, #3b82f6)' }}
+              style={{ color: 'var(--accent-blue)' }}
             >
               Active recommendation
             </span>
@@ -2159,8 +2159,8 @@ export function AiRecommendationsPanel({
           role="alert"
           style={{
             background: 'var(--bg-elevated)',
-            color: 'var(--accent-red, #f87171)',
-            border: '1px solid var(--accent-red, #f87171)',
+            color: 'var(--accent-red)',
+            border: '1px solid var(--accent-red)',
           }}
         >
           <p className="font-semibold">AI analysis failed</p>
@@ -2180,8 +2180,8 @@ export function AiRecommendationsPanel({
           role="alert"
           style={{
             background: 'var(--bg-elevated)',
-            color: 'var(--accent-red, #f87171)',
-            border: '1px solid var(--accent-red, #f87171)',
+            color: 'var(--accent-red)',
+            border: '1px solid var(--accent-red)',
           }}
         >
           <p className="font-semibold">Auto-apply failed</p>
@@ -2201,9 +2201,9 @@ export function AiRecommendationsPanel({
           role="status"
           data-testid="ai-recs-apply-success"
           style={{
-            background: 'rgba(34, 197, 94, 0.12)',
-            color: '#4ade80',
-            border: '1px solid #4ade80',
+            background: 'var(--accent-green-soft)',
+            color: 'var(--accent-green-on)',
+            border: '1px solid var(--accent-green-on)',
             opacity: applySuccessVisible ? 1 : 0,
             transition: 'opacity 300ms ease-out',
           }}
@@ -2342,8 +2342,8 @@ export function AiRecommendationsPanel({
                 width: `${progressPercent}%`,
                 background:
                   phase === 'done'
-                    ? 'var(--accent-green, #10b981)'
-                    : 'var(--accent-blue, #3b82f6)',
+                    ? 'var(--accent-green)'
+                    : 'var(--accent-blue)',
                 transition: 'width 200ms ease-out',
               }}
             />
@@ -2419,8 +2419,8 @@ export function AiRecommendationsPanel({
           }
           className="px-3 py-1.5 rounded text-xs font-medium"
           style={{
-            background: canSend ? 'var(--accent-blue, #3b82f6)' : 'var(--bg-card)',
-            color: canSend ? '#fff' : 'var(--text-faint)',
+            background: canSend ? 'var(--accent-blue)' : 'var(--bg-card)',
+            color: canSend ? 'var(--text-on-accent)' : 'var(--text-faint)',
             border: '1px solid var(--border)',
             opacity: canSend ? 1 : 0.5,
             cursor: canSend ? 'pointer' : 'not-allowed',
@@ -2442,15 +2442,15 @@ export function AiRecommendationsPanel({
           className="rounded p-2 text-xs"
           style={{
             background: testResult.ok
-              ? 'rgba(34, 197, 94, 0.1)'
-              : 'rgba(239, 68, 68, 0.1)',
+              ? 'var(--accent-green-tint)'
+              : 'var(--accent-red-tint)',
             color: testResult.ok
-              ? 'var(--accent-green, #22c55e)'
-              : 'var(--accent-red, #ef4444)',
+              ? 'var(--accent-green)'
+              : 'var(--accent-red)',
             border: `1px solid ${
               testResult.ok
-                ? 'var(--accent-green, #22c55e)'
-                : 'var(--accent-red, #ef4444)'
+                ? 'var(--accent-green)'
+                : 'var(--accent-red)'
             }`,
           }}
         >
@@ -2568,7 +2568,7 @@ export function AiRecommendationsPanel({
             style={{
               background: 'var(--bg-card)',
               border: '1px solid var(--border)',
-              borderTop: '3px solid var(--accent-blue, #3b82f6)',
+              borderTop: '3px solid var(--accent-blue)',
             }}
           >
             <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
@@ -2639,13 +2639,36 @@ export function AiRecommendationsPanel({
                   style={{
                     background: 'var(--bg-elevated)',
                     border: '1px solid var(--border)',
-                    borderTop: '3px solid var(--accent-blue, #3b82f6)',
+                    borderTop: '3px solid var(--accent-blue)',
                     opacity: 0.85,
                   }}
                   data-testid="ai-recs-preview-card"
                   data-preview-rec="1"
                   aria-label="Preview of a v3 toggle-card (sample data)"
                 >
+                  <div
+                    className="flex items-center justify-between gap-2"
+                    data-testid="ai-recs-preview-header"
+                  >
+                    <p
+                      className="text-[10px] font-semibold uppercase tracking-wide"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      Request preview
+                    </p>
+                    <span
+                      className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+                      style={{
+                        background: 'var(--accent-blue-soft)',
+                        color: 'var(--accent-blue)',
+                        border: '1px solid var(--accent-blue)',
+                      }}
+                      data-testid="ai-recs-preview-outcome-pill"
+                      title="Outcome of the request preview"
+                    >
+                      Request outcome · Ready
+                    </span>
+                  </div>
                   <div className="flex items-start justify-between gap-1.5">
                     <p
                       className="font-semibold truncate flex-1"
@@ -2765,13 +2788,13 @@ export function AiRecommendationsPanel({
                   className="rounded p-2 text-left text-[11px] flex flex-col gap-1.5"
                   style={{
                     background: isApplied
-                      ? 'rgba(74, 222, 128, 0.06)'
+                      ? 'var(--accent-green-muted)'
                       : 'var(--bg-elevated)',
                     border: '1px solid var(--border)',
                     borderTop: `3px solid ${
                       isApplied
-                        ? 'var(--accent-green, #4ade80)'
-                        : 'var(--accent-blue, #3b82f6)'
+                        ? 'var(--accent-green)'
+                        : 'var(--accent-blue)'
                     }`,
                     opacity: !strategy?.id ? 0.5 : 1,
                     cursor:
@@ -2791,12 +2814,12 @@ export function AiRecommendationsPanel({
                       className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
                       style={{
                         background: isApplied
-                          ? 'var(--accent-green, #4ade80)'
+                          ? 'var(--accent-green)'
                           : 'var(--bg-card)',
-                        color: isApplied ? '#0a0a0a' : 'var(--text-faint)',
+                        color: isApplied ? 'var(--text-on-positive)' : 'var(--text-faint)',
                         border: `1px solid ${
                           isApplied
-                            ? 'var(--accent-green, #4ade80)'
+                            ? 'var(--accent-green)'
                             : 'var(--border)'
                         }`,
                       }}
@@ -2855,7 +2878,7 @@ export function AiRecommendationsPanel({
                   {errMsg && (
                     <p
                       className="text-[10px] mt-0.5"
-                      style={{ color: 'var(--accent-red, #ef4444)' }}
+                      style={{ color: 'var(--accent-red)' }}
                       data-testid="ai-recs-toggle-error"
                       role="alert"
                     >

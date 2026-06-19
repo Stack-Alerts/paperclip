@@ -175,6 +175,23 @@
   --status-danger-hover:     color-mix(in srgb, var(--core-danger) 80%, white);
   --status-danger-tint:      color-mix(in srgb, var(--core-danger) 18%, var(--core-bg-shell));
 
+  /* ── Token-driven tints (BTCAAAAA-36934 v5) ───────────────────
+     Soft alphas used by the AI Recommendations panel so every
+     status banner / badge reads against the same palette as the
+     rest of the dark theme. */
+  --text-on-accent:        #FFFFFF;
+  --text-on-positive:      #04060D;
+  --text-on-negative:      #FFFFFF;
+  --overlay-scrim:         rgba(0, 0, 0, 0.6);
+  --accent-green-soft:     rgba(34, 197, 94, 0.12);
+  --accent-green-tint:     rgba(34, 197, 94, 0.10);
+  --accent-green-muted:    rgba(74, 222, 128, 0.06);
+  --accent-green-on:       #4ADE80;
+  --accent-red-soft:       rgba(248, 113, 113, 0.12);
+  --accent-red-tint:       rgba(239, 68, 68, 0.10);
+  --accent-red-on:         #F87171;
+  --accent-blue-soft:      rgba(59, 130, 246, 0.08);
+
   /* ── Hover-highlight row palette (BlockSearchPanel signal rows) ── */
   --hover-row-bg:                #0D2940;
   --hover-row-bg-top:            #12344F;
@@ -247,6 +264,20 @@
   --status-danger:           #A63D4B;
   --status-danger-hover:     #C24B5A;
   --status-danger-tint:      #2A141A;
+
+  /* ── Token-driven tints — ocean overrides (BTCAAAAA-36934 v5) ─ */
+  --text-on-accent:        #FFFFFF;
+  --text-on-positive:      #031320;
+  --text-on-negative:      #FFFFFF;
+  --overlay-scrim:         rgba(0, 0, 0, 0.65);
+  --accent-green-soft:     color-mix(in srgb, #22C58B 18%, var(--bg-deep));
+  --accent-green-tint:     color-mix(in srgb, #22C58B 14%, var(--bg-deep));
+  --accent-green-muted:    color-mix(in srgb, #4DE3A8 8%, var(--bg-deep));
+  --accent-green-on:       #4DE3A8;
+  --accent-red-soft:       color-mix(in srgb, #A63D4B 22%, var(--bg-deep));
+  --accent-red-tint:       color-mix(in srgb, #A63D4B 18%, var(--bg-deep));
+  --accent-red-on:         #E26A78;
+  --accent-blue-soft:      color-mix(in srgb, #2A8FE8 14%, var(--bg-deep));
 
   /* ── Accent token overrides — keep ocean-themed tints ── */
   --accent-green:        #22C58B;

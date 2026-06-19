@@ -837,4 +837,19 @@ describe('AiRecommendationsPanel — empty-state preview + demo (BTCAAAAA-36917 
       expect(raw).not.toBeNull();
     });
   });
+
+  it('v5: preview card has "Request preview" header + "Request outcome" pill on the right', async () => {
+    renderEmptyPanel();
+    fireEvent.click(screen.getByTestId('ai-recs-preview-btn'));
+
+    const previewCard = await screen.findByTestId('ai-recs-preview-card');
+    const header = within(previewCard).getByTestId('ai-recs-preview-header');
+    expect(header).toBeInTheDocument();
+    expect(within(header).getByText(/Request preview/i)).toBeInTheDocument();
+
+    const pill = within(header).getByTestId('ai-recs-preview-outcome-pill');
+    expect(pill).toBeInTheDocument();
+    expect(pill).toHaveTextContent(/Request outcome/i);
+    expect(pill).toHaveTextContent(/Ready/i);
+  });
 });
