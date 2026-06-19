@@ -27,6 +27,7 @@ import { TradesPanel } from '@/components/backtest/trades/TradesPanel';
 import { MetricsPanel } from '@/components/backtest/metrics/MetricsPanel';
 import { AiRecommendationsPanel } from '@/components/backtest/ai-recommendations/AiRecommendationsPanel';
 import { ComparePanel } from '@/components/backtest/compare/ComparePanel';
+import { PresetsPanel } from '@/components/backtest/compare/PresetsPanel';
 import { BacktestProgressMeter } from '@/components/backtest/progress-meter';
 import { addRunRecord } from '@/lib/backtest-history';
 import { ConfigDiscoveryResultsDialog, type DiscoveryScenario } from './ConfigDiscoveryResultsDialog';
@@ -612,6 +613,7 @@ function ConfigTab({
   setMinBarsHeld,
   maxBarsHeld,
   setMaxBarsHeld,
+  onLoadPreset,
 }: {
   config: Omit<BacktestConfig, 'strategyId'>;
   onChange: (patch: Partial<Omit<BacktestConfig, 'strategyId'>>) => void;
@@ -662,6 +664,7 @@ function ConfigTab({
   setMinBarsHeld: (v: ChipValue) => void;
   maxBarsHeld: ChipValue;
   setMaxBarsHeld: (v: ChipValue) => void;
+  onLoadPreset: (record: import('@/lib/strategy-builder/types').BacktestRunRecord) => void;
 }) {
 
   // Auto-Custom: re-evaluate whether the current 8 Adaptive SL values still
@@ -714,6 +717,7 @@ function ConfigTab({
     // its natural height and the below-grid Status wrapper claims every
     // remaining pixel of vertical space inside the dialog body.
     <div className="h-full flex flex-col pb-2">
+      <PresetsPanel onLoadPreset={onLoadPreset} />
       {/* 3-Column Grid + below-grid Status section.
           Cycle-13b clarification 2026-06-03: the thick-client `📊 Status:`
           checklist belongs on the Config tab as a full-width text block
@@ -2257,6 +2261,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
               setMinBarsHeld={setMinBarsHeld}
               maxBarsHeld={maxBarsHeld}
               setMaxBarsHeld={setMaxBarsHeld}
+              onLoadPreset={applyRunConfig}
             />
           )}
           {activeTab === 'output' && (

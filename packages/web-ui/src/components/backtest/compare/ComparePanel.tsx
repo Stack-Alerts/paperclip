@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, X, Plus, GitCompare, ChevronUp, ChevronDown, Minus, CheckCircle2, Trophy, Download, Trash2, CheckSquare, Square, ListChecks } from 'lucide-react';
+import { Search, X, Plus, GitCompare, ChevronUp, ChevronDown, Minus, CheckCircle2, Trophy, Download, Trash2, CheckSquare, Square, ListChecks, Bookmark } from 'lucide-react';
 import { loadAllRunRecords, deleteRunRecord, deleteRunRecords, clearAllRunRecords } from '@/lib/backtest-history';
+import { PresetSaveDialog } from './PresetSaveDialog';
 import type { BacktestRunRecord, BacktestResult, BacktestConfigFull } from '@/lib/strategy-builder/types';
 
 // ── Text-size control (parity with Live Output / Trades windows) ───────────────
@@ -248,7 +249,7 @@ function RankBadge({ rank }: { rank: number }) {
 
 function RunCard({
   record, selected, onSelect, onRemove, disabled, slotColor, rank, onApply, anySelected,
-  manageMode, marked, onToggleMark, anyMarked,
+  manageMode, marked, onToggleMark, anyMarked, onSavePreset,
 }: {
   record: BacktestRunRecord;
   selected: boolean;
@@ -263,6 +264,7 @@ function RunCard({
   marked?: boolean;
   onToggleMark?: () => void;
   anyMarked?: boolean;
+  onSavePreset?: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const r = record.result;
@@ -333,6 +335,18 @@ function RunCard({
                 onMouseLeave={e => (e.currentTarget.style.background = 'rgba(46,140,255,0.08)')}
               >
                 <Download size={10} />Apply
+              </button>
+            )}
+            {!manage && onSavePreset && (
+              <button
+                onClick={e => { e.stopPropagation(); onSavePreset(); }}
+                className="p-0.5 rounded"
+                title="Save as config preset"
+                style={{ color: 'var(--text-faint)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent-blue)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}
+              >
+                <Bookmark size={12} />
               </button>
             )}
             {!manage && (
@@ -568,6 +582,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
   const [manageMode, setManageMode] = useState(false);
   const [markedIds, setMarkedIds] = useState<string[]>([]);
   const [pendingDelete, setPendingDelete] = useState<'selected' | 'all' | 'keepTop3' | null>(null);
+  const [presetSaveRecord, setPresetSaveRecord] = useState<BacktestRunRecord | null>(null);
   const [fontScaleIdx, setFontScaleIdx] = useState<FontScaleIdx>(() => {
     if (typeof window === 'undefined') return 1;
     const n = parseInt(window.localStorage.getItem(FONT_SCALE_KEY) ?? '1', 10);
@@ -885,6 +900,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
               onSelect={() => toggleSelect(record.runId)}
               onRemove={() => handleDelete(record.runId)}
               onApply={onApplyConfig ? () => onApplyConfig(record) : undefined}
+              onSavePreset={record.fullConfig ? () => setPresetSaveRecord(record) : undefined}
               anySelected={selectedIds.length > 0}
               disabled={selectedIds.length >= MAX_SELECTED && !selectedIds.includes(record.runId)}
               manageMode={manageMode}
@@ -900,6 +916,14 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
           </p>
         )}
       </div>
+
+      {presetSaveRecord && (
+        <PresetSaveDialog
+          record={presetSaveRecord}
+          onSaved={() => {}}
+          onClose={() => setPresetSaveRecord(null)}
+        />
+      )}
 
       {/* ── Prompt: select one more ── */}
       {colCount === 1 && (
