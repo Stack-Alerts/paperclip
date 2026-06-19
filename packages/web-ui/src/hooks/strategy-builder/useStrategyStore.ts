@@ -646,20 +646,18 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
 
   // Apply a validator auto-fix (TIMING_004, EXIT_009, LOGIC_003, DIRECTION_001)
   // via the backend. The endpoint creates a new strategy version with the
-  // fix applied. We don't splice the raw API response into currentStrategy
-  // — those blocks are in the {name, logic, signals} shape and the rest of
-  // the builder expects the normalized {id, type, data} Block contract; the
-  // un-normalized swap crashed StrategyInfoPanel::computeStats. Instead we
-  // re-run validateStrategy, which re-reads from the DB and reflects the
-  // fix in the validation panel directly. BTCAAAAA-32954.
-  // After fix, track the issue as fixed so the row stays visible with undo.
+  // fix applied, and returns the updated strategy. We swap currentStrategy
+  // with the response to ensure the new versionNumber and metadata are live.
+  // Then re-run validateStrategy to reflect the fix in the validation panel.
+  // Track the issue as fixed so the row stays visible with undo.
   applyAutoFix: async (ruleId, autoFixData) => {
     const { currentStrategy, validationReport } = get();
     if (!currentStrategy || !isBackendStrategyId(currentStrategy.id)) {
       return false;
     }
     try {
-      // Find the issue being fixed so we can track it as fixed
+      // Stash the matching issue BEFORE any state mutations that could clear validationReport.
+      // This ensures we have the issue data even if validation is re-run during the fix.
       const allIssues = [
         ...(validationReport?.critical_issues ?? []),
         ...(validationReport?.errors ?? []),
@@ -669,7 +667,22 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
       ];
       const matchingIssue = allIssues.find((issue) => issue.rule_id === ruleId);
 
-      await autoFixStrategyAPI(currentStrategy.id, ruleId, autoFixData);
+      // Call the API and capture the updated strategy response
+      const updatedStrategy = await autoFixStrategyAPI(currentStrategy.id, ruleId, autoFixData) as Strategy;
+
+      // Swap currentStrategy with the backend response to pick up the new versionNumber,
+      // versionId, and other metadata from the fresh version. Preserve the UI-normalized
+      // blocks from the current session so StrategyInfoPanel can render without crashing.
+      if (updatedStrategy) {
+        set((state) => ({
+          currentStrategy: {
+            ...state.currentStrategy,
+            ...updatedStrategy,
+            // Keep the normalized blocks from the current session to match the builder's expectations
+            blocks: state.currentStrategy?.blocks ?? updatedStrategy.blocks,
+          },
+        }));
+      }
 
       // Track the fixed issue before re-validation and persist to strategy
       if (matchingIssue) {
@@ -726,7 +739,10 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     if (!currentStrategy) return false;
 
     try {
-      const updated: Strategy = { ...currentStrategy };
+      const updated: Strategy = {
+        ...currentStrategy,
+        settings: { ...(currentStrategy.settings ?? {}) },
+      };
 
       if (ruleId === 'missing_timeframe' && typeof data.value === 'string') {
         updated.settings.timeframe = data.value;

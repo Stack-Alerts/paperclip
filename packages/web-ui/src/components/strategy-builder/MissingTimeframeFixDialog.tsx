@@ -14,7 +14,7 @@ export const MissingTimeframeFixDialog: React.FC<MissingTimeframeFixDialogProps>
   onConfirm,
   onCancel,
 }) => {
-  const [selectedTimeframe, setSelectedTimeframe] = useState<string>('1h');
+  const [selectedTimeframe, setSelectedTimeframe] = useState<string>('15m');
 
   const handleConfirm = useCallback(() => {
     onConfirm(selectedTimeframe);

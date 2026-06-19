@@ -1172,6 +1172,7 @@ interface ActiveRec {
   suggestedParams: Array<{ key: string; value: string }>;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function RecommendationCard({
   rec,
   isActive,
@@ -1353,37 +1354,38 @@ function SplitPanel({
   left: React.ReactNode;
   right: React.ReactNode;
 }) {
-  const [splitPercent, setSplitPercent] = useState<number>(SPLIT_DEFAULT);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const isDraggingRef = useRef(false);
-  const [hydrated, setHydrated] = useState(false);
-
-  // Load persisted split on mount.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
+  const [splitPercent, setSplitPercent] = useState<number>(() => {
+    if (typeof window === 'undefined') return SPLIT_DEFAULT;
     try {
       const stored = window.localStorage.getItem(SPLIT_STORAGE_KEY);
       if (stored) {
         const parsed = Number.parseFloat(stored);
         if (Number.isFinite(parsed) && parsed >= SPLIT_MIN && parsed <= SPLIT_MAX) {
-          setSplitPercent(parsed);
+          return parsed;
         }
       }
     } catch {
       // best effort
     }
-    setHydrated(true);
-  }, []);
+    return SPLIT_DEFAULT;
+  });
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingRef = useRef(false);
+  const splitPersistedOnce = useRef(false);
 
-  // Persist split on change.
+  // Persist split on change; skip the first render (initial value already loaded).
   useEffect(() => {
-    if (!hydrated || typeof window === 'undefined') return;
+    if (!splitPersistedOnce.current) {
+      splitPersistedOnce.current = true;
+      return;
+    }
+    if (typeof window === 'undefined') return;
     try {
       window.localStorage.setItem(SPLIT_STORAGE_KEY, String(splitPercent));
     } catch {
       // best effort
     }
-  }, [splitPercent, hydrated]);
+  }, [splitPercent]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -1498,8 +1500,11 @@ export function AiRecommendationsPanel({
     recommendations: string;
     raw: string;
   } | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [applying, setApplying] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [applyError, setApplyError] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [applyDetail, setApplyDetail] = useState<string | null>(null);
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
   const [applySuccessVisible, setApplySuccessVisible] = useState(true);
@@ -1900,6 +1905,7 @@ export function AiRecommendationsPanel({
   }, []);
 
   // AC2: per-rec Apply → loads into active form.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleApplyRec = useCallback((rec: ParsedRec) => {
     setActiveRec({
       id: rec.id,
