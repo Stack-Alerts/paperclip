@@ -89,10 +89,14 @@ DEFERRAL_SNIPPET_MAX = 400
 def _http_session() -> requests.Session:
     """Create HTTP session with retries and proper headers."""
     s = requests.Session()
-    s.headers.update({
+    headers = {
         "Authorization": f"Bearer {os.environ.get('PAPERCLIP_API_KEY', '')}",
         "Content-Type": "application/json",
-    })
+    }
+    run_id = os.environ.get("PAPERCLIP_RUN_ID", "")
+    if run_id:
+        headers["X-Paperclip-Run-Id"] = run_id
+    s.headers.update(headers)
     adapter = HTTPAdapter(max_retries=Retry(
         total=2,
         backoff_factor=0.5,
