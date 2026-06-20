@@ -110,7 +110,12 @@ export function denormalizeBlocks(blocks: Block[]): RawDBBlock[] {
   for (const block of blocks) {
     if (block.type === BlockType.INDICATOR) {
       const data = block.data ?? {};
-      const blockName = data.name as string | undefined ?? '';
+      // Prefer definitionId (snake_case library key) over data.name (title-cased
+      // display name). Without this, the save→reload cycle stores the title-cased
+      // display name ("Cup And Handle") in the DB, which breaks click-to-highlight:
+      // BlockSearchPanel matches by block.id (snake_case), so after a web-UI save
+      // the definitionId no longer matches (BTCAAAAA-37218 regression).
+      const blockName = (data.definitionId as string | undefined) ?? data.name as string | undefined ?? '';
       const signals = data.signals as Array<Record<string, unknown>> | undefined ?? [];
 
       const denormalizedSignals: RawDBSignal[] = signals.map((sig) => {

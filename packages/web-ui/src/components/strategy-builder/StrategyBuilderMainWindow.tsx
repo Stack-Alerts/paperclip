@@ -672,8 +672,16 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         // name IS the join key. Without this, clicking a signal in the canvas can't
         // expand/highlight the matching block in the library panel — the UX feature
         // the board flagged as missing (BTCAAAAA-29995 comment 2026-05-27 06:24 UTC).
+        //
+        // BTCAAAAA-37218 regression: denormalizeBlocks() stored the title-cased
+        // display name ("Cup And Handle") in the DB instead of the snake_case library
+        // key ("cup_and_handle"). After a web-UI save + reload, rawName arrives as the
+        // display name so definitionId would not match block.id in the library JSON.
+        // Normalize to snake_case to handle both fresh API payloads (already snake_case)
+        // and DB entries saved by old code (title-cased display names with spaces).
+        const definitionId = rawName.toLowerCase().replace(/\s+/g, '_');
         const dataWithId: Record<string, unknown> = rawName
-          ? { ...dataCore, name: titleCase(rawName), definitionId: rawName }
+          ? { ...dataCore, name: titleCase(rawName), definitionId }
           : dataCore;
         return {
           id: `block-${strategy.versionId ?? strategy.id}-${i}`,
