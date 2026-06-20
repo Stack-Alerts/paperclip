@@ -355,8 +355,16 @@ def create_pr(
         return None
 
 
-def merge_pr(session: requests.Session, pr_number: int) -> dict | None:
-    """Merge PR with squash."""
+_CI_PENDING = object()  # Sentinel: merge blocked by pending/queued CI checks
+
+
+def merge_pr(session: requests.Session, pr_number: int) -> dict | object | None:
+    """Merge PR with squash.
+
+    Returns:
+        dict on success, _CI_PENDING sentinel when CI checks are still queued,
+        None on hard failure.
+    """
     url = f"{GITHUB_API_BASE}/repos/{REPO_OWNER}/{REPO_NAME}/pulls/{pr_number}/merge"
     payload = {
         "merge_method": "squash",
@@ -369,6 +377,11 @@ def merge_pr(session: requests.Session, pr_number: int) -> dict | None:
         logger.info("Merged PR #%d", pr_number)
         return result
     except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 405:
+            # 405 = required status check is queued/pending; not a hard failure.
+            # The periodic sweep will retry once CI completes.
+            logger.info("PR #%d merge blocked by pending CI checks: %s", pr_number, e.response.text[:200])
+            return _CI_PENDING
         if e.response.status_code == 403:
             logger.warning("Token forbidden (403) on merge: %s", e.response.text)
             return None
@@ -545,6 +558,14 @@ def process_issue(issue: dict[str, Any]) -> dict[str, Any]:
 
     # Step 7: Merge the PR
     merge_result = merge_pr(session, pr_number)
+    if merge_result is _CI_PENDING:
+        logger.info("PR #%d CI checks still pending for %s; sweep will retry", pr_number, issue_identifier)
+        return {
+            "issue": issue_identifier,
+            "action": "skip",
+            "reason": "ci_pending",
+            "pr_number": pr_number,
+        }
     if not merge_result:
         escalate_failure(issue_id, issue_identifier, sha, f"Failed to merge PR #{pr_number}")
         return {
