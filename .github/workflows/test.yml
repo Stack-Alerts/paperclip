@@ -18,6 +18,7 @@ jobs:
   test:
     name: pytest + coverage gate
     runs-on: self-hosted
+    timeout-minutes: 60
 
     # PostgreSQL service for ITM state store real-database tests (BTCAAAAA-450)
     services:
@@ -93,6 +94,7 @@ jobs:
             --cov-config=.coveragerc \
             --cov-report=term-missing \
             --cov-fail-under=20 \
+            --timeout=300 \
             -v 2>&1 | tee /tmp/test-output.txt
 
       - name: Alert on nightly test failure
