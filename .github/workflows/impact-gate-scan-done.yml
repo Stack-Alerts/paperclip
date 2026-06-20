@@ -1,9 +1,12 @@
-name: Impact Gate Scan Done
+# DEPRECATED: Replaced by Paperclip routine "Impact Gate: Scan Done Fix Issues (5-min polling daemon)"
+# (routine ID: 29a90087-7c96-4a8b-b02b-4b7113996296). GitHub Actions cloud runners cannot reach
+# localhost:3100, so the schedule trigger has been removed. workflow_dispatch remains for
+# emergency manual runs from a self-hosted runner with proper secret access.
+# See: BTCAAAAA-27620
+name: Impact Gate Scan Done [DEPRECATED]
 
 on:
-  schedule:
-    # Every 5 minutes — retroactively gate recently-done fix/bug issues
-    - cron: '*/5 * * * *'
+  # Schedule removed — handled by Paperclip routine 29a90087 (*/5 * * * * UTC)
   workflow_dispatch:
     inputs:
       full_scan:
