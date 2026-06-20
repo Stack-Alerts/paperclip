@@ -27,7 +27,7 @@ jobs:
     outputs:
       relevant: ${{ steps.filter.outputs.relevant }}
     steps:
-      - uses: actions/checkout@v4.2.0
+      - uses: actions/checkout@v4.3.1
         with:
           fetch-depth: 0
 
@@ -70,7 +70,7 @@ jobs:
     if: needs.changes.outputs.relevant == 'true'
 
     steps:
-      - uses: actions/checkout@v4.2.0
+      - uses: actions/checkout@v4.3.1
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -95,7 +95,7 @@ jobs:
     if: needs.changes.outputs.relevant == 'true'
 
     steps:
-      - uses: actions/checkout@v4.2.0
+      - uses: actions/checkout@v4.3.1
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -165,7 +165,7 @@ jobs:
 
       - name: Upload walkforward artifacts
         if: always()
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: walkforward-reports
           path: |
@@ -175,7 +175,7 @@ jobs:
 
       - name: Upload walkforward registry
         if: always()
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: walkforward-registry
           path: walkforward_results_registry.json

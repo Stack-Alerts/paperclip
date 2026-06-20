@@ -29,7 +29,7 @@ jobs:
       PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
 
     steps:
-      - uses: actions/checkout@v4.2.0
+      - uses: actions/checkout@v4.3.1
         with:
           fetch-depth: 0
           clean: false
@@ -67,7 +67,7 @@ jobs:
 
       - name: Upload closure-gate output artifact
         if: always()
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: closure-gate-output
           path: /tmp/closure-gate-output.json
