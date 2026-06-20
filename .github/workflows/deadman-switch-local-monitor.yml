@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+
+concurrency:
+  group: deadman-switch-local-monitor
+  cancel-in-progress: false
 jobs:
   local-monitor:
     name: Watch dead-man's-switch liveness via local state file

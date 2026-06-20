@@ -18,6 +18,10 @@ on:
         required: false
         default: ''
 
+
+concurrency:
+  group: backfill-close-stale-runs
+  cancel-in-progress: false
 jobs:
   close-stale:
     name: Close stale in_progress runs and issues

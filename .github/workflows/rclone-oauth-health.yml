@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+
+concurrency:
+  group: rclone-oauth-health
+  cancel-in-progress: false
 jobs:
   oauth-health:
     name: Monitor rclone GDrive OAuth token health

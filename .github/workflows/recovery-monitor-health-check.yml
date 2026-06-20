@@ -18,6 +18,10 @@ permissions:
   contents: read
   actions: write
 
+
+concurrency:
+  group: recovery-monitor-health-check
+  cancel-in-progress: false
 jobs:
   health-check:
     name: Watch paperclip-recovery-monitor liveness

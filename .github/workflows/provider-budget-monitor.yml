@@ -14,6 +14,10 @@ on:
         required: false
         default: "false"
 
+
+concurrency:
+  group: provider-budget-monitor
+  cancel-in-progress: false
 jobs:
   budget-monitor:
     name: Provider budget threshold check

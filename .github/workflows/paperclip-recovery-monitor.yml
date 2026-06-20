@@ -21,6 +21,10 @@ on:
 permissions:
   contents: read
 
+
+concurrency:
+  group: paperclip-recovery-monitor
+  cancel-in-progress: false
 jobs:
   recovery-monitor:
     name: Monitor and recover stalled workflows

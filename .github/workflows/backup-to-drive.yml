@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+
+concurrency:
+  group: backup-to-drive
+  cancel-in-progress: false
 jobs:
   backup:
     name: Offsite backup → Google Drive

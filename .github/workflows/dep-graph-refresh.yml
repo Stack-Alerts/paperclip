@@ -7,6 +7,10 @@ on:
   workflow_dispatch:
     # Allow manual trigger for testing
 
+
+concurrency:
+  group: dep-graph-refresh
+  cancel-in-progress: false
 jobs:
   refresh:
     name: Regenerate dep_graph.json

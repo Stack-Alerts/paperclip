@@ -18,6 +18,10 @@ permissions:
   contents: read
   actions: write
 
+
+concurrency:
+  group: deadman-switch-monitor
+  cancel-in-progress: false
 jobs:
   monitor:
     name: Watch backup dead-man's-switch liveness

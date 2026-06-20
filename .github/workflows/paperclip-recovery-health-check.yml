@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+
+concurrency:
+  group: paperclip-recovery-health-check
+  cancel-in-progress: false
 jobs:
   health-check:
     name: Verify recovery monitor health
