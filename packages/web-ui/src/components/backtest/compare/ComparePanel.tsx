@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, X, Plus, GitCompare, ChevronUp, ChevronDown, Minus, CheckCircle2, Trophy, Download, Trash2, CheckSquare, Square, ListChecks, Bookmark } from 'lucide-react';
-import { loadAllRunRecords, deleteRunRecord, deleteRunRecords, clearAllRunRecords } from '@/lib/backtest-history';
+import { Search, X, Plus, GitCompare, ChevronUp, ChevronDown, Minus, CheckCircle2, Trophy, Download, Trash2, CheckSquare, Square, ListChecks, Bookmark, Archive, ArchiveRestore, Eye, EyeOff } from 'lucide-react';
+import { loadAllRunRecords, deleteRunRecord, deleteRunRecords, clearAllRunRecords, archiveRunRecord, archiveRunRecords, unarchiveRunRecord } from '@/lib/backtest-history';
 import { PresetSaveDialog } from './PresetSaveDialog';
 import type { BacktestRunRecord, BacktestResult, BacktestConfigFull } from '@/lib/strategy-builder/types';
 
@@ -249,7 +249,7 @@ function RankBadge({ rank }: { rank: number }) {
 
 function RunCard({
   record, selected, onSelect, onRemove, disabled, slotColor, rank, onApply, anySelected,
-  manageMode, marked, onToggleMark, anyMarked, onSavePreset,
+  manageMode, marked, onToggleMark, anyMarked, onSavePreset, onArchive, onUnarchive,
 }: {
   record: BacktestRunRecord;
   selected: boolean;
@@ -265,12 +265,15 @@ function RunCard({
   onToggleMark?: () => void;
   anyMarked?: boolean;
   onSavePreset?: () => void;
+  onArchive?: () => void;
+  onUnarchive?: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const r = record.result;
   const equityVals = (r.equityCurve ?? []).map((p: { value: number }) => p.value);
   const profit = r.finalCapital - r.initialCapital;
   const accentColor = slotColor ?? (profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)');
+  const isArchived = !!record.archived;
 
   // In manage mode the card is a delete-selection target; the left bar and
   // dimming track the marked set instead of the compare selection.
@@ -282,7 +285,8 @@ function RunCard({
   // the active set stands out among potentially dozens of cards; hovering
   // re-illuminates the card under the cursor so it stays readable.
   const dimmed = manage ? (!!anyMarked && !marked) : (!!anySelected && !selected);
-  const opacity = dimmed && !hovered ? 0.4 : 1;
+  const baseOpacity = isArchived ? 0.65 : 1;
+  const opacity = dimmed && !hovered ? baseOpacity * 0.4 : baseOpacity;
   const inert = !manage && disabled && !selected;
 
   return (
@@ -292,7 +296,7 @@ function RunCard({
       onMouseLeave={() => setHovered(false)}
       style={{
         position: 'relative',
-        background: 'var(--bg-card)',
+        background: isArchived ? 'color-mix(in srgb, var(--bg-card) 70%, var(--bg-deep))' : 'var(--bg-card)',
         border: marked ? '1px solid var(--accent-red)' : '1px solid var(--border)',
         borderRadius: 6,
         padding: '10px 12px',
@@ -317,6 +321,11 @@ function RunCard({
                   ? <CheckSquare size={14} style={{ color: 'var(--accent-red)', flexShrink: 0 }} />
                   : <Square size={14} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
               )}
+              {isArchived && (
+                <span title="Archived — hidden from default view">
+                  <Archive size={12} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
+                </span>
+              )}
               {rank != null && <RankBadge rank={rank} />}
               <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
                 {fmtDateTime(record.savedAt)}
@@ -337,6 +346,30 @@ function RunCard({
                 <Download size={10} />Apply
               </button>
             )}
+            {!manage && isArchived && onUnarchive && (
+              <button
+                onClick={e => { e.stopPropagation(); onUnarchive(); }}
+                className="p-0.5 rounded"
+                title="Unarchive — restore to active view"
+                style={{ color: 'var(--text-faint)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent-blue)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}
+              >
+                <ArchiveRestore size={12} />
+              </button>
+            )}
+            {!manage && !isArchived && onArchive && (
+              <button
+                onClick={e => { e.stopPropagation(); onArchive(); }}
+                className="p-0.5 rounded"
+                title="Archive — hide from default view (not deleted)"
+                style={{ color: 'var(--text-faint)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}
+              >
+                <Archive size={12} />
+              </button>
+            )}
             {!manage && onSavePreset && (
               <button
                 onClick={e => { e.stopPropagation(); onSavePreset(); }}
@@ -353,7 +386,7 @@ function RunCard({
               <button
                 onClick={e => { e.stopPropagation(); onRemove(); }}
                 className="p-0.5 rounded"
-                title="Remove from history"
+                title="Delete permanently"
                 style={{ color: 'var(--text-faint)' }}
                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent-red)')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}
@@ -583,6 +616,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
   const [markedIds, setMarkedIds] = useState<string[]>([]);
   const [pendingDelete, setPendingDelete] = useState<'selected' | 'all' | 'keepTop3' | null>(null);
   const [presetSaveRecord, setPresetSaveRecord] = useState<BacktestRunRecord | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [fontScaleIdx, setFontScaleIdx] = useState<FontScaleIdx>(() => {
     if (typeof window === 'undefined') return 1;
     const n = parseInt(window.localStorage.getItem(FONT_SCALE_KEY) ?? '1', 10);
@@ -594,22 +628,28 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
     try { window.localStorage.setItem(FONT_SCALE_KEY, String(fontScaleIdx)); } catch { /* quota/private-mode */ }
   }, [fontScaleIdx]);
 
-  const reload = useCallback(() => setRecords(loadAllRunRecords()), []);
+  // Always load all records (including archived) so we can manage them client-side.
+  const reload = useCallback(() => setRecords(loadAllRunRecords({ includeArchived: true })), []);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- reloads persisted run records from localStorage when the current result changes
   useEffect(() => { reload(); }, [reload, currentResult]);
 
-  const rankings = useMemo(() => computeRankings(records), [records]);
+  const activeRecords = useMemo(() => records.filter(r => !r.archived), [records]);
+  const archivedRecords = useMemo(() => records.filter(r => r.archived), [records]);
+  const visibleRecords = useMemo(() => showArchived ? records : activeRecords, [records, activeRecords, showArchived]);
+
+  // Rankings computed over active (non-archived) records only.
+  const rankings = useMemo(() => computeRankings(activeRecords), [activeRecords]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const base = q
-      ? records.filter(r =>
+      ? visibleRecords.filter(r =>
           r.strategyName.toLowerCase().includes(q) ||
           fmtDate(r.savedAt).toLowerCase().includes(q)
         )
-      : records;
+      : visibleRecords;
     return sortRecords(base, sortKey, sortDir, rankings);
-  }, [records, search, sortKey, sortDir, rankings]);
+  }, [visibleRecords, search, sortKey, sortDir, rankings]);
 
   const selectedRecords = useMemo(
     () => selectedIds.map(id => records.find(r => r.runId === id)).filter(Boolean) as BacktestRunRecord[],
@@ -633,6 +673,23 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
     setSelectedIds(prev => prev.filter(id => id !== runId));
     reload();
   }, [reload]);
+
+  const handleArchive = useCallback((runId: string) => {
+    archiveRunRecord(runId);
+    setSelectedIds(prev => prev.filter(id => id !== runId));
+    reload();
+  }, [reload]);
+
+  const handleUnarchive = useCallback((runId: string) => {
+    unarchiveRunRecord(runId);
+    reload();
+  }, [reload]);
+
+  const handleBulkArchive = useCallback(() => {
+    archiveRunRecords(markedIds);
+    setMarkedIds([]);
+    reload();
+  }, [markedIds, reload]);
 
   const toggleMark = useCallback((runId: string) => {
     setMarkedIds(prev => prev.includes(runId) ? prev.filter(id => id !== runId) : [...prev, runId]);
@@ -658,15 +715,15 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
       setMarkedIds([]);
       setPendingDelete(null);
     } else if (pendingDelete === 'keepTop3') {
-      const keep = new Set(records.filter(r => (rankings.get(r.runId)?.rank ?? Infinity) <= 3).map(r => r.runId));
-      const drop = records.filter(r => !keep.has(r.runId)).map(r => r.runId);
+      const keep = new Set(activeRecords.filter(r => (rankings.get(r.runId)?.rank ?? Infinity) <= 3).map(r => r.runId));
+      const drop = activeRecords.filter(r => !keep.has(r.runId)).map(r => r.runId);
       deleteRunRecords(drop);
       setSelectedIds(prev => prev.filter(id => keep.has(id)));
       setMarkedIds([]);
       setPendingDelete(null);
     }
     reload();
-  }, [pendingDelete, markedIds, records, rankings, reload]);
+  }, [pendingDelete, markedIds, activeRecords, rankings, reload]);
 
   const handleSortClick = useCallback((key: SortKey) => {
     setSortKey(prev => {
@@ -685,6 +742,26 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
         <p className="text-xs text-center max-w-xs" style={{ color: 'var(--text-faint)' }}>
           Complete a backtest to populate the history. Up to {MAX_SELECTED} runs can be compared side-by-side.
         </p>
+      </div>
+    );
+  }
+
+  // All-archived state: active list empty but archived runs exist.
+  if (activeRecords.length === 0 && archivedRecords.length > 0 && !showArchived) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-3">
+        <Archive size={32} strokeWidth={1.5} style={{ color: 'var(--text-faint)' }} />
+        <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>All runs are archived.</p>
+        <p className="text-xs text-center max-w-xs" style={{ color: 'var(--text-faint)' }}>
+          Archived runs are hidden by default and excluded from rankings.
+        </p>
+        <button
+          onClick={() => setShowArchived(true)}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded"
+          style={{ color: 'var(--accent-blue)', border: '1px solid rgba(46,140,255,0.35)', background: 'rgba(46,140,255,0.08)' }}
+        >
+          <Eye size={13} />Show archived ({archivedRecords.length})
+        </button>
       </div>
     );
   }
@@ -730,6 +807,22 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
           <SortBtn k="profit" label="Profit" sortKey={sortKey} sortDir={sortDir} onSort={handleSortClick} />
           <SortBtn k="drawdown" label="DD" sortKey={sortKey} sortDir={sortDir} onSort={handleSortClick} />
         </div>
+        {/* Archived runs toggle — only shown when archived runs exist */}
+        {archivedRecords.length > 0 && (
+          <button
+            onClick={() => setShowArchived(s => !s)}
+            className="flex items-center gap-1 text-xs px-2 py-1 rounded flex-shrink-0"
+            title={showArchived ? 'Hide archived runs' : `Show archived runs (${archivedRecords.length})`}
+            style={{
+              background: showArchived ? 'rgba(156,163,175,0.12)' : 'transparent',
+              border: `1px solid ${showArchived ? 'rgba(156,163,175,0.4)' : 'var(--border)'}`,
+              color: showArchived ? 'var(--text-secondary)' : 'var(--text-muted)',
+            }}
+          >
+            {showArchived ? <EyeOff size={12} /> : <Eye size={12} />}
+            Archived ({archivedRecords.length})
+          </button>
+        )}
         {/* Aa−/Aa+ text size — parity with Live Output / Trades windows */}
         <div
           role="group"
@@ -761,7 +854,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
         <button
           onClick={() => (manageMode ? exitManageMode() : setManageMode(true))}
           className="flex items-center gap-1 text-xs px-2 py-1 rounded flex-shrink-0"
-          title={manageMode ? 'Exit selection mode' : 'Select multiple runs to delete'}
+          title={manageMode ? 'Exit selection mode' : 'Select multiple runs to delete or archive'}
           style={{
             background: manageMode ? 'rgba(239,68,68,0.1)' : 'transparent',
             border: `1px solid ${manageMode ? 'rgba(239,68,68,0.4)' : 'var(--border)'}`,
@@ -772,6 +865,16 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
           {manageMode ? 'Done' : 'Manage'}
         </button>
       </div>
+
+      {/* ── Archived notice banner ── */}
+      {showArchived && archivedRecords.length > 0 && (
+        <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded" style={{ background: 'rgba(156,163,175,0.07)', border: '1px solid rgba(156,163,175,0.18)' }}>
+          <Archive size={12} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
+          <span className="text-xs" style={{ color: 'var(--text-faint)' }}>
+            Showing {archivedRecords.length} archived run{archivedRecords.length === 1 ? '' : 's'}. Archived runs are excluded from rankings.
+          </span>
+        </div>
+      )}
 
       {/* ── Selection / manage status ── */}
       {!manageMode ? (
@@ -814,6 +917,19 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
             {allFilteredMarked ? 'Deselect all' : `Select all${search ? ' shown' : ''}`}
           </button>
           <button
+            onClick={handleBulkArchive}
+            disabled={markedIds.length === 0}
+            className="flex items-center gap-1 text-xs px-2 py-0.5 rounded"
+            style={{
+              color: markedIds.length === 0 ? 'var(--text-faint)' : 'var(--text-secondary)',
+              border: `1px solid ${markedIds.length === 0 ? 'var(--border)' : 'rgba(156,163,175,0.4)'}`,
+              background: markedIds.length === 0 ? 'transparent' : 'rgba(156,163,175,0.08)',
+              cursor: markedIds.length === 0 ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <Archive size={11} />Archive selected{markedIds.length > 0 ? ` (${markedIds.length})` : ''}
+          </button>
+          <button
             onClick={() => setPendingDelete('selected')}
             disabled={markedIds.length === 0}
             className="flex items-center gap-1 text-xs px-2 py-0.5 rounded"
@@ -829,14 +945,14 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
           <span className="flex-1" />
           <button
             onClick={() => setPendingDelete('keepTop3')}
-            disabled={records.length <= 3}
+            disabled={activeRecords.length <= 3}
             className="flex items-center gap-1 text-xs px-2 py-0.5 rounded"
-            title="Delete every run except the top 3 by rank"
+            title="Delete every active run except the top 3 by rank"
             style={{
-              color: records.length <= 3 ? 'var(--text-faint)' : 'var(--accent-blue)',
-              border: `1px solid ${records.length <= 3 ? 'var(--border)' : 'rgba(46,140,255,0.4)'}`,
-              background: records.length <= 3 ? 'transparent' : 'rgba(46,140,255,0.08)',
-              cursor: records.length <= 3 ? 'not-allowed' : 'pointer',
+              color: activeRecords.length <= 3 ? 'var(--text-faint)' : 'var(--accent-blue)',
+              border: `1px solid ${activeRecords.length <= 3 ? 'var(--border)' : 'rgba(46,140,255,0.4)'}`,
+              background: activeRecords.length <= 3 ? 'transparent' : 'rgba(46,140,255,0.08)',
+              cursor: activeRecords.length <= 3 ? 'not-allowed' : 'pointer',
             }}
           >
             <Trophy size={11} />Keep top 3 only
@@ -865,7 +981,7 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
             {pendingDelete === 'all'
               ? `Permanently delete all ${records.length} saved run${records.length === 1 ? '' : 's'}? This cannot be undone.`
               : pendingDelete === 'keepTop3'
-              ? `Keep only the top 3 ranked runs and permanently delete the other ${records.length - 3}? This cannot be undone.`
+              ? `Keep only the top 3 ranked active runs and permanently delete the other ${activeRecords.length - 3}? This cannot be undone.`
               : `Permanently delete ${markedIds.length} selected run${markedIds.length === 1 ? '' : 's'}? This cannot be undone.`}
           </span>
           <span className="flex-1" />
@@ -896,9 +1012,11 @@ export function ComparePanel({ currentResult, onApplyConfig }: ComparePanelProps
               record={record}
               selected={slotIdx >= 0}
               slotColor={slotIdx >= 0 ? RUN_COLORS[slotIdx] as string : undefined}
-              rank={rankings.get(record.runId)?.rank}
+              rank={record.archived ? undefined : rankings.get(record.runId)?.rank}
               onSelect={() => toggleSelect(record.runId)}
               onRemove={() => handleDelete(record.runId)}
+              onArchive={() => handleArchive(record.runId)}
+              onUnarchive={() => handleUnarchive(record.runId)}
               onApply={onApplyConfig ? () => onApplyConfig(record) : undefined}
               onSavePreset={record.fullConfig ? () => setPresetSaveRecord(record) : undefined}
               anySelected={selectedIds.length > 0}

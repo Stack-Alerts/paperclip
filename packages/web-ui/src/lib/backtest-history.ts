@@ -3,7 +3,8 @@
 import type { BacktestRunRecord } from '@/lib/strategy-builder/types';
 
 const HISTORY_KEY = 'btcte:backtest_run_history';
-const MAX_RUNS_PER_STRATEGY = 20;
+// Raised from 20 to 50 to accommodate config-discovery runs (25+ per strategy)
+const MAX_RUNS_PER_STRATEGY = 50;
 
 function load(): BacktestRunRecord[] {
   if (typeof window === 'undefined') return [];
@@ -35,13 +36,15 @@ export function addRunRecord(record: BacktestRunRecord): void {
   save([...capped, ...others]);
 }
 
-export function loadAllRunRecords(): BacktestRunRecord[] {
-  return load().sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
+export function loadAllRunRecords(opts?: { includeArchived?: boolean }): BacktestRunRecord[] {
+  const all = load().sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
+  if (opts?.includeArchived) return all;
+  return all.filter(r => !r.archived);
 }
 
 export function loadRunRecordsForStrategy(strategyId: string): BacktestRunRecord[] {
   return load()
-    .filter(r => r.strategyId === strategyId)
+    .filter(r => r.strategyId === strategyId && !r.archived)
     .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
 }
 
@@ -56,4 +59,17 @@ export function deleteRunRecords(runIds: string[]): void {
 
 export function clearAllRunRecords(): void {
   save([]);
+}
+
+export function archiveRunRecord(runId: string): void {
+  save(load().map(r => r.runId === runId ? { ...r, archived: true } : r));
+}
+
+export function unarchiveRunRecord(runId: string): void {
+  save(load().map(r => r.runId === runId ? { ...r, archived: false } : r));
+}
+
+export function archiveRunRecords(runIds: string[]): void {
+  const ids = new Set(runIds);
+  save(load().map(r => ids.has(r.runId) ? { ...r, archived: true } : r));
 }

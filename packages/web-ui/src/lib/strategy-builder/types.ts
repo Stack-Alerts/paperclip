@@ -316,6 +316,7 @@ export interface BacktestRunRecord {
   config: Omit<BacktestConfig, 'strategyId'>;
   fullConfig: BacktestConfigFull;
   result: BacktestResult;
+  archived?: boolean;
 }
 
 // Backtest execution result
