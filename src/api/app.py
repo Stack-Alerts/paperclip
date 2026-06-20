@@ -1535,6 +1535,257 @@ async def sb_revert_strategy(
     return result
 
 
+# ---------------------------------------------------------------------------
+# AI Recommendation Auto-Apply (BTCAAAAA-36347)
+# ---------------------------------------------------------------------------
+
+class _AutoApplyRecItem(BaseModel):
+    rec_id: str
+    type: str
+    raw: Optional[str] = None
+
+
+class _AutoApplyRequestBody(BaseModel):
+    recs: list[_AutoApplyRecItem] = []
+    opt_in_destructive_ids: Optional[list[str]] = None
+
+
+@app.post(
+    "/strategy-builder/strategies/{strategy_id}/auto-apply",
+    tags=["Strategy Builder"],
+    summary="Apply AI recommendations to a strategy (BTCAAAAA-36347)",
+)
+async def sb_auto_apply_strategy(
+    strategy_id: str,
+    body: _AutoApplyRequestBody,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Run the AutoApplyOrchestrator against the latest strategy version.
+
+    Classifies each rec (SAFE / DESTRUCTIVE / UNSUPPORTED), applies SAFE recs
+    (and opted-in DESTRUCTIVE ones), verifies the result, rolls back the batch
+    on any verification failure, and persists a new strategy version if any rec
+    was applied.  Returns the (possibly updated) strategy plus dry_run and apply
+    summaries so the web panel can update its state.  BTCAAAAA-36347.
+    """
+    db = _get_sb_db()
+    if db is None:
+        raise _sb_db_unavailable()
+
+    recs_dicts = [r.model_dump() for r in body.recs]
+    opt_in = body.opt_in_destructive_ids
+
+    def _run() -> dict:
+        import copy as _copy
+        from src.strategy_builder.persistence.strategy_persistence import StrategyPersistence
+        from src.optimizer_v3.ui.ai_recs_auto_apply import AutoApplyOrchestrator
+
+        with db.scoped_managers() as scoped:
+            latest = scoped.strategy.get_latest_version(strategy_id)
+            if latest is None:
+                return {"_not_found": True}
+
+        version_payload = {
+            "name": latest.get("name", ""),
+            "description": latest.get("description") or "",
+            "strategy_type": latest.get("strategy_type") or "Bullish",
+            "blocks": _copy.deepcopy(latest.get("blocks") or []),
+            "exit_conditions": _copy.deepcopy(latest.get("exit_conditions") or []),
+        }
+        sp = StrategyPersistence()
+        strategy_config = sp._dict_to_config(version_payload)
+
+        orch = AutoApplyOrchestrator(applied_by="web_ai_auto_apply")
+        dry_result = orch.dry_run(recs_dicts, opt_in)
+        apply_result = orch.run_apply_all(recs_dicts, strategy_config, opt_in)
+
+        dry_payload = dry_result.to_payload()
+        apply_payload = apply_result.to_payload()
+
+        if apply_result.applied and not apply_result.rolled_back:
+            mutated = sp._config_to_dict(strategy_config)
+            version_data: dict = {
+                k: v for k, v in latest.items()
+                if k not in {
+                    "version_id", "version_number", "timestamp",
+                    "created_at", "config_hash", "validation_timestamp",
+                }
+            }
+            version_data["strategy_id"] = strategy_id
+            version_data["blocks"] = mutated.get("blocks", [])
+            version_data["exit_conditions"] = mutated.get("exit_conditions", [])
+            version_data["strategy_type"] = mutated.get(
+                "strategy_type", latest.get("strategy_type", "Bullish")
+            )
+            with db.scoped_managers() as scoped:
+                new_vid = scoped.strategy.create_strategy_version(version_data)
+                new_version = scoped.strategy.get_strategy_version(new_vid)
+                try:
+                    tests = scoped.test_results.get_version_test_results(str(new_vid))
+                except Exception:
+                    tests = []
+            strategy_out = _build_sb_strategy(strategy_id, new_version, tests)
+        else:
+            with db.scoped_managers() as scoped:
+                latest_reload = scoped.strategy.get_latest_version(strategy_id)
+                try:
+                    tests = scoped.test_results.get_version_test_results(
+                        str(latest_reload.get("version_id", ""))
+                    )
+                except Exception:
+                    tests = []
+            strategy_out = _build_sb_strategy(strategy_id, latest_reload, tests)
+
+        return {
+            "strategy": strategy_out,
+            "dry_run": dry_payload,
+            "apply": apply_payload,
+        }
+
+    try:
+        result = await asyncio.to_thread(_run)
+    except Exception as exc:
+        logger.exception("auto-apply failed for strategy %s", strategy_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Auto-apply failed: {exc}",
+        ) from exc
+
+    if result.get("_not_found"):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy '{strategy_id}' not found",
+        )
+    return result
+
+
+# ---------------------------------------------------------------------------
+# AI Settings — server-side provider/model/key persistence (BTCAAAAA-36347)
+# ---------------------------------------------------------------------------
+
+# Maps web-ui provider IDs to the keyring key names that settings_service.py
+# already owns (SECRET_KEYS). Non-listed providers (claude-code, ollama) need
+# no API key.
+_AI_PROVIDER_KEYRING_KEY: dict[str, str] = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
+}
+
+# Non-secret per-provider model env vars already in USER_KEYS.
+_AI_PROVIDER_MODEL_ENV: dict[str, str] = {
+    "anthropic": "ANTHROPIC_MODEL",
+    "openai": "OPENAI_MODEL",
+    "deepseek": "DEEPSEEK_MODEL",
+    "ollama": "OLLAMA_MODEL",
+}
+
+_AI_VALID_PROVIDERS = frozenset(
+    ["claude-code", "anthropic", "openai", "openrouter", "deepseek", "ollama"]
+)
+
+
+class _AiSettingsBody(BaseModel):
+    provider: str
+    model: str
+    apiKey: Optional[str] = None
+    ollamaBaseUrl: Optional[str] = None
+
+
+@app.get("/ai/settings", tags=["AI Settings"])
+async def get_ai_settings(_: dict = Depends(require_jwt)) -> dict:
+    """Return the server-side AI recommendation settings.
+
+    The raw API key is never exposed — only `hasApiKey` (bool) and a masked
+    preview.  BTCAAAAA-36347.
+    """
+    def _read() -> dict:
+        from src.strategy_builder.ui.settings_service import SettingsService
+        svc = SettingsService()
+
+        provider = svc.get_with_default("AI_PROVIDER", "claude-code")
+        model_env = _AI_PROVIDER_MODEL_ENV.get(provider, "ANTHROPIC_MODEL")
+        model = svc.get_with_default(model_env, "claude-sonnet-4-6")
+        ollama_url = svc.get_with_default("OLLAMA_BASE_URL", "http://localhost:11434")
+
+        keyring_key = _AI_PROVIDER_KEYRING_KEY.get(provider)
+        has_key = False
+        masked_key = None
+        if keyring_key:
+            raw = svc.get(keyring_key)
+            has_key = bool(raw)
+            masked_key = svc.get_masked(keyring_key) if has_key else None
+
+        return {
+            "provider": provider,
+            "model": model,
+            "ollamaBaseUrl": ollama_url,
+            "hasApiKey": has_key,
+            "maskedApiKey": masked_key,
+        }
+
+    try:
+        return await asyncio.to_thread(_read)
+    except Exception as exc:
+        logger.exception("get_ai_settings failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post("/ai/settings", tags=["AI Settings"])
+async def save_ai_settings(
+    body: _AiSettingsBody,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Persist AI recommendation provider/model/key server-side.
+
+    Saves provider + model to .env (non-secret) and the API key to the OS
+    keyring (secret), using the same storage layout as the desktop client's
+    settings_service.py.  BTCAAAAA-36347.
+    """
+    if body.provider not in _AI_VALID_PROVIDERS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown provider: {body.provider!r}",
+        )
+
+    def _write() -> dict:
+        from src.strategy_builder.ui.settings_service import SettingsService
+        svc = SettingsService()
+
+        svc.set("AI_PROVIDER", body.provider)
+
+        model_env = _AI_PROVIDER_MODEL_ENV.get(body.provider)
+        if model_env:
+            svc.set(model_env, body.model)
+        else:
+            svc.set("AI_MODEL", body.model)
+
+        if body.ollamaBaseUrl is not None:
+            svc.set("OLLAMA_BASE_URL", body.ollamaBaseUrl)
+
+        if body.apiKey:
+            keyring_key = _AI_PROVIDER_KEYRING_KEY.get(body.provider)
+            if keyring_key:
+                svc.set(keyring_key, body.apiKey)
+
+        keyring_key = _AI_PROVIDER_KEYRING_KEY.get(body.provider)
+        has_key = bool(svc.get(keyring_key)) if keyring_key else False
+
+        return {
+            "ok": True,
+            "provider": body.provider,
+            "model": body.model,
+            "hasApiKey": has_key,
+        }
+
+    try:
+        return await asyncio.to_thread(_write)
+    except Exception as exc:
+        logger.exception("save_ai_settings failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @app.put(
     "/strategy-builder/strategies/{strategy_id}",
     tags=["Strategy Builder"],
