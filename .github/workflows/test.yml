@@ -55,7 +55,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install \
-            pytest pytest-cov pytest-qt pytest-mock pytest-postgresql \
+            pytest pytest-cov pytest-qt pytest-mock pytest-postgresql pytest-timeout \
             PyQt5 PyQt5-Qt5 PyQt5-sip \
             SQLAlchemy alembic psycopg2-binary \
             numpy pandas pyarrow \

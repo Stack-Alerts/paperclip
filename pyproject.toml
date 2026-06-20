@@ -82,6 +82,10 @@ minversion = "7.0"
 # (pytest --cov=src --cov-fail-under=20) so isolated subset runs
 # (e.g. tests/ui_qt only) don't fail due to low aggregate coverage.
 addopts = "-ra -q --cov=src --cov-config=.coveragerc --cov-report=term-missing"
+# Hard cap per-test at 5 min. Prevents TrainingThread (QThread) hang from
+# blocking the runner indefinitely when pytest completes but threads don't exit.
+# Recurrence: BTCAAAAA-37129, BTCAAAAA-37146, BTCAAAAA-37150.
+timeout = 300
 testpaths = ["tests"]
 # Ensure src/ is always on sys.path so all test modules can import from src/
 # regardless of conftest.py load order (fixes namespace-package import ordering).
