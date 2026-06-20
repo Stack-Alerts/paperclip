@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Trash2, GripVertical, X } from 'lucide-react';
 import { BacktestResult, Strategy, Trade } from '@/lib/strategy-builder/types';
-import { useAiSettings } from '@/hooks/useAiSettings';
+import { useAiSettings, getProviderMeta } from '@/hooks/useAiSettings';
 import { useAiRecsHistory, AiRecsHistoryEntry, AiRecsHistoryStatus } from '@/hooks/useAiRecsHistory';
 
 type SendPhase =
@@ -943,6 +943,27 @@ function parseSuggestedParams(block: string): Array<{ key: string; value: string
   return params;
 }
 
+function findParamInStrategy(strategy: Strategy, paramKey: string): string | undefined {
+  for (const block of (strategy.blocks ?? [])) {
+    const data = block.data;
+    if (!data || typeof data !== 'object') continue;
+    for (const [key, value] of Object.entries(data)) {
+      if (key === paramKey && (typeof value === 'number' || typeof value === 'string')) {
+        return String(value);
+      }
+    }
+  }
+  const settings = strategy.settings;
+  if (settings && typeof settings === 'object') {
+    for (const [key, value] of Object.entries(settings as unknown as Record<string, unknown>)) {
+      if (key === paramKey && (typeof value === 'number' || typeof value === 'string')) {
+        return String(value);
+      }
+    }
+  }
+  return undefined;
+}
+
 function deriveTitle(block: string, index: number): string {
   // Try the first markdown heading inside the block.
   const heading = block.match(/^\s*#{1,6}\s+(.+?)\s*$/m);
@@ -1329,6 +1350,11 @@ export function AiRecommendationsPanel({
 }: AiRecommendationsPanelProps = {}) {
   const hasTrades = (result?.trades?.length ?? 0) > 0;
   const { settings, hydrated: aiSettingsHydrated } = useAiSettings();
+  const providerMeta = aiSettingsHydrated ? getProviderMeta(settings.provider) : null;
+  const hasProvider = aiSettingsHydrated && (
+    !providerMeta?.requiresApiKey ||
+    !!(settings.apiKeys?.[settings.provider]?.trim())
+  );
   const history = useAiRecsHistory();
 
   const [view, setView] = useState<View>('current');
@@ -1722,9 +1748,9 @@ export function AiRecommendationsPanel({
   // optimization-goal modal; the actual analyze fetch runs after the user
   // confirms a goal.
   const handleApproveAndSendClick = useCallback(() => {
-    if (!hasTrades || analyzing) return;
+    if (!hasTrades || !hasProvider || analyzing) return;
     setGoalModalOpen(true);
-  }, [hasTrades, analyzing]);
+  }, [hasTrades, hasProvider, analyzing]);
 
   const handleGoalConfirm = useCallback(
     (goal: string) => {
@@ -1913,7 +1939,7 @@ export function AiRecommendationsPanel({
     [],
   );
 
-  const canSend = hasTrades && !analyzing && aiSettingsHydrated;
+  const canSend = hasTrades && hasProvider && !analyzing && aiSettingsHydrated;
   const showProgress = phase !== 'idle' && phase !== 'error';
   const progressPercent = phase === 'idle' || phase === 'error' ? 0 : PHASE_INFO[phase as Exclude<SendPhase, 'idle' | 'error'>].percent;
   const progressLabel =
@@ -2194,6 +2220,36 @@ export function AiRecommendationsPanel({
               }}
             />
           </div>
+        </div>
+      )}
+
+      {/* Pre-flight validation banners */}
+      {aiSettingsHydrated && !hasTrades && (
+        <div
+          className="rounded p-2 text-xs"
+          role="status"
+          data-testid="ai-recs-no-trades-warning"
+          style={{
+            background: 'var(--bg-elevated)',
+            color: 'var(--accent-orange)',
+            border: '1px solid var(--accent-orange)',
+          }}
+        >
+          No trades recorded — run a backtest first before sending to AI.
+        </div>
+      )}
+      {aiSettingsHydrated && !hasProvider && (
+        <div
+          className="rounded p-2 text-xs"
+          role="status"
+          data-testid="ai-recs-no-provider-warning"
+          style={{
+            background: 'var(--bg-elevated)',
+            color: 'var(--accent-orange)',
+            border: '1px solid var(--accent-orange)',
+          }}
+        >
+          No AI provider configured — open Settings → AI to set one up.
         </div>
       )}
 
@@ -2752,6 +2808,63 @@ export function AiRecommendationsPanel({
                       {errMsg}
                     </p>
                   )}
+
+                  {/* B3: before/after parameter diff — visible only when the rec is ON. */}
+                  {isApplied && (() => {
+                    const snapshot = preApplySnapshots.find(([id]) => id === rec.id);
+                    if (!snapshot) return null;
+                    const [, preStrategy] = snapshot;
+                    const diffs = rec.suggestedParams
+                      .map((p) => ({
+                        key: p.key,
+                        before: findParamInStrategy(preStrategy, p.key),
+                        after: p.value,
+                      }))
+                      .filter(
+                        (d): d is { key: string; before: string; after: string } =>
+                          d.before !== undefined && d.before !== d.after,
+                      );
+                    return (
+                      <div
+                        className="mt-1 pt-1.5"
+                        style={{ borderTop: '1px solid var(--accent-green)' }}
+                        data-testid="ai-recs-param-diff"
+                      >
+                        <p
+                          className="text-[9px] font-semibold uppercase tracking-wide mb-1"
+                          style={{ color: 'var(--accent-green-on)' }}
+                        >
+                          Applied changes
+                        </p>
+                        {diffs.length > 0 ? (
+                          <ul className="flex flex-col gap-0.5" data-testid="ai-recs-param-diff-list">
+                            {diffs.map((d) => (
+                              <li
+                                key={d.key}
+                                className="text-[10px] font-mono flex gap-1 flex-wrap"
+                                data-testid="ai-recs-param-diff-row"
+                              >
+                                <span style={{ color: 'var(--text-faint)' }}>{d.key}:</span>
+                                <span>
+                                  <span style={{ color: 'var(--text-muted)' }}>{d.before}</span>
+                                  <span style={{ color: 'var(--text-faint)' }}> → </span>
+                                  <span style={{ color: 'var(--accent-green-on)' }}>{d.after}</span>
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p
+                            className="text-[10px]"
+                            style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}
+                            data-testid="ai-recs-param-diff-none"
+                          >
+                            No numeric parameters changed — check the strategy blocks manually.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </button>
               );
             })}
