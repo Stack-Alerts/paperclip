@@ -81,23 +81,37 @@ Platform context:
 
 You will be given a JSON payload containing a backtest result: strategy configuration, all executed trades, and aggregate performance metrics.
 
-Respond in EXACTLY this format (do not deviate):
+Respond in EXACTLY this format — do not deviate, add prose, or use markdown bold/italic inside the structured fields:
 
 DIAGNOSIS:
 <2-4 sentence diagnosis of what this strategy does, how it actually performed (cite real numbers from the payload), and the most important issue or strength you observe.>
 
 RECOMMENDATIONS:
-<Numbered list of exactly 1-3 concrete, actionable recommendations. Each item must be one of:
-  (a) a specific parameter change using an exact config key and new value (e.g. "Set riskPerTradePct from 2 to 1"),
-  (b) a specific building block category to add/remove/replace (e.g. "Add a VOLATILITY block to filter low-ATR periods"),
-  (c) a specific risk-management adjustment (e.g. "Lower adaptiveSL.maxSlPct to 2.0 to reduce drawdown").
-Each recommendation must be implementable as a single change to the strategy. Do NOT recommend more than 3 items.>
+<Numbered list of exactly 1-3 recommendations. Each MUST use one of the two templates below — no other format is accepted.>
+
+Template A — parameter or risk change:
+1. <One-sentence title describing the change>
+   Type: ADJUST_PARAM
+   Block: <exact block name from the strategy_config blocks array, or "settings" for top-level strategy settings>
+   Parameter: <exact parameter key matching a key in block.data or strategy settings — do not invent names>
+   Suggested Value: <the new numeric or string value only, e.g. 1.5>
+   Rationale: <one sentence explaining why this change improves the strategy>
+
+Template B — add or remove a building block:
+2. <One-sentence title describing the change>
+   Type: ADD_BLOCK
+   Block: <building block category name, e.g. VOLATILITY>
+   Rationale: <one sentence explaining why>
 
 Rules:
+- Use Template A (Type: ADJUST_PARAM) for every recommendation that changes a numeric or string parameter value.
+- Use Template B (Type: ADD_BLOCK) only when recommending adding an entirely new building block category.
+- The Block field in Template A must match a block name that actually exists in the strategy_config payload, or be the literal word "settings".
+- The Parameter field must be a key that exists in that block's data object or in strategy settings — never invent a key.
 - No prose outside the DIAGNOSIS and RECOMMENDATIONS sections.
-- No invented metrics or parameter keys — only reference numbers and key names that appear in the payload or the list above.
-- If the payload contains no trades, say so in DIAGNOSIS and recommend the user verify the strategy triggers any signals on the chosen data.
-- Keep total response under ~500 words.`;
+- Do NOT use markdown bold (**key**) or colons inside the values on Type/Block/Parameter/Suggested Value/Rationale lines.
+- If the payload contains no trades, say so in DIAGNOSIS and output one recommendation to verify the strategy produces signals.
+- Keep total response under 500 words.`;
 
 /** Format the user message by appending the payload as a JSON code block. */
 function buildUserMessage(prompt: string, payload: unknown): string {
