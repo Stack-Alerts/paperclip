@@ -11,8 +11,13 @@ StandardError=journal
 StandardInput=null
 Environment=HOME=/home/sirrus
 Environment=PATH=/home/sirrus/miniconda3/bin:/usr/local/bin:/usr/bin:/bin:/home/sirrus/.local/bin
-EnvironmentFile=/home/sirrus/projects/BTC-Trade-Engine-PaperClip/.env
 WorkingDirectory=/home/sirrus/projects/BTC-Trade-Engine-PaperClip
+# Explicit PAPERCLIP_* vars — do NOT use EnvironmentFile=.env here.
+# See paperclip-backup-deadman-monitor.service for rationale.
+Environment=PAPERCLIP_LISTEN_HOST=127.0.0.1
+Environment=PAPERCLIP_LISTEN_PORT=3100
+Environment=PAPERCLIP_API_KEY=local_trusted
+Environment=PAPERCLIP_COMPANY_ID=73419cf3-bd37-4a7c-8782-311ccb47fced
 
 [Install]
 WantedBy=default.target

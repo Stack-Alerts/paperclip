@@ -5,13 +5,24 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=python3 /home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/backup_deadman_switch_monitor.py --json-summary
+# Update pinned worktree from origin/main before running; fail-open (|| true) so
+# the timer still fires when the network is down — cached code is better than no run.
+ExecStartPre=/bin/sh -c 'git -C /home/sirrus/.paperclip/monitor-worktrees/btc-main pull --ff-only origin main 2>/dev/null || true'
+ExecStart=python3 /home/sirrus/.paperclip/monitor-worktrees/btc-main/scripts/backup_deadman_switch_monitor.py --json-summary
 StandardOutput=journal
 StandardError=journal
 Environment=HOME=/home/sirrus
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:/snap/bin:/home/sirrus/.local/bin
-WorkingDirectory=/home/sirrus/projects/BTC-Trade-Engine-PaperClip
-EnvironmentFile=/home/sirrus/projects/BTC-Trade-Engine-PaperClip/.env
+WorkingDirectory=/home/sirrus/.paperclip/monitor-worktrees/btc-main
+# Explicit PAPERCLIP_* vars — do NOT use EnvironmentFile=.env here.
+# systemd's EnvironmentFile= overrides Environment= (empirically: opposite of older docs),
+# and .env may ship placeholder values that break local API access.
+# The Python script loads .env via load_dotenv(override=False) for non-conflicting vars
+# (GH_TOKEN, POSTGRES_*, …).  PAPERCLIP_LISTEN_HOST+PORT take priority in _base().
+Environment=PAPERCLIP_LISTEN_HOST=127.0.0.1
+Environment=PAPERCLIP_LISTEN_PORT=3100
+Environment=PAPERCLIP_API_KEY=local_trusted
+Environment=PAPERCLIP_COMPANY_ID=73419cf3-bd37-4a7c-8782-311ccb47fced
 
 [Install]
 WantedBy=default.target

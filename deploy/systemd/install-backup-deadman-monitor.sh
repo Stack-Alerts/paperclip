@@ -12,6 +12,9 @@ TIMER_SRC="${SCRIPT_DIR}/paperclip-backup-deadman-monitor.timer"
 SERVICE_DST="${UNIT_DIR}/paperclip-backup-deadman-monitor.service"
 TIMER_DST="${UNIT_DIR}/paperclip-backup-deadman-monitor.timer"
 
+# Ensure pinned monitor worktree exists (used by the updated ExecStart paths)
+"${SCRIPT_DIR}/setup-monitor-worktree.sh"
+echo ""
 echo "=== Paperclip Backup Dead-Man's-Switch Monitor — Systemd Install ==="
 echo "Source:  ${SCRIPT_DIR}"
 echo "Target:  ${UNIT_DIR}"

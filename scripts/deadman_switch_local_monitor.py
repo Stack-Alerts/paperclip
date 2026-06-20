@@ -27,6 +27,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "src"))
+# Load .env for non-conflicting vars (e.g. GH_TOKEN).
+# PAPERCLIP_* vars are injected by systemd Environment= and must NOT be overridden.
+if (REPO_ROOT / ".env").exists():
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(REPO_ROOT / ".env", override=False)
+    except ImportError:
+        pass
 
 from touch_index.paperclip_client import _session, _base, _company
 

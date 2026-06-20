@@ -2,9 +2,9 @@
 """Backup dead-man's-switch monitor — watches the deadman-switch-monitor workflow.
 
 Runs on the self-hosted machine (systemd timer) as a backup to the
-GH Actions-based ``deadman-switch-monitor.yml``.  Uses ``gh run list``
-to check the ``deadman-switch-monitor`` workflow and the local
-``deadman_switch_monitor_state.json`` as a secondary signal.
+GH Actions-based ``deadman-switch-monitor.yml``.  Uses the GitHub REST API
+(GH_TOKEN) to check the ``deadman-switch-monitor`` workflow.  The gh CLI
+dependency has been removed — ``requests`` is used directly.
 
 This closes the monitoring loop: the backup-deadman-switch is watched
 by the deadman-switch-monitor (ubuntu-latest); the deadman-switch-monitor
@@ -23,8 +23,8 @@ import argparse
 import json
 import logging
 import os
-import subprocess
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -32,21 +32,37 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
+# Load .env for GH_TOKEN and other non-conflicting vars.
+# PAPERCLIP_* vars are injected by systemd Environment= directives and must
+# NOT be overridden — override=False ensures they keep priority.
+if (REPO_ROOT / ".env").exists():
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(REPO_ROOT / ".env", override=False)
+    except ImportError:
+        pass
+
 from touch_index.paperclip_client import _session, _base, _company
 
 MONITOR_LOG = Path.home() / ".paperclip" / "backup_deadman_switch_monitor.log"
 MONITOR_STATE = Path.home() / ".paperclip" / "backup_deadman_switch_monitor_state.json"
-# Local watchdog state (deadman_switch_local_monitor.py, runs every 15 min via systemd).
-# Used as gh-CLI fallback when GitHub API is unreachable.
-PRIMARY_MONITOR_STATE = Path.home() / ".paperclip" / "deadman_switch_local_monitor_state.json"
 MAX_LOG_BYTES = 1 * 1024 * 1024
 
 TARGET_WORKFLOW = "deadman-switch-monitor.yml"
+GH_REPO = "Stack-Alerts/BTC-Trade-Engine-PaperClip"
 ALERT_SEARCH_QUERY = "Backup dead-man's-switch monitor alert"
+GH_BLIND_SEARCH_QUERY = "Backup dead-man's-switch monitor: cannot reach GitHub API"
 CTO_AGENT_ID = "41b5ede6-e209-40ba-b923-dc969c722e6d"
 
 MONITOR_INTERVAL_MINUTES = 30
-MONITOR_THRESHOLD_MINUTES = 90  # GH Actions cron misses ~18% of slots; 90min suppresses those while still catching true failures
+MONITOR_THRESHOLD_MINUTES = 90  # GH Actions cron misses ~18% of slots; 90min suppresses those
+# If reported age exceeds this, require independent corroboration before alerting.
+# A 24h+ stale signal is far more likely to be a stale local artifact than a true failure.
+AGE_SANITY_CAP_MINUTES = 24 * 60
+
+_GH_API_BASE = "https://api.github.com"
+# (delay_before_attempt_s, request_timeout_s) — three attempts total
+_GH_RETRY_SCHEDULE = [(0, 30), (5, 30), (15, 60)]
 
 MONITOR_LOG.parent.mkdir(parents=True, exist_ok=True)
 
@@ -69,50 +85,90 @@ def _rotate_log_if_needed():
         logger.info("Rotated backup monitor log (size exceeded %d bytes)", MAX_LOG_BYTES)
 
 
-_GH_AUTH_ERROR_PATTERNS = [
-    "To get started with GitHub CLI, please run:  gh auth login",
-    "no oauth token found",
-    "populate the GH_TOKEN environment variable",
-]
-
-
 def _gh_run_list(workflow: str, limit: int = 10) -> list[dict] | None:
-    try:
-        result = subprocess.run(
-            [
-                "gh", "run", "list",
-                "--repo", "Stack-Alerts/BTC-Trade-Engine-PaperClip",
-                "--workflow", workflow,
-                "--limit", str(limit),
-                "--json", "status,conclusion,createdAt,databaseId,headSha",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            cwd=str(REPO_ROOT),
+    """Query GitHub Actions run list via REST API with retry on transient failures.
+
+    Returns a list of run dicts (keys: status, conclusion, createdAt, databaseId,
+    headSha) on success, or None if the GitHub API is unreachable after all retries.
+
+    Uses GH_TOKEN env var (loaded from .env via load_dotenv above).  No gh CLI needed.
+    """
+    import requests as req_lib
+
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if not token:
+        logger.error(
+            "No GH_TOKEN/GITHUB_TOKEN available — cannot query GitHub API. "
+            "Ensure GH_TOKEN is set in .env (loaded via load_dotenv) or exported."
         )
-    except FileNotFoundError:
-        logger.error("gh CLI not found in PATH — cannot query workflow runs")
         return None
-    except subprocess.TimeoutExpired:
-        logger.error("gh run list timed out — cannot query workflow runs")
-        return None
-    if result.returncode != 0:
-        stderr_lower = result.stderr.lower() if result.stderr else ""
-        for pattern in _GH_AUTH_ERROR_PATTERNS:
-            if pattern.lower() in stderr_lower:
-                logger.error(
-                    "gh CLI not authenticated — cannot query workflow runs. "
-                    "Run 'gh auth login' or set GH_TOKEN."
-                )
-                return None
-        logger.error("gh run list failed (rc=%d): %s", result.returncode, result.stderr.strip())
-        return None
-    try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError:
-        logger.error("gh run list returned non-JSON: %s", result.stdout[:200])
-        return None
+
+    url = f"{_GH_API_BASE}/repos/{GH_REPO}/actions/workflows/{workflow}/runs"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    params = {"per_page": limit}
+
+    for attempt, (sleep_s, timeout_s) in enumerate(_GH_RETRY_SCHEDULE):
+        if sleep_s:
+            logger.info(
+                "GH API retry %d/%d — waiting %ds before attempt",
+                attempt + 1, len(_GH_RETRY_SCHEDULE), sleep_s,
+            )
+            time.sleep(sleep_s)
+        try:
+            resp = req_lib.get(url, headers=headers, params=params, timeout=timeout_s)
+        except req_lib.exceptions.ConnectionError as exc:
+            logger.warning("GH API connection error (attempt %d/%d): %s",
+                           attempt + 1, len(_GH_RETRY_SCHEDULE), exc)
+            continue
+        except req_lib.exceptions.Timeout:
+            logger.warning("GH API timeout (attempt %d/%d, timeout=%ds)",
+                           attempt + 1, len(_GH_RETRY_SCHEDULE), timeout_s)
+            continue
+        except Exception as exc:
+            logger.warning("GH API request error (attempt %d/%d): %s",
+                           attempt + 1, len(_GH_RETRY_SCHEDULE), exc)
+            continue
+
+        if resp.status_code == 401:
+            logger.error("GH API: unauthorized (bad GH_TOKEN) — not retrying")
+            return None
+        if resp.status_code == 404:
+            logger.error("GH API: workflow not found: %s — not retrying", workflow)
+            return None
+        if resp.status_code >= 500:
+            logger.warning("GH API server error %d (attempt %d/%d)",
+                           resp.status_code, attempt + 1, len(_GH_RETRY_SCHEDULE))
+            continue
+        if resp.status_code != 200:
+            logger.warning("GH API unexpected status %d (attempt %d/%d)",
+                           resp.status_code, attempt + 1, len(_GH_RETRY_SCHEDULE))
+            continue
+
+        try:
+            data = resp.json()
+        except Exception as exc:
+            logger.error("GH API response parse error: %s", exc)
+            return None
+
+        runs_raw = data.get("workflow_runs", [])
+        # Normalise field names to match the old gh CLI JSON schema
+        return [
+            {
+                "status": r.get("status"),
+                "conclusion": r.get("conclusion"),
+                "createdAt": r.get("created_at", ""),
+                "databaseId": r.get("id"),
+                "headSha": r.get("head_sha"),
+            }
+            for r in runs_raw
+        ]
+
+    logger.error("GH API unreachable after %d attempts", len(_GH_RETRY_SCHEDULE))
+    return None
 
 
 def _get_latest_success_age_minutes(runs: list[dict]) -> float | None:
@@ -148,31 +204,6 @@ def _has_any_recent_runs(runs: list[dict], minutes: int) -> bool:
     return False
 
 
-def _read_primary_monitor_state() -> dict | None:
-    if not PRIMARY_MONITOR_STATE.exists():
-        logger.warning("Primary monitor state file missing: %s", PRIMARY_MONITOR_STATE)
-        return None
-    try:
-        return json.loads(PRIMARY_MONITOR_STATE.read_text())
-    except (json.JSONDecodeError, OSError) as exc:
-        logger.error("Failed to read primary monitor state: %s", exc)
-        return None
-
-
-def _get_primary_monitor_age_minutes(state: dict) -> float | None:
-    raw = state.get("last_run_utc")
-    if not raw:
-        logger.warning("Primary monitor state has no 'last_run_utc' field")
-        return None
-    try:
-        ts = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-    except (ValueError, TypeError):
-        logger.warning("Unparseable last_run_utc in primary monitor state: %s", raw)
-        return None
-    age = datetime.now(timezone.utc) - ts.astimezone(timezone.utc)
-    return age.total_seconds() / 60
-
-
 def _load_self_state() -> dict:
     if MONITOR_STATE.exists():
         try:
@@ -187,7 +218,7 @@ def _save_self_state(state: dict):
     MONITOR_STATE.write_text(json.dumps(state, indent=2))
 
 
-def _find_existing_alert() -> dict | None:
+def _find_existing_alert(search_query: str) -> dict | None:
     try:
         sess = _session()
         base_url = _base()
@@ -195,15 +226,10 @@ def _find_existing_alert() -> dict | None:
     except (KeyError, OSError) as exc:
         logger.error("Failed to init Paperclip session: %s", exc)
         return None
-
     try:
         resp = sess.get(
             f"{base_url}/api/companies/{company_id}/issues",
-            params={
-                "status": "todo,in_progress",
-                "q": ALERT_SEARCH_QUERY,
-                "limit": 10,
-            },
+            params={"status": "todo,in_progress", "q": search_query, "limit": 10},
             timeout=30,
         )
         resp.raise_for_status()
@@ -211,9 +237,8 @@ def _find_existing_alert() -> dict | None:
     except Exception as exc:
         logger.error("Failed to search for existing alerts: %s", exc)
         return None
-
     for issue in issues:
-        if ALERT_SEARCH_QUERY in (issue.get("title") or ""):
+        if search_query in (issue.get("title") or ""):
             return issue
     return None
 
@@ -223,6 +248,7 @@ def _create_alert(
     threshold_minutes: int,
     dry_run: bool,
     extra_detail: str = "",
+    priority: str = "critical",
 ) -> bool:
     try:
         sess = _session()
@@ -269,7 +295,7 @@ def _create_alert(
         "title": title,
         "description": description,
         "assigneeAgentId": CTO_AGENT_ID,
-        "priority": "critical",
+        "priority": priority,
         "status": "todo",
     }
 
@@ -297,6 +323,63 @@ def _create_alert(
         return False
 
 
+def _create_gh_blind_alert(dry_run: bool) -> bool:
+    """Create a high-priority (not critical) alert when GH API is unreachable.
+
+    This is distinct from a real workflow-stall alert so operators can triage
+    "we lost GH connectivity" separately from "the workflow actually stalled".
+    """
+    try:
+        sess = _session()
+        base_url = _base()
+        company_id = _company()
+    except (KeyError, OSError) as exc:
+        logger.error("Failed to init Paperclip session: %s", exc)
+        return False
+
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    title = GH_BLIND_SEARCH_QUERY
+    description = (
+        f"**Backup dead-man's-switch monitor — GitHub API unreachable**\n\n"
+        f"- **Check time:** {now_str}\n"
+        f"- **Target workflow:** `{TARGET_WORKFLOW}`\n"
+        f"- **Status:** `gh_blind` — cannot determine workflow health\n"
+        f"- **Action required:** Verify GH_TOKEN is valid and GitHub API is reachable "
+        f"from this host. Until connectivity is restored, the backup monitor cannot "
+        f"verify that `{TARGET_WORKFLOW}` is healthy.\n"
+        f"- This is a `high`-priority notice (not `critical`) — "
+        f"it means the backup monitor is blind, NOT that the workflow has actually stalled."
+    )
+    payload = {
+        "title": title,
+        "description": description,
+        "assigneeAgentId": CTO_AGENT_ID,
+        "priority": "high",
+        "status": "todo",
+    }
+
+    if dry_run:
+        logger.info("DRY RUN: would create gh_blind alert")
+        print(json.dumps(payload, indent=2))  # noqa: T201
+        return True
+
+    try:
+        resp = sess.post(
+            f"{base_url}/api/companies/{company_id}/issues",
+            json=payload,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        created = resp.json()
+        logger.info(
+            "Created gh_blind alert %s",
+            created.get("identifier", created.get("id", "?")),
+        )
+        return True
+    except Exception as exc:
+        logger.error("Failed to create gh_blind alert: %s", exc)
+        return False
+
 
 def _comment_on_existing_alert(
     issue: dict,
@@ -307,7 +390,6 @@ def _comment_on_existing_alert(
     try:
         sess = _session()
         base_url = _base()
-        company_id = _company()
     except (KeyError, OSError) as exc:
         logger.error("Failed to init Paperclip session for commenting: %s", exc)
         return False
@@ -321,7 +403,7 @@ def _comment_on_existing_alert(
         age_line = f"- **Last success:** {age_minutes:.0f} min ago"
 
     body = (
-        f"**Backup dead-man's-switch monitor re-check \u2014 {now_str}**\n\n"
+        f"**Backup dead-man's-switch monitor re-check — {now_str}**\n\n"
         f"- **Check time:** {now_str}\n"
         f"{age_line}\n"
         f"- **Target workflow:** `{TARGET_WORKFLOW}`\n"
@@ -347,15 +429,37 @@ def _comment_on_existing_alert(
         logger.error("Failed to comment on alert %s: %s", issue_id, exc)
         return False
 
+
 def run(
     threshold_minutes: int = MONITOR_THRESHOLD_MINUTES,
     dry_run: bool = False,
 ) -> dict:
     _rotate_log_if_needed()
 
+    now_utc = datetime.now(timezone.utc)
     prev = _load_self_state()
     prev_runs = prev.get("total_runs", 0)
     prev_last = prev.get("last_run_utc", "never")
+
+    # Self-resume guard: if this machine was offline > 2× monitor interval,
+    # cached state is unreliable — skip alerting on this first run.
+    self_gap_minutes: float | None = None
+    self_resumed = False
+    if prev_last != "never":
+        try:
+            prev_ts = datetime.fromisoformat(prev_last.replace("Z", "+00:00"))
+            self_gap_minutes = (now_utc - prev_ts.astimezone(timezone.utc)).total_seconds() / 60
+            if self_gap_minutes > 2 * MONITOR_INTERVAL_MINUTES:
+                self_resumed = True
+                logger.warning(
+                    "Self-resume detected: last self-run was %.0f min ago "
+                    "(expected ≤%d min). Skipping alert on this run — "
+                    "will perform a fresh GH API check next cycle.",
+                    self_gap_minutes,
+                    2 * MONITOR_INTERVAL_MINUTES,
+                )
+        except (ValueError, TypeError):
+            pass
 
     runs = _gh_run_list(TARGET_WORKFLOW, limit=10)
 
@@ -363,90 +467,139 @@ def run(
     alert_skipped = False
     alert_reason = ""
     status = "healthy"
-    primary_state_age = None
-    primary_state_status = "unknown"
+    gh_api_available = runs is not None
 
-    primary_state = _read_primary_monitor_state()
-    if primary_state:
-        primary_state_age = _get_primary_monitor_age_minutes(primary_state)
-        primary_state_status = "available"
+    if self_resumed:
+        # Don't fire on first run after machine wake-up — state is stale.
+        status = "self_resumed"
+        now_utc_str = now_utc.isoformat()
+        _save_self_state({
+            "total_runs": prev_runs + 1,
+            "last_run_utc": now_utc_str,
+            "last_alert_utc": prev.get("last_alert_utc"),
+        })
+        return {
+            "status": status,
+            "target_workflow": TARGET_WORKFLOW,
+            "monitor_interval_minutes": MONITOR_INTERVAL_MINUTES,
+            "monitor_threshold_minutes": threshold_minutes,
+            "self_gap_minutes": self_gap_minutes,
+            "gh_api_available": gh_api_available,
+            "alert_fired": False,
+            "alert_skipped": False,
+            "alert_reason": "self_resumed_skipped",
+            "self_last_run_utc": now_utc_str,
+            "self_prev_run_utc": prev_last,
+            "self_total_runs": prev_runs + 1,
+        }
 
     if runs is None:
+        # GH API truly unreachable — emit a distinct high-priority blind notice.
+        # Do NOT report healthy and do NOT use local state as proxy for workflow age.
         logger.error(
-            "gh CLI auth failure — cannot determine workflow health. "
-            "Falling back to primary monitor state file."
+            "GitHub API unreachable after all retries — emitting gh_blind alert"
         )
-        age_minutes = None
-        if primary_state_age is not None:
-            age_minutes = primary_state_age
+        status = "gh_blind"
+        existing_blind = _find_existing_alert(GH_BLIND_SEARCH_QUERY)
+        if existing_blind:
             logger.info(
-                "Using primary monitor state file age: %.0f min", age_minutes
+                "gh_blind alert %s already open — skipping duplicate",
+                existing_blind.get("identifier", existing_blind.get("id")),
             )
+            alert_skipped = True
         else:
-            status = "auth_error"
+            ok = _create_gh_blind_alert(dry_run)
+            if ok:
+                alert_fired = True
     else:
         age_minutes = _get_latest_success_age_minutes(runs)
 
-    if runs is None and primary_state_age is None:
-        logger.warning("Cannot determine deadman-switch-monitor health at all")
-        alert_reason = "cannot_determine_health"
-        status = "alert"
-    elif age_minutes is None:
-        if not _has_any_recent_runs(runs, threshold_minutes) if runs else True:
+        if age_minutes is None:
+            if not _has_any_recent_runs(runs, threshold_minutes):
+                logger.warning(
+                    "Deadman-switch-monitor has no runs within %d min — alert will fire",
+                    threshold_minutes,
+                )
+                alert_reason = "no_runs_found"
+                status = "alert"
+            else:
+                logger.warning(
+                    "Deadman-switch-monitor has runs but no successes (failing runs exist)"
+                )
+                alert_reason = "all_runs_failing"
+                status = "alert"
+        elif age_minutes > AGE_SANITY_CAP_MINUTES:
+            # Age exceeds 24h — extremely likely to be stale local artifact.
+            # Do a fresh GH query to corroborate before alerting.
             logger.warning(
-                "Deadman-switch-monitor has no runs within %d min — alert will fire",
+                "Reported age %.0f min exceeds sanity cap %d min — "
+                "performing corroboration query before alerting",
+                age_minutes, AGE_SANITY_CAP_MINUTES,
+            )
+            corroboration = _gh_run_list(TARGET_WORKFLOW, limit=5)
+            if corroboration is None:
+                logger.warning(
+                    "Corroboration query failed — treating as gh_blind, not %.0f min stall",
+                    age_minutes,
+                )
+                status = "gh_blind"
+                existing_blind = _find_existing_alert(GH_BLIND_SEARCH_QUERY)
+                if not existing_blind:
+                    _create_gh_blind_alert(dry_run)
+                    alert_fired = True
+                else:
+                    alert_skipped = True
+            else:
+                corr_age = _get_latest_success_age_minutes(corroboration)
+                if corr_age is not None and corr_age <= threshold_minutes:
+                    logger.info(
+                        "Corroboration shows %.0f min ago — actually healthy (initial was stale)",
+                        corr_age,
+                    )
+                    age_minutes = corr_age
+                else:
+                    logger.warning(
+                        "Corroboration confirms stall: %.0f min — alert will fire",
+                        corr_age if corr_age is not None else -1,
+                    )
+                    alert_reason = "overdue_corroborated"
+                    status = "alert"
+        elif age_minutes <= threshold_minutes:
+            logger.info(
+                "Deadman-switch-monitor healthy: last success %.0f min ago "
+                "(threshold %d min)",
+                age_minutes,
                 threshold_minutes,
             )
-            alert_reason = "no_runs_found"
-            status = "alert"
         else:
             logger.warning(
-                "Deadman-switch-monitor has runs but no successes (failing runs exist)"
+                "Deadman-switch-monitor stalled: last success %.0f min ago "
+                "(threshold %d min) — alert will fire",
+                age_minutes,
+                threshold_minutes,
             )
-            alert_reason = "all_runs_failing"
+            alert_reason = "overdue"
             status = "alert"
-    elif age_minutes <= threshold_minutes:
-        logger.info(
-            "Deadman-switch-monitor healthy: last success %.0f min ago "
-            "(threshold %d min)",
-            age_minutes,
-            threshold_minutes,
-        )
-    else:
-        logger.warning(
-            "Deadman-switch-monitor stalled: last success %.0f min ago "
-            "(threshold %d min) — alert will fire",
-            age_minutes,
-            threshold_minutes,
-        )
-        alert_reason = "overdue"
-        status = "alert"
 
-    if alert_reason:
-        existing = _find_existing_alert()
-        if existing:
-            logger.info(
-                "Existing alert %s already open — commenting with re-check status",
-                existing.get("identifier", existing.get("id")),
-            )
-            _comment_on_existing_alert(existing, age_minutes, threshold_minutes, dry_run)
-            alert_skipped = True
-        else:
-            extra = ""
-            if primary_state_age is not None:
-                extra = (
-                    f"- **Primary monitor state file age:** "
-                    f"{primary_state_age:.0f} min\n"
+        if alert_reason:
+            existing = _find_existing_alert(ALERT_SEARCH_QUERY)
+            if existing:
+                logger.info(
+                    "Existing alert %s already open — commenting with re-check status",
+                    existing.get("identifier", existing.get("id")),
                 )
-            ok = _create_alert(age_minutes, threshold_minutes, dry_run, extra)
-            if ok:
-                alert_fired = True
+                _comment_on_existing_alert(existing, age_minutes, threshold_minutes, dry_run)
+                alert_skipped = True
+            else:
+                ok = _create_alert(age_minutes, threshold_minutes, dry_run)
+                if ok:
+                    alert_fired = True
 
-    now_utc = datetime.now(timezone.utc).isoformat()
+    now_utc_str = now_utc.isoformat()
     _save_self_state({
         "total_runs": prev_runs + 1,
-        "last_run_utc": now_utc,
-        "last_alert_utc": now_utc if alert_fired else prev.get("last_alert_utc"),
+        "last_run_utc": now_utc_str,
+        "last_alert_utc": now_utc_str if alert_fired else prev.get("last_alert_utc"),
     })
 
     summary = {
@@ -454,17 +607,19 @@ def run(
         "target_workflow": TARGET_WORKFLOW,
         "monitor_interval_minutes": MONITOR_INTERVAL_MINUTES,
         "monitor_threshold_minutes": threshold_minutes,
-        "last_success_age_minutes": age_minutes,
+        "last_success_age_minutes": (
+            _get_latest_success_age_minutes(runs) if runs is not None else None
+        ),
         "total_runs_checked": len(runs) if runs is not None else 0,
-        "gh_cli_available": runs is not None,
-        "primary_state_file": primary_state_status,
-        "primary_state_age_minutes": primary_state_age,
+        "gh_api_available": gh_api_available,
         "alert_fired": alert_fired,
         "alert_skipped": alert_skipped,
         "commented": alert_skipped,
         "alert_reason": alert_reason or "none",
-        "self_last_run_utc": now_utc,
+        "self_last_run_utc": now_utc_str,
         "self_prev_run_utc": prev_last,
+        "self_gap_minutes": self_gap_minutes,
+        "self_resumed": self_resumed,
         "self_total_runs": prev_runs + 1,
     }
     return summary
@@ -498,8 +653,7 @@ def main():
     if args.json_summary:
         print(json.dumps(summary, indent=2))  # noqa: T201
 
-    detection_ok = summary["status"] != "auth_error"
-    sys.exit(0 if detection_ok else 1)
+    sys.exit(0 if summary["status"] not in ("gh_blind",) else 1)
 
 
 if __name__ == "__main__":
