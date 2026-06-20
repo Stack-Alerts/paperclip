@@ -75,6 +75,26 @@ export async function runDataRepair(timeframe?: string): Promise<DataRepairResul
   return post<DataRepairResult>('/data/repair', { timeframe: timeframe ?? null });
 }
 
+export interface BulkBackfillResult {
+  success: boolean;
+  message: string;
+  summary: {
+    downloaded: number;
+    skipped: number;
+    errors: number;
+    totalBars: number;
+    errorKeys: string[];
+  };
+}
+
+export async function runBulkBackfill(
+  fromMonth: string,
+  toMonth: string,
+  skipExisting = true,
+): Promise<BulkBackfillResult> {
+  return post<BulkBackfillResult>('/data/bulk-backfill', { fromMonth, toMonth, skipExisting });
+}
+
 // ---------------------------------------------------------------------------
 // Timestamp formatting helpers (BTCAAAAA-35962 follow-up)
 //

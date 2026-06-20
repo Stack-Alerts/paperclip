@@ -2832,6 +2832,73 @@ async def backfill_data(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+class _BulkBackfillRequest(BaseModel):
+    fromMonth: str  # "YYYY-MM"
+    toMonth: str    # "YYYY-MM"
+    timeframes: Optional[list[str]] = None  # None = ["15m", "1h", "1d"]
+    skipExisting: bool = False
+
+
+@app.post(
+    "/data/bulk-backfill",
+    tags=["Data Management"],
+    summary="Backfill historical OHLCV data from Binance public archive ZIPs (no API key required)",
+)
+async def bulk_backfill_data(
+    body: _BulkBackfillRequest,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Download monthly OHLCV ZIPs from data.binance.vision for BTCUSDT perpetual.
+
+    Unlike /data/backfill (which uses the Binance Futures REST API and is limited
+    to ~2 years of paginated history), this endpoint fetches pre-built monthly CSV
+    archives that cover the full exchange history with no API key required.
+
+    Archive source: https://data.binance.vision/data/futures/um/monthly/klines/
+    """
+    try:
+        from_year, from_month = (int(p) for p in body.fromMonth.split("-"))
+        to_year, to_month = (int(p) for p in body.toMonth.split("-"))
+    except (ValueError, AttributeError) as exc:
+        raise HTTPException(
+            status_code=422, detail=f"Invalid month format (expected YYYY-MM): {exc}"
+        ) from exc
+
+    if (from_year, from_month) > (to_year, to_month):
+        raise HTTPException(status_code=422, detail="fromMonth must be ≤ toMonth")
+
+    def _run() -> dict:
+        from scripts.binance.bulk_archive_backfill import bulk_backfill  # noqa: PLC0415
+        results = bulk_backfill(
+            from_year, from_month, to_year, to_month,
+            timeframes=body.timeframes,
+            skip_existing=body.skipExisting,
+            verbose=False,
+        )
+        ok = sum(1 for v in results.values() if v["status"] == "ok")
+        skipped = sum(1 for v in results.values() if v["status"] == "skipped")
+        error_keys = [k for k, v in results.items() if v["status"] == "error"]
+        total_bars = sum(v.get("bars", 0) for v in results.values() if v["status"] == "ok")
+        return {
+            "success": len(error_keys) == 0,
+            "message": "Bulk backfill complete" if not error_keys else f"Completed with {len(error_keys)} error(s)",
+            "summary": {
+                "downloaded": ok,
+                "skipped": skipped,
+                "errors": len(error_keys),
+                "totalBars": total_bars,
+                "errorKeys": error_keys,
+            },
+            "results": results,
+        }
+
+    try:
+        return await asyncio.to_thread(_run)
+    except Exception as exc:
+        logger.exception("data/bulk-backfill failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 # ---------------------------------------------------------------------------
 # WebSocket helper: subscribe one channel and fan out to one client
 # ---------------------------------------------------------------------------

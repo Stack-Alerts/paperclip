@@ -9,6 +9,7 @@ import {
   triggerDataUpdate,
   runDataVerify,
   runDataRepair,
+  runBulkBackfill,
   formatLocalShort,
   parseApiTimestamp,
 } from '@/lib/data-management/api';
@@ -145,6 +146,9 @@ export default function MarketDataPage() {
   const [repairing, setRepairing] = useState(false);
   const [repairResult, setRepairResult] = useState<string | null>(null);
 
+  const [bulkBackfilling, setBulkBackfilling] = useState(false);
+  const [bulkBackfillResult, setBulkBackfillResult] = useState<string | null>(null);
+
   const loadStatus = useCallback(async () => {
     setLoadingStatus(true);
     setStatusError(null);
@@ -213,6 +217,28 @@ export default function MarketDataPage() {
       setRepairResult(e instanceof Error ? e.message : 'Repair failed');
     } finally {
       setRepairing(false);
+    }
+  }, [loadStatus, handleVerify]);
+
+  const handleBulkBackfill = useCallback(async () => {
+    setBulkBackfilling(true);
+    setBulkBackfillResult(null);
+    try {
+      const result = await runBulkBackfill('2024-01', '2026-04', true);
+      const s = result.summary;
+      setBulkBackfillResult(
+        result.success
+          ? `Downloaded ${s.downloaded} month/TF files (${s.totalBars.toLocaleString()} bars), skipped ${s.skipped} existing.`
+          : `Finished with ${s.errors} error(s). ${result.message}`,
+      );
+      if (result.success) {
+        await loadStatus();
+        await handleVerify();
+      }
+    } catch (e) {
+      setBulkBackfillResult(e instanceof Error ? e.message : 'Bulk backfill failed');
+    } finally {
+      setBulkBackfilling(false);
     }
   }, [loadStatus, handleVerify]);
 
@@ -513,6 +539,19 @@ export default function MarketDataPage() {
           </div>
         )}
 
+        {bulkBackfillResult && (
+          <div
+            className="p-3 rounded text-sm mb-3"
+            style={{
+              color: 'var(--text-secondary)',
+              background: 'var(--bg-panel-raised)',
+              border: '1px solid var(--border-subtle)',
+            }}
+          >
+            Archive backfill: {bulkBackfillResult}
+          </div>
+        )}
+
         {verifyResults ? (
           <div className="space-y-3">
             {Object.entries(verifyResults).map(([tf, r]) => (
@@ -546,12 +585,20 @@ export default function MarketDataPage() {
                         </button>
                       </>
                     ) : (
-                      <span
-                        style={{ color: 'var(--color-warning)' }}
-                        title={`Historical gap(s) from ${r.gaps?.[0]?.gapStart?.slice(0, 10) ?? '?'} → ${r.gaps?.[0]?.gapEnd?.slice(0, 10) ?? '?'}. Predates the 90-day Binance API horizon; cannot be auto-filled from Binance. Requires LakeAPI backfill.`}
-                      >
-                        ⚠ {r.totalGaps} historical gap{r.totalGaps === 1 ? '' : 's'} (LakeAPI)
-                      </span>
+                      <>
+                        <span style={{ color: 'var(--color-warning)' }}>
+                          ⚠ {r.totalGaps} historical gap{r.totalGaps === 1 ? '' : 's'}
+                        </span>
+                        <button
+                          onClick={handleBulkBackfill}
+                          disabled={bulkBackfilling}
+                          className="px-2 py-0.5 rounded text-xs"
+                          style={{ background: '#3d5470', color: 'var(--text-primary)', border: '1px solid #4d6480' }}
+                          title="Download historical OHLCV from Binance public archive (data.binance.vision). No API key required."
+                        >
+                          {bulkBackfilling ? 'Downloading…' : 'Backfill from Archive'}
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
