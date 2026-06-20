@@ -177,9 +177,10 @@ export default function MarketDataPage() {
   }, []);
 
   useEffect(() => {
-    loadStatus();
-    handleVerify();
-    const interval = setInterval(loadStatus, 60_000);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadStatus();
+    void handleVerify();
+    const interval = setInterval(() => void loadStatus(), 60_000);
     return () => clearInterval(interval);
   }, [loadStatus, handleVerify]);
 

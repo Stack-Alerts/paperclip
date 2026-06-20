@@ -1199,6 +1199,8 @@ interface ActiveRec {
   suggestedParams: Array<{ key: string; value: string }>;
 }
 
+
+
 // ── Split layout (AC1) ───────────────────────────────────────────────────
 
 const SPLIT_MIN = 30;
@@ -1220,13 +1222,9 @@ function SplitPanel({
       const stored = window.localStorage.getItem(SPLIT_STORAGE_KEY);
       if (stored) {
         const parsed = Number.parseFloat(stored);
-        if (Number.isFinite(parsed) && parsed >= SPLIT_MIN && parsed <= SPLIT_MAX) {
-          return parsed;
-        }
+        if (Number.isFinite(parsed) && parsed >= SPLIT_MIN && parsed <= SPLIT_MAX) return parsed;
       }
-    } catch {
-      // best effort
-    }
+    } catch { /* best effort */ }
     return SPLIT_DEFAULT;
   });
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -1763,6 +1761,7 @@ export function AiRecommendationsPanel({
   const handleGoalCancel = useCallback(() => {
     setGoalModalOpen(false);
   }, []);
+
 
   const handleClearActiveRec = useCallback(() => {
     setActiveRec(null);

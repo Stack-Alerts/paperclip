@@ -39,7 +39,7 @@ from datetime import datetime, timezone
 from collections import defaultdict
 from decimal import Decimal
 import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 from functools import partial
 import os
 import csv
@@ -948,7 +948,8 @@ class MulticoreBacktestEngine:
         bars: List[Bar],
         strategy_config: dict,
         backtest_config: dict,
-        progress_callback: Optional[Callable] = None
+        progress_callback: Optional[Callable] = None,
+        subprocess_timeout_secs: int = 7200,
     ) -> Dict[str, Any]:
         """
         Run multicore backtest on historical bars
@@ -1014,45 +1015,69 @@ class MulticoreBacktestEngine:
         )
         
         chunk_results = []
-        
+
         with ProcessPoolExecutor(max_workers=self.num_processes) as executor:
             # Submit all chunks
             future_to_chunk = {
                 executor.submit(process_func, chunk): chunk
                 for chunk in chunks
             }
-            
-            # Collect results as they complete
+
+            # Collect results as they complete; kill the pool if the total wall
+            # time exceeds subprocess_timeout_secs (default 2 h).  This prevents
+            # a single stuck subprocess from making the server unresponsive
+            # indefinitely (BTCAAAAA-36104 / BTCAAAAA-36114).
             completed = 0
-            for future in as_completed(future_to_chunk):
-                chunk = future_to_chunk[future]
-                
-                try:
-                    result = future.result()
-                    chunk_results.append(result)
-                    
-                    # Report progress
-                    completed += 1
-                    if progress_callback:
-                        pct = 10 + int((completed / len(chunks)) * 80)  # 10-90%
-                        progress_callback(
-                            pct,
-                            100,
-                            f"Processed chunk {completed}/{len(chunks)}"
-                        )
-                        
-                except Exception as e:
-                    error_msg = f"Chunk {chunk.chunk_id} failed: {str(e)}"
-                    logger.info(error_msg)
-                    chunk_results.append(ChunkResult(
-                        chunk_id=chunk.chunk_id,
-                        trades=[],
-                        open_trade=None,
-                        total_bars_processed=0,
-                        signals_evaluated=0,
-                        errors=[error_msg],
-                        messages=[]
-                    ))
+            try:
+                for future in as_completed(future_to_chunk, timeout=subprocess_timeout_secs):
+                    chunk = future_to_chunk[future]
+                    try:
+                        result = future.result()
+                        chunk_results.append(result)
+
+                        completed += 1
+                        if progress_callback:
+                            pct = 10 + int((completed / len(chunks)) * 80)
+                            progress_callback(
+                                pct,
+                                100,
+                                f"Processed chunk {completed}/{len(chunks)}"
+                            )
+
+                    except Exception as e:
+                        error_msg = f"Chunk {chunk.chunk_id} failed: {str(e)}"
+                        logger.info(error_msg)
+                        chunk_results.append(ChunkResult(
+                            chunk_id=chunk.chunk_id,
+                            trades=[],
+                            open_trade=None,
+                            total_bars_processed=0,
+                            signals_evaluated=0,
+                            errors=[error_msg],
+                            messages=[]
+                        ))
+
+            except FuturesTimeoutError:
+                timeout_hours = subprocess_timeout_secs / 3600
+                logger.error(
+                    "MulticoreBacktestEngine: subprocess timeout after %.1f h — "
+                    "cancelling remaining futures and returning partial results",
+                    timeout_hours,
+                )
+                for f in future_to_chunk:
+                    f.cancel()
+                if progress_callback:
+                    progress_callback(0, 100, f"Backtest killed: exceeded {timeout_hours:.0f}-hour limit")
+                return {
+                    'trades': [],
+                    'total_bars': len(bars),
+                    'total_signals': 0,
+                    'errors': [
+                        f"Backtest aborted: subprocesses exceeded {timeout_hours:.0f}-hour timeout (BTCAAAAA-36114)"
+                    ],
+                    'messages': [],
+                    'metrics': {},
+                }
         
         # STEP 3: Merge results
         if progress_callback:
