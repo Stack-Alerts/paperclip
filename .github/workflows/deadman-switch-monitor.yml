@@ -21,7 +21,7 @@ permissions:
 
 concurrency:
   group: deadman-switch-monitor
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   monitor:
     name: Watch backup dead-man's-switch liveness
