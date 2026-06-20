@@ -3,7 +3,6 @@
 import React, { useState, useCallback } from 'react';
 import { DataSource, DataVerificationResult } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
 export interface DataManagementPanelProps {
@@ -166,13 +165,16 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
                         >
                           {source.status}
                         </span>
-                        <Button
-                          size="sm"
+                        <button
                           onClick={() => onUpdate?.(source.id)}
                           disabled={disabled}
+                          className="px-2 py-1 rounded text-sm font-medium disabled:opacity-50 transition-colors"
+                          style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                         >
                           Update
-                        </Button>
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -185,13 +187,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
             </CardContent>
           </Card>
 
-          <Button
+          <button
             onClick={handleVerify}
             disabled={disabled || isVerifying || dataSources.length === 0}
-            className="w-full"
+            className="w-full px-4 py-2 rounded text-sm font-medium disabled:opacity-50 transition-colors"
+            style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }}
           >
             {isVerifying ? 'Verifying...' : 'Verify Data Integrity'}
-          </Button>
+          </button>
         </div>
       )}
 
@@ -223,15 +226,16 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
                   </div>
 
                   {result.repairableGaps > 0 && (
-                    <Button
+                    <button
                       onClick={() =>
                         onRepair?.(result.gaps.filter((g) => g.repairable).map((g) => g.startTime.toISOString()))
                       }
                       disabled={disabled}
-                      className="w-full"
+                      className="w-full px-4 py-2 rounded text-sm font-medium disabled:opacity-50 transition-colors"
+                      style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
                     >
                       Repair Gaps
-                    </Button>
+                    </button>
                   )}
 
                   {result.gaps.length > 0 && (
