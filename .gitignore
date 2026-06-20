@@ -222,3 +222,4 @@ docs/screenshots/BTCAAAAA-*.png
 .github_issue_update_BTCAAAAA-*.md
 .freeze-blocker-BTCAAAAA-*.md
 .e2e-test
+.claude/worktrees/
