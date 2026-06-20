@@ -240,9 +240,18 @@ jobs:
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            if [ -n "$SNAPSHOT" ]; then
-              echo "snapshot_file=$SNAPSHOT" >> "$GITHUB_OUTPUT"
+            # Rate-limit: at most one chore(impact-gate) commit per calendar day (UTC).
+            # Many 5-minute runs would otherwise each commit a near-identical snapshot.
+            TODAY=$(date -u +%Y-%m-%d)
+            ALREADY_TODAY=$(git log origin/main --oneline --after="${TODAY}T00:00:00Z" --grep="chore(impact-gate)" 2>/dev/null | head -1)
+            if [ -n "$ALREADY_TODAY" ]; then
+              echo "Rate-limited: chore(impact-gate) commit already exists for ${TODAY} — skipping"
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              if [ -n "$SNAPSHOT" ]; then
+                echo "snapshot_file=$SNAPSHOT" >> "$GITHUB_OUTPUT"
+              fi
             fi
           fi
 
