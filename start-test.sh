@@ -350,6 +350,17 @@ cleanup() {
 }
 trap cleanup INT TERM EXIT
 
+# Worktrees (especially the /tmp/user-test-main-$$ fallbacks) don't share
+# node_modules with the primary repo, so a fresh worktree has no `next` binary
+# and `npm run dev` fails with "sh: 1: next: not found". Install on demand.
+if [[ ! -x "$REPO_ROOT/packages/web-ui/node_modules/.bin/next" ]]; then
+  echo "[test-instance] node_modules missing in $REPO_ROOT/packages/web-ui — running npm install (one-time)..."
+  ( cd "$REPO_ROOT/packages/web-ui" && "$NPM" install --no-audit --no-fund ) || {
+    echo "ERROR: npm install failed in $REPO_ROOT/packages/web-ui" >&2
+    exit 1
+  }
+fi
+
 # Launch test instance
 # BTE_BRANCH_GATE_OK=1 tells gate-main-branch.sh (the predev hook) that we've
 # already done branch verification here — skip the npm-level gate.
