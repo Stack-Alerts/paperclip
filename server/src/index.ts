@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 import type { Request as ExpressRequest, RequestHandler } from "express";
 import { and, eq } from "drizzle-orm";
 import {
+  applyEmbeddedPostgresTuning,
   createDb,
   ensurePostgresDatabase,
   formatEmbeddedPostgresError,
@@ -425,6 +426,15 @@ export async function startServer(): Promise<StartedServer> {
     const dbStatus = await ensurePostgresDatabase(embeddedAdminConnectionString, "paperclip");
     if (dbStatus === "created") {
       logger.info("Created embedded PostgreSQL database: paperclip");
+    }
+
+    try {
+      const { applied } = await applyEmbeddedPostgresTuning(embeddedAdminConnectionString);
+      logger.info({ embeddedPostgresTuning: applied }, "Applied embedded PostgreSQL tuning (ALTER SYSTEM)");
+    } catch (err) {
+      // Tuning is best-effort: the server still works without it, but
+      // operators lose autovacuum/buffer defaults sized for production load.
+      logger.warn({ err }, "Failed to apply embedded PostgreSQL tuning; continuing with current settings");
     }
   
     const embeddedConnectionString = `postgres://paperclip:paperclip@127.0.0.1:${port}/paperclip`;
