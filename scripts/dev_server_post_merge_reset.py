@@ -270,13 +270,37 @@ def clear_next_dev_cache() -> bool:
         return False
 
 
-def restart_dev_server() -> bool:
-    """Restart the dev server and verify it's serving."""
-    try:
-        logger.info("Restarting dev server...")
+SYSTEMD_SERVICE = "btc-dev-server"
 
-        # Kill the process bound to WEBUI_PORT (the actual next-server),
-        # plus any npm run dev wrappers.
+
+def restart_dev_server() -> bool:
+    """Restart the dev server via systemd, eliminating the competing-subprocess race.
+
+    Steps:
+    1. Stop the service cleanly (prevents partial kill states).
+    2. Kill any residual process on the port as a fallback.
+    3. Clear the restart-failure counter so systemd won't refuse to start.
+    4. Start the service and let systemd own the process lifecycle.
+    5. Poll until the server returns 200 with expected content.
+    """
+    try:
+        logger.info("Restarting dev server via systemd (%s)...", SYSTEMD_SERVICE)
+
+        # Stop the service cleanly before touching the port.
+        stop_result = subprocess.run(
+            ["systemctl", "--user", "stop", SYSTEMD_SERVICE],
+            capture_output=True,
+            timeout=15,
+            check=False,
+        )
+        logger.info(
+            "systemctl --user stop %s: rc=%d", SYSTEMD_SERVICE, stop_result.returncode
+        )
+
+        # Wait a moment for the service to fully stop.
+        time.sleep(2)
+
+        # Fallback: kill any residual process still holding the port.
         fuser_result = subprocess.run(
             ["fuser", "-k", f"{WEBUI_PORT}/tcp"],
             capture_output=True,
@@ -285,14 +309,7 @@ def restart_dev_server() -> bool:
         )
         logger.info("fuser kill port %d: rc=%d", WEBUI_PORT, fuser_result.returncode)
 
-        subprocess.run(
-            ["pkill", "-f", "npm run dev"],
-            capture_output=True,
-            timeout=10,
-            check=False,
-        )
-
-        # Wait for port to be released
+        # Wait for port to be released.
         for _ in range(10):
             time.sleep(1)
             port_check = subprocess.run(
@@ -307,22 +324,39 @@ def restart_dev_server() -> bool:
         else:
             logger.warning("Port %d still in use after 10s, proceeding anyway", WEBUI_PORT)
 
-        # Start only the Next.js dev server on the expected port.
-        # start.sh defaults to port 3000 (BTE_WEBUI_PORT unset in .env), so
-        # we invoke npm run dev directly with the explicit port instead.
-        log_path = Path("/tmp") / f"webui-dev-{WEBUI_PORT}.log"
-        log_fh = open(log_path, "a")
-        proc = subprocess.Popen(
-            ["npm", "run", "dev", "--", "--port", str(WEBUI_PORT)],
-            cwd=WEBUI_DIR,
-            stdout=log_fh,
-            stderr=log_fh,
-            start_new_session=True,
+        # Clear the restart-failure counter so systemd will start cleanly.
+        reset_result = subprocess.run(
+            ["systemctl", "--user", "reset-failed", SYSTEMD_SERVICE],
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+        logger.info(
+            "systemctl --user reset-failed %s: rc=%d",
+            SYSTEMD_SERVICE,
+            reset_result.returncode,
         )
 
-        logger.info("Started dev server (PID %d)", proc.pid)
+        # Start the service — systemd is now the sole owner of the process.
+        start_result = subprocess.run(
+            ["systemctl", "--user", "start", SYSTEMD_SERVICE],
+            capture_output=True,
+            timeout=15,
+            check=False,
+        )
+        logger.info(
+            "systemctl --user start %s: rc=%d stderr=%s",
+            SYSTEMD_SERVICE,
+            start_result.returncode,
+            start_result.stderr.decode().strip(),
+        )
+        if start_result.returncode != 0:
+            logger.error(
+                "Failed to start %s: %s", SYSTEMD_SERVICE, start_result.stderr.decode()
+            )
+            return False
 
-        # Wait for the server to come up (max 90 seconds — Turbopack cold-start)
+        # Wait for the server to come up (max 90 seconds — Turbopack cold-start).
         for attempt in range(90):
             time.sleep(1)
             try:
@@ -340,7 +374,7 @@ def restart_dev_server() -> bool:
                     )
                     if title_found:
                         return True
-                    # Server is up but wrong content — keep waiting for compile
+                    # Server is up but wrong content — keep waiting for compile.
                     logger.debug("Waiting for full compile (attempt %d/90)", attempt + 1)
                 else:
                     logger.debug(
@@ -352,10 +386,6 @@ def restart_dev_server() -> bool:
                 logger.debug("Waiting for server (attempt %d/90): %s", attempt + 1, exc)
 
         logger.error("Dev server did not serve expected content within 90 seconds")
-        try:
-            os.killpg(os.getpgid(proc.pid), 15)
-        except Exception:
-            pass
         return False
     except Exception as exc:
         logger.error("Failed to restart dev server: %s", exc)
