@@ -1,0 +1,106 @@
+name: Status Bar Visual Regression
+
+# RTM: BTCAAAAA-30756 — Status Framework Slice 5: Visual Regression Baseline CI Lock
+# First-run bootstrap: generates baselines when none exist, commits them back.
+# Subsequent runs compare against committed baselines (pixel diff ≤ 0.1% gate).
+
+on:
+  pull_request:
+    branches: ["main", "master"]
+    paths:
+      - "packages/web-ui/src/components/layout/StatusBar.tsx"
+      - "packages/web-ui/src/lib/status/**"
+      - "packages/web-ui/src/contexts/StatusContext.tsx"
+      - "packages/web-ui/e2e/status-bar.spec.ts"
+      - "packages/web-ui/playwright.config.ts"
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: packages/web-ui
+
+jobs:
+  visual-regression:
+    name: Status bar visual regression (Playwright)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4.3.1
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: packages/web-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Next.js app
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_PUBLIC_E2E_TEST: "true"
+
+      - name: Check if baselines exist
+        id: baseline_check
+        shell: bash
+        run: |
+          if [ -d "__snapshots__/status-bar" ] && [ "$(ls -A __snapshots__/status-bar 2>/dev/null)" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate baselines (first-run bootstrap)
+        if: steps.baseline_check.outputs.exists == 'false'
+        run: npx playwright test e2e/status-bar.spec.ts --update-snapshots --reporter=github
+        env:
+          CI: "true"
+          NODE_ENV: test
+
+      - name: Commit generated baselines to branch
+        if: steps.baseline_check.outputs.exists == 'false'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add __snapshots__/
+          if git diff --cached --quiet; then
+            echo "No snapshot files generated."
+          else
+            git commit -m "chore(BTCAAAAA-30756): add Playwright visual regression baselines [skip ci]"
+            git push origin HEAD:${{ github.head_ref }}
+            echo "Baselines committed. Next CI run will compare against them."
+          fi
+
+      - name: Run visual regression comparison
+        if: steps.baseline_check.outputs.exists == 'true'
+        run: npx playwright test e2e/status-bar.spec.ts --reporter=github
+        env:
+          CI: "true"
+          NODE_ENV: test
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: playwright-report-visual-regression
+          path: packages/web-ui/playwright-report/
+          retention-days: 7
+
+      - name: Upload screenshot diffs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: screenshot-diffs
+          path: packages/web-ui/test-results/
+          retention-days: 7

@@ -11,6 +11,11 @@ import pytest
 
 
 class TestGetEngine:
+    def setup_method(self):
+        from optimizer_v3.database.settings import get_database_settings
+
+        get_database_settings.cache_clear()
+
     def test_defaults_when_env_unset(self):
         """When no POSTGRES_* vars are set, sensible defaults are used."""
         with patch.dict("os.environ", {}, clear=True):

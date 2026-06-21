@@ -25,3 +25,8 @@ class StatusBus {
 }
 
 export const statusBus = new StatusBus();
+
+// Expose on window for Playwright e2e tests — gated by NEXT_PUBLIC_E2E_TEST build flag
+if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_E2E_TEST === 'true') {
+  (window as Window & { __statusBus?: StatusBus }).__statusBus = statusBus;
+}

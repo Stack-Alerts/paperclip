@@ -90,14 +90,17 @@ export function StatusBarProvider({ children }: { children: React.ReactNode }) {
         prev.filter(e => {
           if (e.pinned) return true;
           if (e.dismissed) return false;
-          if (e.expiresAt && e.expiresAt <= now) return false;
+          if (e.expiresAt && e.expiresAt <= now) {
+            if (e.variant === 'error' && settings.errorPersist) return true;
+            return false;
+          }
           return true;
         })
       );
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [settings.tickerMode]);
+  }, [settings.tickerMode, settings.errorPersist]);
 
   const updateSettings = (newSettings: Partial<StatusBarSettings>) => {
     const updated = { ...settings, ...newSettings };

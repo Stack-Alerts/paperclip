@@ -71,7 +71,7 @@ export function StatusBar() {
 
   if (!settings.tickerMode && visibleEntries.length === 0) {
     return (
-      <div className="h-6 border-t px-3 flex items-center flex-shrink-0 min-h-6" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+      <div data-testid="status-bar" className="h-6 border-t px-3 flex items-center flex-shrink-0 min-h-6" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Ready</span>
       </div>
     );
@@ -80,7 +80,7 @@ export function StatusBar() {
   if (!settings.tickerMode) {
     const entry = visibleEntries[0];
     return (
-      <div className="h-6 border-t px-3 flex items-center flex-shrink-0 min-h-6" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+      <div data-testid="status-bar" className="h-6 border-t px-3 flex items-center flex-shrink-0 min-h-6" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
         <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{entry?.text ?? 'Ready'}</span>
       </div>
     );
@@ -89,7 +89,7 @@ export function StatusBar() {
   // eslint-disable-next-line react-hooks/purity
   const renderNow = Date.now();
   return (
-    <div className="border-t px-3 flex items-stretch flex-shrink-0 flex-col gap-1 py-1" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)', minHeight: '24px' }}>
+    <div data-testid="status-bar" data-mode="ticker" className="border-t px-3 flex items-stretch flex-shrink-0 flex-col gap-1 py-1" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)', minHeight: '24px' }}>
       {visibleEntries.map((entry, idx) => {
         const fallbackCountdown = countdowns[entry.id] ?? (entry.expiresAt ? entry.expiresAt - renderNow : 0);
         return (

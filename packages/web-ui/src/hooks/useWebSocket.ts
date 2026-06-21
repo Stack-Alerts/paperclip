@@ -44,7 +44,7 @@ export function useWebSocket<T>(url: string) {
       ws.onerror = () => {
         if (!unmounted.current) {
           setStatus('error');
-          if (settings.tickerMode) {
+          if (settings.tickerMode && process.env.NEXT_PUBLIC_E2E_TEST !== 'true') {
             status.emit('WebSocket error', { variant: 'error', duration: 4000 });
           }
         }
@@ -53,14 +53,14 @@ export function useWebSocket<T>(url: string) {
       ws.onclose = () => {
         if (unmounted.current) return;
         setStatus('closed');
-        if (settings.tickerMode) {
+        if (settings.tickerMode && process.env.NEXT_PUBLIC_E2E_TEST !== 'true') {
           status.emit('WebSocket disconnected', { variant: 'warning', duration: 2000 });
         }
         reconnectTimer.current = setTimeout(connectRef.current, 3000);
       };
     } catch {
       setStatus('error');
-      if (settings.tickerMode) {
+      if (settings.tickerMode && process.env.NEXT_PUBLIC_E2E_TEST !== 'true') {
         status.emit('WebSocket connection failed', { variant: 'error', duration: 4000 });
       }
       reconnectTimer.current = setTimeout(connectRef.current, 5000);

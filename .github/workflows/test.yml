@@ -123,6 +123,15 @@ jobs:
           pip install --upgrade pip
           pip install nautilus_trader pandas pyarrow
 
+      - name: Link real data files from host
+        run: |
+          mkdir -p data/binance
+          find /home/sirrus/projects/BTC-Trade-Engine-PaperClip/data/binance -mindepth 1 -maxdepth 1 -type d | while read month_dir; do
+            month=$(basename "$month_dir")
+            mkdir -p "data/binance/$month"
+            ln -sfn "$month_dir/"*.parquet "data/binance/$month/" 2>/dev/null || true
+          done
+
       - name: Run real-data multicore regression test
         run: |
           python -m pytest \
@@ -151,6 +160,15 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install nautilus_trader pandas pyarrow PyQt5 pytest pytest-qt
+
+      - name: Link real data files from host
+        run: |
+          mkdir -p data/binance
+          find /home/sirrus/projects/BTC-Trade-Engine-PaperClip/data/binance -mindepth 1 -maxdepth 1 -type d | while read month_dir; do
+            month=$(basename "$month_dir")
+            mkdir -p "data/binance/$month"
+            ln -sfn "$month_dir/"*.parquet "data/binance/$month/" 2>/dev/null || true
+          done
 
       - name: Run canary smoke tests
         env:
