@@ -130,6 +130,24 @@ function initCurrentStrategy(): { current: Strategy | null; list: Strategy[] } {
   return { current: fresh, list: [fresh] };
 }
 
+// Normalize stale title-cased definitionId values saved by old code (before PR #163).
+// Old code stored "Cup And Handle" instead of "cup_and_handle", causing the
+// click-to-highlight comparison against library block.id to always fail.
+function normalizeDefinitionIds(strategy: Strategy | null): Strategy | null {
+  if (!strategy?.blocks) return strategy;
+  let changed = false;
+  const normalizedBlocks = strategy.blocks.map(block => {
+    const data = block.data as Record<string, unknown> | undefined;
+    const defId = data?.definitionId as string | undefined;
+    if (!defId) return block;
+    const norm = defId.toLowerCase().replace(/\s+/g, '_');
+    if (norm === defId) return block;
+    changed = true;
+    return { ...block, data: { ...data, definitionId: norm } };
+  });
+  return changed ? { ...strategy, blocks: normalizedBlocks } : strategy;
+}
+
 export interface FixedIssueEntry {
   key: string;
   issue: ValidationIssue;
@@ -246,7 +264,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
       ? sessions[migratedCurrent.id] ?? null
       : null;
     set({
-      currentStrategy: migratedCurrent,
+      currentStrategy: normalizeDefinitionIds(migratedCurrent),
       strategyList: migrated,
       lastBacktestSession: restoredSession,
       // Seed the result/logs from the cached snapshot so the backtest panel

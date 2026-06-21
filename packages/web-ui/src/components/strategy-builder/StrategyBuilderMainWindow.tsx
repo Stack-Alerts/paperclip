@@ -656,7 +656,18 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
       const mainBlocks: Block[] = rawBlocks.map((b, i): Block => {
         const isFrontendShape =
           b && typeof b === 'object' && 'data' in b && 'type' in b;
-        if (isFrontendShape) return b as Block;
+        if (isFrontendShape) {
+          const blk = b as Block;
+          const blkData = blk.data as Record<string, unknown> | undefined;
+          const defId = blkData?.definitionId as string | undefined;
+          if (defId) {
+            const norm = defId.toLowerCase().replace(/\s+/g, '_');
+            if (norm !== defId) {
+              return { ...blk, data: { ...blkData, definitionId: norm } };
+            }
+          }
+          return blk;
+        }
         const raw = b as unknown as Record<string, unknown>;
         const rawName = typeof raw.name === 'string' ? raw.name : '';
         const signals = raw.signals as unknown;
