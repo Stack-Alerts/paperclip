@@ -210,7 +210,7 @@ while IFS= read -r branch; do
     "${PAPERCLIP_API_URL}/api/issues/${issue_id}" \
     | jq -r '.status // "not_found"' 2>/dev/null || echo "api_error")
 
-  if [[ "$issue_status" == "done" ]]; then
+  if [[ "$issue_status" == "done" || "$issue_status" == "cancelled" ]]; then
     fix_sha=$(curl -sf \
       -H "Authorization: Bearer ${PAPERCLIP_API_KEY}" \
       "${PAPERCLIP_API_URL}/api/issues/${issue_id}/comments?order=desc&limit=20" \
@@ -344,6 +344,10 @@ if [[ "$DRY_RUN" == "false" ]]; then
   for entry in "${DONE_ARCHIVE[@]}"; do
     IFS='|' read -r br behind idleh last_push issue_id issue_status fix_sha ancestor_rc <<< "$entry"
     if [[ "$ancestor_rc" == "0" || "$ancestor_rc" == "no-fix-sha" ]]; then
+      archive_branch "$br"
+    elif [[ "$issue_status" == "cancelled" ]]; then
+      # Cancelled issues: archive regardless of Fix-SHA ancestry — work was deliberately abandoned
+      echo "  Archiving (cancelled issue — Fix-SHA ancestry not required): $br"
       archive_branch "$br"
     else
       echo "  SKIP (done-but-unmerged): $br — Fix-SHA not ancestor of main"
