@@ -1,0 +1,27 @@
+{
+  "_doc": "Closure-gate canary endpoints (BTCAAAAA-37739). The closure-gate smoke runner imports src.api.app and hits these endpoints in-process via FastAPI TestClient. Any response outside allow_status (especially 5xx) causes the parent issue to be reopened with the closure-gate-smoke-failed label. Add an endpoint here when a regression slips past ancestry-only verification.",
+  "endpoints": [
+    {
+      "name": "health",
+      "method": "GET",
+      "path": "/health",
+      "body": null,
+      "allow_status": [200, 204, 404]
+    },
+    {
+      "name": "strategy_builder_validate",
+      "method": "POST",
+      "path": "/strategy-builder/strategies/{seed}/validate",
+      "body": {},
+      "allow_status": [200, 400, 404, 422, 503]
+    },
+    {
+      "name": "strategy_backtest_start",
+      "method": "POST",
+      "path": "/strategies/{seed}/backtest",
+      "body": {"window": "1d"},
+      "allow_status": [200, 400, 404, 422, 503]
+    }
+  ],
+  "seed_strategy_id": "closure-gate-smoke-seed"
+}

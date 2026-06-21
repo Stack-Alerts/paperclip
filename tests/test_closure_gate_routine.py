@@ -207,16 +207,18 @@ class TestFormatRoutineReport:
 class TestProcessIssue:
     """Test issue processing logic."""
 
+    @patch("closure_gate_routine._run_smoke_for_sha")
     @patch("closure_gate_routine.detect_fabrication")
     @patch("closure_gate_routine.fetch_issue_comments")
     @patch("closure_gate_routine.extract_fix_sha_from_comments")
     @patch("closure_gate_routine.verify_sha_on_main")
-    def test_process_issue_verified(self, mock_verify, mock_extract, mock_fetch_comments, mock_fab):
-        """Should mark issue as verified when SHA is on main."""
+    def test_process_issue_verified(self, mock_verify, mock_extract, mock_fetch_comments, mock_fab, mock_smoke):
+        """Should mark issue as verified when SHA is on main and smoke passes."""
         mock_fetch_comments.return_value = []
         mock_extract.return_value = "0123456789abcdef0123456789abcdef01234567"
         mock_fab.return_value = None
         mock_verify.return_value = True
+        mock_smoke.return_value = {"ok": True}
 
         issue = {
             "id": "issue1",

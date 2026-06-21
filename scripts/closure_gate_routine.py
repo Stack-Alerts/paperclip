@@ -67,6 +67,14 @@ MAX_DEFERRAL_API_CALLS = 50
 # State file to track closure-gate actions
 CLOSURE_GATE_STATE_FILE = REPO_ROOT / "data" / "closure_gate_actions.json"
 
+# Closure-gate smoke runner (BTCAAAAA-37739). Disable by setting
+# CLOSURE_GATE_SMOKE=0 — useful when the runner itself is being debugged so the
+# ancestry-only gate still operates.
+SMOKE_SCRIPT = REPO_ROOT / "scripts" / "closure_gate_smoke.py"
+SMOKE_ENABLED = os.environ.get("CLOSURE_GATE_SMOKE", "1") != "0"
+SMOKE_TIMEOUT_SECONDS = 240
+SMOKE_FAIL_LABEL = "closure-gate-smoke-failed"
+
 # Regex for Fix-SHA comment: line-anchored
 FIX_SHA_PATTERN = re.compile(r"^Fix-SHA: ([0-9a-f]{40})$", re.MULTILINE)
 
@@ -654,6 +662,72 @@ def verify_sha_on_main(sha: str, skip_fetch: bool = False) -> bool:
         return False
 
 
+def _run_smoke_for_sha(sha: str) -> dict[str, Any]:
+    """Invoke the closure-gate smoke runner against a commit SHA.
+
+    Returns the parsed JSON verdict from scripts/closure_gate_smoke.py, or a
+    synthetic `{"ok": False, "error": "..."}` dict if the runner could not be
+    executed. The routine treats any non-ok verdict as a smoke failure and
+    reopens the parent issue.
+    """
+    if not SMOKE_ENABLED:
+        return {"ok": True, "skipped": "CLOSURE_GATE_SMOKE=0"}
+    if not SMOKE_SCRIPT.exists():
+        return {"ok": False, "error": f"smoke runner not found at {SMOKE_SCRIPT}"}
+    try:
+        result = subprocess.run(
+            [sys.executable, str(SMOKE_SCRIPT), "--at-sha", sha],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=SMOKE_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": f"smoke runner timed out after {SMOKE_TIMEOUT_SECONDS}s"}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    try:
+        verdict = json.loads(result.stdout) if result.stdout.strip() else {}
+    except json.JSONDecodeError:
+        verdict = {}
+    if not verdict:
+        verdict = {"ok": result.returncode == 0}
+    verdict.setdefault("ok", result.returncode == 0)
+    if result.returncode != 0 and "error" not in verdict:
+        verdict["harness_stderr"] = result.stderr[-500:]
+    return verdict
+
+
+def _format_smoke_failure_comment(sha: str, verdict: dict[str, Any]) -> str:
+    """Render the comment posted when smoke fails for a closed issue."""
+    lines = [
+        f"**Closure-Gate: `{SMOKE_FAIL_LABEL}`**",
+        "",
+        f"The smoke runner refused commit `{sha[:12]}` before flipping this issue to `done`.",
+        "",
+    ]
+    if verdict.get("import_ok") is False:
+        lines.append(f"- import `src.api.app`: FAILED — `{verdict.get('import_error', 'unknown')}`")
+    if "error" in verdict:
+        lines.append(f"- runner error: `{verdict['error']}`")
+    for r in verdict.get("results", []) or []:
+        if r.get("ok"):
+            continue
+        status_str = r.get("status")
+        if status_str is None:
+            status_str = f"error: {r.get('error', 'unknown')}"
+        lines.append(
+            f"- `{r.get('method', '?')} {r.get('path', '?')}` → {status_str} (allow={r.get('in_allow_list')})"
+        )
+    lines.extend([
+        "",
+        "Status reset to `in_review`. After landing a fix on `origin/main`, the next routine pass will re-smoke and reclose.",
+        "",
+        f"Smoke endpoint list: `scripts/closure_gate_smoke_endpoints.json` · runner: `scripts/closure_gate_smoke.py` (BTCAAAAA-37739).",
+    ])
+    return "\n".join(lines)
+
+
 def get_issue_closer_manager(issue: dict[str, Any]) -> str | None:
     """Get the manager of the agent who closed the issue."""
     # This would need to be fetched from Paperclip's agent API
@@ -880,6 +954,49 @@ def process_issue(
     # Verify SHA is on main
     if verify_sha_on_main(sha, skip_fetch=skip_git_fetch):
         logger.info("Issue %s SHA %s is on main", issue_identifier, sha[:8])
+
+        # Closure-gate smoke (BTCAAAAA-37739): ancestry alone let PR #118 ship
+        # a 5xx regression. Before accepting `done`, import src.api.app at the
+        # SHA and hit the canary endpoint list. Any 5xx → reopen.
+        smoke_verdict = _run_smoke_for_sha(sha)
+        if not smoke_verdict.get("ok", False) and not smoke_verdict.get("skipped"):
+            logger.warning(
+                "Issue %s SHA %s FAILED closure-gate smoke", issue_identifier, sha[:8],
+            )
+            action_hash = compute_action_hash(issue_id, sha, "smoke_failed")
+            action_key = f"{issue_id}:{action_hash}"
+            if action_key not in state:
+                comment_body = _format_smoke_failure_comment(sha, smoke_verdict)
+                try:
+                    with _http_session() as sess:
+                        sess.patch(
+                            f"{_base()}/api/issues/{issue_id}",
+                            json={"status": "in_review", "labels": [SMOKE_FAIL_LABEL]},
+                            timeout=API_TIMEOUT,
+                        )
+                        sess.post(
+                            f"{_base()}/api/issues/{issue_id}/comments",
+                            json={"body": comment_body},
+                            timeout=API_TIMEOUT,
+                        )
+                    state[action_key] = {
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "issue_identifier": issue_identifier,
+                        "action": "smoke_failed",
+                        "sha": sha,
+                        "verdict_summary": {
+                            "import_ok": smoke_verdict.get("import_ok"),
+                            "failed_endpoints": [
+                                r.get("name") for r in smoke_verdict.get("results", []) or []
+                                if not r.get("ok")
+                            ],
+                        },
+                    }
+                except Exception as exc:  # noqa: BLE001
+                    logger.error("Failed to reopen issue %s after smoke fail: %s", issue_identifier, exc)
+                    return "smoke_failed", False
+            return "smoke_failed", True
+
         return "verified", True
     else:
         logger.info("Issue %s SHA %s is NOT on main - reopening", issue_identifier, sha[:8])
@@ -977,6 +1094,7 @@ def main(argv: list[str] | None = None) -> None:
         "reopened": 0,
         "requested_sha": 0,
         "flagged_fabrication": 0,
+        "smoke_failed": 0,
         "errors": 0,
     }
     deferral_flags: list[dict[str, Any]] = []
@@ -1004,9 +1122,19 @@ def main(argv: list[str] | None = None) -> None:
                 stats["flagged_fabrication"] += 1
             else:
                 stats["errors"] += 1
+        elif action_type == "smoke_failed":
+            if success:
+                stats["smoke_failed"] += 1
+            else:
+                stats["errors"] += 1
 
     # Save updated state
-    if stats["reopened"] > 0 or stats["requested_sha"] > 0 or stats["flagged_fabrication"] > 0:
+    if (
+        stats["reopened"] > 0
+        or stats["requested_sha"] > 0
+        or stats["flagged_fabrication"] > 0
+        or stats["smoke_failed"] > 0
+    ):
         save_state(state)
         logger.info("Saved updated closure-gate state")
 
@@ -1049,6 +1177,7 @@ def format_routine_report(
         f"**Verified on main:** {stats['verified']}",
         f"**Reopened (unmerged):** {stats['reopened']}",
         f"**Flagged (fabrication):** {stats['flagged_fabrication']}",
+        f"**Reopened (smoke failed):** {stats.get('smoke_failed', 0)}",
         f"**Requested Fix-SHA tag:** {stats['requested_sha']}",
         f"**Unfiled deferrals:** {len(deferral_flags)}",
         f"**Errors:** {stats['errors']}",
