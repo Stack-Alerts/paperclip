@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { BacktestConfigDialog } from '@/components/strategy-builder/BacktestConfigDialog';
 import { Providers } from '@/components/strategy-builder/Providers';
 import { StrategyStatus } from '@/lib/strategy-builder/types';
+import type { BacktestStatusMessage } from '@/lib/strategy-builder/types';
 
 jest.mock('@/hooks/strategy-builder/useStrategyStore', () => ({
   useStrategyStore: jest.fn(),
@@ -29,6 +30,7 @@ const defaultStore = {
   backTestInProgress: false,
   backTestProgress: 0,
   backTestResult: null,
+  backTestLogs: [] as BacktestStatusMessage[],
 };
 
 function renderDialog(open = true, onClose = jest.fn()) {
@@ -117,5 +119,31 @@ describe('BacktestConfigDialog', () => {
     renderDialog(true, onClose);
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  // Regression test for BTCAAAAA-34942: backTestLogs store slice must be forwarded
+  // to the Live Output panel on every poll tick; previously the store discarded logs
+  // and the panel stayed blank until the run completed.
+  it('BTCAAAAA-34942 regression: backTestLogs arriving mid-run appear in Live Output', async () => {
+    const logs: BacktestStatusMessage[] = [
+      { message: 'Loading bars from Binance…', level: 'SYSTEM', timestamp: '2026-06-06T10:00:00Z' },
+      { message: 'Bar 1 processed', level: 'INFO', timestamp: '2026-06-06T10:00:01Z' },
+    ];
+
+    mockStore.mockReturnValue({
+      ...defaultStore,
+      backTestInProgress: true,
+      backTestLogs: logs,
+    } as any);
+
+    render(
+      <Providers tooltips={{}}>
+        <BacktestConfigDialog open onClose={jest.fn()} />
+      </Providers>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Loading bars from Binance/)).toBeInTheDocument();
+    });
   });
 });
