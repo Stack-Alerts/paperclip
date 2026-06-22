@@ -92,6 +92,56 @@ function saveSessionsToStorage(sessions: Record<string, BacktestSession>): void 
   }
 }
 
+// BTCAAAAA-37756 reopen: sb_validate_strategy returns a report but does
+// NOT persist validation_status to strategy_versions. The Strategy
+// Browser's listStrategies response therefore carries null and the row
+// renders as "Un-Validated" even after the editor shows Pass/Fail.
+// Workaround (webui-only, AGENTS.md forbids src/ edits without a
+// cross-scope ticket): cache the most-recent pass/fail per strategy
+// version in localStorage so the browser can enrich its display.
+const VALIDATION_CACHE_KEY = 'btcte:validation_status_cache';
+type ValidationCache = Record<string, 'Pass' | 'Fail'>;
+
+function loadValidationCache(): ValidationCache {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(VALIDATION_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === 'object' ? (parsed as ValidationCache) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveValidationCache(cache: ValidationCache): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(VALIDATION_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Same fallback policy as the backtest-session cache: keep the
+    // in-memory state, lose only cross-reload durability.
+  }
+}
+
+function validationCacheKey(strategy: Strategy): string {
+  const version = strategy.versionId ?? strategy.id;
+  return `${strategy.id}::${version}`;
+}
+
+function persistValidationCache(strategy: Strategy, isValid: boolean): void {
+  if (!isBackendStrategyId(strategy.id)) return;
+  const cache = loadValidationCache();
+  cache[validationCacheKey(strategy)] = isValid ? 'Pass' : 'Fail';
+  saveValidationCache(cache);
+}
+
+export function readCachedValidationStatus(strategy: Pick<Strategy, 'id' | 'versionId'>): 'Pass' | 'Fail' | null {
+  if (!isBackendStrategyId(strategy.id)) return null;
+  const cache = loadValidationCache();
+  return cache[validationCacheKey(strategy as Strategy)] ?? null;
+}
+
 function makeDefaultStrategy(name: string, description = ''): Strategy {
   const now = new Date().toISOString();
   return {
@@ -626,6 +676,11 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
             status: enriched.is_valid ? StrategyStatus.VALID : StrategyStatus.INVALID,
           },
         });
+        // Cache pass/fail so the Strategy Browser can display it after a
+        // listStrategies fetch — sb_validate_strategy does not yet persist
+        // validation_status, so the API returns null and the browser would
+        // otherwise show "Un-Validated" (BTCAAAAA-37756 reopen).
+        persistValidationCache(currentStrategy, enriched.is_valid);
         return;
       } catch {
         // Fall through to local validation below — the structural checks are
@@ -643,6 +698,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
           status: report.is_valid ? StrategyStatus.VALID : StrategyStatus.INVALID,
         },
       });
+      persistValidationCache(currentStrategy, report.is_valid);
     } catch (error) {
       const messages: ValidationMessage[] = [
         {

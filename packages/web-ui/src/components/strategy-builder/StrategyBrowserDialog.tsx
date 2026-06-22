@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect, type CSSProperties } from 'react';
-import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
+import { useStrategyStore, readCachedValidationStatus } from '@/hooks/strategy-builder/useStrategyStore';
 import { Strategy, StrategyStatus, StrategyVersion, Block, BlockType, PersistedExitCondition } from '@/lib/strategy-builder/types';
 import {
   deleteStrategyScoped, duplicateStrategyScoped,
@@ -605,7 +605,19 @@ export function StrategyBrowserDialog({
     setListError(null);
     try {
       const updated = await listStrategies();
-      setLocalList(updated as typeof strategyList);
+      // sb_validate_strategy does not yet persist validation_status, so the
+      // API returns null per row. Enrich with the per-browser localStorage
+      // cache that the editor wrote on its last successful validate so the
+      // browser correctly shows Pass/Fail instead of "Un-Validated"
+      // (BTCAAAAA-37756 reopen).
+      const enriched = (updated as typeof strategyList).map((s) => {
+        const cached = readCachedValidationStatus(s);
+        if (cached && !s.validationStatus) {
+          return { ...s, validationStatus: cached };
+        }
+        return s;
+      });
+      setLocalList(enriched);
     } catch (e) {
       setListError(e instanceof Error ? e.message : 'Failed to load strategies');
       setLocalList(null);

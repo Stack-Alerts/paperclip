@@ -125,12 +125,29 @@ jobs:
 
       - name: Link real data files from host
         run: |
+          set -euo pipefail
           mkdir -p data/binance
-          find /home/sirrus/projects/BTC-Trade-Engine-PaperClip/data/binance -mindepth 1 -maxdepth 1 -type d | while read month_dir; do
+          linked_count=0
+          for month_dir in /home/sirrus/projects/BTC-Trade-Engine-PaperClip/data/binance/*/; do
+            [ -d "$month_dir" ] || continue
             month=$(basename "$month_dir")
             mkdir -p "data/binance/$month"
-            ln -sfn "$month_dir/"*.parquet "data/binance/$month/" 2>/dev/null || true
+            # BTCAAAAA-37949: hardcoded ln -sfn + 2>/dev/null silently produced
+            # empty per-month dirs whenever the host path did not exist on the
+            # runner. The integration test then "found" 0 parquets and the job
+            # passed green-with-zero-data instead of failing. Use cp + count + a
+            # loud zero-file guard so a missing data mount breaks the build.
+            for src in "$month_dir"*.parquet; do
+              [ -f "$src" ] || continue
+              cp "$src" "data/binance/$month/"
+              linked_count=$((linked_count + 1))
+            done
           done
+          echo "Linked $linked_count parquet files into data/binance/"
+          if [ "$linked_count" -eq 0 ]; then
+            echo "::error::No parquet files were linked from /home/sirrus/projects/BTC-Trade-Engine-PaperClip/data/binance. Refusing to run against an empty dataset." >&2
+            exit 1
+          fi
 
       - name: Run real-data multicore regression test
         run: |
@@ -163,12 +180,29 @@ jobs:
 
       - name: Link real data files from host
         run: |
+          set -euo pipefail
           mkdir -p data/binance
-          find /home/sirrus/projects/BTC-Trade-Engine-PaperClip/data/binance -mindepth 1 -maxdepth 1 -type d | while read month_dir; do
+          linked_count=0
+          for month_dir in /home/sirrus/projects/BTC-Trade-Engine-PaperClip/data/binance/*/; do
+            [ -d "$month_dir" ] || continue
             month=$(basename "$month_dir")
             mkdir -p "data/binance/$month"
-            ln -sfn "$month_dir/"*.parquet "data/binance/$month/" 2>/dev/null || true
+            # BTCAAAAA-37949: hardcoded ln -sfn + 2>/dev/null silently produced
+            # empty per-month dirs whenever the host path did not exist on the
+            # runner. The integration test then "found" 0 parquets and the job
+            # passed green-with-zero-data instead of failing. Use cp + count + a
+            # loud zero-file guard so a missing data mount breaks the build.
+            for src in "$month_dir"*.parquet; do
+              [ -f "$src" ] || continue
+              cp "$src" "data/binance/$month/"
+              linked_count=$((linked_count + 1))
+            done
           done
+          echo "Linked $linked_count parquet files into data/binance/"
+          if [ "$linked_count" -eq 0 ]; then
+            echo "::error::No parquet files were linked from /home/sirrus/projects/BTC-Trade-Engine-PaperClip/data/binance. Refusing to run against an empty dataset." >&2
+            exit 1
+          fi
 
       - name: Run canary smoke tests
         env:
