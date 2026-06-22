@@ -243,21 +243,34 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
     wasValidatingRef.current = false;
     const after = currentStrategyRef.current;
     if (after?.status !== StrategyStatus.VALID) return;
-    if (validationPassedSnapshot !== '') return;
     const snap = JSON.stringify({
       id: after.id,
       blocks: after.blocks,
       name: after.name,
     });
-    if (snap !== '' && snap === strategySnapshot) {
+    // BTCAAAAA-37756: re-stamp on every successful validation so the user can
+    // edit-then-re-validate and have the Validate step turn green / Test/Optimize
+    // unlock. The previous guard (`validationPassedSnapshot !== ''` → return)
+    // only stamped the first time and broke the post-edit re-validate flow.
+    if (snap !== '' && snap === strategySnapshot && snap !== validationPassedSnapshot) {
       setValidationPassedSnapshot(snap);
     }
   }, [isValidatingFromStore, strategySnapshot, validationPassedSnapshot]);
 
+  // BTCAAAAA-37756 / BTCAAAAA-37801: derive validated-and-pristine at render time.
+  // Treat the strategy as validated when either (a) the snapshot matches one we
+  // stamped via a successful validation run, or (b) the backend already reports
+  // it as validated (status=VALID or validationStatus='Pass') and the snapshot
+  // still matches the clean (just-loaded) snapshot. Computing this inline avoids
+  // the cascading setState in useEffect that BTCAAAAA-37801 flagged.
+  const isDbAlreadyValidated =
+    !!currentStrategy &&
+    (currentStrategy.status === StrategyStatus.VALID ||
+      (currentStrategy as { validationStatus?: string }).validationStatus === 'Pass');
   const isValidatedAndPristine =
     !!currentStrategy &&
-    validationPassedSnapshot !== '' &&
-    strategySnapshot === validationPassedSnapshot;
+    ((validationPassedSnapshot !== '' && strategySnapshot === validationPassedSnapshot) ||
+      (isDbAlreadyValidated && !!strategySnapshot && strategySnapshot === cleanSnapshot));
 
   // The "Next data check" status-bar countdown was removed (BTCAAAAA-36517):
   // it duplicated the next-candle countdown already shown under the connection
@@ -1061,6 +1074,11 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             // match (see useMemo on currentStrategy) and the step reverts to
             // needing attention.
             forceCompleteStepIds={isValidatedAndPristine ? new Set([1]) : undefined}
+            // BTCAAAAA-37756: glow the Validate step (amber pulse, same animation
+            // as the Save button when there are unsaved changes) whenever the
+            // strategy is not validated/pristine — signals to the user that they
+            // must validate before proceeding to Test/Optimize.
+            pulseStepIds={!isValidatedAndPristine && currentStrategy ? new Set([1]) : undefined}
             onStepClick={(id) => {
               setCurrentStep(id);
               if (id === 1) {

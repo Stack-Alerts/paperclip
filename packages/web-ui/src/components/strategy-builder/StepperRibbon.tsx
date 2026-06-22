@@ -153,6 +153,10 @@ export interface StepperRibbonProps {
   // when the user reopens a strategy that has been validated and the
   // strategy state has not been modified since.
   forceCompleteStepIds?: Set<number>;
+  // BTCAAAAA-37756: steps to render with an amber attention pulse, mirroring
+  // the Save button's amber glow. Used to signal "this step needs action"
+  // (e.g. Validate when the strategy is dirty or unvalidated).
+  pulseStepIds?: Set<number>;
   onStepClick?: (step: number) => void;
   inline?: boolean;
 }
@@ -162,6 +166,7 @@ export function StepperRibbon({
   completedSteps = new Set(),
   errorSteps = new Set(),
   forceCompleteStepIds,
+  pulseStepIds,
   onStepClick,
   inline = false,
 }: StepperRibbonProps) {
@@ -176,14 +181,21 @@ export function StepperRibbon({
   const stepButtons = STEPS.map((step, idx) => {
     const status = getStatus(step.id);
     const clickable = !!onStepClick;
+    // BTCAAAAA-37756: only pulse pending/active steps — once a step is complete
+    // (green) or in error (red), the pulse would visually conflict with its
+    // status color. The amber pulse class is defined in the parent window
+    // (StrategyBuilderMainWindow's <style> block: .button-amber-pulse).
+    const shouldPulse =
+      !!pulseStepIds?.has(step.id) && status !== 'complete' && status !== 'error';
     return (
       <div key={step.id} className="flex items-center gap-2">
         <RichTooltip content={step.tooltip}>
           <button
-            className={stepClasses(status, clickable)}
+            className={`${stepClasses(status, clickable)}${shouldPulse ? ' button-amber-pulse' : ''}`}
             style={status === 'active' ? ACTIVE_STYLE : undefined}
             onClick={() => onStepClick?.(step.id)}
             aria-current={status === 'active' ? 'step' : undefined}
+            data-pulse={shouldPulse ? 'true' : undefined}
           >
             <span aria-hidden="true">{step.icon}</span>
             {step.name}

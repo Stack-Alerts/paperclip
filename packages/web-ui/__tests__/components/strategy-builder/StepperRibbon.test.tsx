@@ -82,4 +82,41 @@ describe('StepperRibbon', () => {
       expect(screen.getAllByLabelText('complete')).toHaveLength(3);
     });
   });
+
+  // BTCAAAAA-37756: pulseStepIds gives the named steps an amber glow (mirrors
+  // the Save button's pulse) to signal "needs action". Used by the MainWindow
+  // to glow the Validate step when the strategy is dirty / unvalidated.
+  describe('pulseStepIds (BTCAAAAA-37756)', () => {
+    it('marks pulsed pending step with data-pulse=true', () => {
+      renderRibbon({ pulseStepIds: new Set([1]) });
+      const buttons = screen.getAllByRole('button');
+      expect(buttons[1]).toHaveAttribute('data-pulse', 'true');
+      expect(buttons[1].className).toMatch(/button-amber-pulse/);
+    });
+
+    it('does NOT pulse a step that is already complete', () => {
+      renderRibbon({
+        pulseStepIds: new Set([1]),
+        forceCompleteStepIds: new Set([1]),
+      });
+      const buttons = screen.getAllByRole('button');
+      expect(buttons[1]).not.toHaveAttribute('data-pulse');
+      expect(buttons[1].className).not.toMatch(/button-amber-pulse/);
+    });
+
+    it('does NOT pulse a step that is in error', () => {
+      renderRibbon({
+        pulseStepIds: new Set([1]),
+        errorSteps: new Set([1]),
+      });
+      const buttons = screen.getAllByRole('button');
+      expect(buttons[1]).not.toHaveAttribute('data-pulse');
+    });
+
+    it('omitting pulseStepIds leaves no pulse markers', () => {
+      renderRibbon();
+      const buttons = screen.getAllByRole('button');
+      buttons.forEach(b => expect(b).not.toHaveAttribute('data-pulse'));
+    });
+  });
 });
