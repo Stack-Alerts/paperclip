@@ -1,0 +1,105 @@
+name: Forbid Test Deletion in Code-Deleting PRs
+
+# BTCAAAAA-37738 — P-2 governance gate.
+# Fails any PR that deletes BOTH a file under tests/** AND a Python file outside
+# tests/**, unless the PR carries the `revert-deletes-tests-approved` label.
+#
+# Root cause this prevents: PR #118 deleted scoped_managers() together with its
+# test in one PR, leaving CI nothing to fail on. Going forward, the test must
+# stay until a board-authorised label is applied.
+#
+# Renaming/moving tests is NOT in scope — only outright deletion of a tests/**
+# file triggers this gate.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: forbid-test-deletion-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Block test deletion without approval label
+    runs-on: ubuntu-latest
+    env:
+      APPROVAL_LABEL: revert-deletes-tests-approved
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Enumerate PR file changes
+        id: changes
+        run: |
+          set -euo pipefail
+          gh api --paginate \
+            "repos/${REPO}/pulls/${PR_NUMBER}/files" \
+            --jq '.[] | {filename: .filename, status: .status}' \
+            > /tmp/pr_files.jsonl
+
+          deleted_tests=$(jq -r 'select(.status=="removed") | .filename' /tmp/pr_files.jsonl \
+            | grep -E '^tests/' || true)
+          deleted_code=$(jq -r 'select(.status=="removed") | .filename' /tmp/pr_files.jsonl \
+            | grep -E '\.py$' | grep -Ev '^tests/' || true)
+
+          {
+            echo "deleted_tests<<EOF"
+            echo "${deleted_tests}"
+            echo "EOF"
+            echo "deleted_code<<EOF"
+            echo "${deleted_code}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Decide gate
+        env:
+          DELETED_TESTS: ${{ steps.changes.outputs.deleted_tests }}
+          DELETED_CODE: ${{ steps.changes.outputs.deleted_code }}
+          LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+
+          has_label=$(echo "${LABELS_JSON}" | jq -r --arg L "${APPROVAL_LABEL}" \
+            'map(select(. == $L)) | length')
+
+          {
+            echo "## Forbid Test Deletion Gate"
+            echo
+            echo "- Approval label (\`${APPROVAL_LABEL}\`): $([ "$has_label" -gt 0 ] && echo yes || echo no)"
+            echo
+            echo "### Deleted test files (\`tests/**\`)"
+            if [ -n "${DELETED_TESTS}" ]; then
+              echo '```'
+              echo "${DELETED_TESTS}"
+              echo '```'
+            else
+              echo "_none_"
+            fi
+            echo
+            echo "### Deleted Python files outside \`tests/**\`"
+            if [ -n "${DELETED_CODE}" ]; then
+              echo '```'
+              echo "${DELETED_CODE}"
+              echo '```'
+            else
+              echo "_none_"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "${DELETED_TESTS}" ] || [ -z "${DELETED_CODE}" ]; then
+            echo "Gate not triggered: PR does not delete both a test and non-test Python code."
+            exit 0
+          fi
+
+          if [ "$has_label" -gt 0 ]; then
+            echo "Gate satisfied: PR carries \`${APPROVAL_LABEL}\`."
+            exit 0
+          fi
+
+          echo "::error::PR deletes tests/** files alongside Python code outside tests/** without the \`${APPROVAL_LABEL}\` label. See BTCAAAAA-37738."
+          exit 1
