@@ -1088,7 +1088,15 @@ function buildRequestPayload(
   backtestConfig: Record<string, unknown> | null | undefined,
   activeRec: ActiveRec | null = null,
   optimizationGoal: string | null = null,
+  blockCatalog: unknown[] | null = null,
 ): string {
+  // Cap trades to 20 (first 10 + last 10) to avoid blowing provider token limits.
+  const allTrades = result?.trades ?? [];
+  const sampledTrades =
+    allTrades.length <= 20
+      ? allTrades
+      : [...allTrades.slice(0, 10), ...allTrades.slice(-10)];
+
   return JSON.stringify(
     {
       strategy_config: strategy
@@ -1100,8 +1108,10 @@ function buildRequestPayload(
             settings: strategy.settings,
           }
         : null,
+      available_blocks: blockCatalog ?? [],
       backtest_config: backtestConfig ?? null,
-      trades: result?.trades ?? [],
+      trades: sampledTrades,
+      trades_total_count: allTrades.length,
       metrics: result
         ? {
             totalTrades: result.totalTrades,
@@ -1354,6 +1364,18 @@ export function AiRecommendationsPanel({
     !!(settings.apiKeys?.[settings.provider]?.trim())
   );
   const history = useAiRecsHistory();
+
+  const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
+  useEffect(() => {
+    fetch('/api/strategy-builder/block-library')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: unknown) => {
+        if (data && typeof data === 'object' && Array.isArray((data as { blocks?: unknown }).blocks)) {
+          setBlockCatalog((data as { blocks: unknown[] }).blocks);
+        }
+      })
+      .catch(() => { /* best effort */ });
+  }, []);
 
   const [view, setView] = useState<View>('current');
   const [phase, setPhase] = useState<SendPhase>('idle');
@@ -1639,6 +1661,7 @@ export function AiRecommendationsPanel({
           backtestConfig,
           activeRec,
           goal,
+          blockCatalog,
         );
         payload = JSON.parse(payloadJson) as unknown;
       } catch (err) {
@@ -1734,6 +1757,7 @@ export function AiRecommendationsPanel({
       strategy,
       backtestConfig,
       activeRec,
+      blockCatalog,
       settings.provider,
       settings.model,
       settings.apiKeys,
@@ -2124,7 +2148,7 @@ export function AiRecommendationsPanel({
         description="Block catalog visible to AI for recommendations"
         defaultOpen={false}
       >
-        <PreviewText text="Building blocks catalog is loaded server-side during AI analysis." />
+        <PreviewText text={blockCatalog ? `${blockCatalog.length} blocks available` : 'Loading block catalog…'} />
       </CollapsibleSection>
 
       {/* Stats bar */}
@@ -2813,7 +2837,13 @@ export function AiRecommendationsPanel({
                     const snapshot = preApplySnapshots.find(([id]) => id === rec.id);
                     if (!snapshot) return null;
                     const [, preStrategy] = snapshot;
-                    const diffs = rec.suggestedParams
+                    const paramSource: Array<{ key: string; value: string }> =
+                      rec.suggestedParams.length > 0
+                        ? rec.suggestedParams
+                        : rec.parameter && rec.suggestedValue
+                          ? [{ key: rec.parameter, value: rec.suggestedValue }]
+                          : [];
+                    const diffs = paramSource
                       .map((p) => ({
                         key: p.key,
                         before: findParamInStrategy(preStrategy, p.key),
