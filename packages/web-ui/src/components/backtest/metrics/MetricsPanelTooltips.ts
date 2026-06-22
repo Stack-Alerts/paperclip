@@ -651,3 +651,166 @@ export function TT_EXIT_TYPE(label: string, count: number, total: number): Toolt
     ],
   };
 }
+
+// ── New tooltips (BTCAAAAA-37920 — Matrix blocks update) ──────────────────────
+
+export const TT_VOLATILITY: TooltipContent = {
+  title: 'Return Volatility (σ per trade)',
+  body: 'Standard deviation of per-trade percentage returns across all trades in the backtest. Higher values indicate more dispersed outcomes — both larger wins and larger losses relative to the mean trade return.',
+  sections: [
+    {
+      header: 'Formula:',
+      items: [
+        'σ = √( Σ (rᵢ − r̄)² / (N − 1) )',
+        'rᵢ = per-trade return (%) for trade i, r̄ = mean per-trade return',
+        'Sample stddev (N−1) — matches the convention used by Sharpe/Sortino denominators',
+      ],
+    },
+    {
+      header: 'Interpretation:',
+      items: [
+        'Low σ (< avg return): consistent per-trade performance',
+        'High σ (> 2× avg return): "lottery ticket" profile — review Largest Win / Largest Loss distribution',
+        'Compare with Avg Win / Avg Loss — high σ with positive expectancy is preferable to high σ with negative expectancy',
+      ],
+    },
+  ],
+};
+
+export const TT_VAR_95: TooltipContent = {
+  title: 'Value at Risk (95%)',
+  body: 'Worst expected per-trade loss at 95% confidence — the return level below which only 5% of historical trades fall. Quantifies downside tail risk on a per-trade basis.',
+  sections: [
+    {
+      header: 'Formula:',
+      items: [
+        'VaR₉₅ = 5th percentile of {r₁, r₂, …, r_N} (per-trade returns)',
+        'Returns a negative number for the typical long-volatility profile',
+        'Reported in % so it can be compared directly with avg loss',
+      ],
+    },
+    {
+      header: 'Interpretation:',
+      items: [
+        'VaR₉₅ = −2.5%: in 1 of 20 trades you should expect to lose at least 2.5% of notional',
+        'VaR₉₅ < 2× |Avg Loss|: tail risk is well-explained by the average — strategy behaves predictably',
+        'VaR₉₅ >> |Avg Loss|: rare but severe losses dominate — review Largest Loss trades and SL placement',
+      ],
+    },
+    { items: ['⚠️ Requires N ≥ 20 trades for a statistically meaningful percentile.'] },
+  ],
+};
+
+export const TT_CVAR_95: TooltipContent = {
+  title: 'Conditional VaR (95%) — Expected Shortfall',
+  body: 'Average loss in the worst 5% of trades. Where VaR tells you the threshold, CVaR tells you the expected damage once you cross it. Always ≤ VaR₉₅ (more negative).',
+  sections: [
+    {
+      header: 'Formula:',
+      items: [
+        'CVaR₉₅ = mean( rᵢ : rᵢ ≤ VaR₉₅ )',
+        'Computed over the bottom 5% of trade returns',
+        'Coherent risk measure — sub-additive, unlike VaR',
+      ],
+    },
+    {
+      header: 'Interpretation:',
+      items: [
+        'Use CVaR for stress-test sizing — size positions to absorb the average tail loss',
+        'CVaR₉₅ / |Avg Loss| ratio: > 1.5× indicates a fat-tailed loss distribution',
+        '|CVaR₉₅ − VaR₉₅| ≈ 0: thin tails (Gaussian-like); large gap: heavy tails',
+      ],
+    },
+  ],
+};
+
+export const TT_EXPOSURE_TIME: TooltipContent = {
+  title: 'Market Exposure Time',
+  body: 'Fraction of the backtest period the strategy held an open position. Strategies that sit in cash most of the time have lower exposure and therefore lower return volatility per unit of time.',
+  sections: [
+    {
+      header: 'Formula:',
+      items: [
+        'Exposure % = Σ(bars held in trades) / total bars analyzed × 100',
+        'Each closed trade contributes its `bars` field; partial bars round toward full-bar resolution',
+        'Open positions at backtest end are excluded',
+      ],
+    },
+    {
+      header: 'Interpretation:',
+      items: [
+        'Exposure < 30%: low-frequency / patient — long flat periods between setups',
+        'Exposure 30–70%: typical intraday-to-swing profile',
+        'Exposure > 80%: near-continuous — return volatility compounds with exposure; size positions accordingly',
+      ],
+    },
+  ],
+};
+
+export const TT_PAYOFF_RATIO: TooltipContent = {
+  title: 'Payoff Ratio (Σ wins / Σ losses)',
+  body: 'Total gross profit divided by total gross loss across the backtest. Distinct from Risk/Reward Ratio (avg win / avg loss) — Payoff captures aggregate profitability rather than the average trade.',
+  sections: [
+    {
+      header: 'Formula:',
+      items: [
+        'Payoff = Σ(pnl of winning trades) / Σ(|pnl| of losing trades)',
+        'Returns the gross-ratio — does not adjust for trade count or time',
+      ],
+    },
+    {
+      header: 'Interpretation:',
+      items: [
+        'Payoff > 1: gross profits exceed gross losses — required for net-positive P&L at any win rate',
+        'Payoff = 2 with 40% win rate ≈ breakeven after costs; Payoff = 3 → net profitable from 26% win rate',
+        'Payoff < 1: losers dominate — improve exits (TP distance) before adding entries',
+      ],
+    },
+    { items: ['⚠️ Combine with Win Rate and Profit Factor for a complete picture.'] },
+  ],
+};
+
+export const TT_LARGEST_WIN: TooltipContent = {
+  title: 'Largest Winning Trade',
+  body: 'Single highest-grossing trade in the backtest. The peak contribution to total profit — useful for assessing concentration: does one trade drive the strategy, or is profit distributed?',
+  sections: [
+    {
+      header: 'Watch for:',
+      items: [
+        'Largest Win ≈ 3× Avg Win: outlier suggests a fat right tail — desirable',
+        'Largest Win / Net Profit > 50%: profit is concentrated in one trade — robustness risk',
+        'Compare with Avg Win — large divergence indicates the strategy occasionally captures a regime-specific move',
+      ],
+    },
+  ],
+};
+
+export const TT_LARGEST_LOSS: TooltipContent = {
+  title: 'Largest Losing Trade',
+  body: 'Single biggest loss in the backtest. The worst-case drawdown event. Bounds the per-trade risk that position sizing and stop placement must absorb.',
+  sections: [
+    {
+      header: 'Watch for:',
+      items: [
+        'Largest Loss ≈ 2× |Avg Loss|: within expected distribution — SL is doing its job',
+        'Largest Loss >> 3× |Avg Loss|: stop was either too wide or skipped — review that trade in the trade log',
+        'Largest Loss < |Avg Loss|: outliers are wins, not losses — unusually controlled downside',
+      ],
+    },
+  ],
+};
+
+export const TT_CURRENCY: TooltipContent = {
+  title: 'Quote Currency',
+  body: 'Currency in which all dollar-denominated metrics (Net Profit, Final Capital, Avg Win / Loss, etc.) are reported. Defaults to USDT for crypto pairs — the quote currency of the canonical BTC.P/USDT backtest.',
+  sections: [
+    {
+      header: 'Notes:',
+      items: [
+        'USDT-pegged values are treated as USD-equivalent for reporting',
+        'If you trade a non-USDT pair (e.g. BTC/EUR), dollar figures are still reported in USDT after engine conversion',
+        'Pair-level notionals and P&L are denominated in this currency throughout',
+      ],
+    },
+  ],
+};

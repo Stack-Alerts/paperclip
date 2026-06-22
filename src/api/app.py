@@ -2185,17 +2185,23 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
             if msg:
                 _append_backtest_log(run_id, msg, level='SYSTEM')
 
-        # Normalize block names: DB stores display names ("Asia Session 50 Percent")
-        # but BlockRegistry is keyed by snake_case ("asia_session_50_percent").
-        # Also back-fill signal weights from BlockRegistry base_points when weight is None —
-        # the DB stores None for weights saved via web UI, causing all signals to default
-        # to 10 pts and sum below the confluence threshold of 40.
-        # Fix: use StrategyPersistence._dict_to_config() which resolves weights via the
-        # BlockRegistry (same path as the thick client), then merge resolved blocks back.
-        # Falls back to the original inline normalisation if anything raises.
+        # Normalize block names BEFORE _dict_to_config so the BlockRegistry lookup
+        # inside _dict_to_config (which is keyed by snake_case) actually succeeds.
+        # DB stores display names ("Asia session 50 percent") but BlockRegistry is
+        # keyed by snake_case ("asia_session_50_percent") — without normalisation the
+        # weight fallback defaults every signal to 10 pts and 3×10=30 < 40 threshold
+        # → 0 trades (BTCAAAAA-37812 regression).
         import copy as _copy
         from src.detectors.building_blocks.registry import BlockRegistry as _BR
         strategy_normalized = _copy.deepcopy(strategy)
+        for _blk in strategy_normalized.get("blocks") or []:
+            _raw = _blk.get("name", "")
+            _blk["name"] = _raw.lower().replace(" ", "_")
+            for _sig in _blk.get("signals") or []:
+                _tc = _sig.get("timing_constraint")
+                if _tc and isinstance(_tc, dict) and "::" in (_tc.get("reference") or ""):
+                    _ref_block, _ref_sig = _tc["reference"].split("::", 1)
+                    _tc["reference"] = f"{_ref_block.lower().replace(' ', '_')}::{_ref_sig}"
         try:
             from src.strategy_builder.persistence.strategy_persistence import StrategyPersistence as _SP
             import dataclasses as _dc
@@ -2205,10 +2211,12 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
             if _norm.get("blocks"):
                 strategy_normalized["blocks"] = _norm["blocks"]
         except Exception:
-            # Fallback: original inline block-name + weight back-fill
+            _append_backtest_log(
+                run_id,
+                "⚠️ _dict_to_config failed, falling back to inline weight back-fill",
+                level='WARN',
+            )
             for blk in strategy_normalized.get("blocks") or []:
-                raw = blk.get("name", "")
-                blk["name"] = raw.lower().replace(" ", "_")
                 block_meta = _BR.get_block(blk["name"])
                 for sig in blk.get("signals") or []:
                     if sig.get("weight") is None and block_meta:
