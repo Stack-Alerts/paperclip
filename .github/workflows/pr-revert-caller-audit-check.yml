@@ -1,0 +1,42 @@
+name: PR Revert Caller-Audit Check
+
+# Enforces the `paperclip-create-revert-pr` skill on every PR.
+# If the PR title or body references a revert verb (`revert`, `reverts`,
+# `reverting`) the body must contain a `## Caller audit` heading.
+# See docs/process/paperclip-create-revert-pr.md and BTCAAAAA-37740.
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  caller-audit:
+    name: Revert PR caller-audit gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4.3.1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Write PR title and body to files
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          mkdir -p /tmp/pr
+          printf '%s' "$PR_TITLE" > /tmp/pr/title.txt
+          printf '%s' "$PR_BODY"  > /tmp/pr/body.md
+
+      - name: Run caller-audit check
+        run: |
+          python3 scripts/check_revert_pr_caller_audit.py \
+            --title-file /tmp/pr/title.txt \
+            --body-file  /tmp/pr/body.md
