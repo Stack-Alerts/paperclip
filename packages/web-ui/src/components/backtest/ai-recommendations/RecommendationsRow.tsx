@@ -1,0 +1,28 @@
+'use client';
+
+import { RecommendationCard, RecommendationCardData } from './RecommendationCard';
+
+export interface RecommendationsRowProps {
+  recommendations: RecommendationCardData[];
+}
+
+const MIN_CARD_PX = 248;
+const COLUMN_GAP_PX = 12;
+
+export function RecommendationsRow({ recommendations }: RecommendationsRowProps) {
+  return (
+    <div
+      data-testid="recommendations-row"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(auto-fit, minmax(${MIN_CARD_PX}px, 1fr))`,
+        gap: COLUMN_GAP_PX,
+        width: '100%',
+      }}
+    >
+      {recommendations.map((rec) => (
+        <RecommendationCard key={rec.id} {...rec} />
+      ))}
+    </div>
+  );
+}
