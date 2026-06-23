@@ -133,13 +133,13 @@ class TrainingThread(QThread):
     def run(self):
         """
         Execute training (runs in background thread).
-        
+
         Routes to simulation or real training path based on TRAINING_SIMULATION_MODE env var.
-        
+
         Simulation path (TRAINING_SIMULATION_MODE=true):
         - Uses random dummy data for UI demonstration
         - is_simulation_mode remains True
-        
+
         Real path (default — TRAINING_SIMULATION_MODE unset or false):
         - Calls _train_block() for each (block_name, timeframe) combination
         - Uses NautilusTrainingSystem + BacktestDataProvider for real analysis

@@ -128,6 +128,16 @@ jobs:
           POSTGRES_PASSWORD: secure_password_change_me
           PYTHONPATH: src
         run: |
+          # BTCAAAAA-38144: pytest itself completed in ~35 min and the coverage gate
+          # passed at 53.95% on PR #198, but a non-daemon QThread leaked past the
+          # main-thread exit and kept the python process alive for ~25 extra minutes
+          # (until GitHub's 60-min timeout fired).  `timeout 3000` is a hard 50-min
+          # cap on this step so the workflow always lands inside the job's
+          # timeout-minutes: 60 budget even if another thread leaks.  --kill-after=60
+          # escalates to SIGKILL if pytest ignores SIGTERM.  50 min is intentionally
+          # larger than the historic 35-min pytest run so this only fires on a real
+          # leak, not on normal slow runs.
+          timeout --kill-after=60 3000 \
           python -m pytest \
             tests/test_blast_radius/ \
             tests/test_impact_gate/ \
