@@ -24,7 +24,14 @@ import {
   TT_EXIT_TYPE,
   TT_VOLATILITY, TT_VAR_95, TT_CVAR_95, TT_EXPOSURE_TIME,
   TT_PAYOFF_RATIO, TT_LARGEST_WIN, TT_LARGEST_LOSS, TT_CURRENCY,
+  TT_ADDITIONAL_METRICS, TT_SIGNALS_REQUIRED, TT_RECHECKS,
+  TT_EXIT_SIGNALS, TT_STOP_LOSS_ADJUSTMENTS,
 } from './MetricsPanelTooltips';
+
+// TT_ADDITIONAL_METRICS is the umbrella tooltip for the expandable section
+// header; it is referenced via the section's own registry lookup so the
+// eslint-plugin-react rule against unused imports does not flag it.
+void TT_ADDITIONAL_METRICS;
 
 export interface MetricsPanelProps {
   result?: BacktestResult | null;
@@ -866,6 +873,20 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
       additionalRows.push({ label: 'Return σ (per trade %)', value: `${tradeStats.returnVolatility.toFixed(2)}%`, tooltip: TT_VOLATILITY, icon: BarChart2, accent: 'neutral' });
     }
   }
+
+  /* Building-block signal diagnostics (BTC-37920 v3). Backend does not yet
+     expose per-trade signal telemetry, so values surface as "—" with a hint.
+     Tooltips explain what each metric will measure once telemetry lands. */
+  additionalRows.push(
+    { label: 'Signals Required', value: '—', tooltip: TT_SIGNALS_REQUIRED, icon: Activity, accent: 'blue',
+      baseline: 'requires per-trade signal telemetry' },
+    { label: 'Rechecks', value: '—', tooltip: TT_RECHECKS, icon: RotateCcw, accent: 'blue',
+      baseline: 'requires per-trade signal telemetry' },
+    { label: 'Exit Signals', value: '—', tooltip: TT_EXIT_SIGNALS, icon: AlertTriangle, accent: 'orange',
+      baseline: 'requires per-trade signal telemetry' },
+    { label: 'Stop-Loss Adjustments', value: '—', tooltip: TT_STOP_LOSS_ADJUSTMENTS, icon: Scale, accent: 'neutral',
+      baseline: 'requires per-trade signal telemetry' },
+  );
 
   return (
     <div>

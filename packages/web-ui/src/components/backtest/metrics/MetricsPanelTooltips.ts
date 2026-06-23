@@ -654,6 +654,123 @@ export function TT_EXIT_TYPE(label: string, count: number, total: number): Toolt
 
 // ── New tooltips (BTCAAAAA-37920 — Matrix blocks update) ──────────────────────
 
+export const TT_ADDITIONAL_METRICS: TooltipContent = {
+  title: 'Building-Block Signal Diagnostics',
+  body: 'Per-trade telemetry for the underlying signal pipeline that produced each entry, recheck, and exit. These counts expose how decisive the strategy was on average — a clean signal cluster drives entries without lots of re-confirmations; a noisy cluster spends the trade waiting for clarity.',
+  sections: [
+    {
+      header: 'Includes:',
+      items: [
+        'Signals Required — building-block signals fired before the entry committed',
+        'Rechecks — additional signals fired while the position was open to re-confirm the thesis',
+        'Exit Signals — explicit building-block exit events (distinct from SL/TP/time exits)',
+        'Stop-Loss Adjustments — number of SL moves during the life of the trade',
+      ],
+    },
+    {
+      header: 'Interpretation:',
+      items: [
+        'Low Signals Required + low Rechecks: high-conviction entries — fast in, fast out',
+        'High Rechecks: thesis needs reinforcement — expect chop on the way to TP',
+        'Many Exit Signals: the building-block framework is the dominant exit reason (vs SL/TP)',
+        'Many SL Adjustments: trailing/ratcheting stops are active — review SL configuration',
+      ],
+    },
+  ],
+};
+
+export const TT_SIGNALS_REQUIRED: TooltipContent = {
+  title: 'Signals Required (per trade)',
+  body: 'Number of building-block signals that fired between entry decision and the actual entry fill. A value of 1 means the first qualifying signal opened the trade; higher values mean the strategy waited for additional confirmation before committing capital.',
+  sections: [
+    {
+      header: 'How it is measured:',
+      items: [
+        'Count of fired signal events during the entry-confirmation window for each trade',
+        'Window length is strategy-defined (typically a few bars before entry)',
+        'Reported as the mean across all trades in the backtest',
+      ],
+    },
+    {
+      header: 'Interpretation:',
+      items: [
+        'Mean ≈ 1: strategy enters on first signal — high fill rate, more whipsaw risk',
+        'Mean 2–3: balanced — filters weak setups without much slippage',
+        'Mean > 3: heavy confirmation — fewer trades, better quality, possible missed moves',
+      ],
+    },
+  ],
+};
+
+export const TT_RECHECKS: TooltipContent = {
+  title: 'Rechecks (per trade)',
+  body: 'Number of additional building-block signals that fired while the position was still open. Rechecks re-validate the original thesis (or its inverse); a high count means the market kept producing signal events during the trade.',
+  sections: [
+    {
+      header: 'How it is measured:',
+      items: [
+        'Count of signal events firing between entry fill and exit fill, excluding the entry signal itself',
+        'Signals may agree with the position (re-confirm) or oppose it (early warning)',
+        'Reported as the mean across all closed trades',
+      ],
+    },
+    {
+      header: 'Interpretation:',
+      items: [
+        'Low rechecks (≈ 0): clean move — entry thesis carried the trade',
+        'Moderate rechecks (2–5): normal for trend-following on multi-bar trades',
+        'High rechecks (> 10): noisy regime — position spent time under question; consider tighter exits',
+      ],
+    },
+  ],
+};
+
+export const TT_EXIT_SIGNALS: TooltipContent = {
+  title: 'Exit Signals (per trade)',
+  body: 'Count of building-block exit signals that fired during the life of the trade. An exit signal is a deliberate "close now" event from the signal framework — distinct from stop-loss, take-profit, time-based, or end-of-backtest exits.',
+  sections: [
+    {
+      header: 'How it is measured:',
+      items: [
+        'Counts only signals explicitly tagged as exit-type by the building-block framework',
+        'A trade can have more than one exit signal before it closes (the framework re-emits on each new bar)',
+        'Reported as the mean across all closed trades',
+      ],
+    },
+    {
+      header: 'Interpretation:',
+      items: [
+        '≈ 0 exit signals + high win rate: exits are dominated by TP — review whether SL is too wide',
+        '≥ 1 exit signal: the framework is actively closing positions — pair with Exit Type breakdown',
+        'Many exit signals + losing trades: exit signals are firing too late — review the exit detector',
+      ],
+    },
+  ],
+};
+
+export const TT_STOP_LOSS_ADJUSTMENTS: TooltipContent = {
+  title: 'Stop-Loss Adjustments (per trade)',
+  body: 'Number of times the stop-loss was moved (tightened or ratcheted) while the trade was open. A value of 0 means the SL stayed at its initial level for the entire trade; higher values mean trailing/ratcheting logic was active.',
+  sections: [
+    {
+      header: 'How it is measured:',
+      items: [
+        'Count of SL update events between entry fill and exit fill',
+        'Includes both tightening (toward price) and loosening (away from price) moves',
+        'Reported as the mean across all closed trades',
+      ],
+    },
+    {
+      header: 'Interpretation:',
+      items: [
+        '0 adjustments: fixed SL — exit distance was set once at entry',
+        '1–3 adjustments: light trailing — common for breakout strategies',
+        'Many adjustments: aggressive trailing/ratcheting — locks in profit but can be stopped out prematurely',
+      ],
+    },
+  ],
+};
+
 export const TT_VOLATILITY: TooltipContent = {
   title: 'Return Volatility (σ per trade)',
   body: 'Standard deviation of per-trade percentage returns across all trades in the backtest. Higher values indicate more dispersed outcomes — both larger wins and larger losses relative to the mean trade return.',
