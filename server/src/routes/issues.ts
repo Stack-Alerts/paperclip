@@ -101,6 +101,10 @@ import { instanceSettingsService } from "../services/instance-settings.js";
 import { environmentService } from "../services/environments.js";
 import { redactSensitiveText } from "../redaction.js";
 import {
+  enforceBtcPrefixTokens,
+  respondBtcPrefixGuardFailure,
+} from "../middleware/btc-prefix-guard.js";
+import {
   createCompanySearchRateLimiter,
   type CompanySearchRateLimiter,
 } from "../services/company-search-rate-limit.js";
@@ -2804,6 +2808,20 @@ export function issueRoutes(
       return;
     }
     assertCompanyAccess(req, existing.companyId);
+    if (typeof req.body?.comment === "string" && req.body.comment.length > 0) {
+      const btcGuardResult = await enforceBtcPrefixTokens({
+        text: req.body.comment,
+        actor: req.actor,
+        lookup: async (candidate, cid) => {
+          const row = await svc.getByIdentifier(candidate);
+          return { exists: !!row && row.companyId === cid };
+        },
+      });
+      if (!btcGuardResult.ok) {
+        respondBtcPrefixGuardFailure(res, btcGuardResult);
+        return;
+      }
+    }
     assertNoAgentHostWorkspaceCommandMutation(req, collectIssueWorkspaceCommandPaths(req.body));
     if (!(await assertAgentIssueMutationAllowed(req, res, existing))) return;
 
@@ -4425,6 +4443,20 @@ export function issueRoutes(
       return;
     }
     assertCompanyAccess(req, issue.companyId);
+    if (typeof req.body?.body === "string" && req.body.body.length > 0) {
+      const btcGuardResult = await enforceBtcPrefixTokens({
+        text: req.body.body,
+        actor: req.actor,
+        lookup: async (candidate, cid) => {
+          const row = await svc.getByIdentifier(candidate);
+          return { exists: !!row && row.companyId === cid };
+        },
+      });
+      if (!btcGuardResult.ok) {
+        respondBtcPrefixGuardFailure(res, btcGuardResult);
+        return;
+      }
+    }
     if (!(await assertAgentIssueMutationAllowed(req, res, issue))) return;
     if (!assertStructuredCommentFieldsAllowed(req, res, {
       presentation: req.body.presentation,
