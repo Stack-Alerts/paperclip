@@ -15,6 +15,7 @@ This routine:
 Usage:
     python scripts/closure_gate_routine.py
     python scripts/closure_gate_routine.py --backfill-days 30
+    python scripts/closure_gate_routine.py --force  # bypass 5h watermark early-exit
 """
 
 from __future__ import annotations
@@ -66,6 +67,15 @@ MAX_DEFERRAL_API_CALLS = 50
 
 # State file to track closure-gate actions
 CLOSURE_GATE_STATE_FILE = REPO_ROOT / "data" / "closure_gate_actions.json"
+
+# Watermark file for the 5h-safety-floor zero-idle early-exit path
+# (BTCAAAAA-37916 step 1+6; BTCAAAAA-37917 implements it). On every successful
+# run we record the current origin/main SHA + the set of done-in-window issue
+# ids + a timestamp. On startup, if the watermark matches current state and
+# is fresh (< WATERMARK_SAFETY_FLOOR_HOURS old), the routine exits before
+# running per-issue verifications — a "zero-idle run".
+WATERMARK_FILE = REPO_ROOT / "data" / "closure_gate_watermark.json"
+WATERMARK_SAFETY_FLOOR_HOURS = 5
 
 # Closure-gate smoke runner (BTCAAAAA-37739). Disable by setting
 # CLOSURE_GATE_SMOKE=0 — useful when the runner itself is being debugged so the
@@ -147,6 +157,173 @@ def save_state(state: dict[str, Any]) -> None:
         CLOSURE_GATE_STATE_FILE.write_text(json.dumps(state, indent=2))
     except IOError as exc:
         logger.error("Failed to save closure gate state: %s", exc)
+
+
+def load_watermark() -> dict[str, Any] | None:
+    """Load the closure-gate watermark from disk.
+
+    Returns the watermark dict or None if the file is absent, unreadable, or
+    malformed. Malformed watermark logs a warning and is treated as None so
+    the next successful run can overwrite it without rejecting the routine.
+    """
+    if not WATERMARK_FILE.exists():
+        return None
+    try:
+        data = json.loads(WATERMARK_FILE.read_text())
+    except (json.JSONDecodeError, IOError) as exc:
+        logger.warning("Failed to load closure-gate watermark: %s", exc)
+        return None
+    if not isinstance(data, dict):
+        logger.warning(
+            "Watermark root is not a dict (got %s); ignoring",
+            type(data).__name__,
+        )
+        return None
+    return data
+
+
+def save_watermark(
+    main_sha: str,
+    done_issue_ids: list[str],
+    *,
+    routine_origin_id: str | None = None,
+    issue_id: str | None = None,
+) -> bool:
+    """Persist the closure-gate watermark after a successful run."""
+    payload = {
+        "lastScanAt": datetime.now(timezone.utc).isoformat(),
+        "lastMainSHA": main_sha,
+        "lastDoneIssueIds": sorted({i for i in done_issue_ids if i}),
+        "routineOriginId": routine_origin_id or "",
+        "issueId": issue_id or "",
+    }
+    try:
+        WATERMARK_FILE.parent.mkdir(parents=True, exist_ok=True)
+        WATERMARK_FILE.write_text(json.dumps(payload, indent=2) + "\n")
+        logger.info(
+            "Saved closure-gate watermark: mainSHA=%s doneIds=%d",
+            main_sha[:8],
+            len(payload["lastDoneIssueIds"]),
+        )
+        return True
+    except IOError as exc:
+        logger.error("Failed to save closure-gate watermark: %s", exc)
+        return False
+
+
+def get_current_origin_main_sha() -> str | None:
+    """Read the current origin/main SHA via `git rev-parse`.
+
+    Returns the 40-char hex SHA or None if origin/main is missing or the
+    command fails. We validate the returned string is exactly 40 lowercase
+    hex chars so a corrupt stdout never leaks into the watermark file.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "origin/main"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            logger.warning(
+                "git rev-parse origin/main rc=%d: %s",
+                result.returncode,
+                result.stderr.strip(),
+            )
+            return None
+        sha = result.stdout.strip()
+        if len(sha) == 40 and all(c in "0123456789abcdef" for c in sha):
+            return sha
+        logger.warning("git rev-parse origin/main returned non-SHA output: %r", sha[:80])
+        return None
+    except subprocess.TimeoutExpired:
+        logger.warning("git rev-parse origin/main timed out after 10s")
+        return None
+    except Exception as exc:
+        logger.error("Failed to read origin/main SHA: %s", exc)
+        return None
+
+
+def check_watermark_early_exit(
+    current_sha: str | None,
+    current_done_ids: list[str],
+    force: bool,
+) -> bool:
+    """Return True if the routine should exit zero-idle.
+
+    All four conditions must hold:
+      - not --force
+      - watermark file present and parseable
+      - watermark lastScanAt parses and is < WATERMARK_SAFETY_FLOOR_HOURS old
+      - watermark lastMainSHA == current origin/main SHA
+      - watermark lastDoneIssueIds == set of current done-in-window IDs
+    """
+    if force:
+        logger.info("--force set: skipping watermark early-exit check")
+        return False
+
+    watermark = load_watermark()
+    if not watermark:
+        logger.info("No watermark present; proceeding with full run")
+        return False
+
+    last_main_sha = watermark.get("lastMainSHA", "")
+    last_scan_at_raw = watermark.get("lastScanAt", "")
+    last_done_ids_raw = watermark.get("lastDoneIssueIds", []) or []
+    if not last_main_sha or not last_scan_at_raw:
+        logger.info(
+            "Watermark missing lastMainSHA/lastScanAt; proceeding with full run",
+        )
+        return False
+
+    try:
+        last_scan_at = datetime.fromisoformat(last_scan_at_raw.replace("Z", "+00:00"))
+        if last_scan_at.tzinfo is None:
+            last_scan_at = last_scan_at.replace(tzinfo=timezone.utc)
+    except ValueError:
+        logger.warning(
+            "Watermark lastScanAt is unparseable (%r); proceeding with full run",
+            last_scan_at_raw,
+        )
+        return False
+
+    age = datetime.now(timezone.utc) - last_scan_at
+    if age >= timedelta(hours=WATERMARK_SAFETY_FLOOR_HOURS):
+        logger.info(
+            "Watermark age %s exceeds %dh floor; proceeding with full run",
+            age,
+            WATERMARK_SAFETY_FLOOR_HOURS,
+        )
+        return False
+
+    if not current_sha:
+        logger.info("Could not read current origin/main; proceeding with full run")
+        return False
+
+    if current_sha != last_main_sha:
+        logger.info(
+            "origin/main advanced since watermark (%s -> %s); proceeding with full run",
+            last_main_sha[:8],
+            current_sha[:8],
+        )
+        return False
+
+    last_done_set = set(last_done_ids_raw)
+    current_done_set = set(current_done_ids)
+    if last_done_set != current_done_set:
+        only_in_watermark = sorted(last_done_set - current_done_set)
+        only_in_current = sorted(current_done_set - last_done_set)
+        logger.info(
+            "Done-in-window set differs from watermark (watermark-only=%d current-only=%d); "
+            "proceeding with full run",
+            len(only_in_watermark),
+            len(only_in_current),
+        )
+        return False
+
+    return True
 
 
 def compute_action_hash(issue_id: str, sha: str, action: str) -> str:
@@ -1027,6 +1204,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "BTCAAAAA-30577 acceptance criterion 7."
         ),
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "Bypass the 5h-safety-floor watermark early-exit and run the full "
+            "per-issue verification pass even if nothing has changed since "
+            "the last scan (BTCAAAAA-37917)."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -1068,7 +1254,7 @@ def main(argv: list[str] | None = None) -> None:
     """Main routine execution."""
     args = _parse_args(argv)
     hours = args.backfill_days * 24 if args.backfill_days else 24
-    logger.info("Starting closure-gate routine (window=%dh)", hours)
+    logger.info("Starting closure-gate routine (window=%dh, force=%s)", hours, args.force)
 
     # Install global wall-clock timeout before any I/O to prevent indefinite hangs.
     _install_global_timeout(ROUTINE_TIMEOUT_SECONDS)
@@ -1079,12 +1265,37 @@ def main(argv: list[str] | None = None) -> None:
 
     # Find done issues
     done_issues = find_done_issues(hours=hours)
+    done_ids_in_window = sorted(
+        {issue.get("id", "") for issue in done_issues if issue.get("id")}
+    )
 
     # Fetch origin/main ONCE before the per-issue loop so verify_sha_on_main()
     # can skip redundant fetches. Without this, N issues with Fix-SHAs triggered
     # N sequential `git fetch` network calls — the primary hang vector in
     # BTCAAAAA-32133.
     fetch_origin_main()
+
+    # Watermark early-exit (BTCAAAAA-37917): if the watermark matches current
+    # state within the 5h safety floor, exit before the per-issue loop. This
+    # is a zero-idle run — main hasn't moved, no new done issues landed.
+    current_main_sha = get_current_origin_main_sha()
+    if check_watermark_early_exit(
+        current_sha=current_main_sha,
+        current_done_ids=done_ids_in_window,
+        force=args.force,
+    ):
+        logger.info(
+            "Zero-idle run: watermark matches current state within %dh floor — exiting",
+            WATERMARK_SAFETY_FLOOR_HOURS,
+        )
+        if current_main_sha:
+            save_watermark(
+                main_sha=current_main_sha,
+                done_issue_ids=done_ids_in_window,
+                routine_origin_id=os.environ.get("PAPERCLIP_ROUTINE_ORIGIN_ID"),
+                issue_id=os.environ.get("PAPERCLIP_TASK_ID"),
+            )
+        sys.exit(0)
 
     # Shared mutable counter limits total deferral API calls across all issues.
     api_call_counter: list[int] = [0]
@@ -1150,6 +1361,16 @@ def main(argv: list[str] | None = None) -> None:
             "Closure-gate routine completed successfully (deferral_flags=%d)",
             len(deferral_flags),
         )
+        # Persist watermark for the 5h-safety-floor early-exit path on the
+        # next run (BTCAAAAA-37917). We only save when the report posted
+        # successfully so a partial run never poisons the watermark.
+        if current_main_sha:
+            save_watermark(
+                main_sha=current_main_sha,
+                done_issue_ids=done_ids_in_window,
+                routine_origin_id=os.environ.get("PAPERCLIP_ROUTINE_ORIGIN_ID"),
+                issue_id=os.environ.get("PAPERCLIP_TASK_ID"),
+            )
     else:
         logger.error("Failed to post routine report, but processing completed")
         sys.exit(1)

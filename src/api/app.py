@@ -2194,6 +2194,16 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
         import copy as _copy
         from src.detectors.building_blocks.registry import BlockRegistry as _BR
         strategy_normalized = _copy.deepcopy(strategy)
+        # PR #134 (BTCAAAAA-35867) routes weight resolution through
+        # StrategyPersistence._dict_to_config → BlockRegistry. The web UI persists
+        # block labels with display casing ("Asia session 50 percent") but the
+        # BlockRegistry is keyed by snake_case ("asia_session_50_percent"). Without
+        # normalizing before the lookup, every signal weight fell back to the
+        # default of 10 pts and total confluence (10+10+10=30) stayed below the
+        # 40-pt threshold → 0 trades (BTCAAAAA-37812 regression).
+        # Normalize block names BEFORE handing to _dict_to_config so the canonical
+        # path resolves real weights. Also rewrite timing_constraint references of
+        # the form "block_name::signal_name" so they keep matching after rename.
         for _blk in strategy_normalized.get("blocks") or []:
             _raw = _blk.get("name", "")
             _blk["name"] = _raw.lower().replace(" ", "_")
