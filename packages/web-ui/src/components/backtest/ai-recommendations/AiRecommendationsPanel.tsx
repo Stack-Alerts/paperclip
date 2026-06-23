@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Trash2, GripVertical, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, GripVertical, X, ExternalLink } from 'lucide-react';
 import { BacktestResult, Strategy, Trade } from '@/lib/strategy-builder/types';
 import { useAiSettings, getProviderMeta } from '@/hooks/useAiSettings';
 import { useAiRecsHistory, AiRecsHistoryEntry, AiRecsHistoryStatus } from '@/hooks/useAiRecsHistory';
@@ -22,6 +22,7 @@ import {
   ProjectedDelta,
   deriveBaselineKpis,
 } from './strategyImpactKpi';
+import { computeReanalyzeHash } from './dirtyHash';
 
 type SendPhase =
   | 'idle'
@@ -108,6 +109,11 @@ interface CachedAnalysis {
   // meantime.
   preApplySnapshots: Array<[string, Strategy]>;
   analysisTimestamp: string;
+  // BTCAAAAA-37773 / Sprint A1: hash of strategy+backtestConfig captured at
+  // the time the cached analysis was produced. Used to gate the persistent
+  // Re-analyze button. Optional so caches written before this field shipped
+  // still parse — missing hash is treated as "unknown" → button enabled.
+  analysisHash?: string;
 }
 
 function readRecsCache(): CachedAnalysis | null {
@@ -140,6 +146,8 @@ function readRecsCache(): CachedAnalysis | null {
         typeof parsed.analysisTimestamp === 'string'
           ? parsed.analysisTimestamp
           : new Date().toISOString(),
+      analysisHash:
+        typeof parsed.analysisHash === 'string' ? parsed.analysisHash : undefined,
     };
   } catch {
     return null;
@@ -1406,12 +1414,57 @@ function SplitPanel({
   );
 }
 
-type View = 'current' | 'history';
+type View = 'current' | 'request' | 'response' | 'history';
 
 const VIEW_LABELS: Record<View, string> = {
   current: 'Current Analysis',
+  request: 'AI Request',
+  response: 'AI Response',
   history: 'History',
 };
+
+const VIEW_ORDER: View[] = ['current', 'request', 'response', 'history'];
+
+// BTCAAAAA-37773 / Sprint A1: persist the active sub-tab in sessionStorage so
+// it survives panel unmounts (parent tab switches, route navigations) within
+// the same browser session.
+const VIEW_STORAGE_KEY = 'ai_recs_view_v1';
+
+function isView(v: unknown): v is View {
+  return v === 'current' || v === 'request' || v === 'response' || v === 'history';
+}
+
+function readStoredView(): View | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(VIEW_STORAGE_KEY);
+    return isView(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredView(v: View): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(VIEW_STORAGE_KEY, v);
+  } catch {
+    // best effort
+  }
+}
+
+function formatPF(pf: number | undefined | null): string {
+  if (pf === undefined || pf === null || !Number.isFinite(pf)) return '—';
+  return pf.toFixed(2);
+}
+
+function formatWR(wr: number | undefined | null): string {
+  if (wr === undefined || wr === null || !Number.isFinite(wr)) return '—';
+  // BacktestResult.winRate may arrive as fraction (0-1) or percent (0-100);
+  // collapse both forms to a single `XX%` chip so the header chip is stable.
+  const pct = wr <= 1 ? wr * 100 : wr;
+  return `${pct.toFixed(1)}%`;
+}
 
 const AI_RECS_PROMPT =
   'Analyze this trading strategy backtest and return a diagnosis and concrete, actionable recommendations.';
@@ -1632,7 +1685,7 @@ export function AiRecommendationsPanel({
   );
   const history = useAiRecsHistory();
 
-  const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
+const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   useEffect(() => {
     fetch('/api/strategy-builder/block-library')
       .then((r) => (r.ok ? r.json() : null))
@@ -1644,12 +1697,20 @@ export function AiRecommendationsPanel({
       .catch(() => { /* best effort */ });
   }, []);
 
-  const [view, setView] = useState<View>('current');
+  const [view, setViewState] = useState<View>(() => readStoredView() ?? 'current');
+  const setView = useCallback((v: View) => {
+    setViewState(v);
+    writeStoredView(v);
+  }, []);
   // BTCAAAAA-37780 / Sprint A6: right-rail sub-tab. "recs" keeps the
   // existing diagnosis-summary + recommendations grid; "diagnose" renders
   // the orchestrator's diagnosis markdown plus the reported-vs-per-entry
   // metrics table and a pinned-impact sentence.
   const [rightTab, setRightTab] = useState<'recs' | 'diagnose'>('recs');
+  // BTCAAAAA-37773: hash captured at the time of the last successful analysis.
+  // Compared against the live strategy+backtestConfig hash to gate the
+  // persistent Re-analyze button (equal → disabled, different → enabled).
+  const [lastAnalysisHash, setLastAnalysisHash] = useState<string | null>(null);
   const [phase, setPhase] = useState<SendPhase>('idle');
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisDetail, setAnalysisDetail] = useState<string | null>(null);
@@ -1731,6 +1792,7 @@ export function AiRecommendationsPanel({
     });
     setAppliedRecIds(cached.appliedRecIds);
     setPreApplySnapshots(cached.preApplySnapshots);
+    if (cached.analysisHash) setLastAnalysisHash(cached.analysisHash);
   }, [strategy?.id]);
 
   // AC21: persist recs + applied state to sessionStorage on change. Done in
@@ -1757,8 +1819,9 @@ export function AiRecommendationsPanel({
       appliedRecIds,
       preApplySnapshots,
       analysisTimestamp: new Date().toISOString(),
+      ...(lastAnalysisHash ? { analysisHash: lastAnalysisHash } : {}),
     });
-  }, [aiAnalysis, appliedRecIds, preApplySnapshots, strategy?.id, demoMode]);
+  }, [aiAnalysis, appliedRecIds, preApplySnapshots, strategy?.id, demoMode, lastAnalysisHash]);
 
   // AC8: countdown for the awaiting-provider phase. Resets to the full
   // ETA whenever we enter the phase, ticks once per second while we are
@@ -2039,6 +2102,7 @@ export function AiRecommendationsPanel({
         setPreviewMode(false);
         setDemoMode(false);
         setAiAnalysis(parsed);
+        setLastAnalysisHash(computeReanalyzeHash(strategy ?? null, backtestConfig ?? null));
         if (history.hydrated) {
           history.add({
             prompt: AI_RECS_PROMPT,
@@ -2275,10 +2339,49 @@ export function AiRecommendationsPanel({
       setAnalysisError(null);
       setAnalysisDetail(null);
     },
-    [],
+    [setView],
   );
 
   const canSend = hasTrades && hasProvider && !analyzing && aiSettingsHydrated;
+
+  // BTCAAAAA-37773 / Sprint A1 — Re-analyze button dirty-hash gating.
+  const currentHash = useMemo(
+    () => computeReanalyzeHash(strategy ?? null, backtestConfig ?? null),
+    [strategy, backtestConfig],
+  );
+  // Dirty when we have a previous analysis hash AND it differs from current.
+  // No previous hash → not dirty (no cached analysis to compare against).
+  const isDirty = lastAnalysisHash !== null && lastAnalysisHash !== currentHash;
+  const reanalyzeDisabled = !canSend || (!isDirty && lastAnalysisHash !== null);
+  const reanalyzeTooltip = !hasTrades
+    ? 'Run a backtest with trades first.'
+    : !hasProvider
+      ? 'No AI provider configured — open Settings → AI to set one up.'
+      : analyzing
+        ? 'AI request in flight…'
+        : lastAnalysisHash === null
+          ? 'Run an analysis first.'
+          : isDirty
+            ? 'Strategy or backtest config changed — re-run'
+            : 'No changes since last analysis';
+
+  const handleReanalyzeClick = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (!canSend) return;
+      const forceRerun = e.metaKey || e.ctrlKey;
+      // Equal hash + not forced → button is already disabled, but guard
+      // anyway in case a stale ref fires the click.
+      if (!forceRerun && !isDirty && lastAnalysisHash !== null) return;
+      setGoalModalOpen(true);
+    },
+    [canSend, isDirty, lastAnalysisHash],
+  );
+
+  const handlePopOut = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    window.open(window.location.href, '_blank', 'noopener,width=1200,height=800');
+  }, []);
+
   const showProgress = phase !== 'idle' && phase !== 'error';
   const progressPercent = phase === 'idle' || phase === 'error' ? 0 : PHASE_INFO[phase as Exclude<SendPhase, 'idle' | 'error'>].percent;
   const progressLabel =
@@ -3284,8 +3387,92 @@ export function AiRecommendationsPanel({
     </div>
   );
 
+  const entriesChip = result?.totalTrades ?? 0;
+  const pfChip = formatPF(result?.profitFactor);
+  const wrChip = formatWR(result?.winRate);
+
   return (
     <div className="flex flex-col gap-3">
+      {/* BTCAAAAA-37773 / Sprint A1 — persistent header row.
+          Left: realtime applied-changes indicator.
+          Right: entries · PF · WR · Re-analyze · Pop Out ↗ */}
+      <div
+        data-testid="ai-recs-header"
+        className="flex items-center justify-between gap-3 flex-wrap"
+      >
+        <div
+          data-testid="ai-recs-realtime"
+          className="flex items-center gap-1.5 text-[11px]"
+          style={{
+            color: 'var(--text-muted)',
+            fontFamily: 'var(--font-mono, monospace)',
+          }}
+          title="Number of recommendations currently applied to the strategy."
+        >
+          <span
+            aria-hidden="true"
+            className="inline-block w-1.5 h-1.5 rounded-full"
+            style={{ background: 'var(--accent-green)' }}
+          />
+          <span>Realtime</span>
+          <span style={{ color: 'var(--text-faint)' }}>·</span>
+          <span data-testid="ai-recs-realtime-count">
+            {appliedRecIds.length} {appliedRecIds.length === 1 ? 'change' : 'changes'} applied
+          </span>
+        </div>
+        <div
+          data-testid="ai-recs-header-chips"
+          className="flex items-center gap-2 text-[11px]"
+          style={{
+            color: 'var(--text-muted)',
+            fontFamily: 'var(--font-mono, monospace)',
+          }}
+        >
+          <span data-testid="ai-recs-chip-entries" title="Trade count from the last backtest">
+            {entriesChip} entries
+          </span>
+          <span style={{ color: 'var(--text-faint)' }}>·</span>
+          <span data-testid="ai-recs-chip-pf" title="Profit factor">PF {pfChip}</span>
+          <span style={{ color: 'var(--text-faint)' }}>·</span>
+          <span data-testid="ai-recs-chip-wr" title="Win rate">WR {wrChip}</span>
+          <span style={{ color: 'var(--text-faint)' }}>·</span>
+          <button
+            type="button"
+            onClick={handleReanalyzeClick}
+            disabled={reanalyzeDisabled}
+            title={reanalyzeTooltip}
+            data-testid="ai-recs-reanalyze"
+            data-dirty={isDirty ? 'true' : 'false'}
+            className="px-2 py-1 rounded text-[11px] font-medium"
+            style={{
+              background: !reanalyzeDisabled ? 'var(--accent-blue)' : 'var(--bg-card)',
+              color: !reanalyzeDisabled ? 'var(--text-on-accent)' : 'var(--text-faint)',
+              border: '1px solid var(--border)',
+              opacity: reanalyzeDisabled ? 0.5 : 1,
+              cursor: reanalyzeDisabled ? 'not-allowed' : 'pointer',
+            }}
+          >
+            Re-analyze
+          </button>
+          <button
+            type="button"
+            onClick={handlePopOut}
+            title="Open this panel in a detached window"
+            data-testid="ai-recs-popout"
+            className="px-2 py-1 rounded text-[11px] font-medium flex items-center gap-1"
+            style={{
+              background: 'var(--bg-card)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border)',
+              cursor: 'pointer',
+            }}
+          >
+            Pop Out
+            <ExternalLink size={11} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
       {/* Tabs */}
       <div
         role="tablist"
@@ -3293,7 +3480,7 @@ export function AiRecommendationsPanel({
         className="flex items-center gap-1 border-b"
         style={{ borderColor: 'var(--border)' }}
       >
-        {(Object.keys(VIEW_LABELS) as View[]).map((v) => {
+        {VIEW_ORDER.map((v) => {
           const isActive = view === v;
           return (
             <button
@@ -3302,6 +3489,7 @@ export function AiRecommendationsPanel({
               role="tab"
               aria-selected={isActive}
               onClick={() => setView(v)}
+              data-testid={`ai-recs-tab-${v}`}
               className="px-3 py-1.5 text-xs font-medium rounded-t"
               style={{
                 background: isActive ? 'var(--bg-card)' : 'transparent',
@@ -3323,9 +3511,16 @@ export function AiRecommendationsPanel({
         })}
       </div>
 
-      {currentView === 'current' ? (
+      {currentView === 'current' && (
         <SplitPanel left={leftPane} right={rightPane} />
-      ) : (
+      )}
+      {currentView === 'request' && (
+        <div data-testid="ai-recs-view-request">{leftPane}</div>
+      )}
+      {currentView === 'response' && (
+        <div data-testid="ai-recs-view-response">{rightPane}</div>
+      )}
+      {currentView === 'history' && (
         <HistoryView
           entries={history.entries}
           hydrated={history.hydrated}
