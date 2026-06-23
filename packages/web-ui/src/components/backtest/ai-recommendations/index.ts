@@ -12,3 +12,10 @@ export type {
   RecommendationCategoryId,
   RecommendationCategoryTone,
 } from './recommendationCategoryPalette';
+export { ReverseViewBanner } from './ReverseViewBanner';
+export type { ReverseViewBannerProps } from './ReverseViewBanner';
+export { extractReverseViewPattern } from './reverseViewPattern';
+export type {
+  ReverseViewInput,
+  ReverseViewPattern,
+} from './reverseViewPattern';

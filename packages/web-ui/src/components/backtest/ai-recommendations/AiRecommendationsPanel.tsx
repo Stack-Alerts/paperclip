@@ -5,12 +5,17 @@ import { ChevronDown, ChevronRight, Trash2, GripVertical, X } from 'lucide-react
 import { BacktestResult, Strategy, Trade } from '@/lib/strategy-builder/types';
 import { useAiSettings, getProviderMeta } from '@/hooks/useAiSettings';
 import { useAiRecsHistory, AiRecsHistoryEntry, AiRecsHistoryStatus } from '@/hooks/useAiRecsHistory';
+import { ReverseViewBanner } from './ReverseViewBanner';
 import {
   buildDiagnoseRows,
   buildStagedRecsSentence,
   type DiagnoseMetricRow,
   type StagedRecSummary,
 } from './diagnoseMetrics';
+import {
+  extractReverseViewPattern,
+  ReverseViewInput,
+} from './reverseViewPattern';
 
 type SendPhase =
   | 'idle'
@@ -1206,6 +1211,26 @@ function parseAnalysisResponse(text: string): {
   return { diagnosis, recommendations, raw: text };
 }
 
+/**
+ * A4 (BTCAAAAA-37777): map a model-emitted confidence label to a synthetic
+ * uplift number used only to rank the top-quartile bucket. The numeric scale
+ * is internal to the reverse-view banner — it never surfaces to the user.
+ */
+function confidenceToUplift(confidence: string | undefined): number {
+  if (!confidence) return 0;
+  switch (confidence.trim().toLowerCase()) {
+    case 'high':
+      return 3;
+    case 'medium':
+    case 'med':
+      return 2;
+    case 'low':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
 interface ActiveRec {
   id: string;
   title: string;
@@ -1810,6 +1835,19 @@ export function AiRecommendationsPanel({
   const stagedSentence = useMemo(
     () => buildStagedRecsSentence(stagedSummaries, strategy ?? null),
     [stagedSummaries, strategy],
+  );
+  // A4 (BTCAAAAA-37777): map the same parsed recs into the minimal shape the
+  // reverse-view extractor needs. Confidence drives the synthetic uplift so
+  // the top-quartile ranking matches the model's own confidence ordering.
+  const reverseViewInputs = useMemo<ReverseViewInput[]>(
+    () =>
+      parsedRecs.map((r) => ({
+        id: r.id,
+        uplift: confidenceToUplift(r.confidence),
+        category: r.type,
+        paramKeys: r.suggestedParams.map((p) => p.key),
+      })),
+    [parsedRecs],
   );
 
   const handleExport = useCallback(() => {
@@ -3173,6 +3211,10 @@ export function AiRecommendationsPanel({
       {/* Per-tile saves are now the action surface (AC20). No more
           sticky "Apply all" footer — apply is per-card. */}
       </>)}
+
+      {parsedRecs.length > 0 && (
+        <ReverseViewBanner pattern={extractReverseViewPattern(reverseViewInputs)} />
+      )}
 
       {rightTab === 'diagnose' && (
         <DiagnosePane
