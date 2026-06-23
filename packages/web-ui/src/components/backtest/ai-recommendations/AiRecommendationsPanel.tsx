@@ -16,6 +16,12 @@ import {
   extractReverseViewPattern,
   ReverseViewInput,
 } from './reverseViewPattern';
+import { StrategyImpactKpiBar } from './StrategyImpactKpiBar';
+import {
+  AppliedRecImpact,
+  ProjectedDelta,
+  deriveBaselineKpis,
+} from './strategyImpactKpi';
 
 type SendPhase =
   | 'idle'
@@ -1020,6 +1026,35 @@ function deriveSummary(block: string, maxLen = 220): string {
   return `${stripped.slice(0, maxLen - 1).trimEnd()}…`;
 }
 
+// BTCAAAAA-37774 Sprint A2 — optional projected-impact fields per rec block.
+// Recognized labels (case-insensitive, "%" / "pp" treated as percentage-point
+// fractions): "Projected Win Rate", "Projected Net Liquidity",
+// "Projected Drawdown", "Projected Profit Factor", "Projected Entries".
+function projectedImpactFromRecRaw(raw: string): ProjectedDelta {
+  const pick = (label: string): number | undefined => {
+    const v = tryExtractField(raw, label);
+    if (v === undefined) return undefined;
+    const m = v.match(/-?\d+(?:\.\d+)?/);
+    if (!m) return undefined;
+    const n = Number(m[0]);
+    if (!Number.isFinite(n)) return undefined;
+    if (/%|pp/i.test(v)) return n / 100;
+    return n;
+  };
+  const out: ProjectedDelta = {};
+  const wr = pick('Projected Win Rate') ?? pick('Projected WR');
+  if (wr !== undefined) out.winRate = wr;
+  const nl = pick('Projected Net Liquidity') ?? pick('Projected PnL');
+  if (nl !== undefined) out.netLiquidity = nl;
+  const dd = pick('Projected Drawdown') ?? pick('Projected DD');
+  if (dd !== undefined) out.maxDrawdown = dd;
+  const pf = pick('Projected Profit Factor') ?? pick('Projected PF');
+  if (pf !== undefined) out.profitFactor = pf;
+  const en = pick('Projected Entries');
+  if (en !== undefined) out.entries = en;
+  return out;
+}
+
 function parseSingleRec(block: string, index: number): ParsedRec {
   const rawSignal = tryExtractField(block, 'Signal');
   return {
@@ -1849,6 +1884,20 @@ export function AiRecommendationsPanel({
       })),
     [parsedRecs],
   );
+
+  // BTCAAAAA-37774 Sprint A2 — baseline + applied impacts feed the KPI bar.
+  const baselineKpis = useMemo(() => deriveBaselineKpis(result ?? null), [result]);
+  const appliedImpacts = useMemo<AppliedRecImpact[]>(() => {
+    if (parsedRecs.length === 0 || appliedRecIds.length === 0) return [];
+    const byId = new Map(parsedRecs.map((r) => [r.id, r] as const));
+    return appliedRecIds
+      .map((id) => {
+        const rec = byId.get(id);
+        if (!rec) return null;
+        return { recId: id, delta: projectedImpactFromRecRaw(rec.raw) };
+      })
+      .filter((x): x is AppliedRecImpact => x !== null);
+  }, [parsedRecs, appliedRecIds]);
 
   const handleExport = useCallback(() => {
     const payload = buildRequestPayload(
@@ -2750,6 +2799,14 @@ export function AiRecommendationsPanel({
           </p>
         )}
       </div>
+
+      {/* BTCAAAAA-37774 Sprint A2 — Strategy Impact KPI bar. */}
+      {result && (
+        <StrategyImpactKpiBar
+          baseline={baselineKpis}
+          appliedImpacts={appliedImpacts}
+        />
+      )}
 
       {/* AC15: RECOMMENDATIONS header + card grid (ComparePanel layout). */}
       <div className="flex flex-col gap-2">
