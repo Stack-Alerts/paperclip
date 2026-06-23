@@ -1,12 +1,14 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { BacktestResult, Trade } from '@/lib/strategy-builder/types';
 import { RichTooltip, type TooltipContent } from '@/components/strategy-builder/RichTooltip';
 import {
   TrendingUp, TrendingDown, DollarSign, Activity, BarChart3, BarChart2, LineChart,
   RotateCcw, AlertTriangle, AlertOctagon, Clock, Hash, Target,
   ArrowUp, ArrowDown, Sparkles, ArrowUpCircle, ArrowDownCircle, Scale,
-  Percent, Trophy, Skull, Coins,
+  Percent, Trophy, Skull, Coins, ChevronDown, ChevronUp,
+  Calendar, Layers, ArrowRight, Percent as PercentIcon,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -18,7 +20,7 @@ import {
   TT_BEST_TRADE, TT_WORST_TRADE, TT_AVG_BARS,
   TT_MAX_CONSEC_WINS, TT_MAX_CONSEC_LOSSES,
   TT_LONG_TRADES, TT_SHORT_TRADES,
-  TT_START_DATE, TT_END_DATE, TT_DURATION, TT_BARS_ANALYZED,
+  TT_DURATION, TT_BARS_ANALYZED, TT_START_DATE, TT_END_DATE,
   TT_EXIT_TYPE,
   TT_VOLATILITY, TT_VAR_95, TT_CVAR_95, TT_EXPOSURE_TIME,
   TT_PAYOFF_RATIO, TT_LARGEST_WIN, TT_LARGEST_LOSS, TT_CURRENCY,
@@ -38,10 +40,7 @@ interface MetricRow {
   tooltip: TooltipContent;
   icon: LucideIcon;
   accent: Accent;
-  // Optional secondary line beneath the value (e.g. "vs BTC 100K: -22.1%").
-  // Drives the small muted pill rendered below the value.
   baseline?: string;
-  // Optional small chip rendered above the label (e.g. "LONG", "SHORT", "Strategy A").
   strategy?: string;
 }
 
@@ -63,6 +62,13 @@ function accentFg(accent: Accent): string {
     case 'blue': return 'var(--accent-blue)';
     default: return 'var(--text-secondary)';
   }
+}
+
+function deltaColor(delta: number | null): string {
+  if (delta == null || !Number.isFinite(delta)) return 'var(--text-muted)';
+  if (delta > 0) return 'var(--accent-green)';
+  if (delta < 0) return 'var(--accent-red)';
+  return 'var(--text-muted)';
 }
 
 function MetricCard({ label, value, color, tooltip, icon: Icon, accent, baseline, strategy }: MetricRow) {
@@ -139,7 +145,9 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
   );
 }
 
-function Sparkline({ values, color, fillBelow = false, height = 56 }: { values: number[]; color: string; fillBelow?: boolean; height?: number }) {
+function Sparkline({
+  values, color, fillBelow = false, height = 56,
+}: { values: number[]; color: string; fillBelow?: boolean; height?: number }) {
   if (values.length < 2) return null;
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -160,6 +168,209 @@ function Sparkline({ values, color, fillBelow = false, height = 56 }: { values: 
   );
 }
 
+/** Webui-only Buy & Hold delta approximation. The backend does not currently
+ *  emit a buy-and-hold benchmark series, so we approximate it from the first
+ *  trade entry price and the last trade exit price. Returns null when the
+ *  approximation is not meaningful (no trades, degenerate prices). */
+function computeBuyHoldDelta(trades: Trade[]): { pct: number; abs: number; entry: number | null; exit: number | null } | null {
+  if (!trades.length) return null;
+  const closed = trades.filter(t => (t.status ?? '').toUpperCase() === 'CLOSED');
+  const pool = closed.length > 0 ? closed : trades;
+  const first = pool.find(t => Number.isFinite(t.entryPrice) && t.entryPrice > 0);
+  const last = [...pool].reverse().find(t => Number.isFinite(t.exitPrice) && t.exitPrice > 0);
+  if (!first || !last) return null;
+  if (!Number.isFinite(first.entryPrice) || !Number.isFinite(last.exitPrice)) return null;
+  const entry = first.entryPrice;
+  const exit = last.exitPrice;
+  if (entry <= 0) return null;
+  const pct = ((exit - entry) / entry) * 100;
+  return { pct, abs: exit - entry, entry, exit };
+}
+
+function formatBuyHoldDeltaPct(d: { pct: number } | null): string {
+  if (!d) return '—';
+  const sign = d.pct >= 0 ? '↗ +' : '↘ ';
+  return `vs BTC Buy&Hold ${sign}${d.pct.toFixed(2)}%`;
+}
+
+function formatBuyHoldDeltaDollar(d: { pct: number } | null, base: number): string {
+  if (!d) return '—';
+  const value = (base * d.pct) / 100;
+  const sign = value >= 0 ? '↗ +$' : '↘ -$';
+  return `vs BTC Buy&Hold ${sign}${Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatBuyHoldDeltaScalar(d: { pct: number } | null): string {
+  if (!d) return '—';
+  const sign = d.pct >= 0 ? '↗ +' : '↘ ';
+  return `vs BTC Buy&Hold ${sign}${d.pct.toFixed(2)}%`;
+}
+
+function HeroCard({
+  label, value, valueColor, icon: Icon, accent, deltaPct, deltaText, tooltip,
+}: {
+  label: string;
+  value: string;
+  valueColor: string;
+  icon: LucideIcon;
+  accent: Accent;
+  deltaPct: number | null;
+  deltaText: string;
+  tooltip: TooltipContent;
+}) {
+  return (
+    <RichTooltip content={tooltip}>
+      <div
+        className="rounded-lg p-4 cursor-default flex flex-col gap-2 h-full"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+      >
+        <div className="flex items-center gap-2.5">
+          <span
+            className="flex items-center justify-center rounded-full shrink-0"
+            style={{
+              background: accentBg(accent),
+              color: accentFg(accent),
+              width: 26, height: 26,
+            }}
+            aria-hidden="true"
+          >
+            <Icon size={15} strokeWidth={2.2} />
+          </span>
+          <p
+            className="text-[11px] font-medium uppercase tracking-wide truncate"
+            style={{ color: 'var(--text-muted)' }}
+            title={label}
+          >
+            {label}
+          </p>
+        </div>
+        <p
+          className="text-2xl font-semibold leading-tight"
+          style={{ color: valueColor, fontVariantNumeric: 'tabular-nums' }}
+        >
+          {value}
+        </p>
+        <p
+          className="text-[11px] font-medium leading-tight"
+          style={{ color: deltaColor(deltaPct), fontVariantNumeric: 'tabular-nums' }}
+        >
+          {deltaText}
+        </p>
+      </div>
+    </RichTooltip>
+  );
+}
+
+function SparklineCard({
+  label, value, icon: Icon, accent, sparkValues, sparkColor, valueColor, tooltip,
+}: {
+  label: string;
+  value: string;
+  icon: LucideIcon;
+  accent: Accent;
+  sparkValues: number[];
+  sparkColor: string;
+  valueColor?: string;
+  tooltip: TooltipContent;
+}) {
+  return (
+    <RichTooltip content={tooltip}>
+      <div
+        className="rounded p-3 cursor-default h-full flex flex-col gap-1.5"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className="flex items-center justify-center rounded-full shrink-0"
+            style={{
+              background: accentBg(accent),
+              color: accentFg(accent),
+              width: 24, height: 24,
+            }}
+            aria-hidden="true"
+          >
+            <Icon size={13} strokeWidth={2.2} />
+          </span>
+          <p
+            className="text-[11px] truncate"
+            style={{ color: 'var(--text-muted)' }}
+            title={label}
+          >
+            {label}
+          </p>
+        </div>
+        <Sparkline values={sparkValues} color={sparkColor} height={28} />
+        <p
+          className="text-sm font-semibold"
+          style={{
+            color: valueColor || 'var(--text-secondary)',
+            fontVariantNumeric: 'tabular-nums',
+            lineHeight: 1.1,
+          }}
+        >
+          {value}
+        </p>
+      </div>
+    </RichTooltip>
+  );
+}
+
+function InfoCard({
+  label, value, icon: Icon, accent, subValue, tooltip,
+}: {
+  label: string;
+  value: string;
+  icon: LucideIcon;
+  accent: Accent;
+  subValue?: string;
+  tooltip: TooltipContent;
+}) {
+  return (
+    <RichTooltip content={tooltip}>
+      <div
+        className="rounded p-3 cursor-default h-full flex flex-col gap-1.5"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className="flex items-center justify-center rounded-full shrink-0"
+            style={{
+              background: accentBg(accent),
+              color: accentFg(accent),
+              width: 24, height: 24,
+            }}
+            aria-hidden="true"
+          >
+            <Icon size={13} strokeWidth={2.2} />
+          </span>
+          <p
+            className="text-[11px] truncate"
+            style={{ color: 'var(--text-muted)' }}
+            title={label}
+          >
+            {label}
+          </p>
+        </div>
+        <p
+          className="text-sm font-semibold"
+          style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}
+        >
+          {value}
+        </p>
+        {subValue && (
+          <p
+            className="text-[10px] truncate"
+            style={{ color: 'var(--text-faint)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}
+            title={subValue}
+          >
+            {subValue}
+          </p>
+        )}
+      </div>
+    </RichTooltip>
+  );
+}
+
 function computeTradeStats(trades: Trade[]) {
   if (!trades.length) return null;
 
@@ -168,16 +379,12 @@ function computeTradeStats(trades: Trade[]) {
 
   const pnls = source.map(t => t.pnl);
   // "Best trade" must be the largest *winning* P&L and "Worst trade" the
-  // smallest *losing* P&L. Using all-PnL min/max made a single winning trade
-  // show +$X as Best and -$X as Worst (the display layer hardcodes a leading
-  // minus for Worst Trade), producing the impossible +203/-203 pair seen in
-  // BTCAAAAA-35996. With no winners or no losers the corresponding value is 0.
+  // smallest *losing* P&L. With no winners or no losers the corresponding
+  // value is 0 (BTCAAAAA-35996 / BTCAAAAA-37920).
   const winPnls = pnls.filter(p => p > 0);
   const lossPnls = pnls.filter(p => p < 0);
   const bestTrade = winPnls.length ? Math.max(...winPnls) : 0;
   const worstTrade = lossPnls.length ? Math.min(...lossPnls) : 0;
-  // Largest Win / Largest Loss mirror best/worst but surface the raw single-
-  // trade magnitudes for the Trade Statistics row (BTCAAAAA-37920 mockup).
   const largestWin = winPnls.length ? Math.max(...winPnls) : 0;
   const largestLoss = lossPnls.length ? Math.min(...lossPnls) : 0;
   const avgBars = source.reduce((s, t) => s + (t.bars ?? 0), 0) / source.length;
@@ -191,15 +398,10 @@ function computeTradeStats(trades: Trade[]) {
     exitTypes[key] = (exitTypes[key] ?? 0) + 1;
   }
 
-  // Aggregate payoff ratio (Σwins / Σlosses) — distinct from per-trade
-  // Risk/Reward which divides averages. Surface in Trade Statistics row.
   const winsSum = winPnls.reduce((s, p) => s + p, 0);
   const lossesSum = lossPnls.reduce((s, p) => s + Math.abs(p), 0);
 
-  // VaR95 / CVaR95 require a meaningful sample of per-trade returns.
-  // Industry convention gates these at N≥20 trades; below that, surface "—"
-  // rather than emit a percentile from 8 data points that users will
-  // over-trust. (BTCAAAAA-37920)
+  // VaR95 / CVaR95 require N≥20 trades; below that surface "—".
   const returnsPct = source.map(t => t.pnlPercentage).filter(p => Number.isFinite(p));
   let var95: number | null = null;
   let cvar95: number | null = null;
@@ -211,8 +413,6 @@ function computeTradeStats(trades: Trade[]) {
     cvar95 = tail.reduce((s, p) => s + p, 0) / tail.length;
   }
 
-  // Return volatility = sample std dev of per-trade percent returns.
-  // Sample std dev requires N>=2; with degenerate inputs we emit "—".
   let returnVolatility: number | null = null;
   if (returnsPct.length >= 2) {
     const mean = returnsPct.reduce((s, p) => s + p, 0) / returnsPct.length;
@@ -234,10 +434,98 @@ function computeTradeStats(trades: Trade[]) {
   };
 }
 
+/* ── Per-metric sparkline series ─────────────────────────────────────────── */
 
-// ── Component ──────────────────────────────────────────────────────────────────
+function buildCumulativeCount(trades: Trade[]): number[] {
+  if (!trades.length) return [];
+  const series: number[] = [];
+  for (let i = 0; i < trades.length; i++) series.push(i + 1);
+  return series;
+}
+
+function buildTradesPerDay(trades: Trade[]): number[] {
+  if (!trades.length) return [];
+  const byDay = new Map<string, number>();
+  for (const t of trades) {
+    const ts = (t as { exitTime?: string; entryTime?: string }).exitTime
+      ?? (t as { entryTime?: string }).entryTime;
+    if (!ts) continue;
+    const day = ts.slice(0, 10);
+    byDay.set(day, (byDay.get(day) ?? 0) + 1);
+  }
+  return Array.from(byDay.values());
+}
+
+function buildCumulativeWinLoss(trades: Trade[]): { wins: number[]; losses: number[] } {
+  if (!trades.length) return { wins: [], losses: [] };
+  const wins: number[] = [];
+  const losses: number[] = [];
+  let cw = 0, cl = 0;
+  for (const t of trades) {
+    if (t.pnl > 0) cw += 1;
+    else if (t.pnl < 0) cl += 1;
+    wins.push(cw);
+    losses.push(cl);
+  }
+  return { wins, losses };
+}
+
+function buildRollingWinRate(trades: Trade[], window = 20): number[] {
+  if (!trades.length) return [];
+  const out: number[] = [];
+  for (let i = 0; i < trades.length; i++) {
+    const start = Math.max(0, i - window + 1);
+    let wins = 0;
+    for (let j = start; j <= i; j++) if (trades[j].pnl > 0) wins += 1;
+    out.push((wins / (i - start + 1)) * 100);
+  }
+  return out;
+}
+
+function buildRollingAvgTrade(trades: Trade[], window = 20): number[] {
+  if (!trades.length) return [];
+  const out: number[] = [];
+  for (let i = 0; i < trades.length; i++) {
+    const start = Math.max(0, i - window + 1);
+    let sum = 0;
+    for (let j = start; j <= i; j++) sum += trades[j].pnl;
+    out.push(sum / (i - start + 1));
+  }
+  return out;
+}
+
+function buildCumulativePnl(trades: Trade[]): number[] {
+  if (!trades.length) return [];
+  const out: number[] = [];
+  let cum = 0;
+  for (const t of trades) {
+    cum += t.pnl;
+    out.push(cum);
+  }
+  return out;
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
+  const [showAdditional, setShowAdditional] = useState(false);
+
+  // All hooks must run unconditionally — compute series for the result we
+  // were given (even if null) so the hook order stays stable across renders.
+  const allTrades = useMemo<Trade[]>(
+    () => (result ? (trades.length > 0 ? trades : (result.trades ?? [])) : []),
+    [result, trades],
+  );
+
+  // Per-metric sparkline series — cheap O(N) over ≤500 trades typical,
+  // recomputed only when the trade list changes.
+  const sparkCumCount = useMemo(() => buildCumulativeCount(allTrades), [allTrades]);
+  const sparkPerDay = useMemo(() => buildTradesPerDay(allTrades), [allTrades]);
+  const sparkCumWinLoss = useMemo(() => buildCumulativeWinLoss(allTrades), [allTrades]);
+  const sparkRollingWR = useMemo(() => buildRollingWinRate(allTrades), [allTrades]);
+  const sparkRollingAvg = useMemo(() => buildRollingAvgTrade(allTrades), [allTrades]);
+  const sparkCumPnl = useMemo(() => buildCumulativePnl(allTrades), [allTrades]);
+
   if (!result) {
     return (
       <div className="flex flex-col items-center justify-center py-12" style={{ color: 'var(--text-faint)' }}>
@@ -247,7 +535,6 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
     );
   }
 
-  const allTrades = trades.length > 0 ? trades : (result.trades ?? []);
   const tradeStats = computeTradeStats(allTrades);
 
   const winPct = (result.winRate * 100).toFixed(1);
@@ -267,7 +554,6 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
     : null;
 
   // Equity curve + drawdown series for the Performance sparklines.
-  // Drawdown is reported as a negative percent relative to the running peak.
   const equityValues = (result.equityCurve ?? []).map(p => p.value);
   let drawdownPcts: number[] = [];
   if (equityValues.length > 0) {
@@ -280,11 +566,6 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
   const recoveryFactor = (result.maxDrawdown * result.initialCapital) !== 0
     ? (netProfit / Math.abs(result.maxDrawdown * result.initialCapital)).toFixed(2)
     : '—';
-  // Sample std dev requires N>=2; downside deviation requires >=1 losing trade;
-  // Calmar's denominator is max drawdown. With degenerate inputs the backend
-  // returns 0.0 for these (app.py:1989-2000) — the math is actually undefined,
-  // not zero. Match the recoveryFactor / rrRatio "—" pattern so users see the
-  // same "undefined" sentinel for every undefined denominator (BTCAAAAA-35996).
   const sharpeStr = allTrades.length >= 2 ? result.sharpeRatio.toFixed(2) : '—';
   const sortinoStr = allTrades.length >= 2 && result.losingTrades > 0
     ? result.sortino_ratio.toFixed(2)
@@ -294,59 +575,248 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
     : '—';
   const avgHoldingBars = tradeStats && tradeStats.avgBars > 0 ? tradeStats.avgBars.toFixed(1) : '—';
 
-  // ── Derived metrics for the new mockup rows (BTCAAAAA-37920) ────────────────
-  // Exposure Time: fraction of bars the strategy held a position. With no
-  // totalBars from the backend we surface "—" rather than fabricate.
   const totalBarsHeld = allTrades.reduce((s, t) => s + (t.bars ?? 0), 0);
   const exposurePct = result.totalBars && result.totalBars > 0
     ? (totalBarsHeld / result.totalBars) * 100
     : null;
 
-  // Symbol is per-trade; display the first non-empty value or "—" (USDT assumed).
   const symbol = allTrades.find(t => t.symbol)?.symbol ?? null;
 
-  // ── Section: Key Metrics (4 KPIs from mockup) ──────────────────────────────
-  const keyMetricRows: MetricRow[] = [
+  /* ── Buy & Hold delta (webui-only approximation) ───────────────────────── */
+  const bhDelta = computeBuyHoldDelta(allTrades);
+  const strategyReturn = result.returnPercentage;
+  const strategyDeltaVsBh = bhDelta ? strategyReturn - bhDelta.pct : null;
+  const strategyAbsVsBh = bhDelta ? (netProfit) - (result.initialCapital * bhDelta.pct / 100) : null;
+  const drawdownVsBh = bhDelta ? (result.maxDrawdown * 100) - (-Math.abs(bhDelta.pct)) : null;
+
+  const sparkEquity = equityValues;
+  const sparkDrawdown = drawdownPcts;
+
+  /* ── Hero strip (4 large KPIs from mockup) ─────────────────────────────── */
+  const heroCards = [
     {
-      label: 'Total Return', value: `${result.returnPercentage >= 0 ? '+' : ''}${result.returnPercentage.toFixed(2)}%`,
-      color: result.returnPercentage >= 0 ? 'var(--accent-green)' : 'var(--accent-red)',
+      label: 'Total Return',
+      value: `${strategyReturn >= 0 ? '+' : ''}${strategyReturn.toFixed(2)}%`,
+      valueColor: strategyReturn >= 0 ? 'var(--accent-green)' : 'var(--accent-red)',
+      icon: strategyReturn >= 0 ? TrendingUp : TrendingDown,
+      accent: (strategyReturn >= 0 ? 'green' : 'red') as Accent,
+      deltaPct: strategyDeltaVsBh,
+      deltaText: formatBuyHoldDeltaPct(bhDelta),
       tooltip: TT_TOTAL_RETURN,
-      icon: result.returnPercentage >= 0 ? TrendingUp : TrendingDown,
-      accent: result.returnPercentage >= 0 ? 'green' : 'red',
     },
     {
-      label: 'Net Profit', value: `${netProfit >= 0 ? '+' : ''}$${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      color: netProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)',
-      tooltip: TT_NET_PROFIT,
+      label: 'Net Profit',
+      value: `${netProfit >= 0 ? '+' : ''}$${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      valueColor: netProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)',
       icon: DollarSign,
-      accent: netProfit >= 0 ? 'green' : 'red',
+      accent: (netProfit >= 0 ? 'green' : 'red') as Accent,
+      deltaPct: strategyAbsVsBh,
+      deltaText: formatBuyHoldDeltaDollar(bhDelta, result.initialCapital),
+      tooltip: TT_NET_PROFIT,
     },
     {
-      label: 'Max Drawdown', value: `${(result.maxDrawdown * 100).toFixed(2)}%`,
-      color: 'var(--accent-orange)',
-      tooltip: TT_MAX_DRAWDOWN,
+      label: 'Max Drawdown',
+      value: `${(result.maxDrawdown * 100).toFixed(2)}%`,
+      valueColor: 'var(--accent-orange)',
       icon: AlertTriangle,
-      accent: 'orange',
+      accent: 'orange' as Accent,
+      deltaPct: drawdownVsBh,
+      deltaText: formatBuyHoldDeltaScalar(bhDelta),
+      tooltip: TT_MAX_DRAWDOWN,
     },
     {
-      label: 'Profit Factor', value: result.profitFactor.toFixed(2),
-      color: result.profitFactor >= 1 ? 'var(--accent-green)' : 'var(--accent-red)',
-      tooltip: TT_PROFIT_FACTOR,
-      icon: Scale,
-      accent: result.profitFactor >= 1 ? 'green' : 'red',
+      label: 'Sharpe Ratio',
+      value: sharpeStr,
+      valueColor: Number(sharpeStr) >= 1 ? 'var(--accent-green)'
+        : Number(sharpeStr) >= 0 ? 'var(--accent-blue)'
+        : 'var(--accent-red)',
+      icon: Activity,
+      accent: (Number(sharpeStr) >= 1 ? 'green' : Number(sharpeStr) >= 0 ? 'blue' : 'red') as Accent,
+      deltaPct: null,
+      deltaText: bhDelta ? 'Buy&Hold Sharpe: not computed' : '—',
+      tooltip: TT_SHARPE,
     },
   ];
 
-  // ── Section: Risk Metrics (8 from mockup) ─────────────────────────────────
-  const riskRows: MetricRow[] = [
-    { label: 'Recovery Factor', value: recoveryFactor, color: Number(recoveryFactor) >= 1 ? 'var(--accent-green)' : 'var(--accent-red)', tooltip: TT_MAX_DRAWDOWN, icon: RotateCcw, accent: Number(recoveryFactor) >= 1 ? 'green' : 'red' },
-    { label: 'Sharpe Ratio', value: sharpeStr, tooltip: TT_SHARPE, icon: Activity, accent: 'blue' },
-    { label: 'Sortino Ratio', value: sortinoStr, tooltip: TT_SORTINO, icon: BarChart3, accent: 'blue' },
-    { label: 'Calmar Ratio', value: calmarStr, tooltip: TT_CALMAR, icon: LineChart, accent: 'blue' },
+  /* ── Risk Metrics (6 sparkline cards in mockup 3×2) ─────────────────────── */
+  const riskSparklineCards = [
     {
-      label: 'Volatility (σ)', value: tradeStats?.returnVolatility != null ? `${tradeStats.returnVolatility.toFixed(2)}%` : '—',
-      tooltip: TT_VOLATILITY, icon: BarChart2, accent: 'neutral',
+      label: 'Volatility (σ)',
+      value: tradeStats?.returnVolatility != null ? `${tradeStats.returnVolatility.toFixed(2)}%` : '—',
+      icon: BarChart2,
+      accent: 'neutral' as Accent,
+      sparkValues: sparkRollingAvg,
+      sparkColor: 'var(--accent-blue)',
+      tooltip: TT_VOLATILITY,
     },
+    {
+      label: 'Sortino Ratio',
+      value: sortinoStr,
+      icon: BarChart3,
+      accent: 'blue' as Accent,
+      sparkValues: sparkEquity,
+      sparkColor: 'var(--accent-blue)',
+      tooltip: TT_SORTINO,
+    },
+    {
+      label: 'Calmar Ratio',
+      value: calmarStr,
+      icon: LineChart,
+      accent: 'blue' as Accent,
+      sparkValues: sparkDrawdown,
+      sparkColor: 'var(--accent-orange)',
+      tooltip: TT_CALMAR,
+    },
+    {
+      label: 'Recovery Factor',
+      value: recoveryFactor,
+      valueColor: Number(recoveryFactor) >= 1 ? 'var(--accent-green)' : 'var(--accent-red)',
+      icon: RotateCcw,
+      accent: (Number(recoveryFactor) >= 1 ? 'green' : 'red') as Accent,
+      sparkValues: sparkCumPnl,
+      sparkColor: Number(recoveryFactor) >= 1 ? 'var(--accent-green)' : 'var(--accent-red)',
+      tooltip: TT_MAX_DRAWDOWN,
+    },
+    {
+      label: 'Win Rate',
+      value: `${winPct}%`,
+      valueColor: result.winRate >= 0.5 ? 'var(--accent-green)' : 'var(--accent-red)',
+      icon: Target,
+      accent: (result.winRate >= 0.5 ? 'green' : 'red') as Accent,
+      sparkValues: sparkRollingWR,
+      sparkColor: 'var(--accent-green)',
+      tooltip: TT_WIN_RATE,
+    },
+    {
+      label: 'Profit Factor',
+      value: result.profitFactor.toFixed(2),
+      valueColor: result.profitFactor >= 1 ? 'var(--accent-green)' : 'var(--accent-red)',
+      icon: Scale,
+      accent: (result.profitFactor >= 1 ? 'green' : 'red') as Accent,
+      sparkValues: sparkCumPnl,
+      sparkColor: result.profitFactor >= 1 ? 'var(--accent-green)' : 'var(--accent-red)',
+      tooltip: TT_PROFIT_FACTOR,
+    },
+  ];
+
+  /* ── Trade Statistics (6 sparkline cards in mockup 3×2) ─────────────────── */
+  const tradeSparklineCards = [
+    {
+      label: 'Trades',
+      value: String(result.totalTrades),
+      icon: Hash,
+      accent: 'neutral' as Accent,
+      sparkValues: sparkCumCount,
+      sparkColor: 'var(--accent-blue)',
+      tooltip: TT_TOTAL_TRADES,
+    },
+    {
+      label: 'Trades/Day',
+      value: sparkPerDay.length > 0
+        ? (allTrades.length / sparkPerDay.length).toFixed(2)
+        : '—',
+      icon: Layers,
+      accent: 'neutral' as Accent,
+      sparkValues: sparkPerDay,
+      sparkColor: 'var(--accent-blue)',
+      tooltip: TT_TOTAL_TRADES,
+    },
+    {
+      label: 'Winning',
+      value: String(result.winningTrades),
+      valueColor: 'var(--accent-green)',
+      icon: ArrowUp,
+      accent: 'green' as Accent,
+      sparkValues: sparkCumWinLoss.wins,
+      sparkColor: 'var(--accent-green)',
+      tooltip: TT_WINNING_TRADES,
+    },
+    {
+      label: 'Losing',
+      value: String(result.losingTrades),
+      valueColor: 'var(--accent-red)',
+      icon: ArrowDown,
+      accent: 'red' as Accent,
+      sparkValues: sparkCumWinLoss.losses,
+      sparkColor: 'var(--accent-red)',
+      tooltip: TT_LOSING_TRADES,
+    },
+    {
+      label: 'Avg Trade',
+      value: `${expectancy >= 0 ? '+' : ''}$${expectancy.toFixed(2)}`,
+      valueColor: expectancy >= 0 ? 'var(--accent-green)' : 'var(--accent-red)',
+      icon: PercentIcon,
+      accent: (expectancy >= 0 ? 'green' : 'red') as Accent,
+      sparkValues: sparkRollingAvg,
+      sparkColor: expectancy >= 0 ? 'var(--accent-green)' : 'var(--accent-red)',
+      tooltip: TT_EXPECTANCY,
+    },
+    {
+      label: 'Avg Win',
+      value: `+$${result.averageWin.toFixed(2)}`,
+      valueColor: 'var(--accent-green)',
+      icon: TrendingUp,
+      accent: 'green' as Accent,
+      sparkValues: sparkCumPnl,
+      sparkColor: 'var(--accent-green)',
+      tooltip: TT_AVG_WIN,
+    },
+  ];
+
+  /* ── Backtest Period (5 InfoCards from mockup strip) ─────────────────────── */
+  const periodCards = [
+    {
+      label: 'Period',
+      value: result.startDate && result.endDate
+        ? `${formatDate(result.startDate)} → ${formatDate(result.endDate)}`
+        : (result.startDate ? formatDate(result.startDate) : '—'),
+      icon: Calendar,
+      accent: 'neutral' as Accent,
+      subValue: durationDays != null ? `${durationDays} days` : undefined,
+      tooltip: TT_START_DATE,
+    },
+    {
+      label: 'Duration',
+      value: durationDays != null ? `${durationDays} days` : '—',
+      icon: Clock,
+      accent: 'neutral' as Accent,
+      subValue: durationDays != null
+        ? `≈ ${(durationDays / 30.44).toFixed(1)} months`
+        : undefined,
+      tooltip: TT_DURATION,
+    },
+    {
+      label: 'Bars / Trades',
+      value: result.totalBars != null
+        ? `${result.totalBars.toLocaleString()} bars`
+        : '—',
+      icon: BarChart3,
+      accent: 'neutral' as Accent,
+      subValue: `${result.totalTrades} trades`,
+      tooltip: TT_BARS_ANALYZED,
+    },
+    {
+      label: 'Capital',
+      value: `$${result.initialCapital.toLocaleString(undefined, { maximumFractionDigits: 0 })} → $${result.finalCapital.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+      icon: DollarSign,
+      accent: (netProfit >= 0 ? 'green' : 'red') as Accent,
+      subValue: `${netProfit >= 0 ? '+' : ''}$${Math.abs(netProfit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      tooltip: TT_INITIAL_CAPITAL,
+    },
+    {
+      label: 'Pair / Currency',
+      value: symbol ?? '—',
+      icon: Coins,
+      accent: 'neutral' as Accent,
+      subValue: 'USDT',
+      tooltip: TT_CURRENCY,
+    },
+  ];
+
+  /* ── Additional metrics (preserves v1 surface under a "show more" expander) */
+  const additionalRows: MetricRow[] = [
+    { label: 'Recovery Factor', value: recoveryFactor, color: Number(recoveryFactor) >= 1 ? 'var(--accent-green)' : 'var(--accent-red)', tooltip: TT_MAX_DRAWDOWN, icon: RotateCcw, accent: Number(recoveryFactor) >= 1 ? 'green' : 'red' },
+    { label: 'Risk / Reward', value: rrRatio, tooltip: TT_RISK_REWARD, icon: Scale, accent: 'neutral' },
     {
       label: 'VaR 95%', value: tradeStats?.var95 != null ? `${tradeStats.var95.toFixed(2)}%` : '—',
       color: tradeStats?.var95 != null ? 'var(--accent-red)' : undefined,
@@ -359,37 +829,21 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
       tooltip: TT_CVAR_95, icon: AlertOctagon, accent: 'red',
       baseline: tradeStats?.cvar95 == null ? 'requires ≥20 trades' : undefined,
     },
-    {
-      label: 'Exposure Time', value: exposurePct != null ? `${exposurePct.toFixed(1)}%` : '—',
-      tooltip: TT_EXPOSURE_TIME, icon: Clock, accent: 'blue',
-    },
-  ];
-
-  // ── Section: Trade Statistics (12 from mockup) ────────────────────────────
-  const tradeRows: MetricRow[] = [
-    { label: 'Total Trades', value: String(result.totalTrades), tooltip: TT_TOTAL_TRADES, icon: Hash, accent: 'neutral' },
-    { label: 'Win Rate', value: `${winPct}%`, color: result.winRate >= 0.5 ? 'var(--accent-green)' : 'var(--accent-red)', tooltip: TT_WIN_RATE, icon: Target, accent: result.winRate >= 0.5 ? 'green' : 'red' },
-    { label: 'Winning Trades', value: String(result.winningTrades), color: 'var(--accent-green)', tooltip: TT_WINNING_TRADES, icon: ArrowUp, accent: 'green' },
-    { label: 'Losing Trades', value: String(result.losingTrades), color: 'var(--accent-red)', tooltip: TT_LOSING_TRADES, icon: ArrowDown, accent: 'red' },
-    { label: 'Largest Win', value: tradeStats ? `${tradeStats.largestWin >= 0 ? '+' : ''}$${tradeStats.largestWin.toFixed(2)}` : '—', color: 'var(--accent-green)', tooltip: TT_LARGEST_WIN, icon: ArrowUpCircle, accent: 'green' },
-    { label: 'Largest Loss', value: tradeStats ? `-$${Math.abs(tradeStats.largestLoss).toFixed(2)}` : '—', color: 'var(--accent-red)', tooltip: TT_LARGEST_LOSS, icon: ArrowDownCircle, accent: 'red' },
-    { label: 'Avg Win', value: `$${result.averageWin.toFixed(2)}`, color: 'var(--accent-green)', tooltip: TT_AVG_WIN, icon: TrendingUp, accent: 'green' },
-    { label: 'Avg Loss', value: `-$${Math.abs(result.averageLoss).toFixed(2)}`, color: 'var(--accent-red)', tooltip: TT_AVG_LOSS, icon: TrendingDown, accent: 'red' },
-    { label: 'Risk / Reward', value: rrRatio, tooltip: TT_RISK_REWARD, icon: Scale, accent: 'neutral' },
+    { label: 'Exposure Time', value: exposurePct != null ? `${exposurePct.toFixed(1)}%` : '—', tooltip: TT_EXPOSURE_TIME, icon: Clock, accent: 'blue' },
     {
       label: 'Payoff Ratio', value: tradeStats && tradeStats.lossesSum > 0
         ? (tradeStats.winsSum / tradeStats.lossesSum).toFixed(2)
         : '—',
       tooltip: TT_PAYOFF_RATIO, icon: Percent, accent: 'neutral',
     },
+    { label: 'Largest Win', value: tradeStats ? `${tradeStats.largestWin >= 0 ? '+' : ''}$${tradeStats.largestWin.toFixed(2)}` : '—', color: 'var(--accent-green)', tooltip: TT_LARGEST_WIN, icon: ArrowUpCircle, accent: 'green' },
+    { label: 'Largest Loss', value: tradeStats ? `-$${Math.abs(tradeStats.largestLoss).toFixed(2)}` : '—', color: 'var(--accent-red)', tooltip: TT_LARGEST_LOSS, icon: ArrowDownCircle, accent: 'red' },
     { label: 'Breakeven Win%', value: `${breakevenWinRate}%`, tooltip: TT_BREAKEVEN_WIN, icon: Sparkles, accent: 'neutral' },
-    { label: 'Expectancy', value: `${expectancy >= 0 ? '+' : ''}$${expectancy.toFixed(2)}`, color: expectancy >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', tooltip: TT_EXPECTANCY, icon: Activity, accent: expectancy >= 0 ? 'green' : 'red' },
+    { label: 'Avg Loss', value: `-$${Math.abs(result.averageLoss).toFixed(2)}`, color: 'var(--accent-red)', tooltip: TT_AVG_LOSS, icon: TrendingDown, accent: 'red' },
   ];
 
-  // ── Section: Trade Insights (conditional — preserved from original) ───────
-  const insightRows: MetricRow[] = [];
   if (tradeStats) {
-    insightRows.push(
+    additionalRows.push(
       { label: 'Best Trade', value: `${tradeStats.bestTrade >= 0 ? '+' : ''}$${tradeStats.bestTrade.toFixed(2)}`, color: 'var(--accent-green)', tooltip: TT_BEST_TRADE, icon: Trophy, accent: 'green' },
       { label: 'Worst Trade', value: `-$${Math.abs(tradeStats.worstTrade).toFixed(2)}`, color: 'var(--accent-red)', tooltip: TT_WORST_TRADE, icon: Skull, accent: 'red' },
       { label: 'Avg Bars Held', value: tradeStats.avgBars.toFixed(1), tooltip: TT_AVG_BARS, icon: Clock, accent: 'neutral' },
@@ -397,7 +851,7 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
       { label: 'Max Consec. Losses', value: String(tradeStats.maxConsecLosses), color: 'var(--accent-red)', tooltip: TT_MAX_CONSEC_LOSSES, icon: ArrowDownCircle, accent: 'red' },
     );
     if (tradeStats.longs + tradeStats.shorts > 0) {
-      insightRows.push(
+      additionalRows.push(
         { label: 'Long Trades', value: String(tradeStats.longs), tooltip: TT_LONG_TRADES, icon: ArrowUp, accent: 'green' },
         { label: 'Short Trades', value: String(tradeStats.shorts), tooltip: TT_SHORT_TRADES, icon: ArrowDown, accent: 'red' },
       );
@@ -405,28 +859,35 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
     for (const [exitType, count] of Object.entries(tradeStats.exitTypes)) {
       if (exitType === 'Unknown') continue;
       const pct = ((count / tradeStats.count) * 100).toFixed(0);
-      insightRows.push({ label: `Exit: ${exitType}`, value: `${count} (${pct}%)`, tooltip: TT_EXIT_TYPE(exitType, count, tradeStats.count), icon: BarChart3, accent: 'neutral' });
+      additionalRows.push({ label: `Exit: ${exitType}`, value: `${count} (${pct}%)`, tooltip: TT_EXIT_TYPE(exitType, count, tradeStats.count), icon: BarChart3, accent: 'neutral' });
     }
-    insightRows.push({ label: 'Avg Holding (bars)', value: avgHoldingBars, tooltip: TT_AVG_BARS, icon: Clock, accent: 'neutral' });
+    additionalRows.push({ label: 'Avg Holding (bars)', value: avgHoldingBars, tooltip: TT_AVG_BARS, icon: Clock, accent: 'neutral' });
     if (tradeStats.returnVolatility != null) {
-      insightRows.push({ label: 'Return σ (per trade %)', value: `${tradeStats.returnVolatility.toFixed(2)}%`, tooltip: TT_VOLATILITY, icon: BarChart2, accent: 'neutral' });
+      additionalRows.push({ label: 'Return σ (per trade %)', value: `${tradeStats.returnVolatility.toFixed(2)}%`, tooltip: TT_VOLATILITY, icon: BarChart2, accent: 'neutral' });
     }
   }
 
-  // ── Section: Backtest Period (7 fields from mockup) ────────────────────────
-  const periodRows: MetricRow[] = [];
-  if (result.startDate) periodRows.push({ label: 'Start Date', value: formatDate(result.startDate), tooltip: TT_START_DATE, icon: Clock, accent: 'neutral' });
-  if (result.endDate) periodRows.push({ label: 'End Date', value: formatDate(result.endDate), tooltip: TT_END_DATE, icon: Clock, accent: 'neutral' });
-  if (durationDays != null) periodRows.push({ label: 'Duration', value: `${durationDays} days`, tooltip: TT_DURATION, icon: Clock, accent: 'neutral' });
-  if (result.totalBars != null) periodRows.push({ label: 'Bars Analyzed', value: result.totalBars.toLocaleString(), tooltip: TT_BARS_ANALYZED, icon: Hash, accent: 'neutral' });
-  periodRows.push({
-    label: 'Currency', value: 'USDT',
-    tooltip: TT_CURRENCY, icon: Coins, accent: 'neutral',
-    baseline: symbol ? `pair: ${symbol}` : 'BacktestResult has no currency field — USDT assumed',
-  });
-
   return (
     <div>
+      {/* Hero strip: 4 large KPIs with vs-Buy&Hold deltas (mockup top row) */}
+      <SectionHeader title="Overview" subtitle="Top-line performance vs Buy & Hold benchmark" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {heroCards.map(card => (
+          <HeroCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            valueColor={card.valueColor}
+            icon={card.icon}
+            accent={card.accent}
+            deltaPct={card.deltaPct}
+            deltaText={card.deltaText}
+            tooltip={card.tooltip}
+          />
+        ))}
+      </div>
+
+      {/* Performance: equity + drawdown sparklines (preserved from v1) */}
       {equityValues.length >= 2 && (
         <>
           <SectionHeader title="Performance" subtitle="Equity curve and underwater drawdown from the run" />
@@ -443,10 +904,18 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
                 <RichTooltip content={TT_INITIAL_CAPITAL}>
                   <span className="cursor-help">Initial ${result.initialCapital.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                 </RichTooltip>
-                <span aria-hidden="true">→</span>
+                <span aria-hidden="true"><ArrowRight size={11} /></span>
                 <RichTooltip content={TT_FINAL_CAPITAL}>
                   <span className="cursor-help">Final ${result.finalCapital.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                 </RichTooltip>
+                {result.endDate && (
+                  <>
+                    <span aria-hidden="true"><ArrowRight size={11} /></span>
+                    <RichTooltip content={TT_END_DATE}>
+                      <span className="cursor-help">End {formatDate(result.endDate)}</span>
+                    </RichTooltip>
+                  </>
+                )}
               </div>
             </div>
             <div className="rounded p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
@@ -462,38 +931,84 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
         </>
       )}
 
-      <SectionHeader title="Key Metrics" subtitle="Top-line performance indicators" />
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {keyMetricRows.map(r => <MetricCard key={r.label} {...r} />)}
-      </div>
-
-      <SectionHeader title="Risk Metrics" subtitle="Volatility, drawdown, and downside risk measures" />
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {riskRows.map(r => <MetricCard key={r.label} {...r} />)}
-      </div>
-
-      <SectionHeader title="Trade Statistics" subtitle="Win/loss distribution, averages, and ratios" />
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {tradeRows.map(r => <MetricCard key={r.label} {...r} />)}
-      </div>
-
-      {insightRows.length > 0 && (
-        <>
-          <SectionHeader title="Trade Insights" subtitle="Per-trade aggregates and exit-type breakdown" />
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {insightRows.map(r => <MetricCard key={r.label} {...r} />)}
+      {/* Two side-by-side 3×2 sparkline-card panels (mockup middle rows) */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div>
+          <SectionHeader title="Risk Metrics" subtitle="Volatility, drawdown, and downside risk measures" />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {riskSparklineCards.map(c => (
+              <SparklineCard
+                key={c.label}
+                label={c.label}
+                value={c.value}
+                valueColor={c.valueColor}
+                icon={c.icon}
+                accent={c.accent}
+                sparkValues={c.sparkValues}
+                sparkColor={c.sparkColor}
+                tooltip={c.tooltip}
+              />
+            ))}
           </div>
-        </>
-      )}
+        </div>
+        <div>
+          <SectionHeader title="Trade Statistics" subtitle="Win/loss distribution and execution rates" />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {tradeSparklineCards.map(c => (
+              <SparklineCard
+                key={c.label}
+                label={c.label}
+                value={c.value}
+                valueColor={c.valueColor}
+                icon={c.icon}
+                accent={c.accent}
+                sparkValues={c.sparkValues}
+                sparkColor={c.sparkColor}
+                tooltip={c.tooltip}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
 
-      {periodRows.length > 0 && (
+      {/* Backtest Period strip (5 cards, mockup bottom row) */}
+      {periodCards.length > 0 && (
         <>
           <SectionHeader title="Backtest Period" subtitle="Run window, sample size, and reporting currency" />
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {periodRows.map(r => <MetricCard key={r.label} {...r} />)}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+            {periodCards.map(c => (
+              <InfoCard
+                key={c.label}
+                label={c.label}
+                value={c.value}
+                icon={c.icon}
+                accent={c.accent}
+                subValue={c.subValue}
+                tooltip={c.tooltip}
+              />
+            ))}
           </div>
         </>
       )}
+
+      {/* Collapsed expander preserves every metric surfaced in v1 */}
+      <div className="mt-5">
+        <button
+          type="button"
+          onClick={() => setShowAdditional(v => !v)}
+          className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide cursor-pointer select-none"
+          style={{ color: 'var(--text-muted)', background: 'transparent', border: 'none', padding: 0 }}
+          aria-expanded={showAdditional}
+        >
+          {showAdditional ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          {showAdditional ? 'Hide additional metrics' : 'Show additional metrics'}
+        </button>
+        {showAdditional && (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 mt-3">
+            {additionalRows.map(r => <MetricCard key={r.label} {...r} />)}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
