@@ -160,7 +160,7 @@ export function toEnginePayload(config: BacktestConfigFull): Record<string, unkn
     lookback_days: config.lookbackDays,
     training_days: config.trainingDays,
     testing_days: config.testingDays,
-    mode: config.mode === 'live_replay' ? 2 : 3,
+    mode: config.mode === 'live_replay' ? 3 : 1,
     tpsl_mode: config.tpslMode,
     sl_adjustment_mode: config.slAdjustmentMode,
     adaptive_sl_preset: config.adaptiveSLPreset,

@@ -193,8 +193,8 @@ function PresetButtonRow({
 // ── API payload translation (React camelCase → Python snake_case) ─────────────
 
 function buildPythonPayload(config: BacktestConfigFull, strategyId: string): Record<string, unknown> {
-  // Python engine expects mode as int enum: 1 = historical, 2 = live_replay
-  const modeInt = config.mode === 'historical' ? 1 : 2;
+  // Python engine expects mode as int enum: 1 = historical, 2 = walk_forward, 3 = live_replay
+  const modeInt = config.mode === 'historical' ? 1 : 3;
 
   const payload: Record<string, unknown> = {
     strategyId, // retained so the store can build the API URL path
