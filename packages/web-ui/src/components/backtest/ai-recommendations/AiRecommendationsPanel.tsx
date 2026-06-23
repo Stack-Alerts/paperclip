@@ -5,6 +5,12 @@ import { ChevronDown, ChevronRight, Trash2, GripVertical, X } from 'lucide-react
 import { BacktestResult, Strategy, Trade } from '@/lib/strategy-builder/types';
 import { useAiSettings, getProviderMeta } from '@/hooks/useAiSettings';
 import { useAiRecsHistory, AiRecsHistoryEntry, AiRecsHistoryStatus } from '@/hooks/useAiRecsHistory';
+import {
+  buildDiagnoseRows,
+  buildStagedRecsSentence,
+  type DiagnoseMetricRow,
+  type StagedRecSummary,
+} from './diagnoseMetrics';
 
 type SendPhase =
   | 'idle'
@@ -1350,6 +1356,207 @@ const VIEW_LABELS: Record<View, string> = {
 const AI_RECS_PROMPT =
   'Analyze this trading strategy backtest and return a diagnosis and concrete, actionable recommendations.';
 
+// BTCAAAAA-37780 / Sprint A6 — minimal markdown renderer for the Diagnose
+// pane. The rest of the panel renders diagnosis text with `whitespace-pre-wrap`,
+// so we preserve that line-break convention and add light inline support
+// for **bold**, _italic_, and `inline code` plus `- `/`* ` bullet lists.
+// Anything fancier (tables, links, code blocks) falls back to plain text.
+function renderInline(line: string, keyPrefix: string): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  const re = /(\*\*[^*]+\*\*|_[^_]+_|`[^`]+`)/g;
+  let last = 0;
+  let i = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(line)) !== null) {
+    if (m.index > last) out.push(line.slice(last, m.index));
+    const tok = m[0];
+    if (tok.startsWith('**')) {
+      out.push(<strong key={`${keyPrefix}:b:${i++}`}>{tok.slice(2, -2)}</strong>);
+    } else if (tok.startsWith('_')) {
+      out.push(<em key={`${keyPrefix}:i:${i++}`}>{tok.slice(1, -1)}</em>);
+    } else if (tok.startsWith('`')) {
+      out.push(
+        <code
+          key={`${keyPrefix}:c:${i++}`}
+          style={{ fontFamily: 'var(--font-mono, monospace)' }}
+        >
+          {tok.slice(1, -1)}
+        </code>,
+      );
+    }
+    last = m.index + tok.length;
+  }
+  if (last < line.length) out.push(line.slice(last));
+  return out;
+}
+
+function DiagnosisMarkdown({ text }: { text: string }) {
+  if (!text.trim()) return null;
+  const lines = text.split(/\r?\n/);
+  const out: React.ReactNode[] = [];
+  let bullets: string[] | null = null;
+  let blockIdx = 0;
+
+  const flushBullets = () => {
+    if (!bullets) return;
+    const items = bullets;
+    out.push(
+      <ul
+        key={`ul:${blockIdx++}`}
+        className="list-disc pl-5 text-xs"
+        style={{ color: 'var(--text-secondary)' }}
+      >
+        {items.map((b, i) => (
+          <li key={i}>{renderInline(b, `ul:${blockIdx}:${i}`)}</li>
+        ))}
+      </ul>,
+    );
+    bullets = null;
+  };
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    const bulletMatch = line.match(/^\s*[-*]\s+(.*)$/);
+    if (bulletMatch) {
+      if (!bullets) bullets = [];
+      bullets.push(bulletMatch[1]);
+      continue;
+    }
+    flushBullets();
+    if (line.trim().length === 0) continue;
+    out.push(
+      <p
+        key={`p:${blockIdx++}`}
+        className="text-xs whitespace-pre-wrap"
+        style={{ color: 'var(--text-secondary)' }}
+      >
+        {renderInline(line, `p:${blockIdx}`)}
+      </p>,
+    );
+  }
+  flushBullets();
+  return <div className="flex flex-col gap-2">{out}</div>;
+}
+
+interface DiagnosePaneProps {
+  diagnosis: string;
+  rows: DiagnoseMetricRow[];
+  stagedSentence: string;
+  hasResult: boolean;
+}
+
+function DiagnosePane({ diagnosis, rows, stagedSentence, hasResult }: DiagnosePaneProps) {
+  return (
+    <div className="flex flex-col gap-3" data-testid="ai-recs-diagnose-pane">
+      <div
+        className="rounded p-3"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+      >
+        <p
+          className="text-xs font-semibold uppercase tracking-wide mb-2"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          DIAGNOSIS
+        </p>
+        {diagnosis.trim() ? (
+          <DiagnosisMarkdown text={diagnosis} />
+        ) : (
+          <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
+            {hasResult
+              ? 'Awaiting AI analysis. Use “Approve & Send to AI” once the request preview is verified.'
+              : 'Run a backtest first, then use “Approve & Send to AI” to receive a strategy diagnosis.'}
+          </p>
+        )}
+      </div>
+
+      <div
+        className="rounded"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+      >
+        <p
+          className="text-xs font-semibold uppercase tracking-wide px-3 pt-3"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          METRICS — REPORTED vs PER-ENTRY
+        </p>
+        <table
+          data-testid="ai-recs-diagnose-table"
+          className="w-full text-xs mt-2"
+          style={{ borderCollapse: 'collapse' }}
+        >
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--border)' }}>
+              <th
+                className="text-left px-3 py-1.5 font-semibold"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                Metric
+              </th>
+              <th
+                className="text-right px-3 py-1.5 font-semibold"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                Reported
+              </th>
+              <th
+                className="text-right px-3 py-1.5 font-semibold"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                Per-entry
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={row.key}
+                data-testid={`ai-recs-diagnose-row-${row.key}`}
+                data-divergent={row.divergent ? 'true' : 'false'}
+                style={{ borderBottom: '1px solid var(--border)' }}
+              >
+                <td className="px-3 py-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  {row.label}
+                </td>
+                <td
+                  className="px-3 py-1.5 text-right"
+                  style={{
+                    color: 'var(--text-secondary)',
+                    fontFamily: 'var(--font-mono, monospace)',
+                  }}
+                >
+                  {row.reported}
+                </td>
+                <td
+                  className="px-3 py-1.5 text-right"
+                  style={{
+                    color: row.divergent ? 'var(--accent-orange)' : 'var(--text-secondary)',
+                    fontFamily: 'var(--font-mono, monospace)',
+                  }}
+                >
+                  {row.perEntry}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div
+        data-testid="ai-recs-staged-sentence"
+        className="rounded p-3 text-xs"
+        style={{
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--border)',
+          borderLeft: '3px solid var(--accent-blue)',
+          color: 'var(--text-secondary)',
+        }}
+      >
+        {stagedSentence}
+      </div>
+    </div>
+  );
+}
+
 export function AiRecommendationsPanel({
   result,
   strategy,
@@ -1378,6 +1585,11 @@ export function AiRecommendationsPanel({
   }, []);
 
   const [view, setView] = useState<View>('current');
+  // BTCAAAAA-37780 / Sprint A6: right-rail sub-tab. "recs" keeps the
+  // existing diagnosis-summary + recommendations grid; "diagnose" renders
+  // the orchestrator's diagnosis markdown plus the reported-vs-per-entry
+  // metrics table and a pinned-impact sentence.
+  const [rightTab, setRightTab] = useState<'recs' | 'diagnose'>('recs');
   const [phase, setPhase] = useState<SendPhase>('idle');
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisDetail, setAnalysisDetail] = useState<string | null>(null);
@@ -1582,6 +1794,23 @@ export function AiRecommendationsPanel({
     if (!aiAnalysis?.recommendations) return [];
     return parseRecommendations(aiAnalysis.recommendations);
   }, [aiAnalysis?.recommendations]);
+
+  // BTCAAAAA-37780 / Sprint A6 — Diagnose tab data.
+  const diagnoseRows: DiagnoseMetricRow[] = useMemo(
+    () => buildDiagnoseRows(result ?? null, result?.trades ?? null),
+    [result],
+  );
+  const stagedSummaries: StagedRecSummary[] = useMemo(
+    () =>
+      parsedRecs
+        .filter((r) => appliedRecIds.includes(r.id))
+        .map((r) => ({ id: r.id, title: r.title, suggestedParams: r.suggestedParams })),
+    [parsedRecs, appliedRecIds],
+  );
+  const stagedSentence = useMemo(
+    () => buildStagedRecsSentence(stagedSummaries, strategy ?? null),
+    [stagedSummaries, strategy],
+  );
 
   const handleExport = useCallback(() => {
     const payload = buildRequestPayload(
@@ -2408,6 +2637,46 @@ export function AiRecommendationsPanel({
   // rollback is a follow-up backend ticket; see AC18 inline notes).
   const rightPane = (
     <div className="flex flex-col gap-3">
+      {/* BTCAAAAA-37780 / Sprint A6 — right-rail sub-tabs. The recs tab
+          keeps the existing diagnosis-summary card + per-rec toggle grid;
+          the diagnose tab renders the orchestrator markdown plus a
+          reported-vs-per-entry metrics table and the pinned-impact
+          sentence. */}
+      <div
+        role="tablist"
+        aria-label="Right-rail views"
+        data-testid="ai-recs-right-tabs"
+        className="flex items-center gap-1 border-b"
+        style={{ borderColor: 'var(--border)' }}
+      >
+        {(['recs', 'diagnose'] as const).map((t) => {
+          const isActive = rightTab === t;
+          const label = t === 'recs' ? 'Recommendations' : 'Diagnose';
+          return (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setRightTab(t)}
+              data-testid={`ai-recs-right-tab-${t}`}
+              className="px-3 py-1.5 text-xs font-medium rounded-t"
+              style={{
+                background: isActive ? 'var(--bg-card)' : 'transparent',
+                color: isActive ? 'var(--text-secondary)' : 'var(--text-faint)',
+                border: '1px solid var(--border)',
+                borderBottom: isActive ? '1px solid var(--bg-card)' : '1px solid var(--border)',
+                marginBottom: isActive ? '-1px' : '0',
+                cursor: 'pointer',
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {rightTab === 'recs' && (<>
       {/* Diagnosis card: compact summary at the top so the grid below has
           room. The detailed prose is still rendered in full; we just do
           not crowd it next to the per-rec cards. */}
@@ -2903,6 +3172,16 @@ export function AiRecommendationsPanel({
 
       {/* Per-tile saves are now the action surface (AC20). No more
           sticky "Apply all" footer — apply is per-card. */}
+      </>)}
+
+      {rightTab === 'diagnose' && (
+        <DiagnosePane
+          diagnosis={aiAnalysis?.diagnosis ?? aiAnalysis?.raw ?? ''}
+          rows={diagnoseRows}
+          stagedSentence={stagedSentence}
+          hasResult={!!result}
+        />
+      )}
     </div>
   );
 
