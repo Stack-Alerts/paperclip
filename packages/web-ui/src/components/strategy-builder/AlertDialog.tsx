@@ -92,25 +92,27 @@ export const QuestionDialog: React.FC<QuestionDialogProps> = ({
           <button
             onClick={() => onResult('cancel')}
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+            style={{ background: 'var(--btn-cancel-bg)', color: 'var(--btn-primary-text)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--btn-cancel-bg-hover)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--btn-cancel-bg)')}
           >
             ❌ Cancel
           </button>
           <button
             onClick={() => onResult('no')}
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+            style={{ background: 'var(--btn-cancel-bg)', color: 'var(--btn-primary-text)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--btn-cancel-bg-hover)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--btn-cancel-bg)')}
           >
             🔴 No
           </button>
           <button
             onClick={() => onResult('yes')}
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
-            style={{ background: 'var(--accent-blue)', color: 'var(--btn-primary-text)' }}
+            style={{ background: 'var(--btn-confirm-bg)', color: 'var(--btn-primary-text)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--btn-confirm-bg-hover)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--btn-confirm-bg)')}
           >
             ✅ Yes
           </button>
