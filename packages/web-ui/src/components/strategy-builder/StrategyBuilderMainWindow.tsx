@@ -217,6 +217,18 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // re-prompt. Any block / name change invalidates this match and forces a
   // re-validate before backtest.
   const [validationPassedSnapshot, setValidationPassedSnapshot] = useState<string>('');
+  // BTCAAAAA-37756 (round 2): snapshot of the strategy at the moment the user
+  // last dismissed the "Validation Required" alert. While
+  // `strategySnapshot === validationPromptDismissedFor`, the user has already
+  // been told validation is required for this dirty state — re-clicking
+  // Test/Optimize (or Tools > Backtest…) must NOT re-open the alert in a loop.
+  // Resets automatically once the user edits (snapshot diverges) or switches
+  // strategy (id-change effect below).
+  const [validationPromptDismissedFor, setValidationPromptDismissedFor] = useState<string>('');
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- identity-change reset only; cannot derive at render time because the trigger is the strategy id (a different identity than strategySnapshot).
+    setValidationPromptDismissedFor('');
+  }, [currentStrategy?.id]);
   // Ref mirrors currentStrategy so async `.then()` callbacks (e.g. the post-load
   // re-validate in handleStrategySelect) read the freshest strategy object
   // instead of the closure-captured one from the moment the callback was queued.
@@ -1004,6 +1016,7 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
             // backtest config.
             { label: 'Backtest…',      onClick: () => {
                 if (!isValidatedAndPristine) {
+                  if (validationPromptDismissedFor === strategySnapshot) return;
                   setActiveDialog('validationRequiredAlert');
                   return;
                 }
@@ -1088,7 +1101,13 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
                 // pass. If the user has modified the strategy since the last
                 // successful validation, route them through the validation
                 // page with a message instead of opening the backtest config.
+                // BTCAAAAA-37756 (round 2): if the user already dismissed the
+                // "Validation Required" alert for THIS dirty snapshot, do not
+                // re-open the alert on every click — that was the modal/alert
+                // re-open loop. The user can still click the Validate step
+                // directly to validate.
                 if (!isValidatedAndPristine) {
+                  if (validationPromptDismissedFor === strategySnapshot) return;
                   setActiveDialog('validationRequiredAlert');
                   return;
                 }
@@ -1254,8 +1273,10 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
 
       {/* BTCAAAAA-36689: shown when the user attempts to open Test/Optimize
           (via the stepper or Tools > Backtest…) without a clean validation
-          pass. Closing the alert drops them on the Validate step with the
-          validation dialog open so the re-validate is a single click away. */}
+          pass. BTCAAAAA-37756 (round 2): closing the alert marks the current
+          dirty snapshot as "seen" so the next click on Test/Optimize does NOT
+          re-open it (fix for the alert/modal re-open loop). The user can still
+          validate by clicking the Validate step directly. */}
       <AlertDialog
         open={activeDialog === 'validationRequiredAlert'}
         title="Validation Required"
@@ -1263,9 +1284,8 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
         message="This strategy has changes that have not been validated. Run validation first, then continue to backtest."
         icon="⚠️"
         onClose={() => {
+          setValidationPromptDismissedFor(strategySnapshot);
           setActiveDialog(null);
-          setCurrentStep(1);
-          setActiveDialog('validation');
         }}
       />
 

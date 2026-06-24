@@ -119,4 +119,13 @@ describe('StepperRibbon', () => {
       buttons.forEach(b => expect(b).not.toHaveAttribute('data-pulse'));
     });
   });
+
+  // BTCAAAAA-38259: the suppression logic lives in
+  // StrategyBuilderMainWindow — the stepper itself does not need a new visual
+  // state for this fix. The MainWindow captures a `validationPromptDismissedFor`
+  // snapshot the first time the user closes the "Validation Required" alert
+  // and refuses to re-open the alert while the strategy remains in that same
+  // dirty state. Once the user edits the strategy (snapshot diverges) or
+  // switches to a different strategy (id change), the dismissed flag is
+  // cleared and the next test/optimize click re-prompts as before.
 });
