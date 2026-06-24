@@ -38,7 +38,14 @@ ALERT_SEARCH_QUERY = "Dead-man's-switch monitor alert"
 CTO_AGENT_ID = "41b5ede6-e209-40ba-b923-dc969c722e6d"
 
 DEADMAN_INTERVAL_MINUTES = 30
-MONITOR_THRESHOLD_MINUTES = 45
+# Default alert threshold (minutes since last successful run before firing).
+# Override at runtime via DEADMAN_MONITOR_THRESHOLD_MINUTES env var.
+# Tuned for observed GH Actions cron slot-dropping cadence — see
+# .github/workflows/README.md "Cadence vs threshold policy". Median gap
+# observed on the primary monitor is ~58 min; 90 min = ~3× designed cadence.
+MONITOR_THRESHOLD_MINUTES = int(
+    os.environ.get("DEADMAN_MONITOR_THRESHOLD_MINUTES", "90")
+)
 
 MONITOR_LOG.parent.mkdir(parents=True, exist_ok=True)
 

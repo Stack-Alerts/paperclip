@@ -10,9 +10,9 @@ on:
         required: false
         default: 'false'
       threshold:
-        description: 'Alert threshold in minutes'
+        description: 'Alert threshold in minutes (override default 90 with DEADMAN_MONITOR_THRESHOLD_MINUTES env var on the script, or this input)'
         required: false
-        default: '45'
+        default: '90'
 
 permissions:
   contents: read

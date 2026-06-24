@@ -55,7 +55,16 @@ GH_BLIND_SEARCH_QUERY = "Backup dead-man's-switch monitor: cannot reach GitHub A
 CTO_AGENT_ID = "41b5ede6-e209-40ba-b923-dc969c722e6d"
 
 MONITOR_INTERVAL_MINUTES = 30
-MONITOR_THRESHOLD_MINUTES = 90  # GH Actions cron misses ~18% of slots; 90min suppresses those
+# Default alert threshold (minutes since last successful run before firing).
+# Override at runtime via BACKUP_DEADMAN_MONITOR_THRESHOLD_MINUTES env var.
+# Tuned for observed GH Actions cron slot-dropping cadence on the *primary*
+# monitor (median gap ~58 min on `deadman-switch-monitor.yml`); 180 min
+# gives ~6× primary cadence so this monitor stays a real backup, not a
+# chronic false-positive generator. See .github/workflows/README.md
+# "Cadence vs threshold policy".
+MONITOR_THRESHOLD_MINUTES = int(
+    os.environ.get("BACKUP_DEADMAN_MONITOR_THRESHOLD_MINUTES", "180")
+)
 # If reported age exceeds this, require independent corroboration before alerting.
 # A 24h+ stale signal is far more likely to be a stale local artifact than a true failure.
 AGE_SANITY_CAP_MINUTES = 24 * 60

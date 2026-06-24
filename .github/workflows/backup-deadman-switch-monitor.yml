@@ -10,9 +10,9 @@ on:
         required: false
         default: 'false'
       threshold:
-        description: 'Alert threshold in minutes'
+        description: 'Alert threshold in minutes (override default 180 with BACKUP_DEADMAN_MONITOR_THRESHOLD_MINUTES env var on the script, or this input)'
         required: false
-        default: '90'
+        default: '180'
 
 permissions:
   contents: read
