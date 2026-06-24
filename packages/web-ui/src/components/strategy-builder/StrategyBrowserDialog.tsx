@@ -606,13 +606,15 @@ export function StrategyBrowserDialog({
     try {
       const updated = await listStrategies();
       // sb_validate_strategy does not yet persist validation_status, so the
-      // API returns null per row. Enrich with the per-browser localStorage
-      // cache that the editor wrote on its last successful validate so the
-      // browser correctly shows Pass/Fail instead of "Un-Validated"
-      // (BTCAAAAA-37756 reopen).
+      // API returns the truthy sentinel "Un-Validated" (or null) per row.
+      // Enrich with the per-browser localStorage cache that the editor wrote
+      // on its last successful validate so the browser correctly shows
+      // Pass/Fail instead of "Un-Validated" (BTCAAAAA-37756 reopen).
+      // Only override non-terminal values — an explicit Pass/Fail from the
+      // API wins over the cache.
       const enriched = (updated as typeof strategyList).map((s) => {
         const cached = readCachedValidationStatus(s);
-        if (cached && !s.validationStatus) {
+        if (cached && s.validationStatus !== 'Pass' && s.validationStatus !== 'Fail') {
           return { ...s, validationStatus: cached };
         }
         return s;

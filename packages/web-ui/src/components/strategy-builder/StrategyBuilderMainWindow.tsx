@@ -14,7 +14,7 @@ import { StepperRibbon } from './StepperRibbon';
 import { StrategyInfoPanel, STRATEGY_NAME_INPUT_ID } from './StrategyInfoPanel';
 import { StrategyBlocksPanel } from './StrategyBlocksPanel';
 import { BlockSearchPanel } from './BlockSearchPanel';
-import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
+import { useStrategyStore, readCachedValidationStatus } from '@/hooks/strategy-builder/useStrategyStore';
 import * as api from '@/lib/strategy-builder/api';
 import type { BacktestResult, BacktestConfig, Strategy, Block } from '@/lib/strategy-builder/types';
 import { BlockType, StrategyStatus } from '@/lib/strategy-builder/types';
@@ -275,10 +275,18 @@ export const StrategyBuilderMainWindow: React.FC<StrategyBuilderMainWindowProps>
   // it as validated (status=VALID or validationStatus='Pass') and the snapshot
   // still matches the clean (just-loaded) snapshot. Computing this inline avoids
   // the cascading setState in useEffect that BTCAAAAA-37801 flagged.
+  // BTCAAAAA-37756 v4: also fall back to the per-browser localStorage cache
+  // (readCachedValidationStatus) — the store's validate path mutates
+  // currentStrategy.status in memory but does not saveToStorage, so a freshly
+  // loaded strategy from the browser sees stale state (status=DRAFT) even
+  // though the previous session cached Pass. Without this, re-opening a
+  // validated strategy leaves the Validate button grey and the Test/Optimize
+  // gate locked.
   const isDbAlreadyValidated =
     !!currentStrategy &&
     (currentStrategy.status === StrategyStatus.VALID ||
-      (currentStrategy as { validationStatus?: string }).validationStatus === 'Pass');
+      (currentStrategy as { validationStatus?: string }).validationStatus === 'Pass' ||
+      readCachedValidationStatus(currentStrategy) === 'Pass');
   const isValidatedAndPristine =
     !!currentStrategy &&
     ((validationPassedSnapshot !== '' && strategySnapshot === validationPassedSnapshot) ||
