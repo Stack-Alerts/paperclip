@@ -17,12 +17,13 @@ on:
 
 concurrency:
   group: impact-gate-polling-daemon
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   poll:
     name: Poll for done fix issues and run Impact Gate
     runs-on: self-hosted
+    timeout-minutes: 4
 
     env:
       PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
