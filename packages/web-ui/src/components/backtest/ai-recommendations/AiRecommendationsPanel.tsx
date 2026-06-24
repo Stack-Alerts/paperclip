@@ -3216,24 +3216,30 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
               const isApplied = appliedRecIds.includes(rec.id);
               const isApplyingThis = perTileApplying.includes(rec.id);
               const errMsg = perTileError[rec.id];
+              const STRUCTURAL_TYPES = new Set(['ADD_SIGNAL', 'REMOVE_SIGNAL', 'ADD_BLOCK', 'REMOVE_BLOCK']);
+              const isStructural = STRUCTURAL_TYPES.has((rec.type ?? '').toUpperCase());
+              const isAutoApplicable = isStructural || !!(rec.parameter && rec.suggestedValue);
               return (
                 <button
                   key={rec.id}
                   type="button"
-                  role="switch"
-                  aria-checked={isApplied}
+                  role={isAutoApplicable ? 'switch' : undefined}
+                  aria-checked={isAutoApplicable ? isApplied : undefined}
                   aria-busy={isApplyingThis}
-                  disabled={!strategy?.id || isApplyingThis}
-                  onClick={() => handleToggleRec(rec)}
+                  disabled={!strategy?.id || isApplyingThis || !isAutoApplicable}
+                  onClick={isAutoApplicable ? () => handleToggleRec(rec) : undefined}
                   data-testid="ai-recs-toggle-card"
                   data-rec-id={rec.id}
                   data-applied={isApplied ? 'true' : 'false'}
+                  data-auto-applicable={isAutoApplicable ? 'true' : 'false'}
                   title={
-                    isApplyingThis
-                      ? 'Sending this recommendation to the orchestrator…'
-                      : isApplied
-                        ? 'Click to roll back this recommendation (local rollback — server-side undo is a follow-up backend ticket).'
-                        : 'Click to apply this recommendation to the strategy.'
+                    !isAutoApplicable
+                      ? 'This recommendation cannot be auto-applied — re-run AI analysis to get a structured recommendation.'
+                      : isApplyingThis
+                        ? 'Sending this recommendation to the orchestrator…'
+                        : isApplied
+                          ? 'Click to roll back this recommendation (local rollback — server-side undo is a follow-up backend ticket).'
+                          : 'Click to apply this recommendation to the strategy.'
                   }
                   className="rounded p-2 text-left text-[11px] flex flex-col gap-1.5"
                   style={{
@@ -3244,11 +3250,16 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
                     borderTop: `3px solid ${
                       isApplied
                         ? 'var(--accent-green)'
-                        : 'var(--accent-blue)'
+                        : isAutoApplicable
+                          ? 'var(--accent-blue)'
+                          : '#d97706'
                     }`,
                     opacity: !strategy?.id ? 0.5 : 1,
-                    cursor:
-                      !strategy?.id || isApplyingThis ? 'not-allowed' : 'pointer',
+                    cursor: !isAutoApplicable
+                      ? 'default'
+                      : !strategy?.id || isApplyingThis
+                        ? 'not-allowed'
+                        : 'pointer',
                     transition: 'opacity 120ms ease, border-color 120ms ease',
                   }}
                 >
@@ -3265,17 +3276,25 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
                       style={{
                         background: isApplied
                           ? 'var(--accent-green)'
-                          : 'var(--bg-card)',
-                        color: isApplied ? 'var(--text-on-positive)' : 'var(--text-faint)',
+                          : !isAutoApplicable
+                            ? '#fef3c7'
+                            : 'var(--bg-card)',
+                        color: isApplied
+                          ? 'var(--text-on-positive)'
+                          : !isAutoApplicable
+                            ? '#92400e'
+                            : 'var(--text-faint)',
                         border: `1px solid ${
                           isApplied
                             ? 'var(--accent-green)'
-                            : 'var(--border)'
+                            : !isAutoApplicable
+                              ? '#d97706'
+                              : 'var(--border)'
                         }`,
                       }}
                       data-testid="ai-recs-toggle-badge"
                     >
-                      {isApplyingThis ? '…' : isApplied ? 'ON' : 'OFF'}
+                      {isApplyingThis ? '…' : isApplied ? 'ON' : !isAutoApplicable ? 'MANUAL' : 'OFF'}
                     </span>
                   </div>
 
@@ -3321,6 +3340,17 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
                       title={rec.rationale}
                     >
                       {rec.rationale}
+                    </p>
+                  )}
+
+                  {/* MANUAL hint: shown when AI did not produce structured fields */}
+                  {!isAutoApplicable && (
+                    <p
+                      className="text-[10px] mt-0.5"
+                      style={{ color: '#d97706', fontStyle: 'italic' }}
+                      data-testid="ai-recs-manual-hint"
+                    >
+                      Re-run AI analysis to get a structured auto-apply recommendation.
                     </p>
                   )}
 
