@@ -19,3 +19,11 @@ export type {
   ReverseViewInput,
   ReverseViewPattern,
 } from './reverseViewPattern';
+export { StrategyAfterChangesRail } from './StrategyAfterChangesRail';
+export type { StrategyAfterChangesRailProps } from './StrategyAfterChangesRail';
+export { mergeStrategyAfterChanges } from './strategyAfterChangesMerge';
+export type {
+  AfterChangesItem,
+  AfterChangesStatus,
+  CurrentRecRef,
+} from './strategyAfterChangesMerge';

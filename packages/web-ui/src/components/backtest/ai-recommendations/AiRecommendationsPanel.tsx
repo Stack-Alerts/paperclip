@@ -23,6 +23,8 @@ import {
   deriveBaselineKpis,
 } from './strategyImpactKpi';
 import { computeReanalyzeHash } from './dirtyHash';
+import { StrategyAfterChangesRail } from './StrategyAfterChangesRail';
+import { mergeStrategyAfterChanges } from './strategyAfterChangesMerge';
 
 type SendPhase =
   | 'idle'
@@ -2414,6 +2416,41 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
 
   const currentView = view;
 
+  // A5: Right-rail "Strategy after changes" — merge today's parsed recs with
+  // staged items carried over from prior applied history entries for the same
+  // strategy. The rail's toggle reuses handleToggleRec so apply/rollback paths
+  // stay identical to the per-card flow.
+  const afterChangesItems = useMemo(
+    () =>
+      mergeStrategyAfterChanges({
+        currentRecs: parsedRecs.map((r) => ({ id: r.id, title: r.title })),
+        appliedRecIds,
+        historyEntries: history.entries,
+        currentStrategyName: strategy?.name ?? null,
+      }),
+    [parsedRecs, appliedRecIds, history.entries, strategy?.name],
+  );
+
+  const appliedRecIdSet = useMemo(() => new Set(appliedRecIds), [appliedRecIds]);
+
+  const handleRailToggleCurrent = useCallback(
+    (recId: string) => {
+      const rec = parsedRecs.find((r) => r.id === recId);
+      if (!rec) return;
+      void handleToggleRec(rec);
+    },
+    [parsedRecs, handleToggleRec],
+  );
+
+  const handleRailJumpToOriginEntry = useCallback(
+    (_historyEntryId: string) => {
+      // id is intentionally ignored — panel only switches view; scroll-to-entry lives in HistoryView
+      void _historyEntryId;
+      setView('history');
+    },
+    [setView],
+  );
+
   // ── LEFT pane: config + active-form + Approve flow ──
   const leftPane = (
     <div className="flex flex-col gap-3">
@@ -3511,16 +3548,27 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
         })}
       </div>
 
-      {currentView === 'current' && (
-        <SplitPanel left={leftPane} right={rightPane} />
-      )}
-      {currentView === 'request' && (
+{currentView === 'current' ? (
+        <div
+          data-testid="ai-recs-current-with-rail"
+          className="flex gap-3"
+          style={{ flexWrap: 'wrap', alignItems: 'flex-start' }}
+        >
+          <div style={{ flex: '1 1 720px', minWidth: 0 }}>
+            <SplitPanel left={leftPane} right={rightPane} />
+          </div>
+          <StrategyAfterChangesRail
+            items={afterChangesItems}
+            toggleOn={appliedRecIdSet}
+            onToggleCurrent={handleRailToggleCurrent}
+            onJumpToOriginEntry={handleRailJumpToOriginEntry}
+          />
+        </div>
+      ) : currentView === 'request' ? (
         <div data-testid="ai-recs-view-request">{leftPane}</div>
-      )}
-      {currentView === 'response' && (
+      ) : currentView === 'response' ? (
         <div data-testid="ai-recs-view-response">{rightPane}</div>
-      )}
-      {currentView === 'history' && (
+      ) : (
         <HistoryView
           entries={history.entries}
           hydrated={history.hydrated}
