@@ -199,6 +199,73 @@ const MANAGED_WORKSPACE_GIT_CLONE_TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_INLINE_WAKE_COMMENTS = 8;
 const MAX_INLINE_WAKE_COMMENT_BODY_CHARS = 4_000;
 const MAX_INLINE_WAKE_COMMENT_BODY_TOTAL_CHARS = 12_000;
+const DEFAULT_MAX_INLINE_WAKE_CONTINUATION_SUMMARY_CHARS = 4_000;
+const DEFAULT_WAKE_PAYLOAD_COMPRESS_THRESHOLD_CHARS = 16_000;
+const DEFAULT_WAKE_PAYLOAD_COMPRESS_AGGRESSIVE_CHARS = 1_500;
+
+function readPositiveIntEnv(name: string): number | null {
+  const raw = process.env[name];
+  if (typeof raw !== "string" || raw.trim().length === 0) return null;
+  const parsed = Number.parseInt(raw.trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function resolveMaxInlineContinuationSummaryChars() {
+  return (
+    readPositiveIntEnv("PAPERCLIP_WAKE_CONTINUATION_SUMMARY_MAX_CHARS") ??
+    DEFAULT_MAX_INLINE_WAKE_CONTINUATION_SUMMARY_CHARS
+  );
+}
+
+function resolveWakePayloadCompressThresholdChars() {
+  return (
+    readPositiveIntEnv("PAPERCLIP_WAKE_PAYLOAD_COMPRESS_THRESHOLD_CHARS") ??
+    DEFAULT_WAKE_PAYLOAD_COMPRESS_THRESHOLD_CHARS
+  );
+}
+
+function resolveWakePayloadCompressAggressiveChars() {
+  return (
+    readPositiveIntEnv("PAPERCLIP_WAKE_PAYLOAD_COMPRESS_AGGRESSIVE_CHARS") ??
+    DEFAULT_WAKE_PAYLOAD_COMPRESS_AGGRESSIVE_CHARS
+  );
+}
+
+function extractMarkdownSection(markdown: string, heading: string, maxChars: number): string | null {
+  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^##\\s+${escaped}\\s*$([\\s\\S]*?)(?=^##\\s+|\\Z)`, "im");
+  const match = re.exec(markdown);
+  const section = match?.[1]?.trim();
+  if (!section) return null;
+  return section.length > maxChars ? `${section.slice(0, Math.max(0, maxChars - 20)).trimEnd()}\n[truncated]` : section;
+}
+
+function buildCompressedContinuationSummaryHeadline(body: string): { body: string; truncated: boolean } {
+  const maxChars = resolveWakePayloadCompressAggressiveChars();
+  const objective = extractMarkdownSection(body, "Objective", Math.floor(maxChars / 2)) ?? "";
+  const nextAction = extractMarkdownSection(body, "Next Action", Math.floor(maxChars / 2)) ?? "";
+  const recentActions = extractMarkdownSection(body, "Recent Concrete Actions", Math.floor(maxChars / 2)) ?? "";
+  const blocks: string[] = ["# Continuation Summary (compressed)", ""];
+  if (objective) {
+    blocks.push("## Objective", "", objective, "");
+  }
+  if (nextAction) {
+    const firstLine = nextAction.split(/\r?\n/)[0]?.replace(/^[-*]\s+/, "").trim() ?? nextAction;
+    blocks.push("## Next Action", "", `- ${firstLine}`, "");
+  }
+  if (recentActions) {
+    blocks.push("## Recent Concrete Actions (headline)", "", recentActions, "");
+  }
+  const text = blocks.join("\n").trim();
+  if (text.length <= maxChars) {
+    return { body: text, truncated: text.length < body.length };
+  }
+  return {
+    body: `${text.slice(0, Math.max(0, maxChars - 20)).trimEnd()}\n[truncated]`,
+    truncated: true,
+  };
+}
+
 const execFile = promisify(execFileCallback);
 const EXECUTION_PATH_HEARTBEAT_RUN_STATUSES = ["queued", "running", "scheduled_retry"] as const;
 const CANCELLABLE_HEARTBEAT_RUN_STATUSES = ["queued", "running", "scheduled_retry"] as const;
@@ -1881,7 +1948,7 @@ export function mergeCoalescedContextSnapshot(
   return merged;
 }
 
-async function buildPaperclipWakePayload(input: {
+export async function buildPaperclipWakePayload(input: {
   db: Db;
   companyId: string;
   contextSnapshot: Record<string, unknown>;
@@ -1925,6 +1992,9 @@ async function buildPaperclipWakePayload(input: {
           .then((rows) => rows[0] ?? null)
       : null);
   if (commentIds.length === 0 && Object.keys(executionStage).length === 0 && !issueSummary) return null;
+
+  const wakeReason = readNonEmptyString(input.contextSnapshot.wakeReason);
+  const isTransientFailureRetry = wakeReason === BOUNDED_TRANSIENT_HEARTBEAT_RETRY_WAKE_REASON;
 
   const commentRows =
     commentIds.length === 0
@@ -1996,7 +2066,21 @@ async function buildPaperclipWakePayload(input: {
     });
   }
 
-  return {
+  const maxInlineContinuationSummaryChars = resolveMaxInlineContinuationSummaryChars();
+  const initialContinuationSummary = continuationSummary
+    ? {
+        key: continuationSummary.key,
+        title: continuationSummary.title,
+        body:
+          continuationSummary.body.length > maxInlineContinuationSummaryChars
+            ? continuationSummary.body.slice(0, maxInlineContinuationSummaryChars)
+            : continuationSummary.body,
+        bodyTruncated: continuationSummary.body.length > maxInlineContinuationSummaryChars,
+        updatedAt: continuationSummary.updatedAt.toISOString(),
+      }
+    : null;
+
+  const payload = {
     reason: readNonEmptyString(input.contextSnapshot.wakeReason),
     issue: issueSummary
       ? {
@@ -2008,10 +2092,14 @@ async function buildPaperclipWakePayload(input: {
           workMode: issueSummary.workMode,
         }
       : null,
-    childIssueSummaries: Array.isArray(input.contextSnapshot.childIssueSummaries)
-      ? input.contextSnapshot.childIssueSummaries
-      : [],
-    childIssueSummaryTruncated: input.contextSnapshot.childIssueSummaryTruncated === true,
+    childIssueSummaries: isTransientFailureRetry
+      ? []
+      : Array.isArray(input.contextSnapshot.childIssueSummaries)
+        ? input.contextSnapshot.childIssueSummaries
+        : [],
+    childIssueSummaryTruncated: isTransientFailureRetry
+      ? false
+      : input.contextSnapshot.childIssueSummaryTruncated === true,
     livenessContinuation: readNonEmptyString(input.contextSnapshot.livenessContinuationState) ||
       readNonEmptyString(input.contextSnapshot.livenessContinuationInstruction) ||
       readNonEmptyString(input.contextSnapshot.livenessContinuationSourceRunId) ||
@@ -2034,22 +2122,13 @@ async function buildPaperclipWakePayload(input: {
     unresolvedBlockerIssueIds: Array.isArray(input.contextSnapshot.unresolvedBlockerIssueIds)
       ? input.contextSnapshot.unresolvedBlockerIssueIds.filter((value): value is string => typeof value === "string" && value.length > 0)
       : [],
-    unresolvedBlockerSummaries: Array.isArray(input.contextSnapshot.unresolvedBlockerSummaries)
-      ? input.contextSnapshot.unresolvedBlockerSummaries
-      : [],
+    unresolvedBlockerSummaries: isTransientFailureRetry
+      ? []
+      : Array.isArray(input.contextSnapshot.unresolvedBlockerSummaries)
+        ? input.contextSnapshot.unresolvedBlockerSummaries
+        : [],
     executionStage: Object.keys(executionStage).length > 0 ? executionStage : null,
-    continuationSummary: continuationSummary
-      ? {
-          key: continuationSummary.key,
-          title: continuationSummary.title,
-          body:
-            continuationSummary.body.length > 4_000
-              ? continuationSummary.body.slice(0, 4_000)
-              : continuationSummary.body,
-          bodyTruncated: continuationSummary.body.length > 4_000,
-          updatedAt: continuationSummary.updatedAt.toISOString(),
-        }
-      : null,
+    continuationSummary: initialContinuationSummary,
     commentIds,
     latestCommentId: commentIds[commentIds.length - 1] ?? null,
     comments,
@@ -2061,6 +2140,23 @@ async function buildPaperclipWakePayload(input: {
     truncated,
     fallbackFetchNeeded: truncated || missingCommentCount > 0,
   };
+
+  if (initialContinuationSummary) {
+    const compressThreshold = resolveWakePayloadCompressThresholdChars();
+    const serialized = JSON.stringify(payload);
+    if (serialized.length > compressThreshold) {
+      const compressed = buildCompressedContinuationSummaryHeadline(initialContinuationSummary.body);
+      payload.continuationSummary = {
+        key: initialContinuationSummary.key,
+        title: initialContinuationSummary.title,
+        body: compressed.body,
+        bodyTruncated: compressed.truncated || initialContinuationSummary.bodyTruncated,
+        updatedAt: initialContinuationSummary.updatedAt,
+      };
+    }
+  }
+
+  return payload;
 }
 
 function runTaskKey(run: typeof heartbeatRuns.$inferSelect) {
