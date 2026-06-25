@@ -195,7 +195,7 @@ the above instead.
 
 ## Dev/Test Stack Lifecycle Management (BTCAAAAA-33697)
 
-The development stack consists of three services. When they hang or crash, use these
+The development stack consists of four services. When they hang or crash, use these
 commands to stop, diagnose, and recover without CEO intervention.
 
 ### Services
@@ -205,6 +205,16 @@ commands to stop, diagnose, and recover without CEO intervention.
 | Backend API | `:8765` | `start_api.sh` | `btc-dev-backend.service` |
 | Supervised Web UI | `:3010` | `start-dev.sh` | `btc-dev-server.service` |
 | Ephemeral Test Web UI | `:3000` | `start-test.sh` | (not under systemd) |
+| Isolated Test Instances | `:4000–:4999` | `start-test-iso.sh` | (not under systemd) |
+
+`start-test-iso.sh` runs each instance in its own git worktree
+(`$BTC_TEST_WORKTREES/`, default `~/btc-test-worktrees/`) with a
+deterministic per-branch port. It is the worktree-per-instance variant
+of `start-test.sh`: use it for parallel branch testing or detached-SHA
+reproduction, not as a replacement for the supervised dev server on
+`:3010`. See [`docs/operations/test-iso.md`](docs/operations/test-iso.md)
+for the full operator guide. Implemented in [BTCAAAAA-38277](/BTCAAAAA/issues/BTCAAAAA-38277)
+(design motivation: [BTCAAAAA-38260](/BTCAAAAA/issues/BTCAAAAA-38260)).
 
 ### Diagnostics
 
