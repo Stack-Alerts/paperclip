@@ -3,9 +3,15 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Trash2, GripVertical, X, ExternalLink } from 'lucide-react';
 import { BacktestResult, Strategy, Trade } from '@/lib/strategy-builder/types';
-import { useAiSettings, getProviderMeta } from '@/hooks/useAiSettings';
+import { useAiSettings } from '@/hooks/useAiSettings';
+import { useAiProviderAvailability } from '@/hooks/useAiProviderAvailability';
 import { useAiRecsHistory, AiRecsHistoryEntry, AiRecsHistoryStatus } from '@/hooks/useAiRecsHistory';
+import { AiProviderStatusBanner } from './AiProviderStatusBanner';
 import { ReverseViewBanner } from './ReverseViewBanner';
+import {
+  DEFAULT_CONFIDENCE_FLOOR,
+  meetsConfidenceFloor,
+} from './confidenceFloor';
 import {
   buildDiagnoseRows,
   buildStagedRecsSentence,
@@ -1786,11 +1792,7 @@ export function AiRecommendationsPanel({
 }: AiRecommendationsPanelProps = {}) {
   const hasTrades = (result?.trades?.length ?? 0) > 0;
   const { settings, hydrated: aiSettingsHydrated } = useAiSettings();
-  const providerMeta = aiSettingsHydrated ? getProviderMeta(settings.provider) : null;
-  const hasProvider = aiSettingsHydrated && (
-    !providerMeta?.requiresApiKey ||
-    !!(settings.apiKeys?.[settings.provider]?.trim())
-  );
+  const { hasProvider } = useAiProviderAvailability();
   const history = useAiRecsHistory();
 
 const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
@@ -1861,6 +1863,11 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   // demo payload never leaks into sessionStorage.
   const [previewMode, setPreviewMode] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  // BTCAAAAA-38464 (Stream 3, L2): confidence-floor toggle. When false
+  // (default), recs whose `confidence` falls below the floor are hidden behind
+  // the "Advanced" disclosure. When true, every parsed rec is shown regardless
+  // of confidence so the user can audit what the AI declined to flag.
+  const [showLowConfidenceRecs, setShowLowConfidenceRecs] = useState(false);
 
   // AC9: admin gate for Export to JSON. Computed once on mount from the
   // auth_token claim; a fresh login would remount the panel through key
@@ -2052,6 +2059,21 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
     () => buildStagedRecsSentence(stagedSummaries, strategy ?? null),
     [stagedSummaries, strategy],
   );
+  // BTCAAAAA-38464 (Stream 3, L2): confidence-floor filter applied to the
+  // recs that actually render. When `showLowConfidenceRecs` is true the floor
+  // is bypassed so the user can audit what was hidden; otherwise recs with
+  // `confidence` below the floor (default 0.4) are excluded. Hidden count is
+  // surfaced separately in the RECOMMENDATIONS header.
+  const visibleRecs = useMemo(
+    () =>
+      showLowConfidenceRecs
+        ? parsedRecs
+        : parsedRecs.filter((rec) =>
+            meetsConfidenceFloor(rec.confidence, DEFAULT_CONFIDENCE_FLOOR),
+          ),
+    [parsedRecs, showLowConfidenceRecs],
+  );
+  const hiddenRecCount = parsedRecs.length - visibleRecs.length;
   // A4 (BTCAAAAA-37777): map the same parsed recs into the minimal shape the
   // reverse-view extractor needs. Confidence drives the synthetic uplift so
   // the top-quartile ranking matches the model's own confidence ordering.
@@ -2884,20 +2906,12 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           No trades recorded — run a backtest first before sending to AI.
         </div>
       )}
-      {aiSettingsHydrated && !hasProvider && (
-        <div
-          className="rounded p-2 text-xs"
-          role="status"
-          data-testid="ai-recs-no-provider-warning"
-          style={{
-            background: 'var(--bg-elevated)',
-            color: 'var(--accent-orange)',
-            border: '1px solid var(--accent-orange)',
-          }}
-        >
-          No AI provider configured — open Settings → AI to set one up.
-        </div>
-      )}
+      {/* BTCAAAAA-38464 (Stream 3, H1): replaces the prior static warning with
+          a one-click "Why is AI off?" banner that routes to Settings → AI. The
+          banner component owns its own `hydrated && !hasProvider` gate so the
+          panel just needs to render it unconditionally — it returns null when
+          the provider IS configured (or before hydration completes). */}
+      <AiProviderStatusBanner />
 
       {/* Action buttons */}
       <div className="flex items-center gap-2 justify-end mt-1 flex-wrap">
@@ -3128,8 +3142,37 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
                 className="ml-1.5 text-[10px] font-normal"
                 style={{ color: 'var(--text-faint)' }}
               >
-                ({parsedRecs.length} · {appliedRecIds.length} applied)
+                ({visibleRecs.length} · {appliedRecIds.length} applied
+                {hiddenRecCount > 0 ? ` · ${hiddenRecCount} hidden` : ''})
               </span>
+            )}
+            {/* BTCAAAAA-38464 (Stream 3, L2): low-confidence disclosure toggle.
+                Only meaningful when there is actually something hidden by the
+                floor; rendering the button when `hiddenRecCount === 0` would
+                just add visual noise without a payload. */}
+            {hiddenRecCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowLowConfidenceRecs((v) => !v)}
+                data-testid="ai-recs-toggle-low-confidence"
+                aria-pressed={showLowConfidenceRecs}
+                className="ml-2 px-1.5 py-0.5 text-[10px] rounded underline"
+                style={{
+                  background: 'transparent',
+                  color: 'var(--accent-blue)',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+                title={
+                  showLowConfidenceRecs
+                    ? 'Hide recs below the confidence floor'
+                    : 'Show all recs, including those below the confidence floor'
+                }
+              >
+                {showLowConfidenceRecs
+                  ? 'Hide low-confidence recs'
+                  : 'Show low-confidence recs'}
+              </button>
             )}
           </p>
           {/* BTCAAAAA-36917 v4 UX: surfaced only when demoMode is true so
@@ -3379,7 +3422,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
             className="grid gap-2"
             style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}
           >
-            {parsedRecs.map((rec) => {
+            {visibleRecs.map((rec) => {
               const isApplied = appliedRecIds.includes(rec.id);
               const isApplyingThis = perTileApplying.includes(rec.id);
               const errMsg = perTileError[rec.id];
