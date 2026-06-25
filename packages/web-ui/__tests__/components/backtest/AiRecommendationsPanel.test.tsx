@@ -5,6 +5,12 @@ import type { BacktestResult, Strategy, Trade } from '@/lib/strategy-builder/typ
 
 jest.mock('@/hooks/useAiSettings', () => ({
   useAiSettings: jest.fn(),
+  getProviderMeta: jest.fn(() => ({
+    id: 'anthropic',
+    label: 'Anthropic',
+    requiresApiKey: true,
+    envKey: 'ANTHROPIC_API_KEY',
+  })),
 }));
 
 import { useAiSettings } from '@/hooks/useAiSettings';
@@ -359,8 +365,15 @@ describe('AiRecommendationsPanel — AC9 admin gate (BTCAAAAA-36873)', () => {
 // post-analysis state before exercising the grid.
 // ──────────────────────────────────────────────────────────────────────────
 describe('AiRecommendationsPanel — AC15 per-tile toggle grid (BTCAAAAA-36873 v3)', () => {
+  // The parser extracts `parameter` / `suggestedValue` via tryExtractField,
+  // which only matches `Parameter:` and `Suggested Value:` field names
+  // (optionally bold). The previous `Key:` / `Value:` flavor looked similar
+  // to the parser but did not populate either field, so the new
+  // checkbox-style toggle would render `disabled` and never flip. Use the
+  // parser-friendly names so the toggle's enabled-state assertion is
+  // meaningful.
   const SAMPLE_RECOMMENDATIONS =
-    '1. Reduce position size\n   Type: signal\n   Rationale: cap exposure\n   Key: maxAllocation\n   Value: 15\n\n2. Tighten stop-loss\n   Type: risk\n   Rationale: cut losers early\n   Key: stopLossPct\n   Value: 1.5';
+    '1. Reduce position size\n   Type: signal\n   Rationale: cap exposure\n   Parameter: maxAllocation\n   Suggested Value: 15\n\n2. Tighten stop-loss\n   Type: risk\n   Rationale: cut losers early\n   Parameter: stopLossPct\n   Suggested Value: 1.5';
 
   const SAMPLE_DIAGNOSIS =
     'The strategy overshoots on high-volatility regimes.';
@@ -425,22 +438,26 @@ describe('AiRecommendationsPanel — AC15 per-tile toggle grid (BTCAAAAA-36873 v
     expect(cards).toHaveLength(2);
   });
 
-  it('renders OFF state for every card on initial analysis', async () => {
+  it('renders every card in the unapplied state on initial analysis', async () => {
     await renderWithAnalysis();
-    const badges = screen.getAllByTestId('ai-recs-toggle-badge');
-    expect(badges).toHaveLength(2);
-    expect(badges.every((b) => b.textContent === 'OFF')).toBe(true);
+    const cards = screen.getAllByTestId('ai-recs-toggle-card');
+    expect(cards).toHaveLength(2);
+    expect(cards.every((c) => c.getAttribute('data-applied') === 'false')).toBe(true);
+    const toggles = screen.getAllByRole('checkbox', { name: /Apply / });
+    expect(toggles).toHaveLength(2);
+    expect(toggles.every((t) => (t as HTMLInputElement).checked === false)).toBe(true);
   });
 
-  it('flips a card to ON state when clicked and POSTs the single rec to /api/ai/auto-apply', async () => {
+  it('flips a card to applied state when the toggle is clicked and POSTs the single rec to /api/ai/auto-apply', async () => {
     const fetchMock = await renderWithAnalysis();
 
     const cards = screen.getAllByTestId('ai-recs-toggle-card');
-    fireEvent.click(cards[0]);
+    const firstToggle = within(cards[0]).getByRole('checkbox');
+    fireEvent.click(firstToggle);
 
     await waitFor(() => {
-      const badges = screen.getAllByTestId('ai-recs-toggle-badge');
-      expect(badges[0].textContent).toBe('ON');
+      const updated = screen.getAllByTestId('ai-recs-toggle-card');
+      expect(updated[0].getAttribute('data-applied')).toBe('true');
     });
 
     const autoApplyCall = fetchMock.mock.calls.find(([url]) =>
@@ -453,19 +470,26 @@ describe('AiRecommendationsPanel — AC15 per-tile toggle grid (BTCAAAAA-36873 v
     expect(body.recs).toHaveLength(1);
   });
 
-  it('flips a card back to OFF on second click without calling the API again', async () => {
+  it('flips a card back to unapplied on second toggle without calling the API again', async () => {
     const fetchMock = await renderWithAnalysis();
 
     const cards = screen.getAllByTestId('ai-recs-toggle-card');
-    fireEvent.click(cards[0]);
+    const firstToggle = within(cards[0]).getByRole('checkbox');
+    fireEvent.click(firstToggle);
     await waitFor(() => {
-      expect(screen.getAllByTestId('ai-recs-toggle-badge')[0].textContent).toBe('ON');
+      const updated = screen.getAllByTestId('ai-recs-toggle-card');
+      expect(updated[0].getAttribute('data-applied')).toBe('true');
     });
     const callsBefore = fetchMock.mock.calls.length;
 
-    fireEvent.click(cards[0]);
+    // Re-query after the state change so we click the fresh toggle node.
+    const togglesAfterFirst = within(
+      screen.getAllByTestId('ai-recs-toggle-card')[0],
+    ).getByRole('checkbox');
+    fireEvent.click(togglesAfterFirst);
     await waitFor(() => {
-      expect(screen.getAllByTestId('ai-recs-toggle-badge')[0].textContent).toBe('OFF');
+      const updated = screen.getAllByTestId('ai-recs-toggle-card');
+      expect(updated[0].getAttribute('data-applied')).toBe('false');
     });
     // No new auto-apply POST — rollback is local (AC18).
     expect(fetchMock.mock.calls.length).toBe(callsBefore);
@@ -567,9 +591,13 @@ describe('AiRecommendationsPanel — AC21/AC22 retention (BTCAAAAA-36873 v3)', (
     // Toggle state survives the remount as part of the cached payload.
     const cards = screen.getAllByTestId('ai-recs-toggle-card');
     expect(cards).toHaveLength(2);
-    expect(screen.getAllByTestId('ai-recs-toggle-badge').every((b) => b.textContent === 'OFF')).toBe(
-      true,
-    );
+    // New compare-style card uses `data-applied` on the card root and a
+    // real <input type="checkbox"> for the toggle — there is no OFF/ON
+    // text badge anymore.
+    expect(cards.every((c) => c.getAttribute('data-applied') === 'false')).toBe(true);
+    const toggles = screen.getAllByRole('checkbox', { name: /Apply / });
+    expect(toggles).toHaveLength(2);
+    expect(toggles.every((t) => (t as HTMLInputElement).checked === false)).toBe(true);
   });
 
   it('AC21: cache is scoped by strategyId — mounting a different strategy does not hydrate stale recs', async () => {

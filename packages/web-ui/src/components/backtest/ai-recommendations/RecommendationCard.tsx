@@ -20,6 +20,11 @@ export interface RecommendationCardData {
   applied: boolean;
   onToggleApplied: (next: boolean) => void;
   disabled?: boolean;
+  /** Optional extra data-* attributes applied to the card root. Used by the
+   * parent panel to preserve the `ai-recs-toggle-card` testid and the
+   * `data-rec-id` attribute that StrategyAfterChangesRail's CSS-selector
+   * scroll-into-view contract depends on. */
+  dataAttributes?: Record<string, string>;
 }
 
 export function RecommendationCard({
@@ -35,6 +40,7 @@ export function RecommendationCard({
   applied,
   onToggleApplied,
   disabled = false,
+  dataAttributes,
 }: RecommendationCardData) {
   const tone = RECOMMENDATION_CATEGORY_PALETTE[categoryId];
   const deltaFg = deltaNegative ? 'var(--accent-red-on)' : 'var(--accent-green-on)';
@@ -44,6 +50,7 @@ export function RecommendationCard({
     <article
       data-testid={`rec-card-${id}`}
       data-applied={applied ? 'true' : 'false'}
+      {...(dataAttributes ?? {})}
       className="flex flex-col rounded h-full"
       style={{
         background: 'var(--bg-card)',

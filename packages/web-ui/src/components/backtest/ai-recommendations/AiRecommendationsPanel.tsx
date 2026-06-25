@@ -31,6 +31,9 @@ import {
 import { computeReanalyzeHash } from './dirtyHash';
 import { StrategyAfterChangesRail } from './StrategyAfterChangesRail';
 import { mergeStrategyAfterChanges } from './strategyAfterChangesMerge';
+import { RecommendationsRow } from './RecommendationsRow';
+import type { RecommendationCardData } from './RecommendationCard';
+import type { RecommendationCategoryId } from './recommendationCategoryPalette';
 
 type SendPhase =
   | 'idle'
@@ -1082,27 +1085,6 @@ function parseSuggestedParams(block: string): Array<{ key: string; value: string
   return params;
 }
 
-function findParamInStrategy(strategy: Strategy, paramKey: string): string | undefined {
-  for (const block of (strategy.blocks ?? [])) {
-    const data = block.data;
-    if (!data || typeof data !== 'object') continue;
-    for (const [key, value] of Object.entries(data)) {
-      if (key === paramKey && (typeof value === 'number' || typeof value === 'string')) {
-        return String(value);
-      }
-    }
-  }
-  const settings = strategy.settings;
-  if (settings && typeof settings === 'object') {
-    for (const [key, value] of Object.entries(settings as unknown as Record<string, unknown>)) {
-      if (key === paramKey && (typeof value === 'number' || typeof value === 'string')) {
-        return String(value);
-      }
-    }
-  }
-  return undefined;
-}
-
 function deriveTitle(block: string, index: number): string {
   // Try the first markdown heading inside the block.
   const heading = block.match(/^\s*#{1,6}\s+(.+?)\s*$/m);
@@ -1175,6 +1157,83 @@ function projectedImpactFromRecRaw(raw: string): ProjectedDelta {
   const en = pick('Projected Entries');
   if (en !== undefined) out.entries = en;
   return out;
+}
+
+// BTCAAAAA-38438: hoisted from the inline .map() so the mapper below can
+// classify recs without recreating the Set on every render.
+const STRUCTURAL_TYPES = new Set(['ADD_SIGNAL', 'REMOVE_SIGNAL', 'ADD_BLOCK', 'REMOVE_BLOCK']);
+
+// BTCAAAAA-38438: map a ParsedRec.type string to a RecommendationCategoryId
+// for the mockup-aligned card palette. Conservative default → 'signal' so
+// unknown types still render with a sensible tone instead of crashing.
+function categoryIdFromRecType(type: string | undefined): RecommendationCategoryId {
+  const t = (type ?? '').toUpperCase();
+  if (t.includes('ADJUST_PARAM') || t.includes('ADJUST')) return 'risk';
+  if (t.includes('ADD_SIGNAL') || t.includes('REMOVE_SIGNAL') || t.includes('SIGNAL')) return 'signal';
+  if (t.includes('ADD_BLOCK') || t.includes('REMOVE_BLOCK') || t.includes('REGIME')) return 'regime';
+  if (t.includes('EXIT')) return 'exit';
+  if (t.includes('ENTRY')) return 'entry';
+  return 'signal';
+}
+
+// BTCAAAAA-38438: format a projected-impact delta as a short label suitable
+// for the top-right pill on the mockup-aligned card.
+function formatDeltaLabel(delta: ProjectedDelta): { label: string; negative: boolean } {
+  if (delta.winRate !== undefined) {
+    const v = delta.winRate;
+    const pct = Math.abs(v) < 1 ? `${(v * 100).toFixed(1)}pp` : `${v.toFixed(1)}pp`;
+    return { label: `${v >= 0 ? '+' : ''}${pct} WR`, negative: v < 0 };
+  }
+  if (delta.netLiquidity !== undefined) {
+    const v = delta.netLiquidity;
+    return { label: `${v >= 0 ? '+' : ''}${v.toFixed(1)} PnL`, negative: v < 0 };
+  }
+  if (delta.maxDrawdown !== undefined) {
+    const v = delta.maxDrawdown;
+    return { label: `${v >= 0 ? '+' : ''}${v.toFixed(1)} DD`, negative: v < 0 };
+  }
+  if (delta.profitFactor !== undefined) {
+    const v = delta.profitFactor;
+    return { label: `${v >= 0 ? '+' : ''}${v.toFixed(2)} PF`, negative: v < 0 };
+  }
+  if (delta.entries !== undefined) {
+    const v = delta.entries;
+    return { label: `${v >= 0 ? '+' : ''}${Math.round(v)} entries`, negative: v < 0 };
+  }
+  return { label: '—', negative: false };
+}
+
+function toCardData(rec: ParsedRec, ctx: {
+  applied: boolean;
+  isApplyingThis: boolean;
+  isAutoApplicable: boolean;
+  onToggleApplied: () => void;
+}): RecommendationCardData {
+  const delta = projectedImpactFromRecRaw(rec.raw);
+  const { label: deltaLabel, negative: deltaNegative } = formatDeltaLabel(delta);
+  const codeLines = rec.suggestedParams.length > 0
+    ? rec.suggestedParams.map((p) => `${p.key} = ${p.value}`)
+    : rec.parameter && rec.suggestedValue
+      ? [`${rec.parameter} = ${rec.suggestedValue}`]
+      : [`type: ${rec.type ?? 'recommendation'}`];
+  return {
+    id: rec.id,
+    categoryId: categoryIdFromRecType(rec.type),
+    deltaLabel,
+    deltaNegative,
+    title: rec.title,
+    description: rec.rationale ?? rec.summary,
+    codeLines,
+    applied: ctx.applied,
+    onToggleApplied: ctx.onToggleApplied,
+    disabled: ctx.isApplyingThis || !ctx.isAutoApplicable,
+    dataAttributes: {
+      'data-testid': 'ai-recs-toggle-card',
+      'data-rec-id': rec.id,
+      'data-applied': ctx.applied ? 'true' : 'false',
+      'data-auto-applicable': ctx.isAutoApplicable ? 'true' : 'false',
+    },
+  };
 }
 
 function parseSingleRec(block: string, index: number): ParsedRec {
@@ -3418,229 +3477,55 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
             )}
           </div>
         ) : (
-          <div
-            className="grid gap-2"
-            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}
-          >
-            {visibleRecs.map((rec) => {
-              const isApplied = appliedRecIds.includes(rec.id);
-              const isApplyingThis = perTileApplying.includes(rec.id);
-              const errMsg = perTileError[rec.id];
-              const STRUCTURAL_TYPES = new Set(['ADD_SIGNAL', 'REMOVE_SIGNAL', 'ADD_BLOCK', 'REMOVE_BLOCK']);
-              const isStructural = STRUCTURAL_TYPES.has((rec.type ?? '').toUpperCase());
-              const isAutoApplicable = isStructural || !!(rec.parameter && rec.suggestedValue);
-              return (
-                <button
-                  key={rec.id}
-                  type="button"
-                  role={isAutoApplicable ? 'switch' : undefined}
-                  aria-checked={isAutoApplicable ? isApplied : undefined}
-                  aria-busy={isApplyingThis}
-                  disabled={!strategy?.id || isApplyingThis || !isAutoApplicable}
-                  onClick={isAutoApplicable ? () => handleToggleRec(rec) : undefined}
-                  data-testid="ai-recs-toggle-card"
-                  data-rec-id={rec.id}
-                  data-applied={isApplied ? 'true' : 'false'}
-                  data-auto-applicable={isAutoApplicable ? 'true' : 'false'}
-                  title={
-                    !isAutoApplicable
-                      ? 'This recommendation cannot be auto-applied — re-run AI analysis to get a structured recommendation.'
-                      : isApplyingThis
-                        ? 'Sending this recommendation to the orchestrator…'
-                        : isApplied
-                          ? 'Click to roll back this recommendation (local rollback — server-side undo is a follow-up backend ticket).'
-                          : 'Click to apply this recommendation to the strategy.'
-                  }
-                  className="rounded p-2 text-left text-[11px] flex flex-col gap-1.5"
-                  style={{
-                    background: isApplied
-                      ? 'var(--accent-green-muted)'
-                      : 'var(--bg-elevated)',
-                    border: '1px solid var(--border)',
-                    borderTop: `3px solid ${
-                      isApplied
-                        ? 'var(--accent-green)'
-                        : isAutoApplicable
-                          ? 'var(--accent-blue)'
-                          : '#d97706'
-                    }`,
-                    opacity: !strategy?.id ? 0.5 : 1,
-                    cursor: !isAutoApplicable
-                      ? 'default'
-                      : !strategy?.id || isApplyingThis
-                        ? 'not-allowed'
-                        : 'pointer',
-                    transition: 'opacity 120ms ease, border-color 120ms ease',
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-1.5">
-                    <p
-                      className="font-semibold truncate flex-1"
-                      style={{ color: 'var(--text-secondary)' }}
-                      title={rec.title}
-                    >
-                      {rec.title}
-                    </p>
-                    <span
-                      className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+          <div className="flex flex-col gap-2">
+            {/* BTCAAAAA-38438: per-tile error strip above the row so the
+                error pill does not collide with the mockup-aligned toggle
+                inside the card body. BTCAAAAA-38468 feedback capture flows
+                through the `dataAttributes` spread on RecommendationCard. */}
+            {parsedRecs.some((r) => perTileError[r.id]) && (
+              <ul
+                className="flex flex-col gap-1"
+                data-testid="ai-recs-error-strip"
+              >
+                {parsedRecs.map((rec) => {
+                  const errMsg = perTileError[rec.id];
+                  if (!errMsg) return null;
+                  return (
+                    <li
+                      key={`err-${rec.id}`}
+                      className="text-[11px] flex items-center gap-2 rounded px-2 py-1"
                       style={{
-                        background: isApplied
-                          ? 'var(--accent-green)'
-                          : !isAutoApplicable
-                            ? '#fef3c7'
-                            : 'var(--bg-card)',
-                        color: isApplied
-                          ? 'var(--text-on-positive)'
-                          : !isAutoApplicable
-                            ? '#92400e'
-                            : 'var(--text-faint)',
-                        border: `1px solid ${
-                          isApplied
-                            ? 'var(--accent-green)'
-                            : !isAutoApplicable
-                              ? '#d97706'
-                              : 'var(--border)'
-                        }`,
+                        background: 'var(--accent-red-soft)',
+                        color: 'var(--accent-red)',
+                        border: '1px solid var(--accent-red)',
                       }}
-                      data-testid="ai-recs-toggle-badge"
-                    >
-                      {isApplyingThis ? '…' : isApplied ? 'ON' : !isAutoApplicable ? 'MANUAL' : 'OFF'}
-                    </span>
-                  </div>
-
-                  {/* AC17: how this rec sets up / adjusts the building block.
-                      We surface the rec type + the first few suggested params
-                      so the user sees exactly what would change. */}
-                  <p
-                    className="text-[10px] truncate"
-                    style={{ color: 'var(--text-faint)' }}
-                    title={`type: ${rec.type}`}
-                  >
-                    {rec.type}
-                  </p>
-                  {rec.suggestedParams.length > 0 && (
-                    <ul
-                      className="flex flex-col gap-0.5"
-                      data-testid="ai-recs-toggle-params"
-                    >
-                      {rec.suggestedParams.slice(0, 4).map((p, idx) => (
-                        <li
-                          key={`${rec.id}:p:${idx}`}
-                          className="font-mono text-[10px] truncate"
-                          style={{ color: 'var(--text-secondary)' }}
-                          title={`${p.key} = ${p.value}`}
-                        >
-                          {p.key} = {p.value}
-                        </li>
-                      ))}
-                      {rec.suggestedParams.length > 4 && (
-                        <li
-                          className="text-[10px]"
-                          style={{ color: 'var(--text-faint)' }}
-                        >
-                          + {rec.suggestedParams.length - 4} more…
-                        </li>
-                      )}
-                    </ul>
-                  )}
-                  {rec.rationale && (
-                    <p
-                      className="text-[10px] line-clamp-2"
-                      style={{ color: 'var(--text-faint)' }}
-                      title={rec.rationale}
-                    >
-                      {rec.rationale}
-                    </p>
-                  )}
-
-                  {/* MANUAL hint: shown when AI did not produce structured fields */}
-                  {!isAutoApplicable && (
-                    <p
-                      className="text-[10px] mt-0.5"
-                      style={{ color: '#d97706', fontStyle: 'italic' }}
-                      data-testid="ai-recs-manual-hint"
-                    >
-                      Re-run AI analysis to get a structured auto-apply recommendation.
-                    </p>
-                  )}
-
-                  {/* AC20 error surface: per-tile, not a global banner. */}
-                  {errMsg && (
-                    <p
-                      className="text-[10px] mt-0.5"
-                      style={{ color: 'var(--accent-red)' }}
                       data-testid="ai-recs-toggle-error"
                       role="alert"
                     >
-                      {errMsg}
-                    </p>
-                  )}
-
-                  {/* B3: before/after parameter diff — visible only when the rec is ON. */}
-                  {isApplied && (() => {
-                    const snapshot = preApplySnapshots.find(([id]) => id === rec.id);
-                    if (!snapshot) return null;
-                    const [, preStrategy] = snapshot;
-                    const paramSource: Array<{ key: string; value: string }> =
-                      rec.suggestedParams.length > 0
-                        ? rec.suggestedParams
-                        : rec.parameter && rec.suggestedValue
-                          ? [{ key: rec.parameter, value: rec.suggestedValue }]
-                          : [];
-                    const diffs = paramSource
-                      .map((p) => ({
-                        key: p.key,
-                        before: findParamInStrategy(preStrategy, p.key),
-                        after: p.value,
-                      }))
-                      .filter(
-                        (d): d is { key: string; before: string; after: string } =>
-                          d.before !== undefined && d.before !== d.after,
-                      );
-                    return (
-                      <div
-                        className="mt-1 pt-1.5"
-                        style={{ borderTop: '1px solid var(--accent-green)' }}
-                        data-testid="ai-recs-param-diff"
-                      >
-                        <p
-                          className="text-[9px] font-semibold uppercase tracking-wide mb-1"
-                          style={{ color: 'var(--accent-green-on)' }}
-                        >
-                          Applied changes
-                        </p>
-                        {diffs.length > 0 ? (
-                          <ul className="flex flex-col gap-0.5" data-testid="ai-recs-param-diff-list">
-                            {diffs.map((d) => (
-                              <li
-                                key={d.key}
-                                className="text-[10px] font-mono flex gap-1 flex-wrap"
-                                data-testid="ai-recs-param-diff-row"
-                              >
-                                <span style={{ color: 'var(--text-faint)' }}>{d.key}:</span>
-                                <span>
-                                  <span style={{ color: 'var(--text-muted)' }}>{d.before}</span>
-                                  <span style={{ color: 'var(--text-faint)' }}> → </span>
-                                  <span style={{ color: 'var(--accent-green-on)' }}>{d.after}</span>
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p
-                            className="text-[10px]"
-                            style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}
-                            data-testid="ai-recs-param-diff-none"
-                          >
-                            No numeric parameters changed — check the strategy blocks manually.
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </button>
-              );
-            })}
+                      <span className="font-semibold">{rec.title}:</span>
+                      <span>{errMsg}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <RecommendationsRow
+              recommendations={parsedRecs.map((rec) => {
+                const isApplied = appliedRecIds.includes(rec.id);
+                const isApplyingThis = perTileApplying.includes(rec.id);
+                const isStructural = STRUCTURAL_TYPES.has((rec.type ?? '').toUpperCase());
+                const isAutoApplicable = isStructural || !!(rec.parameter && rec.suggestedValue);
+                return toCardData(rec, {
+                  applied: isApplied,
+                  isApplyingThis,
+                  isAutoApplicable,
+                  onToggleApplied: () => {
+                    if (!strategy?.id || isApplyingThis || !isAutoApplicable) return;
+                    handleToggleRec(rec);
+                  },
+                });
+              })}
+            />
           </div>
         )}
       </div>
