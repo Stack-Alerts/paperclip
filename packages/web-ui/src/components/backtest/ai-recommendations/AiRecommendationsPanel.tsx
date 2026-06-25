@@ -569,6 +569,25 @@ function HistoryCard({
   );
 }
 
+// BTCAAAAA-38300 — helpers for the compact history row.
+// History entries don't store a provider today (see useAiRecsHistory.ts).
+// Render the strategy name when present, fall back to a stable "ai" label
+// so the row never collapses to an empty second line.
+function providerLabel(entry: AiRecsHistoryEntry): string {
+  if (entry.strategyName && entry.strategyName.trim().length > 0) {
+    return entry.strategyName;
+  }
+  return 'ai';
+}
+
+// BTCAAAAA-38300 — count numbered recommendations in a recommendations
+// block. Matches "1." / "1)" / "  2. " patterns the AI tends to emit.
+function countRecommendations(text: string): number {
+  if (!text) return 0;
+  const matches = text.match(/(?:^|\n)\s*\d+[.)]\s+\S/g);
+  return matches ? matches.length : 0;
+}
+
 function HistoryView({
   entries,
   hydrated,
@@ -586,6 +605,10 @@ function HistoryView({
   onRequestClearAll: () => void;
   onLoadIntoCurrent: (entry: AiRecsHistoryEntry) => void;
 }) {
+  // BTCAAAAA-38300 — local state tracks which row is currently expanded
+  // so the View/Hide button stays in sync with the HistoryCard below.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   if (!hydrated) {
     return (
       <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
@@ -614,7 +637,10 @@ function HistoryView({
           className="text-[10px] font-semibold uppercase tracking-wide"
           style={{ color: 'var(--text-muted)' }}
         >
-          {entries.length} {entries.length === 1 ? 'entry' : 'entries'} (most recent first)
+          {/* BTCAAAAA-38300 — header matches BTC-37748 mockup (mockup
+              05.png): "PAST ANALYSES (?N)". Count moved into the label so
+              the header reads exactly like the mockup. */}
+          PAST ANALYSES ({entries.length})
         </p>
         <button
           type="button"
@@ -630,16 +656,96 @@ function HistoryView({
           Clear all
         </button>
       </div>
-      {entries.map((entry) => (
-        <HistoryCard
-          key={entry.id}
-          entry={entry}
-          onUpdateStatus={onUpdateStatus}
-          onUpdateNotes={onUpdateNotes}
-          onRequestDelete={onRequestDelete}
-          onLoadIntoCurrent={onLoadIntoCurrent}
-        />
-      ))}
+      {entries.map((entry) => {
+        const isOpen = expandedId === entry.id;
+        return (
+          <div
+            key={entry.id}
+            data-testid={`history-row-${entry.id}`}
+            className="flex flex-col gap-1"
+          >
+            {/* BTCAAAAA-38300 — compact history row matching mockup 05:
+                status dot · date/time · provider · prompt ·
+                "N recs · K applied" · View button. */}
+            <div
+              className="flex items-center gap-2 rounded px-2 py-1.5"
+              style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <StatusBadge status={entry.status} />
+              <div
+                className="flex flex-col"
+                style={{ minWidth: 130 }}
+              >
+                <span
+                  className="text-[11px]"
+                  style={{
+                    color: 'var(--text-secondary)',
+                    fontFamily: 'var(--font-mono, monospace)',
+                  }}
+                >
+                  {formatTimestamp(entry.createdAt)}
+                </span>
+                <span
+                  className="text-[10px]"
+                  style={{ color: 'var(--text-faint)' }}
+                >
+                  {providerLabel(entry)}
+                </span>
+              </div>
+              <span
+                className="text-xs flex-1 truncate"
+                style={{ color: 'var(--text-muted)' }}
+                title={entry.prompt}
+              >
+                {entry.prompt}
+              </span>
+              <span
+                data-testid={`history-counts-${entry.id}`}
+                className="text-[11px] shrink-0"
+                style={{
+                  color:
+                    entry.status === 'applied'
+                      ? 'var(--accent-green-on)'
+                      : 'var(--text-faint)',
+                  fontFamily: 'var(--font-mono, monospace)',
+                }}
+              >
+                {(() => {
+                  const n = countRecommendations(entry.recommendations);
+                  const k = entry.status === 'applied' ? n : 0;
+                  return `${n} rec${n === 1 ? '' : 's'} · ${k} applied`;
+                })()}
+              </span>
+              <button
+                type="button"
+                onClick={() => setExpandedId(isOpen ? null : entry.id)}
+                data-testid={`history-view-${entry.id}`}
+                className="px-2 py-1 rounded text-[10px] font-medium shrink-0"
+                style={{
+                  background: isOpen ? 'var(--accent-blue)' : 'var(--bg-elevated)',
+                  color: isOpen ? 'var(--text-on-accent)' : 'var(--text-secondary)',
+                  border: `1px solid ${isOpen ? 'var(--accent-blue)' : 'var(--border)'}`,
+                  cursor: 'pointer',
+                }}
+              >
+                {isOpen ? 'Hide' : 'View'}
+              </button>
+            </div>
+            {isOpen && (
+              <HistoryCard
+                entry={entry}
+                onUpdateStatus={onUpdateStatus}
+                onUpdateNotes={onUpdateNotes}
+                onRequestDelete={onRequestDelete}
+                onLoadIntoCurrent={onLoadIntoCurrent}
+              />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1737,6 +1843,16 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   const [activeRec, setActiveRec] = useState<ActiveRec | null>(null);
   const [optimizationGoal, setOptimizationGoal] = useState<string | null>(null);
 
+  // BTCAAAAA-38300 — AI Response tab metadata (provider / tokens / duration).
+  // Populated after each successful analyze; the response tab header reads
+  // this to render "claude, 184 tokens · 4.1s" matching mockup 04.png.
+  const [responseMeta, setResponseMeta] = useState<{
+    provider: string;
+    tokens: number;
+    durationMs: number;
+  } | null>(null);
+  const [responseCopied, setResponseCopied] = useState(false);
+
   // BTCAAAAA-36917 v4 UX: empty-state preview/demo affordances.
   // previewMode renders a single static card inline (no aiAnalysis touch —
   // the v3 sessionStorage cache stays empty).
@@ -2068,6 +2184,13 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
 
       setPhase('awaiting-provider');
 
+      // BTCAAAAA-38300 — record provider / tokens / duration so the AI
+      // Response tab can show "claude, 184 tokens · 4.1s" matching the
+      // BTC-37748 mockup (mockup 04.png). Tokens are estimated from the
+      // response length at 4 chars/token; the analyzer endpoint does not
+      // return a usage field today.
+      const sentAt = Date.now();
+
       try {
         const res = await fetch('/api/ai/analyze', {
           method: 'POST',
@@ -2104,6 +2227,15 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
         setPreviewMode(false);
         setDemoMode(false);
         setAiAnalysis(parsed);
+        // BTCAAAAA-38300 — record provider / tokens / duration for the AI
+        // Response tab header. Tokens are estimated at ~4 chars/token from
+        // the raw response text; the analyzer endpoint does not return a
+        // usage field today.
+        setResponseMeta({
+          provider: settings.provider,
+          tokens: Math.round((data.text?.length ?? 0) / 4),
+          durationMs: Date.now() - sentAt,
+        });
         setLastAnalysisHash(computeReanalyzeHash(strategy ?? null, backtestConfig ?? null));
         if (history.hydrated) {
           history.add({
@@ -2172,6 +2304,40 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   const handleClearActiveRec = useCallback(() => {
     setActiveRec(null);
   }, []);
+
+  // BTCAAAAA-38300 — AI Response tab "Copy" button. Copies the most recent
+  // raw model reply (history.entries[0].raw, falling back to the in-memory
+  // aiAnalysis raw) to the clipboard. Falls back to a hidden textarea +
+  // execCommand for browsers without async clipboard support.
+  const handleCopyResponse = useCallback(async () => {
+    const text =
+      history.entries[0]?.raw ||
+      aiAnalysis?.raw ||
+      '';
+    if (!text) return;
+    try {
+      if (
+        typeof navigator !== 'undefined' &&
+        navigator.clipboard &&
+        typeof navigator.clipboard.writeText === 'function'
+      ) {
+        await navigator.clipboard.writeText(text);
+      } else if (typeof document !== 'undefined') {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setResponseCopied(true);
+      window.setTimeout(() => setResponseCopied(false), 1500);
+    } catch {
+      // best-effort copy; silent fail keeps the button click non-blocking
+    }
+  }, [history.entries, aiAnalysis]);
 
   // AC15-AC20: per-tile toggle. A click on an "off" card applies just that
   // rec through the orchestrator (one-element recs array), captures the
@@ -2454,6 +2620,51 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   // ── LEFT pane: config + active-form + Approve flow ──
   const leftPane = (
     <div className="flex flex-col gap-3">
+      {/* BTCAAAAA-38300 — REQUEST PREVIEW promoted above the fold to match
+          the BTC-37748 mockup. Per operator "must look exactly the same as
+          this" (comment f2b214b2, 2026-06-24), all 5 sections are now
+          default-open so the operator sees the full request layout at a
+          glance, matching mockup 03. Existing banners, AI settings, and
+          Approve flow still render below. */}
+      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+        REQUEST PREVIEW
+      </p>
+
+      <CollapsibleSection
+        title="1. Strategy Configuration"
+        description="Complete strategy setup including blocks and parameters"
+      >
+        <PreviewText text={formatStrategyConfig(strategy)} />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="2. Backtest Configuration"
+        description="How the backtest was configured (timeframe, SL/TP, position sizing)"
+      >
+        <PreviewText text={formatBacktestConfig(backtestConfig)} />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="3. Trade Results"
+        description="All trades executed with entry/exit details"
+      >
+        <PreviewText text={formatTrades(result?.trades)} />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="4. Metrics & Ratings"
+        description="Performance metrics"
+      >
+        <PreviewText text={formatMetrics(result)} />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="5. Available Building Blocks"
+        description="Block catalog visible to AI for recommendations"
+      >
+        <PreviewText text={blockCatalog ? `${blockCatalog.length} blocks available` : 'Loading block catalog…'} />
+      </CollapsibleSection>
+
       {/* Active rec banner (AC2 surface) */}
       {activeRec && (
         <div
@@ -2562,50 +2773,6 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           {applySuccess}
         </div>
       )}
-
-      {/* Request Preview header */}
-      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-        REQUEST PREVIEW
-      </p>
-
-      <CollapsibleSection
-        title="1. Strategy Configuration"
-        description="Complete strategy setup including blocks and parameters"
-      >
-        <PreviewText text={formatStrategyConfig(strategy)} />
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="2. Backtest Configuration"
-        description="How the backtest was configured (timeframe, SL/TP, position sizing)"
-        defaultOpen={false}
-      >
-        <PreviewText text={formatBacktestConfig(backtestConfig)} />
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="3. Trade Results"
-        description="All trades executed with entry/exit details"
-        defaultOpen={false}
-      >
-        <PreviewText text={formatTrades(result?.trades)} />
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="4. Metrics & Ratings"
-        description="Performance metrics"
-        defaultOpen={false}
-      >
-        <PreviewText text={formatMetrics(result)} />
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="5. Available Building Blocks"
-        description="Block catalog visible to AI for recommendations"
-        defaultOpen={false}
-      >
-        <PreviewText text={blockCatalog ? `${blockCatalog.length} blocks available` : 'Loading block catalog…'} />
-      </CollapsibleSection>
 
       {/* Stats bar */}
       {result && (
@@ -3597,7 +3764,100 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
       ) : currentView === 'request' ? (
         <div data-testid="ai-recs-view-request">{leftPane}</div>
       ) : currentView === 'response' ? (
-        <div data-testid="ai-recs-view-response">{rightPane}</div>
+        (() => {
+          const rawReply =
+            history.entries[0]?.raw || aiAnalysis?.raw || '';
+          return (
+            <div
+              data-testid="ai-recs-view-response"
+              className="flex flex-col gap-2"
+            >
+              {/* BTCAAAAA-38300 — header row matching BTC-37748 mockup
+                  (mockup 04.png): AI RESPONSE label · RAW MODEL REPLY
+                  badge · provider/tokens/duration · Copy button. */}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className="text-xs font-semibold uppercase tracking-wide"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    AI RESPONSE
+                  </span>
+                  <span
+                    data-testid="ai-recs-raw-badge"
+                    className="text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide"
+                    style={{
+                      background: 'var(--accent-blue-soft)',
+                      color: 'var(--accent-blue)',
+                      border: '1px solid var(--accent-blue)',
+                    }}
+                  >
+                    RAW MODEL REPLY
+                  </span>
+                  {responseMeta && (
+                    <span
+                      data-testid="ai-recs-response-meta"
+                      className="text-[11px]"
+                      style={{
+                        color: 'var(--text-faint)',
+                        fontFamily: 'var(--font-mono, monospace)',
+                      }}
+                    >
+                      {responseMeta.provider}, {responseMeta.tokens} tokens ·{' '}
+                      {(responseMeta.durationMs / 1000).toFixed(1)}s
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyResponse}
+                  disabled={!rawReply}
+                  data-testid="ai-recs-copy-response"
+                  className="px-2 py-1 rounded text-[10px] font-medium"
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    color: responseCopied
+                      ? 'var(--accent-green-on)'
+                      : 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                    cursor: rawReply ? 'pointer' : 'not-allowed',
+                    opacity: rawReply ? 1 : 0.5,
+                  }}
+                >
+                  {responseCopied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              {rawReply ? (
+                <pre
+                  data-testid="ai-recs-raw-reply"
+                  className="rounded p-3 text-xs whitespace-pre-wrap"
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                    fontFamily: 'var(--font-mono, monospace)',
+                    minHeight: 360,
+                    maxHeight: '70vh',
+                    overflow: 'auto',
+                  }}
+                >
+                  {rawReply}
+                </pre>
+              ) : (
+                <div
+                  className="rounded p-4 text-xs text-center"
+                  style={{
+                    background: 'var(--bg-card)',
+                    color: 'var(--text-faint)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  No AI response yet — run an analysis from the Current Analysis tab.
+                </div>
+              )}
+            </div>
+          );
+        })()
       ) : (
         <HistoryView
           entries={history.entries}
