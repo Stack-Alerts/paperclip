@@ -196,7 +196,7 @@ jobs:
             [ -d "$month_dir" ] || continue
             month=$(basename "$month_dir")
             mkdir -p "data/binance/$month"
-            # BTCAAAAA-37949: hardcoded ln -sfn + 2>/dev/null silently produced
+            # BTCAAAAA-37949 (v2): hardcoded ln -sfn + 2>/dev/null silently produced
             # empty per-month dirs whenever the host path did not exist on the
             # runner. The integration test then "found" 0 parquets and the job
             # passed green-with-zero-data instead of failing. Use cp + count + a
@@ -253,7 +253,7 @@ jobs:
             [ -d "$month_dir" ] || continue
             month=$(basename "$month_dir")
             mkdir -p "data/binance/$month"
-            # BTCAAAAA-37949: hardcoded ln -sfn + 2>/dev/null silently produced
+            # BTCAAAAA-37949 (v2): hardcoded ln -sfn + 2>/dev/null silently produced
             # empty per-month dirs whenever the host path did not exist on the
             # runner. The integration test then "found" 0 parquets and the job
             # passed green-with-zero-data instead of failing. Use cp + count + a
