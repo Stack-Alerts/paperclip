@@ -37,7 +37,7 @@ import os
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +54,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 logger = logging.getLogger("merge_dispatch")
+_TELEMETRY_LOGGER = logging.getLogger("merge_dispatch.telemetry")
 
 # Configuration
 REPO_OWNER = "Stack-Alerts"
@@ -65,6 +66,100 @@ MERGE_DISPATCH_TRACKING = "BTCAAAAA-30048"  # This routine's tracking issue
 
 # Regex for Fix-SHA comment: line-anchored
 FIX_SHA_PATTERN = re.compile(r"^Fix-SHA: ([0-9a-f]{40})$", re.MULTILINE)
+
+# Event-gate (BTCAAAAA-38258, Stage 1): watermark + safety floor lets the
+# periodic sweep early-exit when no in_review set has changed since the last
+# fire. dispatch_for_issue() is the agent-finish trigger and bypasses this
+# gate by design. Kill-switch via MERGE_DISPATCH_IDEMPOTENT env var.
+WATERMARK_FILE = REPO_ROOT / "data" / "merge_dispatch_watermark.json"
+MERGE_DISPATCH_SAFETY_FLOOR_MINUTES = int(
+    os.environ.get("MERGE_DISPATCH_SAFETY_FLOOR_MINUTES", "10")
+)
+MERGE_DISPATCH_IDEMPOTENT = (
+    os.environ.get("MERGE_DISPATCH_IDEMPOTENT", "true").lower() != "false"
+)
+
+
+def load_watermark() -> dict[str, Any] | None:
+    """Read the merge-dispatch watermark. Returns None when absent or corrupt."""
+    try:
+        return json.loads(WATERMARK_FILE.read_text())
+    except FileNotFoundError:
+        return None
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning(
+            "Could not parse merge-dispatch watermark at %s: %s", WATERMARK_FILE, exc
+        )
+        return None
+
+
+def save_watermark(
+    in_review_ids: list[str],
+    routine_origin_id: str = "",
+    issue_id: str = "",
+) -> bool:
+    """Persist the watermark after a full run. Sorts/dedupes ids and creates parent dirs."""
+    sorted_ids = sorted({i for i in in_review_ids if i})
+    payload = {
+        "lastScanAt": datetime.now(timezone.utc).isoformat(),
+        "lastInReviewIds": sorted_ids,
+        "routineOriginId": routine_origin_id,
+        "issueId": issue_id,
+    }
+    try:
+        WATERMARK_FILE.parent.mkdir(parents=True, exist_ok=True)
+        WATERMARK_FILE.write_text(json.dumps(payload))
+        return True
+    except OSError as exc:
+        logger.error(
+            "Failed to write merge-dispatch watermark to %s: %s", WATERMARK_FILE, exc
+        )
+        return False
+
+
+def check_early_exit(
+    current_in_review_ids: list[str],
+    watermark: dict[str, Any] | None = None,
+) -> bool:
+    """Return True if a fresh, unchanged watermark lets the sweep early-exit.
+
+    Kill-switch (MERGE_DISPATCH_IDEMPOTENT=false) forces a full run. Without a
+    watermark, with stale timestamp, or with a different in_review set, the
+    sweep must run.
+    """
+    if not MERGE_DISPATCH_IDEMPOTENT:
+        return False
+    wm = watermark if watermark is not None else load_watermark()
+    if not wm:
+        return False
+    raw_ts = wm.get("lastScanAt", "")
+    try:
+        last = datetime.fromisoformat(raw_ts)
+    except (TypeError, ValueError):
+        return False
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    age = datetime.now(timezone.utc) - last
+    if age > timedelta(minutes=MERGE_DISPATCH_SAFETY_FLOOR_MINUTES):
+        return False
+    return set(wm.get("lastInReviewIds", [])) == set(current_in_review_ids)
+
+
+def emit_telemetry_log(
+    fired_at: datetime,
+    idempotency_skip: bool,
+    would_work_count: int,
+    merged_count: int,
+) -> None:
+    """Emit a structured one-line telemetry record for this routine fire."""
+    payload = {
+        "routine": "merge_dispatch",
+        "fired_at": fired_at.isoformat(),
+        "idempotency_skip": idempotency_skip,
+        "would_work_count": would_work_count,
+        "merged_count": merged_count,
+    }
+    _TELEMETRY_LOGGER.info(json.dumps(payload))
 
 
 def _http_session() -> requests.Session:
@@ -636,7 +731,9 @@ def main(argv: list[str] | None = None) -> int:
     """Main routine execution.
 
     With ``--issue <id>`` runs the agent-finish trigger for a single issue (primary path).
-    With no args, runs the periodic backup sweep over all in_review issues.
+    With no args, runs the periodic backup sweep over all in_review issues. The sweep
+    is event-gated (BTCAAAAA-38258): it early-exits when the in_review set is
+    unchanged since the last sweep AND the watermark is within the safety floor.
     """
     argv = sys.argv[1:] if argv is None else argv
     if "--issue" in argv:
@@ -646,11 +743,36 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         return dispatch_for_issue(argv[idx + 1])
 
+    fired_at = datetime.now(timezone.utc)
     logger.info("Starting merge-dispatch routine (backup sweep)")
 
     # Find all in_review issues
     issues = find_in_review_issues()
+    issue_ids = [issue.get("id", "") for issue in issues if issue.get("id")]
     logger.info("Found %d in_review issues to process", len(issues))
+
+    # Event-gate: short-circuit when nothing relevant changed since the last sweep.
+    if check_early_exit(issue_ids):
+        logger.info(
+            "Watermark fresh and unchanged across %d issues; early-exit", len(issue_ids)
+        )
+        emit_telemetry_log(
+            fired_at=fired_at,
+            idempotency_skip=True,
+            would_work_count=0,
+            merged_count=0,
+        )
+        output = {
+            "timestamp": fired_at.isoformat(),
+            "idempotency_skip": True,
+            "issues_processed": 0,
+            "would_work_count": 0,
+            "merged_count": 0,
+            "results": [],
+            "summary": {"merged": 0, "skipped": 0, "failed": 0, "errors": 0},
+        }
+        print(json.dumps(output, indent=2))
+        return 0
 
     results = []
     for issue in issues:
@@ -666,13 +788,30 @@ def main(argv: list[str] | None = None) -> int:
                 "error": str(e),
             })
 
-    # Report results
+    # Persist watermark so the next sweep can early-exit when nothing has changed.
+    save_watermark(in_review_ids=issue_ids)
+
+    merged_count = sum(1 for r in results if r.get("action") == "merged")
+    would_work_count = sum(
+        1 for r in results if r.get("action") in {"merged", "failed"}
+    )
+
+    emit_telemetry_log(
+        fired_at=fired_at,
+        idempotency_skip=False,
+        would_work_count=would_work_count,
+        merged_count=merged_count,
+    )
+
     output = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": fired_at.isoformat(),
+        "idempotency_skip": False,
         "issues_processed": len(results),
+        "would_work_count": would_work_count,
+        "merged_count": merged_count,
         "results": results,
         "summary": {
-            "merged": len([r for r in results if r.get("action") == "merged"]),
+            "merged": merged_count,
             "skipped": len([r for r in results if r.get("action") == "skip"]),
             "failed": len([r for r in results if r.get("action") == "failed"]),
             "errors": len([r for r in results if r.get("action") == "error"]),
