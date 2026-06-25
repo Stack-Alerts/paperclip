@@ -3621,6 +3621,68 @@ async def repair_data(
 
 
 # ---------------------------------------------------------------------------
+# AI Recommendations: backend-mediated send route (BTCAAAAA-37005)
+# ---------------------------------------------------------------------------
+
+_KEY_AI_RECS_QUEUE = "bte:ai_recommendations:queue"
+
+
+class _AiRecommendationsSendRequest(BaseModel):
+    """Body for POST /ai-recommendations/send.
+
+    Accepts the same shape produced by the web-UI Export to JSON button
+    (src/components/backtest/ai-recommendations/AiRecommendationsPanel.tsx:
+    buildRequestPayload).  All fields are optional so partial payloads from
+    the thick client are also accepted.
+    """
+
+    strategy_config: Optional[dict] = None
+    backtest_config: Optional[dict] = None
+    trades: Optional[list] = None
+    metrics: Optional[dict] = None
+
+
+@app.post(
+    "/ai-recommendations/send",
+    tags=["AI Recommendations"],
+    summary="Enqueue an AI analysis request and return a correlation ID",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def ai_recommendations_send(
+    body: _AiRecommendationsSendRequest,
+    _: dict = Depends(require_jwt),
+) -> dict:
+    """Accept a backtest payload, enqueue it for AI analysis, and return a correlationId.
+
+    The correlationId can be used by the caller to poll for results once the
+    AI processing worker picks the job from the queue.  The queue key is
+    ``bte:ai_recommendations:queue`` (Redis list, RPUSH).
+
+    Removes API keys from the browser path: the web-UI can call this route
+    instead of calling the AI provider directly via /api/ai/analyze.
+    """
+    correlation_id = str(uuid.uuid4())
+    job = json.dumps(
+        {
+            "correlationId": correlation_id,
+            "enqueuedAt": datetime.now(timezone.utc).isoformat(),
+            "payload": body.model_dump(),
+        }
+    )
+    try:
+        await _redis.rpush(_KEY_AI_RECS_QUEUE, job)
+    except Exception as exc:
+        logger.error("ai_recommendations_send: Redis rpush failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Queue unavailable — Redis write failed",
+        ) from exc
+
+    logger.info("ai_recommendations_send: enqueued job correlationId=%s", correlation_id)
+    return {"correlationId": correlation_id}
+
+
+# ---------------------------------------------------------------------------
 # 7 WebSocket domains
 # ---------------------------------------------------------------------------
 

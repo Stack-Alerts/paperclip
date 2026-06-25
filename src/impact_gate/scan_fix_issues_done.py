@@ -215,19 +215,24 @@ def _is_recent(issue: dict, days_back: int) -> bool:
 
 
 def _fetch_done_issues(days_back: int | None = None) -> list[dict]:
-    """Return all "done" fix/bug issues from the company (paginated)."""
-    # Exclude routine_execution issues server-side — they are never fix/bug
-    # issues and account for 13k+ of the ~14k done-issue count, making
-    # pagination prohibitively slow (165s+). Fix/bug issues are always manual.
+    """Return all "done" fix/bug issues from the company (paginated).
+
+    Excludes routine_execution issues server-side (they are never fix/bug
+    issues and account for 13k+ of the ~14k done-issue count, making pagination
+    prohibitively slow). Fix/bug issues are always manual. When days_back is
+    set, also applies a server-side completedAfter filter to further narrow
+    the scan window.
+    """
+    params: dict[str, Any] = {"status": "done", "originKind": "manual"}
+    if days_back is not None:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
+        params["completedAfter"] = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
     issues = _paginate(
         f"/api/companies/{_company()}/issues",
-        {"status": "done", "originKind": "manual"},
+        params,
         page_size=100,
     )
-    fix_issues = [i for i in issues if _is_fix_issue(i)]
-    if days_back is not None:
-        fix_issues = [i for i in fix_issues if _is_recent(i, days_back)]
-    return fix_issues
+    return [i for i in issues if _is_fix_issue(i)]
 
 
 def scan(
