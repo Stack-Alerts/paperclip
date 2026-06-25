@@ -69,7 +69,7 @@ def _fetch_done_fix_issues(lookback_minutes: int = 10) -> list[dict]:
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=lookback_minutes)
     issues = _paginate(
         f"/api/companies/{_company()}/issues",
-        {"status": "done"},
+        {"status": "done", "originKind": "manual"},
         page_size=100,
     )
     recent = []
