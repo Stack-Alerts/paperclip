@@ -14,17 +14,33 @@ env:
   PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
   PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
 
+# BTCAAAAA-38518 (least-privilege): explicit read-only GITHUB_TOKEN. The
+# change-detection job only inspects which files changed and never pushes,
+# creates artifacts, or interacts with the API beyond checkout. The downstream
+# pytest / real-data / canary jobs are run-only and do not need write scopes
+# either.
+permissions:
+  contents: read
+
 jobs:
   # ─── 0. Change detection ──────────────────────────────────────────────────
-  # BTCAAAAA-37899: skip the BTC-745 / BTC-1476 self-hosted jobs on webui-only
-  # PRs. Pattern mirrors ui-ci.yml / BTCAAAAA-36465 — change-detection job
-  # instead of a workflow-level `paths:` filter (the filter would dead-lock
-  # branch protection by leaving the required checks pending).
+  # BTCAAAAA-38518: dorny/paths-filter@v3 (GitHub-hosted action) replaces the
+  # BTCAAAAA-37899 self-hosted bash gate. The change-detection job now runs on
+  # ubuntu-latest so it does NOT consume self-hosted runner minutes — the
+  # downstream `pytest + coverage gate`, `Real-data regression`, and `Canary
+  # trade-execution` stay on self-hosted (they need the data + db) but no
+  # longer wait in the same queue behind a gate job. Mirrors BTCAAAAA-37899
+  # / BTCAAAAA-36465 — change-detection job instead of a workflow-level
+  # `paths:` filter (the filter would dead-lock branch protection by leaving
+  # required checks pending).
   changes:
     name: Detect python/server changes
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     outputs:
-      python: ${{ steps.filter.outputs.python }}
+      # `python` is true when any changed file is outside packages/web-ui/.
+      # Default step sets it for schedule / workflow_dispatch where the action
+      # has no base/ref to diff against — coverage gate must run nightly.
+      python: ${{ steps.filter.outputs.python || steps.default.outputs.python }}
     steps:
       - uses: actions/checkout@v4.3.1
         with:
@@ -32,40 +48,37 @@ jobs:
 
       - name: Determine whether python/server files changed
         id: filter
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE_SHA: ${{ github.event.before }}
-          AFTER_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          # Always run for schedule and manual dispatch — coverage gate must
-          # still run nightly regardless of which files changed.
-          if [ "$EVENT_NAME" = "schedule" ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            echo "Event $EVENT_NAME: running python jobs unconditionally"
-            echo "python=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # Detect changed files for push and pull_request events
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            FILES=$(gh pr view "$PR_NUMBER" --json files --jq '.files[].path' || echo "__ERROR__")
-          else
-            FILES=$(git diff --name-only "$BEFORE_SHA" "$AFTER_SHA" 2>/dev/null || echo "__ERROR__")
-          fi
-          echo "Changed files:"
-          echo "$FILES"
-          # python=true when ANY changed file is outside packages/web-ui/.
-          # gh pr view returns __ERROR__ if the call fails; fall back to running
-          # the tests (fail safe) rather than silently skipping them.
-          if echo "$FILES" | grep -q '__ERROR__'; then
-            echo "Change detection failed; defaulting python=true (fail safe)."
-            echo "python=true" >> "$GITHUB_OUTPUT"
-          elif echo "$FILES" | grep -vq '^packages/web-ui/'; then
-            echo "python=true (at least one non-webui file changed)" >> "$GITHUB_OUTPUT"
-          else
-            echo "python=false (webui-only change; skipping BTC-745 / BTC-1476 jobs)" >> "$GITHUB_OUTPUT"
-          fi
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        # Pinned to SHA per BTCAAAAA-38518 supply-chain hardening. SHA
+        # corresponds to the v3.0.2 tag; verify against
+        # https://github.com/dorny/paths-filter/releases/tag/v3.0.2 on next
+        # online session before bumping.
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        with:
+          # Force git-based diff (no REST API call) so the action works under
+          # workflow-level `permissions: contents: read` without requiring
+          # `pull-requests: read`. With `fetch-depth: 0` on the prior
+          # actions/checkout step, dorny runs `git diff
+          # origin/${{ github.base_ref }}...HEAD` to determine changed files.
+          # Avoids the "Resource not accessible by integration" 403 we hit on
+          # PR #237 when the API path was taken with only contents:read.
+          token: ''
+          # Match any file outside packages/web-ui/. Two patterns OR'd:
+          #   1. '!(packages)/**'         — anything not under packages/
+          #   2. 'packages/!(web-ui)/**'  — under packages/ but not web-ui/
+          # Together they cover every non-webui path. dorny/paths-filter
+          # emits `python=true` if ANY changed file matches any pattern,
+          # `python=false` otherwise — same semantics as the previous bash
+          # `grep -vq '^packages/web-ui/'` gate.
+          filters: |
+            python:
+              - '!(packages)/**'
+              - 'packages/!(web-ui)/**'
+
+      - name: Default python=true when dorny did not produce a value
+        id: default
+        if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || steps.filter.outcome != 'success' || steps.filter.outputs.python == '')
+        run: echo "python=true" >> "$GITHUB_OUTPUT"
 
   test:
     name: pytest + coverage gate
