@@ -94,9 +94,12 @@ jobs:
           POSTGRES_USER: optimizer_admin
           POSTGRES_PASSWORD: secure_password_change_me
         ports:
-          # Host port 55432 avoids collision with hindsight postgres on
-          # the sirrus-local self-hosted runner (BTCAAAAA-30505).
-          - 55432:5432
+          # BTCAAAAA-38523: use a random host port (no fixed mapping) so
+          # pytest jobs can run concurrently on the 2 self-hosted runners
+          # (sirrus-local + sirrus-local-2) that share host sirrus-serv.
+          # Without this, the 2nd runner fails with
+          # "Bind for 0.0.0.0:55432 failed: port is already allocated".
+          - 5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -135,7 +138,9 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
           POSTGRES_HOST: localhost
-          POSTGRES_PORT: 55432
+          # BTCAAAAA-38523: pick up the dynamic host port that GitHub
+          # assigned to the postgres service container.
+          POSTGRES_PORT: ${{ job.services.postgres.ports['5432'] }}
           POSTGRES_DB: optimizer_v3
           POSTGRES_USER: optimizer_admin
           POSTGRES_PASSWORD: secure_password_change_me
