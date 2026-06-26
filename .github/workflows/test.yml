@@ -83,6 +83,8 @@ jobs:
   test:
     name: pytest + coverage gate
     runs-on: self-hosted
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     timeout-minutes: 60
 
     # PostgreSQL service for ITM state store real-database tests (BTCAAAAA-450)
