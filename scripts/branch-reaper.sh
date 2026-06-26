@@ -50,6 +50,15 @@ for arg in "$@"; do
   esac
 done
 
+# If --post-comment, tee all output to a temp file so we can POST it as a
+# comment at the end. Output still flows to the terminal (systemd journal /
+# stdout-append log) — tee duplicates it.
+REPORT_TMP=""
+if [[ "$POST_COMMENT" == "true" ]]; then
+  REPORT_TMP=$(mktemp)
+  exec > >(tee -a "$REPORT_TMP") 2>&1
+fi
+
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "=== BRANCH REAPER — DRY-RUN MODE ==="
 else
@@ -368,4 +377,24 @@ if [[ "$DRY_RUN" == "false" ]]; then
 
   echo ""
   echo "=== LIVE ACTIONS COMPLETE ==="
+fi
+
+# --- Post report comment if --post-comment was passed ---
+if [[ "$POST_COMMENT" == "true" && -n "$REPORT_TMP" ]]; then
+  echo ""
+  echo "=== POSTING REPORT TO ${REPORT_ISSUE} ==="
+  REPORT_BODY=$(cat "${REPORT_TMP}")
+  if command -v jq >/dev/null 2>&1; then
+    JSON_BODY=$(printf '%s' "${REPORT_BODY}" | jq -Rs .)
+  else
+    JSON_BODY=$(printf '%s' "${REPORT_BODY}" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+  fi
+  HTTP_RC=$(curl -s -o /dev/null -w '%{http_code}' \
+    -X POST \
+    -H "Authorization: Bearer ${PAPERCLIP_API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d "{\"body\": ${JSON_BODY}}" \
+    "${PAPERCLIP_API_URL}/api/issues/${REPORT_ISSUE}/comments" || echo "000")
+  echo "  Comment POST HTTP ${HTTP_RC}"
+  rm -f "${REPORT_TMP}"
 fi

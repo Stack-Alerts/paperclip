@@ -1,0 +1,19 @@
+[Unit]
+Description=Branch Reaper — daily stale branch cleanup for Stack-Alerts/BTC-Trade-Engine-PaperClip
+Documentation=https://github.com/Stack-Alerts/BTC-Trade-Engine-PaperClip
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/branch-reaper.sh --post-comment
+StandardOutput=append:/home/sirrus/.paperclip/instances/default/logs/branch-reaper.log
+StandardError=append:/home/sirrus/.paperclip/instances/default/logs/branch-reaper.log
+Environment=HOME=/home/sirrus
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/home/sirrus/.local/bin
+# Source PAPERCLIP_API_URL / PAPERCLIP_API_KEY / PAPERCLIP_COMPANY_ID / GH_TOKEN
+# from the repo .env. The bash script does not call load_dotenv itself.
+EnvironmentFile=/home/sirrus/projects/BTC-Trade-Engine-PaperClip/.env
+
+[Install]
+WantedBy=default.target

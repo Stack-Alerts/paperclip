@@ -1,0 +1,12 @@
+[Unit]
+Description=Branch Reaper daily timer (03:00 UTC, after backup slot settles)
+
+[Timer]
+# Daily at 03:00 UTC — runs after the 00:00/04:00/08:00/12:00/16:00/20:00
+# backup rotations have a chance to settle, and before the US trading day opens.
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
