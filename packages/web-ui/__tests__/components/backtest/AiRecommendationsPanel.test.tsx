@@ -1025,3 +1025,531 @@ describe('AiRecommendationsPanel — BTCAAAAA-38469 conflict guard', () => {
     expect(autoApplyCall).toBeUndefined();
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────
+// Sprint B6 — Re-analyze dirty-hash gating (BTCAAAAA-37773 / Sprint A1)
+// The Re-analyze button in the persistent header is gated by a djb2 hash
+// of the current strategy + backtestConfig. Disabled when the hash matches
+// the analysis-time snapshot; enabled when strategy/config changes.
+// ──────────────────────────────────────────────────────────────────────────
+describe('AiRecommendationsPanel — re-analyze dirty-hash gating (Sprint B6)', () => {
+  const SAMPLE_TEXT =
+    'DIAGNOSIS: Baseline strategy analysis.\n\n' +
+    'RECOMMENDATIONS:\n' +
+    '1. Reduce position size\n' +
+    '   Type: signal\n' +
+    '   Rationale: cap exposure\n' +
+    '   Parameter: maxAllocation\n' +
+    '   Suggested Value: 15';
+
+  it('re-analyze button is enabled before any analysis (no hash yet, tooltip says run first)', () => {
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+    const btn = screen.getByTestId('ai-recs-reanalyze');
+    expect(btn).not.toBeDisabled();
+    expect(btn.getAttribute('title')).toMatch(/Run an analysis first/i);
+  });
+
+  it('re-analyze button is disabled after analysis when strategy + config unchanged', async () => {
+    const fetchMock = jest.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/api/ai/analyze')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ ok: true, text: SAMPLE_TEXT }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ blocks: [] }) } as Response);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const strategy = makeStrategy();
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={strategy}
+        backtestConfig={{ timeframe: '1h' }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Approve & Send to AI/i }));
+    fireEvent.click(screen.getByTestId('opt-goal-confirm'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Send Again/i })).toBeInTheDocument();
+    });
+
+    const btn = screen.getByTestId('ai-recs-reanalyze');
+    expect(btn).toBeDisabled();
+    expect(btn.getAttribute('data-dirty')).toBe('false');
+    expect(btn.getAttribute('title')).toMatch(/No changes since last analysis/i);
+  });
+
+  it('re-analyze button becomes enabled (dirty=true) when strategy changes after analysis', async () => {
+    const fetchMock = jest.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/api/ai/analyze')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ ok: true, text: SAMPLE_TEXT }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ blocks: [] }) } as Response);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const strategy = makeStrategy();
+    const { rerender } = render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={strategy}
+        backtestConfig={{ timeframe: '1h' }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Approve & Send to AI/i }));
+    fireEvent.click(screen.getByTestId('opt-goal-confirm'));
+
+    // Wait for the analysis to fully complete (Send Again button = analysisInFlight=false)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Send Again/i })).toBeInTheDocument();
+    });
+
+    // At this point canSend=true but hash matches → button disabled with data-dirty=false
+    expect(screen.getByTestId('ai-recs-reanalyze')).toBeDisabled();
+
+    // Re-render with a different strategy so the hash changes → dirty
+    rerender(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={
+          {
+            ...strategy,
+            name: 'Modified Strategy',
+            blocks: [{ id: 'b1', type: 'ema', parameters: {} }],
+          } as unknown as Strategy
+        }
+        backtestConfig={{ timeframe: '4h' }}
+      />,
+    );
+
+    const btn = screen.getByTestId('ai-recs-reanalyze');
+    expect(btn).not.toBeDisabled();
+    expect(btn.getAttribute('data-dirty')).toBe('true');
+    expect(btn.getAttribute('title')).toMatch(/Strategy or backtest config changed/i);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Sprint B6 — AI Request tab: 5 collapsible sections (BTCAAAAA-38562)
+// Clicking the "AI Request" top-level tab shows leftPane with 5 named
+// CollapsibleSection cards; each has a copy button.
+// ──────────────────────────────────────────────────────────────────────────
+describe('AiRecommendationsPanel — AI Request tab sections (Sprint B6 / BTCAAAAA-38562)', () => {
+  it('clicking AI Request tab switches to the request view', () => {
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('ai-recs-tab-request'));
+    expect(screen.getByTestId('ai-recs-view-request')).toBeInTheDocument();
+    expect(screen.getByTestId('ai-recs-tab-request')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('request view contains all 5 required section titles', () => {
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('ai-recs-tab-request'));
+
+    const EXPECTED_SECTIONS = [
+      '1. Strategy Configuration',
+      '2. Backtest Configuration',
+      '3. Trade Results',
+      '4. Metrics & Ratings',
+      '5. Available Building Blocks',
+    ];
+    for (const title of EXPECTED_SECTIONS) {
+      expect(screen.getByText(title)).toBeInTheDocument();
+    }
+  });
+
+  it('each section renders a copy button', () => {
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('ai-recs-tab-request'));
+
+    // CollapsibleSection generates: data-testid=`collapsible-copy-${title.replace(/\s+/g, '-').toLowerCase()}`
+    expect(screen.getByTestId('collapsible-copy-1.-strategy-configuration')).toBeInTheDocument();
+    expect(screen.getByTestId('collapsible-copy-2.-backtest-configuration')).toBeInTheDocument();
+    expect(screen.getByTestId('collapsible-copy-3.-trade-results')).toBeInTheDocument();
+    expect(screen.getByTestId('collapsible-copy-4.-metrics-&-ratings')).toBeInTheDocument();
+    expect(screen.getByTestId('collapsible-copy-5.-available-building-blocks')).toBeInTheDocument();
+  });
+
+  it('sections default to open; clicking a header collapses it (removes PreviewText from DOM)', () => {
+    const { container } = render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('ai-recs-tab-request'));
+
+    // All 5 sections are open by default → 5 <pre> elements from PreviewText
+    const presBefore = container.querySelectorAll('pre');
+    expect(presBefore.length).toBeGreaterThanOrEqual(5);
+
+    // Collapse section 1 by clicking its header button
+    const headerBtn = screen.getByText('1. Strategy Configuration').closest('button');
+    expect(headerBtn).not.toBeNull();
+    fireEvent.click(headerBtn!);
+
+    // One PreviewText <pre> should have been removed from the DOM
+    const presAfter = container.querySelectorAll('pre');
+    expect(presAfter.length).toBe(presBefore.length - 1);
+
+    // The title span remains (header button is not removed)
+    expect(screen.getByText('1. Strategy Configuration')).toBeInTheDocument();
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Sprint B6 — AI Response tab rendering (BTCAAAAA-38300)
+// The "AI Response" top-level tab shows the raw model reply + metadata.
+// ──────────────────────────────────────────────────────────────────────────
+describe('AiRecommendationsPanel — AI Response tab rendering (Sprint B6)', () => {
+  it('clicking AI Response tab switches to the response view', () => {
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('ai-recs-tab-response'));
+    expect(screen.getByTestId('ai-recs-view-response')).toBeInTheDocument();
+    expect(screen.getByTestId('ai-recs-tab-response')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('shows placeholder and disabled copy button when no analysis has been run', () => {
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('ai-recs-tab-response'));
+
+    expect(
+      screen.getByText(/No AI response yet — run an analysis from the Current Analysis tab\./i),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('ai-recs-copy-response')).toBeDisabled();
+  });
+
+  it('shows RAW MODEL REPLY badge and raw text after a successful analysis', async () => {
+    const RAW_TEXT =
+      'DIAGNOSIS: Good strategy.\n\nRECOMMENDATIONS:\n' +
+      '1. Widen EMA\n   Type: signal\n   Confidence: high\n' +
+      '   Parameter: ema_window\n   Suggested Value: 100';
+    const fetchMock = jest.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/api/ai/analyze')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ ok: true, text: RAW_TEXT }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ blocks: [] }) } as Response);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Approve & Send to AI/i }));
+    fireEvent.click(screen.getByTestId('opt-goal-confirm'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Send Again/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('ai-recs-tab-response'));
+
+    expect(screen.getByTestId('ai-recs-raw-badge')).toHaveTextContent(/RAW MODEL REPLY/i);
+    expect(screen.getByTestId('ai-recs-raw-reply')).toHaveTextContent('DIAGNOSIS: Good strategy.');
+    // Copy button is enabled once there is a reply
+    expect(screen.getByTestId('ai-recs-copy-response')).not.toBeDisabled();
+  });
+
+  it('shows provider/tokens/duration metadata after a successful analysis', async () => {
+    const fetchMock = jest.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/api/ai/analyze')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            text:
+              'DIAGNOSIS: x\n\nRECOMMENDATIONS:\n' +
+              '1. Widen EMA\n   Type: signal\n   Parameter: p\n   Suggested Value: 1',
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ blocks: [] }) } as Response);
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Approve & Send to AI/i }));
+    fireEvent.click(screen.getByTestId('opt-goal-confirm'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Send Again/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('ai-recs-tab-response'));
+
+    const meta = screen.getByTestId('ai-recs-response-meta');
+    expect(meta).toBeInTheDocument();
+    // Provider matches defaultSettings.settings.provider
+    expect(meta.textContent).toMatch(/anthropic/i);
+    expect(meta.textContent).toMatch(/\d+ tokens/i);
+    expect(meta.textContent).toMatch(/\d+\.\d+s/);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Sprint B6 — History tab swap-in (BTCAAAAA-37772)
+// Clicking "Load into current analysis" on a history entry hydrates
+// aiAnalysis from that entry and navigates to the "Current Analysis" view.
+// ──────────────────────────────────────────────────────────────────────────
+describe('AiRecommendationsPanel — history tab swap-in (Sprint B6)', () => {
+  const HISTORY_ENTRY = {
+    id: 'hist-sprint-b6',
+    createdAt: '2026-06-26T10:00:00Z',
+    prompt: 'sprint b6 system prompt',
+    summary: 'sprint b6 summary',
+    diagnosis: 'Sprint B6 history diagnosis text.',
+    recommendations:
+      '1. Adjust window\n   Type: signal\n   Rationale: smoother\n' +
+      '   Parameter: window\n   Suggested Value: 20',
+    raw:
+      'DIAGNOSIS: Sprint B6 history diagnosis text.\n\n' +
+      'RECOMMENDATIONS:\n1. Adjust window\n   Type: signal\n' +
+      '   Parameter: window\n   Suggested Value: 20',
+    status: 'new' as const,
+    notes: '',
+    strategyName: 'Sprint B6 Strategy',
+  };
+
+  beforeEach(() => {
+    window.localStorage.setItem(
+      'btc-paperclip:ai-recs:v1',
+      JSON.stringify([HISTORY_ENTRY]),
+    );
+  });
+
+  it('history tab renders entries loaded from localStorage', async () => {
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('ai-recs-tab-history'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId(`history-row-${HISTORY_ENTRY.id}`)).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('ai-recs-tab-history')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('loading a history entry switches to current tab and shows its diagnosis', async () => {
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+
+    // Navigate to history tab and wait for hydration
+    fireEvent.click(screen.getByTestId('ai-recs-tab-history'));
+    await waitFor(() => {
+      expect(screen.getByTestId(`history-row-${HISTORY_ENTRY.id}`)).toBeInTheDocument();
+    });
+
+    // Expand the history card by clicking "View" on the compact row
+    fireEvent.click(screen.getByTestId(`history-view-${HISTORY_ENTRY.id}`));
+
+    // HistoryCard only renders when the row is expanded
+    await waitFor(() => {
+      expect(screen.getByTestId(`history-load-${HISTORY_ENTRY.id}`)).toBeInTheDocument();
+    });
+
+    // Click "Load into current analysis"
+    fireEvent.click(screen.getByTestId(`history-load-${HISTORY_ENTRY.id}`));
+
+    // Panel should switch back to the "current" view
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-recs-tab-current')).toHaveAttribute('aria-selected', 'true');
+    });
+
+    // The loaded diagnosis must be visible in the current analysis view
+    expect(screen.getByText('Sprint B6 history diagnosis text.')).toBeInTheDocument();
+  });
+
+  it('history tab chip shows entry count when entries are present', async () => {
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+
+    // History chip "(1)" should appear after hydration
+    await waitFor(() => {
+      const histTab = screen.getByTestId('ai-recs-tab-history');
+      expect(histTab.textContent).toContain('(1)');
+    });
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Sprint B6 — KPI re-projection: bar renders and "applied" chip updates
+// The StrategyImpactKpiBar appears when a result is provided and its
+// "N applied" chip updates as recs are toggled (BTCAAAAA-37774 Sprint A2).
+// ──────────────────────────────────────────────────────────────────────────
+describe('AiRecommendationsPanel — KPI re-projection (Sprint B6)', () => {
+  const SAMPLE_TEXT =
+    'DIAGNOSIS: Baseline.\n\n' +
+    'RECOMMENDATIONS:\n' +
+    '1. Reduce position size\n' +
+    '   Type: signal\n' +
+    '   Rationale: cap exposure\n' +
+    '   Parameter: maxAllocation\n' +
+    '   Suggested Value: 15';
+
+  async function renderWithAnalysis() {
+    const fetchMock = jest.fn().mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/ai/analyze')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ ok: true, text: SAMPLE_TEXT }),
+        });
+      }
+      // auto-apply returns a valid strategy so the toggle flip succeeds
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          strategy: makeStrategy(),
+          apply: { applied: [{ rec_id: 'rec-0' }], applied_count: 1 },
+        }),
+      });
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Approve & Send to AI/i }));
+    fireEvent.click(screen.getByTestId('opt-goal-confirm'));
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('ai-recs-toggle-card')).toHaveLength(1);
+    });
+
+    return fetchMock;
+  }
+
+  it('renders the strategy impact KPI bar when a result is provided', async () => {
+    await renderWithAnalysis();
+    expect(screen.getByTestId('strategy-impact-kpi-bar')).toBeInTheDocument();
+  });
+
+  it('KPI bar shows "0 applied" chip before any recs are toggled', async () => {
+    await renderWithAnalysis();
+    expect(screen.getByTestId('strategy-impact-applied-chip')).toHaveTextContent('0 applied');
+  });
+
+  it('"applied" chip updates to "1 applied" after toggling a rec on', async () => {
+    await renderWithAnalysis();
+
+    const cards = screen.getAllByTestId('ai-recs-toggle-card');
+    const firstToggle = within(cards[0]).getByRole('checkbox');
+    fireEvent.click(firstToggle);
+
+    await waitFor(() => {
+      expect(cards[0].getAttribute('data-applied')).toBe('true');
+    });
+
+    expect(screen.getByTestId('strategy-impact-applied-chip')).toHaveTextContent('1 applied');
+  });
+
+  it('realtime header count updates to "1 change applied" after toggling a rec on', async () => {
+    await renderWithAnalysis();
+
+    expect(screen.getByTestId('ai-recs-realtime-count')).toHaveTextContent('0 changes applied');
+
+    const cards = screen.getAllByTestId('ai-recs-toggle-card');
+    const toggle = within(cards[0]).getByRole('checkbox');
+    fireEvent.click(toggle);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-recs-realtime-count')).toHaveTextContent('1 change applied');
+    });
+  });
+
+  it('KPI bar shows all four tiles: Win Rate, Max Drawdown, Net PnL, Trades', async () => {
+    await renderWithAnalysis();
+
+    expect(screen.getByTestId('strategy-impact-tile-wr')).toBeInTheDocument();
+    expect(screen.getByTestId('strategy-impact-tile-max-drawdown')).toBeInTheDocument();
+    expect(screen.getByTestId('strategy-impact-tile-net-pnl')).toBeInTheDocument();
+    expect(screen.getByTestId('strategy-impact-tile-trades')).toBeInTheDocument();
+  });
+});
