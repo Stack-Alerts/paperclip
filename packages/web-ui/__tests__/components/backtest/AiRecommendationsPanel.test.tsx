@@ -5,11 +5,17 @@ import type { BacktestResult, Strategy, Trade } from '@/lib/strategy-builder/typ
 
 jest.mock('@/hooks/useAiSettings', () => ({
   useAiSettings: jest.fn(),
+  // BTCAAAAA-38469 — conflict-guard tests need getProviderMeta to resolve
+  // during AiRecommendationsPanel's pre-render provider check. Returning a
+  // minimal valid provider meta keeps the render path alive without
+  // touching any production wiring.
   getProviderMeta: jest.fn(() => ({
     id: 'anthropic',
     label: 'Anthropic',
     requiresApiKey: true,
     envKey: 'ANTHROPIC_API_KEY',
+    defaultModel: 'claude-sonnet-4-6',
+    models: [{ id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' }],
   })),
 }));
 
@@ -879,5 +885,122 @@ describe('AiRecommendationsPanel — empty-state preview + demo (BTCAAAAA-36917 
     expect(pill).toBeInTheDocument();
     expect(pill).toHaveTextContent(/Request outcome/i);
     expect(pill).toHaveTextContent(/Ready/i);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// BTCAAAAA-38469 — single-winner guard for conflicting AI recs.
+// When 2+ recommendations target the same parameter (same `Key`), only the
+// highest-confidence one remains applyable. Losers get a Conflict badge and
+// a disabled toggle with a "Why disabled?" tooltip.
+// ──────────────────────────────────────────────────────────────────────────
+describe('AiRecommendationsPanel — BTCAAAAA-38469 conflict guard', () => {
+  // Three recs: rec-0 (high), rec-1 (low) and rec-2 (medium) all targeting
+  // the same parameter. Only rec-0 (highest confidence) should remain
+  // applyable; rec-1 + rec-2 should be conflict losers. The parser reads
+  // `Parameter:` for the target key, so use that field name.
+  const CONFLICTING_TEXT =
+    'DIAGNOSIS: conflicting recommendations probe.\n\n' +
+    'RECOMMENDATIONS: ' +
+    '1. Use 30 as window\n' +
+    '   Type: signal\n' +
+    '   Confidence: high\n' +
+    '   Rationale: tighten lookback\n' +
+    '   Parameter: window\n' +
+    '   Suggested Value: 30\n\n' +
+    '2. Use 14 as window\n' +
+    '   Type: signal\n' +
+    '   Confidence: low\n' +
+    '   Rationale: snappier response\n' +
+    '   Parameter: window\n' +
+    '   Suggested Value: 14\n\n' +
+    '3. Use 21 as window\n' +
+    '   Type: signal\n' +
+    '   Confidence: medium\n' +
+    '   Rationale: middle ground\n' +
+    '   Parameter: window\n' +
+    '   Suggested Value: 21';
+
+  async function renderConflictPanel() {
+    const fetchMock = jest.fn().mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/ai/analyze')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ ok: true, text: CONFLICTING_TEXT }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          strategy: makeStrategy(),
+          apply: { applied: [], applied_count: 0 },
+        }),
+      });
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(
+      <AiRecommendationsPanel
+        result={makeResult()}
+        strategy={makeStrategy()}
+        backtestConfig={{}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Approve & Send to AI/i }));
+    fireEvent.click(screen.getByTestId('opt-goal-confirm'));
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('ai-recs-toggle-card')).toHaveLength(3);
+    });
+    return fetchMock;
+  }
+
+  it('renders a Conflict badge only on losing recs (not the winner)', async () => {
+    await renderConflictPanel();
+    const badges = screen.getAllByTestId('ai-recs-conflict-badge');
+    // Exactly two losers (low + medium); high-confidence winner has no badge.
+    expect(badges).toHaveLength(2);
+    for (const badge of badges) {
+      expect(badge).toHaveTextContent(/Conflict/i);
+    }
+  });
+
+  it('disables the apply toggle on losing recs with an explanatory tooltip', async () => {
+    await renderConflictPanel();
+    const cards = screen.getAllByTestId('ai-recs-toggle-card');
+    // The first card in DOM order is rec-0 (high) — the winner; must NOT be
+    // disabled by the conflict guard. The other two are losers.
+    const winner = cards[0];
+    expect(winner).not.toHaveAttribute('aria-disabled', 'true');
+    expect(winner.getAttribute('title') ?? '').not.toMatch(/higher-confidence/i);
+
+    const loser1 = cards[1];
+    expect(loser1).toHaveAttribute('aria-disabled', 'true');
+    expect(loser1.getAttribute('title') ?? '').toMatch(/higher-confidence/i);
+
+    const loser2 = cards[2];
+    expect(loser2).toHaveAttribute('aria-disabled', 'true');
+    expect(loser2.getAttribute('title') ?? '').toMatch(/higher-confidence/i);
+  });
+
+  it('does not POST to /api/ai/auto-apply when a conflict loser is clicked', async () => {
+    const fetchMock = await renderConflictPanel();
+    const cards = screen.getAllByTestId('ai-recs-toggle-card');
+    fireEvent.click(cards[1]); // rec-1 (low confidence loser)
+
+    // No auto-apply call should fire for the loser; the badge stays OFF.
+    await waitFor(() => {
+      const badge = within(cards[1]).getByTestId('ai-recs-toggle-badge');
+      expect(badge.textContent).toBe('OFF');
+    });
+    const autoApplyCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/api/ai/auto-apply'),
+    );
+    expect(autoApplyCall).toBeUndefined();
   });
 });

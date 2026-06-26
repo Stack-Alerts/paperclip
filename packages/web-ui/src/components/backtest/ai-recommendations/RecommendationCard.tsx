@@ -40,6 +40,8 @@ export interface RecommendationCardData {
    * `window.__AI_RECS_FEEDBACK__`.
    */
   analysisId: string;
+  /** Optional badge rendered in the card header to flag a rec that lost a same-param conflict. */
+  conflictBadge?: { label: string; tooltip?: string };
 }
 
 export function RecommendationCard({
@@ -58,6 +60,7 @@ export function RecommendationCard({
   dataAttributes,
   appliedDiff,
   analysisId,
+  conflictBadge,
 }: RecommendationCardData) {
   const tone = RECOMMENDATION_CATEGORY_PALETTE[categoryId];
   const deltaFg = deltaNegative ? 'var(--accent-red-on)' : 'var(--accent-green-on)';
@@ -89,13 +92,30 @@ export function RecommendationCard({
       }}
     >
       <header className="flex items-center justify-between gap-2 px-3 pt-3">
-        <span
-          data-testid={`rec-card-${id}-category`}
-          className="text-[10px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5"
-          style={{ background: tone.bg, color: tone.fg, border: `1px solid ${tone.fg}` }}
-        >
-          {categoryLabel ?? tone.label}
-        </span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span
+            data-testid={`rec-card-${id}-category`}
+            className="text-[10px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5"
+            style={{ background: tone.bg, color: tone.fg, border: `1px solid ${tone.fg}` }}
+          >
+            {categoryLabel ?? tone.label}
+          </span>
+          {conflictBadge && (
+            <span
+              data-testid={`rec-card-${id}-conflict`}
+              data-conflict-loser="true"
+              className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+              style={{
+                background: 'var(--accent-amber-soft, #fef3c7)',
+                color: 'var(--accent-amber-on, #92400e)',
+                border: '1px solid var(--accent-amber-on, #d97706)',
+              }}
+              title={conflictBadge.tooltip}
+            >
+              {conflictBadge.label}
+            </span>
+          )}
+        </div>
         <span
           data-testid={`rec-card-${id}-delta`}
           className="text-[10px] font-semibold rounded px-1.5 py-0.5"

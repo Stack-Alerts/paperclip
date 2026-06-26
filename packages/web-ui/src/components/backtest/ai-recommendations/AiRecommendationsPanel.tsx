@@ -40,6 +40,7 @@ import {
 } from './strategyImpactKpi';
 import { computeReanalyzeHash } from './dirtyHash';
 import { buildAiRecsSystemPrompt } from './prompts/systemPrompt';
+import { detectConflicts } from './conflictDetector';
 import { StrategyAfterChangesRail } from './StrategyAfterChangesRail';
 import { mergeStrategyAfterChanges } from './strategyAfterChangesMerge';
 import { RecommendationsRow } from './RecommendationsRow';
@@ -81,6 +82,8 @@ const APPLY_SUCCESS_DISMISS_MS = 3000;
 // AWAITING_PROVIDER_ETA_SECONDS so the visible ETA and the abort trip stay
 // in sync.
 const PREFLIGHT_TIMEOUT_MS = 30_000;
+
+const STRUCTURAL_TYPES = new Set(['ADD_SIGNAL', 'REMOVE_SIGNAL', 'ADD_BLOCK', 'REMOVE_BLOCK']);
 
 // BTCAAAAA-36917 v4 UX: hardcoded sample payload for the empty-state
 // "Preview the new layout" + "Load demo data" affordances. The preview card
@@ -1199,10 +1202,6 @@ function projectedImpactFromRecRaw(raw: string): ProjectedDelta {
   return out;
 }
 
-// BTCAAAAA-38438: hoisted from the inline .map() so the mapper below can
-// classify recs without recreating the Set on every render.
-const STRUCTURAL_TYPES = new Set(['ADD_SIGNAL', 'REMOVE_SIGNAL', 'ADD_BLOCK', 'REMOVE_BLOCK']);
-
 // BTCAAAAA-38438: map a ParsedRec.type string to a RecommendationCategoryId
 // for the mockup-aligned card palette. Conservative default → 'signal' so
 // unknown types still render with a sensible tone instead of crashing.
@@ -1247,6 +1246,8 @@ function toCardData(rec: ParsedRec, ctx: {
   applied: boolean;
   isApplyingThis: boolean;
   isAutoApplicable: boolean;
+  isConflictLoser?: boolean;
+  conflictTooltip?: string;
   onToggleApplied: () => void;
   preApplySnapshots: ReadonlyArray<[string, Strategy]>;
   analysisId: string;
@@ -1288,6 +1289,18 @@ function toCardData(rec: ParsedRec, ctx: {
     }
   }
 
+  // BTCAAAAA-38469 — single-winner guard. A conflict-loser can never be
+  // toggled, so we layer the gate on top of the existing disabled flag and
+  // surface a Conflict badge in the card header via `conflictBadge`.
+  const conflictLoser = !!ctx.isConflictLoser;
+  const dataAttributes: Record<string, string> = {
+    'data-testid': 'ai-recs-toggle-card',
+    'data-rec-id': rec.id,
+    'data-applied': ctx.applied ? 'true' : 'false',
+    'data-auto-applicable': ctx.isAutoApplicable ? 'true' : 'false',
+    'data-conflict-loser': conflictLoser ? 'true' : 'false',
+  };
+
   return {
     id: rec.id,
     categoryId: categoryIdFromRecType(rec.type),
@@ -1298,15 +1311,13 @@ function toCardData(rec: ParsedRec, ctx: {
     codeLines,
     applied: ctx.applied,
     onToggleApplied: ctx.onToggleApplied,
-    disabled: ctx.isApplyingThis || !ctx.isAutoApplicable,
+    disabled: ctx.isApplyingThis || !ctx.isAutoApplicable || conflictLoser,
     appliedDiff,
-    dataAttributes: {
-      'data-testid': 'ai-recs-toggle-card',
-      'data-rec-id': rec.id,
-      'data-applied': ctx.applied ? 'true' : 'false',
-      'data-auto-applicable': ctx.isAutoApplicable ? 'true' : 'false',
-    },
+    dataAttributes,
     analysisId: ctx.analysisId,
+    conflictBadge: conflictLoser
+      ? { label: 'Conflict', tooltip: ctx.conflictTooltip }
+      : undefined,
   };
 }
 
@@ -2249,6 +2260,11 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
     if (!analysisRecommendations) return [];
     return parseRecommendations(analysisRecommendations);
   }, [analysisRecommendations]);
+
+  // BTCAAAAA-38469 — single-winner guard for conflicting AI recs. Computed
+  // from the same parsedRecs the toggle grid iterates, so the conflict
+  // status is always in sync with what the user sees.
+  const conflictInfo = useMemo(() => detectConflicts(parsedRecs), [parsedRecs]);
 
   // BTCAAAAA-37780 / Sprint A6 — Diagnose tab data.
   const diagnoseRows: DiagnoseMetricRow[] = useMemo(
@@ -3867,7 +3883,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
             )}
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+<div className="flex flex-col gap-2">
             {/* BTCAAAAA-38438: per-tile error strip above the row so the
                 error pill does not collide with the mockup-aligned toggle
                 inside the card body. BTCAAAAA-38468 feedback capture flows
@@ -3889,8 +3905,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
                         color: 'var(--accent-red)',
                         border: '1px solid var(--accent-red)',
                       }}
-                      data-testid="ai-recs-toggle-error"
-                      role="alert"
+                      data-testid="ai-recs-error-strip-item"
                     >
                       <span className="font-semibold">{rec.title}:</span>
                       <span>{errMsg}</span>
@@ -3906,12 +3921,16 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
                 const isApplyingThis = perTileApplying.includes(rec.id);
                 const isStructural = STRUCTURAL_TYPES.has((rec.type ?? '').toUpperCase());
                 const isAutoApplicable = isStructural || !!(rec.parameter && rec.suggestedValue);
+                const recConflict = conflictInfo.get(rec.id);
+                const isConflictLoser = !!recConflict?.isConflictLoser;
                 return toCardData(rec, {
                   applied: isApplied,
                   isApplyingThis,
                   isAutoApplicable,
+                  isConflictLoser,
+                  conflictTooltip: recConflict?.conflictTooltip,
                   onToggleApplied: () => {
-                    if (!strategy?.id || isApplyingThis || !isAutoApplicable) return;
+                    if (!strategy?.id || isApplyingThis || !isAutoApplicable || isConflictLoser) return;
                     handleToggleRec(rec);
                   },
                   preApplySnapshots,
