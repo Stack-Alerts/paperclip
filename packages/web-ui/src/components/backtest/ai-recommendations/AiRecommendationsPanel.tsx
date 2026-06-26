@@ -29,6 +29,7 @@ import {
   deriveBaselineKpis,
 } from './strategyImpactKpi';
 import { computeReanalyzeHash } from './dirtyHash';
+import { buildAiRecsSystemPrompt } from './prompts/systemPrompt';
 import { StrategyAfterChangesRail } from './StrategyAfterChangesRail';
 import { mergeStrategyAfterChanges } from './strategyAfterChangesMerge';
 import { RecommendationsRow } from './RecommendationsRow';
@@ -1639,8 +1640,6 @@ function formatWR(wr: number | undefined | null): string {
   return `${pct.toFixed(1)}%`;
 }
 
-const AI_RECS_PROMPT =
-  'Analyze this trading strategy backtest and return a diagnosis and concrete, actionable recommendations.';
 
 // BTCAAAAA-37780 / Sprint A6 — minimal markdown renderer for the Diagnose
 // pane. The rest of the panel renders diagnosis text with `whitespace-pre-wrap`,
@@ -2272,6 +2271,15 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
       // return a usage field today.
       const sentAt = Date.now();
 
+      // BTCAAAAA-38465 (Stream 4) — build the system prompt from the live
+      // strategy + block catalog so it includes BTC/crypto context, the
+      // supported building-block vocabulary, the strategy's actual block
+      // types, and the parameter key list the auto-apply path keys off of.
+      const systemPrompt = buildAiRecsSystemPrompt({
+        strategy: strategy ?? null,
+        blockCatalog,
+      });
+
       try {
         const res = await fetch('/api/ai/analyze', {
           method: 'POST',
@@ -2281,7 +2289,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
             model: settings.model,
             apiKey: settings.apiKeys[settings.provider],
             ollamaBaseUrl: settings.ollamaBaseUrl,
-            prompt: AI_RECS_PROMPT,
+            prompt: systemPrompt,
             payload,
             optimizationGoal: goal,
           }),
@@ -2320,7 +2328,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
         setLastAnalysisHash(computeReanalyzeHash(strategy ?? null, backtestConfig ?? null));
         if (history.hydrated) {
           history.add({
-            prompt: AI_RECS_PROMPT,
+            prompt: systemPrompt,
             diagnosis: parsed.diagnosis,
             recommendations: parsed.recommendations,
             raw: parsed.raw,
