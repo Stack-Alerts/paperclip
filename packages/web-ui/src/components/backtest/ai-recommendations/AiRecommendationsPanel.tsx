@@ -1292,40 +1292,58 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
         REQUEST PREVIEW
       </p>
 
-      <CollapsibleSection
-        title="1. Strategy Configuration"
-        description="Complete strategy setup including blocks and parameters"
-      >
-        <PreviewText text={formatStrategyConfig(strategy)} />
-      </CollapsibleSection>
+      {(() => {
+        const strategyText = formatStrategyConfig(strategy);
+        const backtestText = formatBacktestConfig(backtestConfig);
+        const tradesText = formatTrades(result?.trades);
+        const metricsText = formatMetrics(result);
+        const blocksText = blockCatalog
+          ? JSON.stringify(blockCatalog, null, 2)
+          : 'Loading block catalog…';
+        return (
+          <>
+            <CollapsibleSection
+              title="1. Strategy Configuration"
+              description="Complete strategy setup including blocks and parameters"
+              copyText={strategyText}
+            >
+              <PreviewText text={strategyText} />
+            </CollapsibleSection>
 
-      <CollapsibleSection
-        title="2. Backtest Configuration"
-        description="How the backtest was configured (timeframe, SL/TP, position sizing)"
-      >
-        <PreviewText text={formatBacktestConfig(backtestConfig)} />
-      </CollapsibleSection>
+            <CollapsibleSection
+              title="2. Backtest Configuration"
+              description="How the backtest was configured (timeframe, SL/TP, position sizing)"
+              copyText={backtestText}
+            >
+              <PreviewText text={backtestText} />
+            </CollapsibleSection>
 
-      <CollapsibleSection
-        title="3. Trade Results"
-        description="All trades executed with entry/exit details"
-      >
-        <PreviewText text={formatTrades(result?.trades)} />
-      </CollapsibleSection>
+            <CollapsibleSection
+              title="3. Trade Results"
+              description="All trades executed with entry/exit details"
+              copyText={tradesText}
+            >
+              <PreviewText text={tradesText} />
+            </CollapsibleSection>
 
-      <CollapsibleSection
-        title="4. Metrics & Ratings"
-        description="Performance metrics"
-      >
-        <PreviewText text={formatMetrics(result)} />
-      </CollapsibleSection>
+            <CollapsibleSection
+              title="4. Metrics & Ratings"
+              description="Performance metrics"
+              copyText={metricsText}
+            >
+              <PreviewText text={metricsText} />
+            </CollapsibleSection>
 
-      <CollapsibleSection
-        title="5. Available Building Blocks"
-        description="Block catalog visible to AI for recommendations"
-      >
-        <PreviewText text={blockCatalog ? `${blockCatalog.length} blocks available` : 'Loading block catalog…'} />
-      </CollapsibleSection>
+            <CollapsibleSection
+              title="5. Available Building Blocks"
+              description="Block catalog visible to AI for recommendations"
+              copyText={blocksText}
+            >
+              <PreviewText text={blockCatalog ? `${blockCatalog.length} blocks available\n\n${blocksText}` : blocksText} />
+            </CollapsibleSection>
+          </>
+        );
+      })()}
 
       {/* Active rec banner (AC2 surface) */}
       {activeRec && (
