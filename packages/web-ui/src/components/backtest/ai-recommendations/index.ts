@@ -2,6 +2,11 @@ export { AiRecommendationsPanel } from './AiRecommendationsPanel';
 export type { AiRecommendationsPanelProps } from './AiRecommendationsPanel';
 export { RecommendationCard } from './RecommendationCard';
 export type { RecommendationCardData } from './RecommendationCard';
+export { RecommendationDiff } from './RecommendationDiff';
+export type {
+  RecommendationDiffParam,
+  RecommendationDiffProps,
+} from './RecommendationDiff';
 export { RecommendationsRow } from './RecommendationsRow';
 export type { RecommendationsRowProps } from './RecommendationsRow';
 export {

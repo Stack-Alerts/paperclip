@@ -39,6 +39,7 @@ import { mergeStrategyAfterChanges } from './strategyAfterChangesMerge';
 import { RecommendationsRow } from './RecommendationsRow';
 import type { RecommendationCardData } from './RecommendationCard';
 import type { RecommendationCategoryId } from './recommendationCategoryPalette';
+import type { RecommendationDiffParam } from './RecommendationDiff';
 
 type SendPhase =
   | 'idle'
@@ -1090,6 +1091,27 @@ function parseSuggestedParams(block: string): Array<{ key: string; value: string
   return params;
 }
 
+function findParamInStrategy(strategy: Strategy, paramKey: string): string | undefined {
+  for (const block of (strategy.blocks ?? [])) {
+    const data = block.data;
+    if (!data || typeof data !== 'object') continue;
+    for (const [key, value] of Object.entries(data)) {
+      if (key === paramKey && (typeof value === 'number' || typeof value === 'string')) {
+        return String(value);
+      }
+    }
+  }
+  const settings = strategy.settings;
+  if (settings && typeof settings === 'object') {
+    for (const [key, value] of Object.entries(settings as unknown as Record<string, unknown>)) {
+      if (key === paramKey && (typeof value === 'number' || typeof value === 'string')) {
+        return String(value);
+      }
+    }
+  }
+  return undefined;
+}
+
 function deriveTitle(block: string, index: number): string {
   // Try the first markdown heading inside the block.
   const heading = block.match(/^\s*#{1,6}\s+(.+?)\s*$/m);
@@ -1213,6 +1235,7 @@ function toCardData(rec: ParsedRec, ctx: {
   isApplyingThis: boolean;
   isAutoApplicable: boolean;
   onToggleApplied: () => void;
+  preApplySnapshots: ReadonlyArray<[string, Strategy]>;
 }): RecommendationCardData {
   const delta = projectedImpactFromRecRaw(rec.raw);
   const { label: deltaLabel, negative: deltaNegative } = formatDeltaLabel(delta);
@@ -1221,6 +1244,36 @@ function toCardData(rec: ParsedRec, ctx: {
     : rec.parameter && rec.suggestedValue
       ? [`${rec.parameter} = ${rec.suggestedValue}`]
       : [`type: ${rec.type ?? 'recommendation'}`];
+
+  // B3 (BTCAAAAA-38467): when the rec is applied, compute the per-param
+  // before/after diff from the pre-apply snapshot so RecommendationCard can
+  // render its inline <RecommendationDiff />. Only params whose value
+  // actually changed are surfaced.
+  let appliedDiff: ReadonlyArray<RecommendationDiffParam> | undefined;
+  if (ctx.applied) {
+    const snapshotEntry = ctx.preApplySnapshots.find(([id]) => id === rec.id);
+    if (snapshotEntry) {
+      const [, preStrategy] = snapshotEntry;
+      const paramSource: Array<{ key: string; value: string }> =
+        rec.suggestedParams.length > 0
+          ? rec.suggestedParams
+          : rec.parameter && rec.suggestedValue
+            ? [{ key: rec.parameter, value: rec.suggestedValue }]
+            : [];
+      appliedDiff = paramSource
+        .map((p) => ({
+          key: p.key,
+          before: findParamInStrategy(preStrategy, p.key),
+          after: p.value,
+        }))
+        .filter(
+          (d): d is RecommendationDiffParam =>
+            d.before !== undefined && d.before !== d.after,
+        );
+      if (appliedDiff.length === 0) appliedDiff = undefined;
+    }
+  }
+
   return {
     id: rec.id,
     categoryId: categoryIdFromRecType(rec.type),
@@ -1232,6 +1285,7 @@ function toCardData(rec: ParsedRec, ctx: {
     applied: ctx.applied,
     onToggleApplied: ctx.onToggleApplied,
     disabled: ctx.isApplyingThis || !ctx.isAutoApplicable,
+    appliedDiff,
     dataAttributes: {
       'data-testid': 'ai-recs-toggle-card',
       'data-rec-id': rec.id,
@@ -3577,6 +3631,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
                     if (!strategy?.id || isApplyingThis || !isAutoApplicable) return;
                     handleToggleRec(rec);
                   },
+                  preApplySnapshots,
                 });
               })}
             />

@@ -5,6 +5,10 @@ import {
   RECOMMENDATION_CATEGORY_PALETTE,
   RecommendationCategoryId,
 } from './recommendationCategoryPalette';
+import {
+  RecommendationDiff,
+  RecommendationDiffParam,
+} from './RecommendationDiff';
 
 export interface RecommendationCardData {
   id: string;
@@ -25,6 +29,8 @@ export interface RecommendationCardData {
    * `data-rec-id` attribute that StrategyAfterChangesRail's CSS-selector
    * scroll-into-view contract depends on. */
   dataAttributes?: Record<string, string>;
+  /** Per-parameter before/after deltas — rendered as a collapsed diff when applied. */
+  appliedDiff?: ReadonlyArray<RecommendationDiffParam>;
 }
 
 export function RecommendationCard({
@@ -41,6 +47,7 @@ export function RecommendationCard({
   onToggleApplied,
   disabled = false,
   dataAttributes,
+  appliedDiff,
 }: RecommendationCardData) {
   const tone = RECOMMENDATION_CATEGORY_PALETTE[categoryId];
   const deltaFg = deltaNegative ? 'var(--accent-red-on)' : 'var(--accent-green-on)';
@@ -177,6 +184,15 @@ export function RecommendationCard({
           </span>
         </label>
       </footer>
+
+      {applied && appliedDiff && (
+        <div className="px-3 pb-2">
+          <RecommendationDiff
+            params={appliedDiff}
+            testIdPrefix={`rec-card-${id}-diff`}
+          />
+        </div>
+      )}
     </article>
   );
 }

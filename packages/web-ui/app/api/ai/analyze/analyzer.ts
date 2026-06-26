@@ -120,7 +120,27 @@ Hard rules — breaking any of these makes your output unparseable:
 - Suggested Value is a single scalar: a number or string, nothing else.
 - No prose, bullet lists, headings, or text outside the DIAGNOSIS and RECOMMENDATIONS sections.
 - If the payload contains no trades, say so in DIAGNOSIS and give one ADD_BLOCK recommendation.
-- Keep total response under 600 words.`;
+- Keep total response under 600 words.
+
+=== WORKED EXAMPLE ===
+This is a complete, valid response for a typical backtest. Match this structure and field order exactly. Do not add extra sections, prose, or commentary.
+
+DIAGNOSIS:
+The RSI Reversion strategy executed 47 trades over the backtest with a 51% win rate and a -1.8% net return, primarily because exits were triggered too early by the fixed 5-bar hold and stop losses were placed at a uniform 1.5% without adapting to recent volatility.
+
+RECOMMENDATIONS:
+1. Widen stop loss to track volatility
+   Type: ADJUST_PARAM
+   Block: settings
+   Parameter: adaptiveSL.enabled
+   Suggested Value: true
+   Rationale: Switching from a fixed stop to an adaptive volatility-based stop should reduce whipsaw losses in ranging markets.
+2. Reduce fixed hold to allow winners to breathe
+   Type: ADJUST_PARAM
+   Block: settings
+   Parameter: maxBarsHeld
+   Suggested Value: 8
+   Rationale: Extending the hold by 3 bars gives winning setups room to reach their mean-reversion target before time exit.`;
 
 /** Format the user message by appending the payload as a JSON code block. */
 function buildUserMessage(prompt: string, payload: unknown): string {
