@@ -37,5 +37,7 @@ export default defineConfig({
     : undefined,
 
   snapshotDir: './__snapshots__',
-  snapshotPathTemplate: '{snapshotDir}/status-bar/{arg}{ext}',
+  // Default Playwright path: __snapshots__/<test-file-slug>/<arg>.png.
+  // Lets each spec (status-bar, ai-recs-panel, …) keep its own snapshot folder.
+  snapshotPathTemplate: '{snapshotDir}/{testFilePath}/{arg}{ext}',
 });
