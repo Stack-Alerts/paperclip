@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { BarChart3, TrendingUp, TrendingDown, Activity } from 'lucide-react';
 import { BacktestConfig, BacktestProgress, BacktestResult } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -161,107 +162,145 @@ export const BacktestConfigPanel: React.FC<BacktestConfigPanelProps> = ({
         </CardContent>
       </Card>
 
-      {/* Progress Section */}
-      {progress && (
+      {/* Status + Charts row — Variant A layout (BTCAAAAA-38536):
+          Status / progress lives on the LEFT, result-chart blocks on the RIGHT. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Status Panel (left) */}
         <Card>
           <CardHeader>
-            <CardTitle>Progress</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Activity size={14} strokeWidth={2} />
+              Status
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Status</Label>
-                <p className="text-sm font-semibold">{progress.status}</p>
-              </div>
-              <div>
-                <Label>Candles</Label>
-                <p className="text-sm font-semibold">
-                  {progress.currentCandle} / {progress.totalCandles}
-                </p>
-              </div>
-              <div>
-                <Label>Trades</Label>
-                <p className="text-sm font-semibold">
-                  {progress.currentTrade} / {progress.totalTrades}
-                </p>
-              </div>
-              <div>
-                <Label>Message</Label>
-                <p className="text-sm truncate">{progress.message}</p>
-              </div>
-            </div>
+            {progress ? (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Status</Label>
+                    <p className="text-sm font-semibold">{progress.status}</p>
+                  </div>
+                  <div>
+                    <Label>Candles</Label>
+                    <p className="text-sm font-semibold">
+                      {progress.currentCandle} / {progress.totalCandles}
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Trades</Label>
+                    <p className="text-sm font-semibold">
+                      {progress.currentTrade} / {progress.totalTrades}
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Message</Label>
+                    <p className="text-sm truncate">{progress.message}</p>
+                  </div>
+                </div>
 
-            {/* Progress Bars */}
-            <div className="space-y-2">
-              <div className="space-y-1">
-                <Label className="text-xs">Candle Progress</Label>
-                <div className="w-full rounded-full h-2" style={{ backgroundColor: 'var(--border-default)' }}>
-                  <div
-                    className="h-2 rounded-full transition-all"
-                    style={{
-                      width: `${progress.totalCandles > 0
-                        ? (progress.currentCandle / progress.totalCandles) * 100
-                        : 0}%`,
-                      backgroundColor: 'var(--accent-blue)',
-                    }}
-                  />
+                {/* Progress Bars */}
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Candle Progress</Label>
+                    <div className="w-full rounded-full h-2" style={{ backgroundColor: 'var(--border-default)' }}>
+                      <div
+                        className="h-2 rounded-full transition-all"
+                        style={{
+                          width: `${progress.totalCandles > 0
+                            ? (progress.currentCandle / progress.totalCandles) * 100
+                            : 0}%`,
+                          backgroundColor: 'var(--accent-blue)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Trade Progress</Label>
+                    <div className="w-full rounded-full h-2" style={{ backgroundColor: 'var(--border-default)' }}>
+                      <div
+                        className="h-2 rounded-full transition-all"
+                        style={{
+                          width: `${progress.totalTrades > 0
+                            ? (progress.currentTrade / progress.totalTrades) * 100
+                            : 0}%`,
+                          backgroundColor: 'var(--color-bullish)',
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Trade Progress</Label>
-                <div className="w-full rounded-full h-2" style={{ backgroundColor: 'var(--border-default)' }}>
-                  <div
-                    className="h-2 rounded-full transition-all"
-                    style={{
-                      width: `${progress.totalTrades > 0
-                        ? (progress.currentTrade / progress.totalTrades) * 100
-                        : 0}%`,
-                      backgroundColor: 'var(--color-bullish)',
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
+              </>
+            ) : (
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                Status will appear here once a backtest starts.
+              </p>
+            )}
           </CardContent>
         </Card>
-      )}
 
-      {/* Results Section */}
-      {result && (
+        {/* Charts Panel (right) — Variant A with results, Variant B placeholder */}
         <Card>
           <CardHeader>
-            <CardTitle>Results</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 size={14} strokeWidth={2} />
+              {result ? 'Variant A — With Result Charts' : 'Variant B — No Result Yet'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <Label className="text-xs">Total Trades</Label>
-                <p className="text-lg font-semibold">{result.tradeCount}</p>
+            {result ? (
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">Total Trades</Label>
+                  <p className="text-lg font-semibold">{result.tradeCount}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Win Rate</Label>
+                  <p className="text-lg font-semibold">{(result.winRate * 100).toFixed(2)}%</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Profit Factor</Label>
+                  <p className="text-lg font-semibold">{result.profitFactor.toFixed(2)}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Max Drawdown</Label>
+                  <p className="text-lg font-semibold">{(result.maxDrawdown * 100).toFixed(2)}%</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Total Return</Label>
+                  <p className="text-lg font-semibold">{(result.totalReturn * 100).toFixed(2)}%</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Sharpe Ratio</Label>
+                  <p className="text-lg font-semibold">{result.sharpeRatio.toFixed(2)}</p>
+                </div>
+                <div className="col-span-3 flex items-center gap-4 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+                  <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: 'var(--color-bullish)' }}>
+                    <TrendingUp size={12} strokeWidth={2} />
+                    Bullish
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: 'var(--color-bearish)' }}>
+                    <TrendingDown size={12} strokeWidth={2} />
+                    Bearish
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                    <BarChart3 size={12} strokeWidth={2} />
+                    Equity Curve
+                  </span>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Win Rate</Label>
-                <p className="text-lg font-semibold">{(result.winRate * 100).toFixed(2)}%</p>
+            ) : (
+              <div
+                className="flex flex-col items-center justify-center text-center py-8"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <BarChart3 size={32} strokeWidth={1.5} className="mb-3 opacity-50" />
+                <p className="text-sm">No result yet. Run a backtest to populate charts.</p>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Profit Factor</Label>
-                <p className="text-lg font-semibold">{result.profitFactor.toFixed(2)}</p>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Max Drawdown</Label>
-                <p className="text-lg font-semibold">{(result.maxDrawdown * 100).toFixed(2)}%</p>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Total Return</Label>
-                <p className="text-lg font-semibold">{(result.totalReturn * 100).toFixed(2)}%</p>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Sharpe Ratio</Label>
-                <p className="text-lg font-semibold">{result.sharpeRatio.toFixed(2)}</p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
-      )}
+      </div>
     </div>
   );
 };
