@@ -83,6 +83,36 @@ describe('testAiConnection', () => {
     expect(result.detail).toBe('invalid x-api-key');
   });
 
+  it('routes MiniMax to the Anthropic-compatible /v1/messages endpoint', async () => {
+    const fetchMock = jest.fn().mockResolvedValue(makeResponse(200, { id: 'msg_2' }));
+    const cfg: ConnectionTestConfig = {
+      provider: 'minimax',
+      model: 'MiniMax-M3',
+      apiKey: 'mm-key',
+    };
+    const result = await testAiConnection(cfg, deps(fetchMock));
+    expect(result.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.minimax.io/anthropic/v1/messages',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'x-api-key': 'mm-key',
+          'anthropic-version': '2023-06-01',
+        }),
+      }),
+    );
+  });
+
+  it('requires an API key for MiniMax', async () => {
+    const fetchMock = jest.fn();
+    const cfg: ConnectionTestConfig = { provider: 'minimax', model: 'MiniMax-M3' };
+    const result = await testAiConnection(cfg, deps(fetchMock));
+    expect(result.ok).toBe(false);
+    expect(result.message).toMatch(/API key/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('hits the OpenAI-compatible endpoint for deepseek', async () => {
     const fetchMock = jest.fn().mockResolvedValue(makeResponse(200, {}));
     const cfg: ConnectionTestConfig = {

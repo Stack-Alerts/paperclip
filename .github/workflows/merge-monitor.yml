@@ -1,0 +1,73 @@
+name: Merge Monitor
+
+on:
+  schedule:
+    # Every hour on the hour — board directive BTCAAAAA-36465 2026-06-24 19:13Z.
+    # Routine is the autonomous fix surface for stuck merges; CEO intervention
+    # is only requested when the routine itself cannot resolve (e.g. branch policy
+    # blocked, repeated squash-merge failure).
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (log + summary only — no cancellations, no merges, no comments)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write   # squash-merge + delete-branch
+  pull-requests: write  # gh pr merge / workflow run
+
+concurrency:
+  group: merge-monitor
+  cancel-in-progress: false  # Never cancel an in-flight run; let it finish
+
+jobs:
+  monitor:
+    name: Scan OPEN PRs, cancel stale CI, squash-merge eligible PRs
+    runs-on: self-hosted
+    timeout-minutes: 30
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4.3.1
+        with:
+          fetch-depth: 0
+          clean: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        run: |
+          python3 --version
+          python3 -m pip install --upgrade pip
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install requests urllib3
+
+      - name: Run merge monitor routine
+        id: monitor
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          python3 scripts/merge_monitor.py 2>&1 | tee /tmp/merge-monitor.log
+          echo "monitor_exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Write step summary
+        if: always()
+        run: python3 scripts/_merge_monitor_summary.py
+
+      - name: Upload summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merge-monitor-output
+          path: /tmp/merge-monitor-output.json
+          if-no-files-found: ignore
+          retention-days: 7

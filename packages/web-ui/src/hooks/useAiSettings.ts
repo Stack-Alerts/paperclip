@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 export type AiProvider =
   | 'claude-code'
   | 'anthropic'
+  | 'minimax'
   | 'openai'
   | 'openrouter'
   | 'deepseek'
@@ -51,6 +52,14 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     info: 'Default pricing: $3.00/M input · $15.00/M output',
     models: CLAUDE_MODELS,
     defaultModel: 'claude-sonnet-4-6',
+  },
+  {
+    id: 'minimax',
+    label: 'MiniMax (Anthropic-compatible)',
+    requiresApiKey: true,
+    info: 'MiniMax-M3 served via the Anthropic-compatible /v1/messages endpoint. Provide the API key from your MiniMax account.',
+    models: ['MiniMax-M3'],
+    defaultModel: 'MiniMax-M3',
   },
   {
     id: 'openrouter',

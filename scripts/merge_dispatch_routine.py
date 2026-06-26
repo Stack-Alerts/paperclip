@@ -313,13 +313,26 @@ def find_in_review_issues() -> list[dict[str, Any]]:
 
 
 def extract_fix_sha_from_comments(comments: list[dict[str, Any]]) -> str | None:
-    """Extract Fix-SHA from comment list."""
+    """Extract Fix-SHA from comment list.
+
+    BTC-30048 squash-gap resilience: when a branch is force-pushed after
+    the original Fix-SHA comment lands, the older Fix-SHA references an
+    orphan commit that no remote branch contains. Prefer the LATEST
+    Fix-SHA that resolves to a remote branch; fall back to the FIRST
+    comment's SHA (original behavior) when no candidate is reachable.
+    """
+    candidates: list[str] = []
     for comment in comments:
         body = comment.get("body", "")
         match = FIX_SHA_PATTERN.search(body)
         if match:
-            return match.group(1)
-    return None
+            candidates.append(match.group(1))
+    if not candidates:
+        return None
+    for sha in reversed(candidates):
+        if find_branch_for_sha(sha):
+            return sha
+    return candidates[0]
 
 
 def sha_exists_locally(sha: str) -> bool:

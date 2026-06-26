@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic';
 const VALID_PROVIDERS: AnalyzeProvider[] = [
   'claude-code',
   'anthropic',
+  'minimax',
   'openai',
   'openrouter',
   'deepseek',

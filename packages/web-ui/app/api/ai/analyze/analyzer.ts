@@ -10,6 +10,7 @@
 export type AnalyzeProvider =
   | 'claude-code'
   | 'anthropic'
+  | 'minimax'
   | 'openai'
   | 'openrouter'
   | 'deepseek'
@@ -58,6 +59,13 @@ const OPENAI_COMPATIBLE_ENDPOINTS: Partial<Record<AnalyzeProvider, string>> = {
   openai: 'https://api.openai.com/v1/chat/completions',
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
   deepseek: 'https://api.deepseek.com/chat/completions',
+};
+
+// Anthropic-compatible /v1/messages endpoints. Both anthropic and minimax share
+// the same x-api-key + anthropic-version header shape.
+const ANTHROPIC_COMPATIBLE_ENDPOINTS: Partial<Record<AnalyzeProvider, string>> = {
+  anthropic: 'https://api.anthropic.com/v1/messages',
+  minimax: 'https://api.minimax.io/anthropic/v1/messages',
 };
 
 const OLLAMA_DEFAULT_URL = 'http://localhost:11434';
@@ -160,8 +168,13 @@ async function callAnthropic(
   req: AnalyzeRequest,
   deps: Required<AnalyzeDeps>,
 ): Promise<AnalyzeResult> {
+  const endpoint = ANTHROPIC_COMPATIBLE_ENDPOINTS[req.provider];
+  if (!endpoint) {
+    return { ok: false, error: `Unsupported Anthropic-compatible provider: ${req.provider}.` };
+  }
+  const providerLabel = req.provider === 'minimax' ? 'MiniMax' : 'Anthropic';
   const res = await withTimeout(deps.timeoutMs, (signal) =>
-    deps.fetch('https://api.anthropic.com/v1/messages', {
+    deps.fetch(endpoint, {
       method: 'POST',
       signal,
       headers: {
@@ -180,7 +193,7 @@ async function callAnthropic(
   if (!res.ok) {
     return {
       ok: false,
-      error: `Anthropic rejected the request (HTTP ${res.status}).`,
+      error: `${providerLabel} rejected the request (HTTP ${res.status}).`,
       detail: await describeError(res),
     };
   }
@@ -193,7 +206,7 @@ async function callAnthropic(
     .join('\n')
     .trim();
   if (!text) {
-    return { ok: false, error: 'Anthropic returned an empty response.' };
+    return { ok: false, error: `${providerLabel} returned an empty response.` };
   }
   return { ok: true, text };
 }
@@ -321,6 +334,7 @@ export async function analyze(
 
   const needsKey =
     req.provider === 'anthropic' ||
+    req.provider === 'minimax' ||
     req.provider === 'openai' ||
     req.provider === 'openrouter' ||
     req.provider === 'deepseek';
@@ -333,6 +347,7 @@ export async function analyze(
       case 'claude-code':
         return await resolved.runClaudeCli(req.model, req.prompt, req.payload);
       case 'anthropic':
+      case 'minimax':
         return await callAnthropic(req, resolved);
       case 'openai':
       case 'openrouter':

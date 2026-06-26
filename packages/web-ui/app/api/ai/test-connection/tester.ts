@@ -10,6 +10,7 @@
 export type TestProvider =
   | 'claude-code'
   | 'anthropic'
+  | 'minimax'
   | 'openai'
   | 'openrouter'
   | 'deepseek'
@@ -44,6 +45,13 @@ const OPENAI_COMPATIBLE_ENDPOINTS: Partial<Record<TestProvider, string>> = {
   openai: 'https://api.openai.com/v1/chat/completions',
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
   deepseek: 'https://api.deepseek.com/chat/completions',
+};
+
+// Anthropic-compatible /v1/messages endpoints. Both anthropic and minimax share
+// the same x-api-key + anthropic-version header shape.
+const ANTHROPIC_COMPATIBLE_ENDPOINTS: Partial<Record<TestProvider, string>> = {
+  anthropic: 'https://api.anthropic.com/v1/messages',
+  minimax: 'https://api.minimax.io/anthropic/v1/messages',
 };
 
 async function withTimeout<T>(
@@ -87,8 +95,13 @@ async function testAnthropic(
   cfg: ConnectionTestConfig,
   deps: Required<TesterDeps>,
 ): Promise<ConnectionTestResult> {
+  const endpoint = ANTHROPIC_COMPATIBLE_ENDPOINTS[cfg.provider];
+  if (!endpoint) {
+    return { ok: false, message: `Unsupported Anthropic-compatible provider: ${cfg.provider}.` };
+  }
+  const providerLabel = cfg.provider === 'minimax' ? 'MiniMax' : 'Anthropic';
   const res = await withTimeout(deps.timeoutMs, (signal) =>
-    deps.fetch('https://api.anthropic.com/v1/messages', {
+    deps.fetch(endpoint, {
       method: 'POST',
       signal,
       headers: {
@@ -104,11 +117,11 @@ async function testAnthropic(
     }),
   );
   if (res.ok) {
-    return { ok: true, message: `Connected to Anthropic with ${cfg.model}.` };
+    return { ok: true, message: `Connected to ${providerLabel} with ${cfg.model}.` };
   }
   return {
     ok: false,
-    message: `Anthropic rejected the request (HTTP ${res.status}).`,
+    message: `${providerLabel} rejected the request (HTTP ${res.status}).`,
     detail: await describeError(res),
   };
 }
@@ -225,6 +238,7 @@ export async function testAiConnection(
 
   const needsKey =
     cfg.provider === 'anthropic' ||
+    cfg.provider === 'minimax' ||
     cfg.provider === 'openai' ||
     cfg.provider === 'openrouter' ||
     cfg.provider === 'deepseek';
@@ -237,6 +251,7 @@ export async function testAiConnection(
       case 'claude-code':
         return await resolved.runClaudeCli(cfg.model);
       case 'anthropic':
+      case 'minimax':
         return await testAnthropic(cfg, resolved);
       case 'openai':
       case 'openrouter':
