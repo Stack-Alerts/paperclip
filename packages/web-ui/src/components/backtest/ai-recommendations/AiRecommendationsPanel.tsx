@@ -1,16 +1,22 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronDown, ChevronRight, Trash2, GripVertical, X, ExternalLink } from 'lucide-react';
 import { BacktestResult, Strategy, Trade } from '@/lib/strategy-builder/types';
 import { useAiSettings } from '@/hooks/useAiSettings';
 import { useAiProviderAvailability } from '@/hooks/useAiProviderAvailability';
 import { useAiRecsHistory, AiRecsHistoryEntry, AiRecsHistoryStatus } from '@/hooks/useAiRecsHistory';
-import { AiProviderStatusBanner } from './AiProviderStatusBanner';
 import {
   executeApply,
   type ApplyOrchestratorDeps,
 } from './applyOrchestrator';
+import {
+  classifyPreflight,
+  scrollToBacktestButton,
+  DEFAULT_SETTINGS_HREF,
+  type PreflightError,
+} from './preflightValidation';
 import { ReverseViewBanner } from './ReverseViewBanner';
 import {
   DEFAULT_CONFIDENCE_FLOOR,
@@ -68,6 +74,13 @@ const AWAITING_PROVIDER_ETA_SECONDS = 30;
 
 // AC10: how long the green "Applied" banner stays visible before fading out.
 const APPLY_SUCCESS_DISMISS_MS = 3000;
+
+// BTCAAAAA-38466 (Stream 5, B2) — hard ceiling on a single analyze request.
+// Past this we surface the timeout banner with a Retry button instead of
+// leaving the user waiting on a stalled provider. Mirrors
+// AWAITING_PROVIDER_ETA_SECONDS so the visible ETA and the abort trip stay
+// in sync.
+const PREFLIGHT_TIMEOUT_MS = 30_000;
 
 // BTCAAAAA-36917 v4 UX: hardcoded sample payload for the empty-state
 // "Preview the new layout" + "Load demo data" affordances. The preview card
@@ -1908,8 +1921,23 @@ export function AiRecommendationsPanel({
 }: AiRecommendationsPanelProps = {}) {
   const hasTrades = (result?.trades?.length ?? 0) > 0;
   const { settings, hydrated: aiSettingsHydrated } = useAiSettings();
-  const { hasProvider } = useAiProviderAvailability();
+  const { hasProvider, providerLabel } = useAiProviderAvailability();
   const history = useAiRecsHistory();
+  const router = useRouter();
+
+  // BTCAAAAA-38466 (Stream 5, B2) — preflight validation state. The classifier
+  // (preflightValidation.ts) is pure; we feed it the hydrated flags plus the
+  // most-recent request error + duration + raw response + parse result. Each
+  // failure mode (no-trades / no-provider / timeout / unparseable) renders
+  // its own banner with a one-click affordance.
+  const [lastPreflightError, setLastPreflightError] = useState<PreflightError | null>(null);
+  const [lastPreflightDurationMs, setLastPreflightDurationMs] = useState<number | null>(null);
+  const [lastRawResponse, setLastRawResponse] = useState<string | null>(null);
+  const [lastParseResult, setLastParseResult] = useState<{ diagnosis: string; recommendations: string } | null>(null);
+  // Distinguishes a user-driven abort (handleCancel) from a 30s timeout.
+  // Without this ref both paths surface as a generic "request cancelled"
+  // message and the timeout banner never fires.
+  const timedOutRef = useRef(false);
 
 const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   useEffect(() => {
@@ -2345,6 +2373,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
       }
       const controller = new AbortController();
       abortRef.current = controller;
+      timedOutRef.current = false;
 
       setPhase('building-request');
       await new Promise((r) => setTimeout(r, 0));
@@ -2399,6 +2428,16 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
         blockCatalog,
       });
 
+      // BTCAAAAA-38466 (Stream 5, B2) — hard 30s timeout. Fires only if
+      // neither the response nor a user cancel arrives first. The flag on
+      // timedOutRef is what the catch block uses to distinguish a
+      // provider-stall timeout from a user-driven cancel (both surface as
+      // an AbortError otherwise).
+      const timeoutId = setTimeout(() => {
+        timedOutRef.current = true;
+        controller.abort();
+      }, PREFLIGHT_TIMEOUT_MS);
+
       try {
         const res = await fetch('/api/ai/analyze', {
           method: 'POST',
@@ -2414,6 +2453,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           }),
           signal: controller.signal,
         });
+        clearTimeout(timeoutId);
         const data = (await res.json()) as {
           ok: boolean;
           text?: string;
@@ -2421,6 +2461,15 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           detail?: string;
         };
         if (!res.ok || !data.ok) {
+          // BTCAAAAA-38466 — feed the HTTP failure into the preflight
+          // classifier so generic HTTP errors fall through to the existing
+          // analysisError banner, but anything that *would* be a timeout
+          // is classified correctly.
+          setLastPreflightError({
+            kind: res.status === 408 || res.status === 504 ? 'timeout' : 'http',
+            message: data.error ?? `The analyze endpoint returned HTTP ${res.status}.`,
+          });
+          setLastPreflightDurationMs(Date.now() - sentAt);
           setAnalysisError(
             data.error ?? `The analyze endpoint returned HTTP ${res.status}.`,
           );
@@ -2430,6 +2479,16 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           return;
         }
         const parsed = parseAnalysisResponse(data.text ?? '');
+        // BTCAAAAA-38466 — detect an unparseable model reply before
+        // clearing preflight state. parseAnalysisResponse falls back to
+        // "use the full text as diagnosis" so we need to compare parsed
+        // sections to the raw length to know whether the model actually
+        // produced a structured reply.
+        setLastRawResponse(parsed.raw);
+        setLastParseResult({
+          diagnosis: parsed.diagnosis,
+          recommendations: parsed.recommendations,
+        });
         // BTCAAAAA-36917 v4 UX: real AI response — clear any preview/demo
         // affordances so the user lands on the genuine analysis.
         setPreviewMode(false);
@@ -2462,9 +2521,32 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           dismissTimerRef.current = null;
         }, 1200);
       } catch (err) {
+        clearTimeout(timeoutId);
         if (err instanceof DOMException && err.name === 'AbortError') {
-          setAnalysisError('Request cancelled.');
+          if (timedOutRef.current) {
+            // BTCAAAAA-38466 — provider stalled past PREFLIGHT_TIMEOUT_MS.
+            // Record the timeout so classifyPreflight emits the timeout
+            // banner with a Retry button. We do NOT set analysisError
+            // here so the existing analysisError banner doesn't compete
+            // with the new one.
+            setLastPreflightError({
+              kind: 'timeout',
+              message: `The AI provider did not respond in ${Math.round(PREFLIGHT_TIMEOUT_MS / 1000)}s.`,
+            });
+            setLastPreflightDurationMs(Date.now() - sentAt);
+          } else {
+            setAnalysisError('Request cancelled.');
+          }
         } else {
+          // BTCAAAAA-38466 — generic fetch failure (DNS, CORS, server
+          // crash). Surface via the existing analysisError banner; the
+          // preflight classifier will fall through to "none" because the
+          // kind is not timeout.
+          setLastPreflightError({
+            kind: 'network',
+            message: err instanceof Error ? err.message : 'The analyze request failed.',
+          });
+          setLastPreflightDurationMs(Date.now() - sentAt);
           setAnalysisError(
             err instanceof Error ? err.message : 'The analyze request failed.',
           );
@@ -2700,6 +2782,84 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   );
 
   const canSend = hasTrades && hasProvider && !analyzing && aiSettingsHydrated;
+
+  // BTCAAAAA-38466 (Stream 5, B2) — pure classifier over the live context.
+  // Returns one of 5 PreflightState variants; the JSX below maps each to a
+  // distinct banner with a one-click affordance.
+  const preflightState = useMemo(
+    () =>
+      classifyPreflight({
+        hydrated: aiSettingsHydrated,
+        hasTrades,
+        hasProvider,
+        providerLabel: providerLabel || settings.provider,
+        lastError: lastPreflightError,
+        lastDurationMs: lastPreflightDurationMs,
+        lastRawResponse,
+        lastParseResult,
+      }),
+    [
+      aiSettingsHydrated,
+      hasTrades,
+      hasProvider,
+      providerLabel,
+      settings.provider,
+      lastPreflightError,
+      lastPreflightDurationMs,
+      lastRawResponse,
+      lastParseResult,
+    ],
+  );
+
+  // BTCAAAAA-38466 — banner affordances. Each handler is intentionally
+  // tiny: scroll-to-backtest uses the existing InfoTooltip id, settings
+  // navigation uses next/navigation, retry re-runs runApproveAndSend, and
+  // copy-unparseable writes the raw response to the clipboard with a
+  // textarea fallback for older browsers.
+  const handleRunBacktestClick = useCallback(() => {
+    scrollToBacktestButton();
+  }, []);
+
+  const handleOpenSettingsClick = useCallback(() => {
+    router.push(DEFAULT_SETTINGS_HREF);
+  }, [router]);
+
+  const handleRetryClick = useCallback(() => {
+    // Clear the timeout markers so classifyPreflight returns to "none" on
+    // next paint, then kick off a fresh send using the most recent goal.
+    setLastPreflightError(null);
+    setLastPreflightDurationMs(null);
+    void runApproveAndSend(optimizationGoal);
+  }, [runApproveAndSend, optimizationGoal]);
+
+  const [copyUnparseableFeedback, setCopyUnparseableFeedback] = useState(false);
+  const handleCopyUnparseableClick = useCallback(async () => {
+    const text =
+      preflightState.kind === 'unparseable' ? preflightState.raw : '';
+    if (!text) return;
+    try {
+      if (
+        typeof navigator !== 'undefined' &&
+        navigator.clipboard &&
+        typeof navigator.clipboard.writeText === 'function'
+      ) {
+        await navigator.clipboard.writeText(text);
+      } else if (typeof document !== 'undefined') {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopyUnparseableFeedback(true);
+      window.setTimeout(() => setCopyUnparseableFeedback(false), 1500);
+    } catch {
+      // best-effort copy; silent fail keeps the button click non-blocking
+    }
+  }, [preflightState]);
 
   // BTCAAAAA-37773 / Sprint A1 — Re-analyze button dirty-hash gating.
   const currentHash = useMemo(
@@ -3058,10 +3218,17 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
         </div>
       )}
 
-      {/* Pre-flight validation banners */}
-      {aiSettingsHydrated && !hasTrades && (
+      {/* BTCAAAAA-38466 (Stream 5, B2) — preflight validation banners. The
+          classifier is the single source of truth for which banner to
+          render. Each variant ships its own one-click affordance:
+            no-trades    → scroll the Run Backtest button into view
+            no-provider  → push the user to Settings → AI
+            timeout      → retry the most recent request
+            unparseable  → copy the raw reply so the user can paste
+                           it into another tool manually */}
+      {preflightState.kind === 'no-trades' && (
         <div
-          className="rounded p-2 text-xs"
+          className="rounded p-2 text-xs flex items-start justify-between gap-2"
           role="status"
           data-testid="ai-recs-no-trades-warning"
           style={{
@@ -3070,15 +3237,128 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
             border: '1px solid var(--accent-orange)',
           }}
         >
-          No trades recorded — run a backtest first before sending to AI.
+          <div>
+            <p className="font-semibold">No trades recorded</p>
+            <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>
+              Run a backtest first before sending to AI.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleRunBacktestClick}
+            data-testid="ai-recs-no-trades-action"
+            className="px-2 py-1 rounded text-[11px] font-medium shrink-0"
+            style={{
+              background: 'var(--accent-orange)',
+              color: 'var(--text-on-accent, #fff)',
+              border: '1px solid var(--accent-orange)',
+              cursor: 'pointer',
+            }}
+          >
+            Run Backtest
+          </button>
         </div>
       )}
-      {/* BTCAAAAA-38464 (Stream 3, H1): replaces the prior static warning with
-          a one-click "Why is AI off?" banner that routes to Settings → AI. The
-          banner component owns its own `hydrated && !hasProvider` gate so the
-          panel just needs to render it unconditionally — it returns null when
-          the provider IS configured (or before hydration completes). */}
-      <AiProviderStatusBanner />
+      {preflightState.kind === 'no-provider' && (
+        <div
+          className="rounded p-2 text-xs flex items-start justify-between gap-2"
+          role="status"
+          data-testid="ai-recs-no-provider-warning"
+          style={{
+            background: 'var(--bg-elevated)',
+            color: 'var(--accent-orange)',
+            border: '1px solid var(--accent-orange)',
+          }}
+        >
+          <div>
+            <p className="font-semibold">No AI provider configured</p>
+            <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>
+              {preflightState.providerLabel} is not set up. Open Settings → AI to configure one.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenSettingsClick}
+            data-testid="ai-recs-no-provider-action"
+            className="px-2 py-1 rounded text-[11px] font-medium shrink-0"
+            style={{
+              background: 'var(--accent-orange)',
+              color: 'var(--text-on-accent, #fff)',
+              border: '1px solid var(--accent-orange)',
+              cursor: 'pointer',
+            }}
+          >
+            Open Settings
+          </button>
+        </div>
+      )}
+      {preflightState.kind === 'timeout' && (
+        <div
+          className="rounded p-2 text-xs flex items-start justify-between gap-2"
+          role="status"
+          data-testid="ai-recs-timeout-warning"
+          style={{
+            background: 'var(--bg-elevated)',
+            color: 'var(--accent-orange)',
+            border: '1px solid var(--accent-orange)',
+          }}
+        >
+          <div>
+            <p className="font-semibold">AI provider timed out</p>
+            <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>
+              The provider did not respond in{' '}
+              {Math.round((preflightState.durationMs || PREFLIGHT_TIMEOUT_MS) / 1000)}s.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleRetryClick}
+            data-testid="ai-recs-timeout-action"
+            className="px-2 py-1 rounded text-[11px] font-medium shrink-0"
+            style={{
+              background: 'var(--accent-orange)',
+              color: 'var(--text-on-accent, #fff)',
+              border: '1px solid var(--accent-orange)',
+              cursor: 'pointer',
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      {preflightState.kind === 'unparseable' && (
+        <div
+          className="rounded p-2 text-xs flex items-start justify-between gap-2"
+          role="status"
+          data-testid="ai-recs-unparseable-warning"
+          style={{
+            background: 'var(--bg-elevated)',
+            color: 'var(--accent-orange)',
+            border: '1px solid var(--accent-orange)',
+          }}
+        >
+          <div>
+            <p className="font-semibold">Provider response could not be parsed</p>
+            <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>
+              The provider replied, but the response did not include a DIAGNOSIS or RECOMMENDATIONS section. Copy the raw reply and paste it into another tool if you need it.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopyUnparseableClick}
+            data-testid="ai-recs-unparseable-action"
+            className="px-2 py-1 rounded text-[11px] font-medium shrink-0"
+            style={{
+              background: 'var(--accent-orange)',
+              color: 'var(--text-on-accent, #fff)',
+              border: '1px solid var(--accent-orange)',
+              cursor: 'pointer',
+            }}
+          >
+            {copyUnparseableFeedback ? 'Copied' : 'Copy Response'}
+          </button>
+        </div>
+      )}
 
       {/* Action buttons */}
       <div className="flex items-center gap-2 justify-end mt-1 flex-wrap">
