@@ -1249,6 +1249,7 @@ function toCardData(rec: ParsedRec, ctx: {
   isAutoApplicable: boolean;
   onToggleApplied: () => void;
   preApplySnapshots: ReadonlyArray<[string, Strategy]>;
+  analysisId: string;
 }): RecommendationCardData {
   const delta = projectedImpactFromRecRaw(rec.raw);
   const { label: deltaLabel, negative: deltaNegative } = formatDeltaLabel(delta);
@@ -1305,6 +1306,7 @@ function toCardData(rec: ParsedRec, ctx: {
       'data-applied': ctx.applied ? 'true' : 'false',
       'data-auto-applicable': ctx.isAutoApplicable ? 'true' : 'false',
     },
+    analysisId: ctx.analysisId,
   };
 }
 
@@ -3898,6 +3900,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
               </ul>
             )}
             <RecommendationsRow
+              analysisId={lastAnalysisHash ?? strategy?.id ?? ''}
               recommendations={parsedRecs.map((rec) => {
                 const isApplied = appliedRecIds.includes(rec.id);
                 const isApplyingThis = perTileApplying.includes(rec.id);
@@ -3912,6 +3915,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
                     handleToggleRec(rec);
                   },
                   preApplySnapshots,
+                  analysisId: lastAnalysisHash ?? strategy?.id ?? '',
                 });
               })}
             />

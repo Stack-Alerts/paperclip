@@ -4,12 +4,18 @@ import { RecommendationCard, RecommendationCardData } from './RecommendationCard
 
 export interface RecommendationsRowProps {
   recommendations: RecommendationCardData[];
+  /**
+   * Stable identifier for the analysis that produced this batch of
+   * recommendations. Passed through to every card so per-card feedback
+   * keys are scoped to the same analysis. See BTCAAAAA-38468.
+   */
+  analysisId: string;
 }
 
 const MIN_CARD_PX = 248;
 const COLUMN_GAP_PX = 12;
 
-export function RecommendationsRow({ recommendations }: RecommendationsRowProps) {
+export function RecommendationsRow({ recommendations, analysisId }: RecommendationsRowProps) {
   return (
     <div
       data-testid="recommendations-row"
@@ -21,7 +27,7 @@ export function RecommendationsRow({ recommendations }: RecommendationsRowProps)
       }}
     >
       {recommendations.map((rec) => (
-        <RecommendationCard key={rec.id} {...rec} />
+        <RecommendationCard key={rec.id} {...rec} analysisId={analysisId} />
       ))}
     </div>
   );

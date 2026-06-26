@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { FeedbackValue, setFeedback as persistFeedback } from '@/components/backtest/ai-recommendations/feedbackCapture';
 
 export type AiRecsHistoryStatus = 'new' | 'applied' | 'dismissed';
 
@@ -104,6 +105,13 @@ export interface UseAiRecsHistoryResult {
   updateNotes: (id: string, notes: string) => void;
   deleteEntry: (id: string) => void;
   clear: () => void;
+  /**
+   * Stream 7 (BTCAAAAA-38468) write path. Persists per-card thumbs-up/down
+   * feedback for the given analysis+rec IDs to sessionStorage. Frontend-only
+   * by design — no network call. The hook is the canonical write path so
+   * the panel does not import feedbackCapture directly.
+   */
+  setFeedback: (analysisId: string, recId: string, value: FeedbackValue) => void;
 }
 
 export function useAiRecsHistory(): UseAiRecsHistoryResult {
@@ -180,5 +188,21 @@ export function useAiRecsHistory(): UseAiRecsHistoryResult {
     persist([]);
   }, []);
 
-  return { entries, hydrated, add, updateStatus, updateNotes, deleteEntry, clear };
+  const setFeedback = useCallback<UseAiRecsHistoryResult['setFeedback']>(
+    (analysisId, recId, value) => {
+      persistFeedback(analysisId, recId, value);
+    },
+    [],
+  );
+
+  return {
+    entries,
+    hydrated,
+    add,
+    updateStatus,
+    updateNotes,
+    deleteEntry,
+    clear,
+    setFeedback,
+  };
 }

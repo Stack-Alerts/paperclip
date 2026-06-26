@@ -4,6 +4,7 @@ import { RecommendationsRow } from './RecommendationsRow';
 import { RecommendationCategoryId } from './recommendationCategoryPalette';
 
 const SAMPLE_CODE = ['side = long', 'tp_ratio = 1.5x', 'risk_pct = 0.25'];
+const SAMPLE_ANALYSIS_ID = 'storybook-analysis-fixture';
 
 function makeRec(
   id: string,
@@ -22,6 +23,7 @@ function makeRec(
     applied: false,
     onToggleApplied: () => undefined,
     onApplyOnChart: () => undefined,
+    analysisId: SAMPLE_ANALYSIS_ID,
   };
 }
 
@@ -46,7 +48,7 @@ function StatefulRow({ initialApplied = [] as string[] }: { initialApplied?: str
         return copy;
       }),
   }));
-  return <RecommendationsRow recommendations={recs} />;
+  return <RecommendationsRow recommendations={recs} analysisId={SAMPLE_ANALYSIS_ID} />;
 }
 
 const meta = {

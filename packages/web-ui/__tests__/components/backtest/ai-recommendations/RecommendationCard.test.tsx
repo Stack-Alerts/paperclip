@@ -3,6 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { RecommendationCard, RecommendationCardData } from '@/components/backtest/ai-recommendations/RecommendationCard';
 import { RecommendationsRow } from '@/components/backtest/ai-recommendations/RecommendationsRow';
 
+const SAMPLE_ANALYSIS_ID = 'test-analysis-fixture';
+
 function makeProps(overrides: Partial<RecommendationCardData> = {}): RecommendationCardData {
   return {
     id: 'r1',
@@ -14,6 +16,7 @@ function makeProps(overrides: Partial<RecommendationCardData> = {}): Recommendat
     applied: false,
     onToggleApplied: jest.fn(),
     onApplyOnChart: jest.fn(),
+    analysisId: SAMPLE_ANALYSIS_ID,
     ...overrides,
   };
 }
@@ -61,7 +64,7 @@ describe('RecommendationsRow', () => {
       makeProps({ id: 'b', title: 'B', categoryId: 'entry' }),
       makeProps({ id: 'c', title: 'C', categoryId: 'exit' }),
     ];
-    render(<RecommendationsRow recommendations={recs} />);
+    render(<RecommendationsRow recommendations={recs} analysisId={SAMPLE_ANALYSIS_ID} />);
     expect(screen.getByTestId('rec-card-a')).toBeInTheDocument();
     expect(screen.getByTestId('rec-card-b')).toBeInTheDocument();
     expect(screen.getByTestId('rec-card-c')).toBeInTheDocument();
@@ -69,7 +72,7 @@ describe('RecommendationsRow', () => {
 
   it('uses a CSS grid with auto-fit columns so it wraps below 1440 px', () => {
     const recs = [makeProps({ id: 'a' })];
-    render(<RecommendationsRow recommendations={recs} />);
+    render(<RecommendationsRow recommendations={recs} analysisId={SAMPLE_ANALYSIS_ID} />);
     const row = screen.getByTestId('recommendations-row');
     const style = row.getAttribute('style') ?? '';
     expect(style).toContain('grid-template-columns');
