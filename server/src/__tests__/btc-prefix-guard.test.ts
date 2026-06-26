@@ -21,9 +21,9 @@ describe("extractBtcPrefixTokens", () => {
     ]);
   });
 
-  it("does not match tokens with fewer than 4 digits", () => {
-    expect(extractBtcPrefixTokens("BTC-12 is too short")).toEqual([]);
-    expect(extractBtcPrefixTokens("BTC-1 nope")).toEqual([]);
+  it("matches tokens with fewer than 4 digits (early issue numbers must also be caught)", () => {
+    expect(extractBtcPrefixTokens("BTC-12 is an early issue")).toEqual(["BTC-12"]);
+    expect(extractBtcPrefixTokens("BTC-1 is the first")).toEqual(["BTC-1"]);
   });
 
   it("does not match tokens with more than 6 digits", () => {
@@ -68,7 +68,11 @@ describe("suggestedFullForm", () => {
   it("returns null for non-conforming tokens", () => {
     expect(suggestedFullForm("BTCAAAAA-1234")).toBeNull();
     expect(suggestedFullForm("BTC-EUR")).toBeNull();
-    expect(suggestedFullForm("BTC-12")).toBeNull();
+  });
+
+  it("normalizes short-number tokens like BTC-12 (early issues)", () => {
+    expect(suggestedFullForm("BTC-12")).toBe("BTCAAAAA-12");
+    expect(suggestedFullForm("BTC-1")).toBe("BTCAAAAA-1");
   });
 });
 
@@ -178,6 +182,30 @@ describe("enforceBtcPrefixTokens", () => {
     });
     expect(result).toEqual({ ok: true });
     expect(calls).toBe(0);
+  });
+
+  it("uses explicit companyId over actor when both are provided", async () => {
+    const seen: Array<{ candidate: string; cid: string }> = [];
+    const result = await enforceBtcPrefixTokens({
+      text: "see BTC-9999",
+      companyId: "explicit-company",
+      actor: { type: "board", companyIds: ["other-company"] },
+      lookup: async (candidate, cid) => {
+        seen.push({ candidate, cid });
+        return { exists: true };
+      },
+    });
+    expect(result).toEqual({ ok: true });
+    expect(seen[0].cid).toBe("explicit-company");
+  });
+
+  it("uses explicit companyId without actor (multi-company board user scenario)", async () => {
+    const result = await enforceBtcPrefixTokens({
+      text: "see BTC-9999",
+      companyId: "target-company",
+      lookup: async (_candidate, cid) => ({ exists: cid === "target-company" }),
+    });
+    expect(result).toEqual({ ok: true });
   });
 
   it("deduplicates lookups for repeated tokens", async () => {

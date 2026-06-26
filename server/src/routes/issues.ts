@@ -5643,7 +5643,7 @@ export function issueRoutes(
     if (typeof req.body?.comment === "string" && req.body.comment.length > 0) {
       const btcGuardResult = await enforceBtcPrefixTokens({
         text: req.body.comment,
-        actor: req.actor,
+        companyId: existing.companyId,
         lookup: async (candidate, cid) => {
           const row = await svc.getByIdentifier(candidate);
           return { exists: !!row && row.companyId === cid };
@@ -7500,7 +7500,7 @@ export function issueRoutes(
     if (typeof req.body?.body === "string" && req.body.body.length > 0) {
       const btcGuardResult = await enforceBtcPrefixTokens({
         text: req.body.body,
-        actor: req.actor,
+        companyId: issue.companyId,
         lookup: async (candidate, cid) => {
           const row = await svc.getByIdentifier(candidate);
           return { exists: !!row && row.companyId === cid };

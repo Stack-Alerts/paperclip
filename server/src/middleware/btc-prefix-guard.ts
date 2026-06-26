@@ -1,6 +1,6 @@
 import type { Response } from "express";
 
-const BTC_PREFIX_TOKEN_RE = /\bBTC-(\d{4,6})\b/g;
+const BTC_PREFIX_TOKEN_RE = /\bBTC-(\d{1,6})\b/g;
 export const BTC_FULL_PREFIX = "BTCAAAAA";
 
 export type BtcPrefixActorContext = {
@@ -43,23 +43,28 @@ export function pickActorCompanyId(actor: BtcPrefixActorContext | null | undefin
 }
 
 export function suggestedFullForm(token: string, fullPrefix: string = BTC_FULL_PREFIX): string | null {
-  const numeric = /^BTC-(\d{4,6})$/.exec(token)?.[1];
+  const numeric = /^BTC-(\d{1,6})$/.exec(token)?.[1];
   if (!numeric) return null;
   return `${fullPrefix}-${numeric}`;
 }
 
 export async function enforceBtcPrefixTokens(params: {
   text: string | null | undefined;
-  actor: BtcPrefixActorContext | null | undefined;
+  /** Explicit company scope for validation. Takes precedence over actor when set. */
+  companyId?: string | null;
+  actor?: BtcPrefixActorContext | null | undefined;
   lookup: BtcPrefixLookup;
   fullPrefix?: string;
 }): Promise<BtcPrefixGuardResult> {
-  const { text, actor, lookup } = params;
+  const { text, lookup } = params;
   const fullPrefix = params.fullPrefix ?? BTC_FULL_PREFIX;
   const tokens = extractBtcPrefixTokens(text);
   if (tokens.length === 0) return { ok: true };
 
-  const companyId = pickActorCompanyId(actor);
+  const companyId =
+    typeof params.companyId === "string" && params.companyId.length > 0
+      ? params.companyId
+      : pickActorCompanyId(params.actor);
   if (!companyId) {
     return { ok: true };
   }
