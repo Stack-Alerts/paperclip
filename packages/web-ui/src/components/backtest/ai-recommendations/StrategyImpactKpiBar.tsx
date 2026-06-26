@@ -2,10 +2,16 @@
 
 // BTCAAAAA-37774 Sprint A2 — Strategy Impact KPI bar.
 //
-// Four tiles (WR · Net Liquidity · DD/PF · Entries) showing before → after
-// values and a delta strip, plus a far-right "<n> applied" chip and a
-// Preview/Confirmed indicator that flips after a 250ms debounced
+// Four tiles (Win Rate · Max Drawdown · Net PnL · Trades) showing
+// before → after values and a delta strip, plus a far-right "<n> applied"
+// chip and a Preview/Confirmed indicator that flips after a 250ms debounced
 // re-backtest stub (Sprint B/B4 ships the real endpoint).
+//
+// Label set aligned to mockup BTCAAAAA-38517: the prior "DD · PF"
+// dual-row tile (maxDrawdown + profitFactor) was simplified to a single
+// "Max Drawdown" tile to match the board-supplied mockup. "Net Liquidity"
+// was renamed "Net PnL" and "Entries" was renamed "Trades" — the
+// underlying KpiSet fields are unchanged.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -17,7 +23,6 @@ import {
   formatCurrency,
   formatInteger,
   formatPercent,
-  formatRatio,
   rebacktestStub,
   sumDeltas,
 } from './strategyImpactKpi';
@@ -37,18 +42,13 @@ export interface StrategyImpactKpiBarProps {
 }
 
 interface TileSpec {
-  id: 'wr' | 'net-liquidity' | 'dd-pf' | 'entries';
+  id: 'wr' | 'max-drawdown' | 'net-pnl' | 'trades';
   label: string;
   format: (v: number) => string;
-  format2?: (v: number) => string;
   pick: (k: KpiSet) => number;
-  pick2?: (k: KpiSet) => number;
   delta: (d: ProjectedDelta) => number;
-  delta2?: (d: ProjectedDelta) => number;
   formatDelta: (d: number) => string;
-  formatDelta2?: (d: number) => string;
   higherIsBetter: boolean;
-  higherIsBetter2?: boolean;
 }
 
 const TILES: TileSpec[] = [
@@ -62,8 +62,17 @@ const TILES: TileSpec[] = [
     higherIsBetter: true,
   },
   {
-    id: 'net-liquidity',
-    label: 'Net Liquidity',
+    id: 'max-drawdown',
+    label: 'Max Drawdown',
+    format: (v) => formatPercent(v, 1),
+    pick: (k) => k.maxDrawdown,
+    delta: (d) => d.maxDrawdown ?? 0,
+    formatDelta: (d) => `${d >= 0 ? '+' : ''}${(d * 100).toFixed(1)}pp`,
+    higherIsBetter: false,
+  },
+  {
+    id: 'net-pnl',
+    label: 'Net PnL',
     format: (v) => formatCurrency(v),
     pick: (k) => k.netLiquidity,
     delta: (d) => d.netLiquidity ?? 0,
@@ -71,22 +80,8 @@ const TILES: TileSpec[] = [
     higherIsBetter: true,
   },
   {
-    id: 'dd-pf',
-    label: 'DD · PF',
-    format: (v) => formatPercent(v, 1),
-    format2: (v) => formatRatio(v, 2),
-    pick: (k) => k.maxDrawdown,
-    pick2: (k) => k.profitFactor,
-    delta: (d) => d.maxDrawdown ?? 0,
-    delta2: (d) => d.profitFactor ?? 0,
-    formatDelta: (d) => `${d >= 0 ? '+' : ''}${(d * 100).toFixed(1)}pp`,
-    formatDelta2: (d) => `${d >= 0 ? '+' : ''}${d.toFixed(2)}`,
-    higherIsBetter: false,
-    higherIsBetter2: true,
-  },
-  {
-    id: 'entries',
-    label: 'Entries',
+    id: 'trades',
+    label: 'Trades',
     format: (v) => formatInteger(v),
     pick: (k) => k.entries,
     delta: (d) => d.entries ?? 0,
@@ -285,15 +280,6 @@ export function StrategyImpactKpiBar({
           const delta1 = after1 - before1;
           const dir1 = deltaDirection(delta1, tile.higherIsBetter);
 
-          const before2 = tile.pick2?.(baseline);
-          const after2 = tile.pick2?.(after);
-          const delta2 =
-            before2 !== undefined && after2 !== undefined ? after2 - before2 : null;
-          const dir2 =
-            delta2 !== null && tile.higherIsBetter2 !== undefined
-              ? deltaDirection(delta2, tile.higherIsBetter2)
-              : null;
-
           return (
             <div
               key={tile.id}
@@ -336,35 +322,6 @@ export function StrategyImpactKpiBar({
                 label={tile.formatDelta(delta1)}
                 testId={`strategy-impact-${tile.id}-delta`}
               />
-
-              {tile.format2 && before2 !== undefined && after2 !== undefined && delta2 !== null && dir2 && (
-                <div className="mt-1 pt-1" style={{ borderTop: '1px dashed var(--border)' }}>
-                  <div className="flex items-baseline gap-1 flex-wrap">
-                    <span
-                      className="text-[11px] font-mono"
-                      style={{ color: 'var(--text-muted)' }}
-                      data-testid={`strategy-impact-${tile.id}-before2`}
-                    >
-                      {tile.format2(before2)}
-                    </span>
-                    <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
-                      →
-                    </span>
-                    <span
-                      className="text-sm font-mono font-semibold"
-                      style={{ color: 'var(--text-secondary)' }}
-                      data-testid={`strategy-impact-${tile.id}-after2`}
-                    >
-                      {tile.format2(after2)}
-                    </span>
-                  </div>
-                  <DeltaChip
-                    direction={dir2}
-                    label={tile.formatDelta2?.(delta2) ?? ''}
-                    testId={`strategy-impact-${tile.id}-delta2`}
-                  />
-                </div>
-              )}
             </div>
           );
         })}
