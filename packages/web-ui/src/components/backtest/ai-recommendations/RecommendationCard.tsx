@@ -102,7 +102,7 @@ export function RecommendationCard({
           </span>
           {conflictBadge && (
             <span
-              data-testid={`rec-card-${id}-conflict`}
+              data-testid="ai-recs-conflict-badge"
               data-conflict-loser="true"
               className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
               style={{
@@ -189,6 +189,10 @@ export function RecommendationCard({
             style={{ color: 'var(--text-muted)', cursor: disabled ? 'not-allowed' : 'pointer' }}
           >
             <span>Apply</span>
+            {/* testability marker — hidden visually, read by tests via data-testid */}
+            <span data-testid="ai-recs-toggle-badge" style={{ display: 'none' }}>
+              {applied ? 'ON' : 'OFF'}
+            </span>
             <span style={{ position: 'relative', display: 'inline-block', width: 28, height: 16 }}>
               <input
                 type="checkbox"

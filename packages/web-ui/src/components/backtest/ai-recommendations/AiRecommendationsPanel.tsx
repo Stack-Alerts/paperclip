@@ -15,6 +15,7 @@ import {
   readIsAdminFromAuthToken,
 } from './cacheUtils';
 import { CollapsibleSection, PreviewText } from './CollapsibleSection';
+import { detectConflicts } from './conflictDetector';
 import {
   formatStrategyConfig,
   formatBacktestConfig,
@@ -2211,23 +2212,42 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
             )}
             <RecommendationsRow
               analysisId={lastAnalysisHash ?? strategy?.id ?? ''}
-              recommendations={parsedRecs.map((rec) => {
-                const isApplied = appliedRecIds.includes(rec.id);
-                const isApplyingThis = perTileApplying.includes(rec.id);
-                const isStructural = STRUCTURAL_TYPES.has((rec.type ?? '').toUpperCase());
-                const isAutoApplicable = isStructural || !!(rec.parameter && rec.suggestedValue);
-                return toCardData(rec, {
-                  applied: isApplied,
-                  isApplyingThis,
-                  isAutoApplicable,
-                  onToggleApplied: () => {
-                    if (!strategy?.id || isApplyingThis || !isAutoApplicable) return;
-                    handleToggleRec(rec);
-                  },
-                  preApplySnapshots,
-                  analysisId: lastAnalysisHash ?? strategy?.id ?? '',
+              recommendations={(() => {
+                const conflictMap = detectConflicts(parsedRecs);
+                return parsedRecs.map((rec) => {
+                  const isApplied = appliedRecIds.includes(rec.id);
+                  const isApplyingThis = perTileApplying.includes(rec.id);
+                  const isStructural = STRUCTURAL_TYPES.has((rec.type ?? '').toUpperCase());
+                  const isAutoApplicable = isStructural || !!(rec.parameter && rec.suggestedValue);
+                  const recConflict = conflictMap.get(rec.id);
+                  const isConflictLoser = !!recConflict?.isConflictLoser;
+                  const base = toCardData(rec, {
+                    applied: isApplied,
+                    isApplyingThis,
+                    isAutoApplicable,
+                    onToggleApplied: () => {
+                      if (!strategy?.id || isApplyingThis || !isAutoApplicable || isConflictLoser) return;
+                      handleToggleRec(rec);
+                    },
+                    preApplySnapshots,
+                    analysisId: lastAnalysisHash ?? strategy?.id ?? '',
+                  });
+                  if (!isConflictLoser) {
+                    return { ...base, dataAttributes: { ...base.dataAttributes, 'data-conflict-loser': 'false' } };
+                  }
+                  return {
+                    ...base,
+                    disabled: true,
+                    conflictBadge: { label: 'Conflict', tooltip: recConflict?.conflictTooltip ?? '' },
+                    dataAttributes: {
+                      ...base.dataAttributes,
+                      'data-conflict-loser': 'true',
+                      'aria-disabled': 'true',
+                      title: recConflict?.conflictTooltip ?? '',
+                    },
+                  };
                 });
-              })}
+              })()}
             />
           </div>
         )}

@@ -3,6 +3,19 @@ import { render, screen, fireEvent, waitFor, act, cleanup, within } from '@testi
 import { AiRecommendationsPanel } from '@/components/backtest/ai-recommendations/AiRecommendationsPanel';
 import type { BacktestResult, Strategy, Trade } from '@/lib/strategy-builder/types';
 
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+    back: jest.fn(),
+    forward: jest.fn(),
+    refresh: jest.fn(),
+  })),
+  usePathname: jest.fn(() => '/'),
+  useSearchParams: jest.fn(() => new URLSearchParams()),
+}));
+
 jest.mock('@/hooks/useAiSettings', () => ({
   useAiSettings: jest.fn(),
   // BTCAAAAA-38469 — conflict-guard tests need getProviderMeta to resolve
@@ -104,6 +117,14 @@ beforeEach(() => {
   // confusing "first click did not toggle" symptoms.
   window.sessionStorage.clear();
   window.localStorage.clear();
+  // Sprint A (A1) added a block-library fetch inside the panel. Provide a
+  // default no-op global.fetch so tests that don't care about it don't crash.
+  global.fetch = jest.fn((url: RequestInfo | URL) => {
+    if (String(url).includes('/api/strategy-builder/block-library')) {
+      return Promise.resolve({ ok: true, json: async () => ({ blocks: [] }) } as Response);
+    }
+    return Promise.resolve({ ok: false, json: async () => ({}) } as Response);
+  }) as unknown as typeof fetch;
 });
 
 describe('AiRecommendationsPanel — progress UI (BTCAAAAA-36777)', () => {
