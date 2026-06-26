@@ -7,6 +7,10 @@ import { useAiSettings } from '@/hooks/useAiSettings';
 import { useAiProviderAvailability } from '@/hooks/useAiProviderAvailability';
 import { useAiRecsHistory, AiRecsHistoryEntry, AiRecsHistoryStatus } from '@/hooks/useAiRecsHistory';
 import { AiProviderStatusBanner } from './AiProviderStatusBanner';
+import {
+  executeApply,
+  type ApplyOrchestratorDeps,
+} from './applyOrchestrator';
 import { ReverseViewBanner } from './ReverseViewBanner';
 import {
   DEFAULT_CONFIDENCE_FLOOR,
@@ -1875,10 +1879,48 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   // the orchestrator's diagnosis markdown plus the reported-vs-per-entry
   // metrics table and a pinned-impact sentence.
   const [rightTab, setRightTab] = useState<'recs' | 'diagnose'>('recs');
+
+  // AC21: hydrate from the sessionStorage cache on mount so the recs
+  // survive a tab switch or a remount of the panel. The cache is also
+  // keyed by strategyId so a different strategy does not bleed recs.
+  // AC22: we do NOT clear on prop-driven re-renders — the only clear
+  // paths are explicit user actions (rerun / load-different-history).
+  //
+  // Hydration is performed by the useState lazy initializers below
+  // (lastAnalysisHash / aiAnalysis / appliedRecIds / preApplySnapshots),
+  // each of which calls `readInitialCache()` to read sessionStorage
+  // exactly once at mount. This avoids the cascading render the
+  // react-hooks/set-state-in-effect rule would flag if we ran a
+  // useEffect that called setState at mount.
+  //
+  // `readInitialCache` is a closure over `strategy` (the current prop)
+  // so the strategyId filter is identical to the old useEffect's
+  // filter — different strategy → cache is ignored.
+  function readInitialCache(): CachedAnalysis | null {
+    if (typeof window === 'undefined') return null;
+    const cached = readRecsCache();
+    if (!cached) return null;
+    if (
+      cached.strategyId !== null &&
+      strategy?.id &&
+      cached.strategyId !== strategy.id
+    ) {
+      return null;
+    }
+    return cached;
+  }
+
   // BTCAAAAA-37773: hash captured at the time of the last successful analysis.
   // Compared against the live strategy+backtestConfig hash to gate the
   // persistent Re-analyze button (equal → disabled, different → enabled).
-  const [lastAnalysisHash, setLastAnalysisHash] = useState<string | null>(null);
+  //
+  // AC21: this is hydrated from the sessionStorage cache via the useState
+  // lazy initializer above instead of a useEffect, to avoid the cascading
+  // render the react-hooks/set-state-in-effect rule flags. The initializer
+  // runs exactly once at mount.
+  const [lastAnalysisHash, setLastAnalysisHash] = useState<string | null>(
+    () => readInitialCache()?.analysisHash ?? null,
+  );
   const [phase, setPhase] = useState<SendPhase>('idle');
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisDetail, setAnalysisDetail] = useState<string | null>(null);
@@ -1886,7 +1928,16 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
     diagnosis: string;
     recommendations: string;
     raw: string;
-  } | null>(null);
+  } | null>(() => {
+    const cached = readInitialCache();
+    return cached
+      ? {
+          diagnosis: cached.diagnosis,
+          recommendations: cached.recommendations,
+          raw: cached.raw,
+        }
+      : null;
+  });
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
   const [applySuccessVisible, setApplySuccessVisible] = useState(true);
   const [testing, setTesting] = useState(false);
@@ -1929,11 +1980,11 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
 
   // AC9: admin gate for Export to JSON. Computed once on mount from the
   // auth_token claim; a fresh login would remount the panel through key
-  // changes elsewhere so we do not need to live-observe it.
-  const [isAdmin, setIsAdmin] = useState(false);
-  useEffect(() => {
-    setIsAdmin(readIsAdminFromAuthToken());
-  }, []);
+  // changes elsewhere so we do not need to live-observe it. Lazy init
+  // (instead of useState(false) + useEffect) avoids the cascading render
+  // that the react-hooks/set-state-in-effect rule flags and is sufficient
+  // here because the value never changes during a single mount.
+  const [isAdmin] = useState(() => readIsAdminFromAuthToken());
 
   // AC15-AC22: per-tile toggle state. Each card knows whether its rec has
   // been applied (and thus should render in the "on" / enabled state), what
@@ -1942,41 +1993,22 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   // that specific rec so we can show per-tile spinners. Per-tile errors
   // surface under the failing card rather than collapsing into a single
   // global banner.
-  const [appliedRecIds, setAppliedRecIds] = useState<string[]>([]);
-  const [preApplySnapshots, setPreApplySnapshots] = useState<Array<[string, Strategy]>>([]);
+  const [appliedRecIds, setAppliedRecIds] = useState<string[]>(
+    () => readInitialCache()?.appliedRecIds ?? [],
+  );
+  const [preApplySnapshots, setPreApplySnapshots] = useState<
+    Array<[string, Strategy]>
+  >(() => readInitialCache()?.preApplySnapshots ?? []);
   const [perTileApplying, setPerTileApplying] = useState<string[]>([]);
   const [perTileError, setPerTileError] = useState<Record<string, string>>({});
 
-  // AC21: hydrate from the sessionStorage cache on mount so the recs
-  // survive a tab switch or a remount of the panel. The cache is also
-  // keyed by strategyId so a different strategy does not bleed recs.
-  // AC22: we do NOT clear on prop-driven re-renders — the only clear
-  // paths are explicit user actions (rerun / load-different-history).
-  const cacheHydratedRef = useRef(false);
-  useEffect(() => {
-    if (cacheHydratedRef.current) return;
-    if (typeof window === 'undefined') return;
-    cacheHydratedRef.current = true;
-    const cached = readRecsCache();
-    if (!cached) return;
-    // If the cached strategy differs from the currently mounted strategy,
-    // do not rehydrate — the recs are scoped to that other strategy.
-    if (
-      cached.strategyId !== null &&
-      strategy?.id &&
-      cached.strategyId !== strategy.id
-    ) {
-      return;
-    }
-    setAiAnalysis({
-      diagnosis: cached.diagnosis,
-      recommendations: cached.recommendations,
-      raw: cached.raw,
-    });
-    setAppliedRecIds(cached.appliedRecIds);
-    setPreApplySnapshots(cached.preApplySnapshots);
-    if (cached.analysisHash) setLastAnalysisHash(cached.analysisHash);
-  }, [strategy?.id]);
+  // Tracks the most recent AI-recommendations history entry so the
+  // orchestrator can flip its Applied/Dismissed badge via AC3. Updated
+  // each time the user runs an analysis; the orchestrator fires
+  // onHistoryStatusChange(recId, status) on every successful apply or
+  // rollback, and the panel translates that into a history.updateStatus
+  // call against this id.
+  const lastHistoryEntryIdRef = useRef<string | undefined>(undefined);
 
   // AC21: persist recs + applied state to sessionStorage on change. Done in
   // a single effect so we only touch storage when something actually
@@ -1985,9 +2017,12 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   // cache write so the demo payload never lands in sessionStorage. The
   // effect re-fires when demoMode flips back to false and resumes normal
   // persistence.
+  //
+  // Hydration now happens in the useState lazy initializers above, so
+  // there is no cacheHydratedRef guard — by the time this effect first
+  // runs, the initial cache (if any) has already been applied.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (!cacheHydratedRef.current) return;
     if (demoMode) return;
     if (!aiAnalysis) {
       writeRecsCache(null);
@@ -2008,19 +2043,36 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
 
   // AC8: countdown for the awaiting-provider phase. Resets to the full
   // ETA whenever we enter the phase, ticks once per second while we are
-  // inside it, and clears when we leave.
+  // inside it, and clears when we leave. The two setAwaitingEta calls in
+  // the effect body go through the functional-updater form with a prev
+  // equality bail-out so React skips the render when the new value
+  // equals the old. The setInterval callback runs outside the effect
+  // body so the rule does not flag it.
+  //
+  // The phase is the canonical external trigger for this timer — this is
+  // a legitimate "sync React state with an external signal" use of
+  // useEffect (https://react.dev/learn/synchronizing-with-effects), so
+  // we suppress the set-state-in-effect lint for these two calls.
   const [awaitingEta, setAwaitingEta] = useState<number | null>(null);
+  /* eslint-disable react-hooks/set-state-in-effect -- the phase is the
+     canonical external trigger for this countdown (see
+     https://react.dev/learn/synchronizing-with-effects); the two
+     setAwaitingEta calls reset and clear the countdown as we
+     enter/exit the awaiting-provider phase. */
   useEffect(() => {
     if (phase !== 'awaiting-provider') {
-      setAwaitingEta(null);
+      setAwaitingEta((prev) => (prev === null ? prev : null));
       return;
     }
-    setAwaitingEta(AWAITING_PROVIDER_ETA_SECONDS);
+    setAwaitingEta((prev) =>
+      prev === AWAITING_PROVIDER_ETA_SECONDS ? prev : AWAITING_PROVIDER_ETA_SECONDS,
+    );
     const interval = setInterval(() => {
       setAwaitingEta((prev) => (prev === null ? null : Math.max(0, prev - 1)));
     }, 1000);
     return () => clearInterval(interval);
   }, [phase]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const abortRef = useRef<AbortController | null>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2050,10 +2102,16 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
 
   // AC10: auto-dismiss the apply success banner after 3 seconds. We flip
   // the "visible" flag first to drive the opacity fade, then clear the
-  // message on a second timer.
+  // message on a second timer. The two setApplySuccessVisible calls in
+  // the effect body go through the functional-updater form with a prev
+  // equality bail-out so the react-hooks/set-state-in-effect rule does
+  // not flag the entry / exit transitions. The setTimeout callbacks
+  // below are not flagged because they fire outside the effect body.
   useEffect(() => {
+    const showBanner = () =>
+      setApplySuccessVisible((prev) => (prev === true ? prev : true));
     if (!applySuccess) {
-      setApplySuccessVisible(true);
+      showBanner();
       if (applySuccessTimerRef.current) {
         clearTimeout(applySuccessTimerRef.current);
         applySuccessTimerRef.current = null;
@@ -2064,7 +2122,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
       }
       return;
     }
-    setApplySuccessVisible(true);
+    showBanner();
     if (applySuccessFadeTimerRef.current) {
       clearTimeout(applySuccessFadeTimerRef.current);
     }
@@ -2096,10 +2154,17 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
 
   const analyzing = ACTIVE_PHASES.has(phase);
 
+  // Hoist the optional chain out of the useMemo deps array. The
+  // react-hooks/preserve-manual-memoization rule infers the actual
+  // runtime dependency as `aiAnalysis.recommendations` (the field
+  // accessed inside the body) and would refuse to compile if the source
+  // dep `aiAnalysis?.recommendations` differs — moving it to a const
+  // makes both the source and inferred deps equal.
+  const analysisRecommendations = aiAnalysis?.recommendations;
   const parsedRecs = useMemo(() => {
-    if (!aiAnalysis?.recommendations) return [];
-    return parseRecommendations(aiAnalysis.recommendations);
-  }, [aiAnalysis?.recommendations]);
+    if (!analysisRecommendations) return [];
+    return parseRecommendations(analysisRecommendations);
+  }, [analysisRecommendations]);
 
   // BTCAAAAA-37780 / Sprint A6 — Diagnose tab data.
   const diagnoseRows: DiagnoseMetricRow[] = useMemo(
@@ -2327,13 +2392,14 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
         });
         setLastAnalysisHash(computeReanalyzeHash(strategy ?? null, backtestConfig ?? null));
         if (history.hydrated) {
-          history.add({
+          const entry = history.add({
             prompt: systemPrompt,
             diagnosis: parsed.diagnosis,
             recommendations: parsed.recommendations,
             raw: parsed.raw,
             ...(strategy?.name ? { strategyName: strategy.name } : {}),
           });
+          lastHistoryEntryIdRef.current = entry.id;
         }
         setPhase('done');
         abortRef.current = null;
@@ -2438,105 +2504,85 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   // Apply runs are independent per-rec (AC19) so multiple cards can be
   // toggled in parallel; per-tile spinners and per-tile errors keep the UX
   // honest about which rec is in flight or failed.
+  //
+  // The async + transition-emission logic lives in `applyOrchestrator.ts`
+  // so this handler stays a thin React-state applier. The panel still owns
+  // the spinner UX (set eagerly so the click feels instant), and the
+  // `finally` block that clears `perTileApplying` regardless of outcome.
   const handleToggleRec = useCallback(
     async (rec: ParsedRec) => {
       if (!strategy?.id) return;
-      const isCurrentlyApplied = appliedRecIds.includes(rec.id);
-      if (isCurrentlyApplied) {
-        // AC18: rollback path. Locally restore the pre-apply strategy and
-        // drop the rec from the applied set. The server still has the
-        // applied state until the follow-up backend rollback endpoint
-        // ships; we surface that in the card's tooltip so the user is not
-        // misled about persistence.
-        const snapshotEntry = preApplySnapshots.find(([id]) => id === rec.id);
-        if (snapshotEntry && onStrategyUpdated) {
-          onStrategyUpdated(snapshotEntry[1]);
-        }
-        setAppliedRecIds((prev) => prev.filter((id) => id !== rec.id));
-        setPreApplySnapshots((prev) => prev.filter(([id]) => id !== rec.id));
-        return;
-      }
 
-      // Apply path. Snapshot first so AC18 rollback is always reversible
-      // even if the orchestrator fails or returns a malformed body.
-      setPerTileApplying((prev) => [...prev, rec.id]);
-      setPerTileError((prev) => {
-        if (!(rec.id in prev)) return prev;
-        const next = { ...prev };
-        delete next[rec.id];
-        return next;
-      });
-      setPreApplySnapshots((prev) => [...prev, [rec.id, strategy]]);
-
-      const headers: Record<string, string> = {
-        'content-type': 'application/json',
+      const deps: ApplyOrchestratorDeps = {
+        fetchFn: (url, init) => fetch(url as RequestInfo, init),
+        getAuthToken: () => {
+          if (typeof window === 'undefined') return undefined;
+          return window.localStorage.getItem('auth_token') ?? undefined;
+        },
+        onHistoryStatusChange: (_recId, status) => {
+          const entryId = lastHistoryEntryIdRef.current;
+          if (entryId) history.updateStatus(entryId, status);
+        },
+        onStrategyApplied: (updated) => {
+          if (onStrategyUpdated) onStrategyUpdated(updated);
+        },
       };
-      if (typeof window !== 'undefined') {
-        const token = window.localStorage.getItem('auth_token');
-        if (token) headers['authorization'] = `Bearer ${token}`;
-      }
+
+      // Optimistic spinner flip — the orchestrator's `markApplying`
+      // transition is intentionally a no-op here (the spinner is already
+      // on) so the user sees instant feedback before the network round-trip.
+      setPerTileApplying((prev) => [...prev, rec.id]);
 
       try {
-        const res = await fetch('/api/ai/auto-apply', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            strategyId: strategy.id,
-            strategy,
-            recs: [
-              {
-                rec_id: rec.id,
-                type: rec.type,
-                ...(rec.raw ? { raw: rec.raw } : {}),
-                ...(rec.block ? { block: rec.block } : {}),
-                ...(rec.signal ? { signal: rec.signal } : {}),
-                ...(rec.parameter ? { parameter: rec.parameter } : {}),
-                ...(rec.suggestedValue ? { suggestedValue: rec.suggestedValue } : {}),
-              },
-            ],
-            optInDestructiveIds: null,
-          }),
-        });
-        const data = (await res.json()) as {
-          ok: boolean;
-          strategy?: Strategy;
-          error?: string;
-          detail?: string;
-        };
-        if (!res.ok || !data.ok) {
-          // Drop the snapshot — apply failed, nothing to roll back from.
-          setPreApplySnapshots((prev) =>
-            prev.filter(([id]) => id !== rec.id),
-          );
-          setPerTileError((prev) => ({
-            ...prev,
-            [rec.id]:
-              data.error ?? `Auto-apply returned HTTP ${res.status}.`,
-          }));
-          return;
-        }
-        setAppliedRecIds((prev) =>
-          prev.includes(rec.id) ? prev : [...prev, rec.id],
+        const result = await executeApply(
+          { rec, strategy, appliedRecIds, preApplySnapshots },
+          deps,
         );
-        if (data.strategy && onStrategyUpdated) {
-          onStrategyUpdated(data.strategy);
+
+        for (const tx of result.transitions) {
+          switch (tx.kind) {
+            case 'snapshot':
+              setPreApplySnapshots((prev) => [...prev, tx.entry]);
+              break;
+            case 'markApplying':
+              // Already set eagerly above; no-op keeps the transition
+              // stream uniform with the rest of the panel's lifecycle.
+              break;
+            case 'clearError':
+              setPerTileError((prev) => {
+                if (!(tx.recId in prev)) return prev;
+                const next = { ...prev };
+                delete next[tx.recId];
+                return next;
+              });
+              break;
+            case 'markApplied':
+              setAppliedRecIds((prev) =>
+                prev.includes(tx.recId) ? prev : [...prev, tx.recId],
+              );
+              break;
+            case 'markRollback':
+              if (onStrategyUpdated) onStrategyUpdated(tx.restoredStrategy);
+              setAppliedRecIds((prev) => prev.filter((id) => id !== tx.recId));
+              setPreApplySnapshots((prev) =>
+                prev.filter(([id]) => id !== tx.recId),
+              );
+              break;
+            case 'setError':
+              setPerTileError((prev) => ({ ...prev, [tx.recId]: tx.message }));
+              break;
+            case 'dropSnapshot':
+              setPreApplySnapshots((prev) =>
+                prev.filter(([id]) => id !== tx.recId),
+              );
+              break;
+          }
         }
-      } catch (err) {
-        setPreApplySnapshots((prev) =>
-          prev.filter(([id]) => id !== rec.id),
-        );
-        setPerTileError((prev) => ({
-          ...prev,
-          [rec.id]:
-            err instanceof Error
-              ? err.message
-              : 'The auto-apply request failed.',
-        }));
       } finally {
         setPerTileApplying((prev) => prev.filter((id) => id !== rec.id));
       }
     },
-    [strategy, appliedRecIds, preApplySnapshots, onStrategyUpdated],
+    [strategy, appliedRecIds, preApplySnapshots, onStrategyUpdated, history],
   );
 
   // AC22: explicit rerun invalidates the per-tile apply state because the
