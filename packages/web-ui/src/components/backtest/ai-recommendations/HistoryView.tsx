@@ -326,15 +326,17 @@ export function HistoryView({
       </div>
       {entries.map((entry) => {
         const isOpen = expandedId === entry.id;
+        const recCount = countRecommendations(entry.recommendations);
+        const appliedCount = entry.status === 'applied' ? recCount : 0;
         return (
           <div
             key={entry.id}
             data-testid={`history-row-${entry.id}`}
             className="flex flex-col gap-1"
           >
-            {/* BTCAAAAA-38300 — compact history row matching mockup 05:
-                status dot · date/time · provider · prompt ·
-                "N recs · K applied" · View button. */}
+            {/* Q7 (BTCAAAAA-38564) — compact history row matching mockup 6:
+                status badge · date/time + provider · prompt (truncated) ·
+                "N recs · K applied" · View (→ Current Analysis) · ⋯ Details. */}
             <div
               className="flex items-center gap-2 rounded px-2 py-1.5"
               style={{
@@ -343,10 +345,7 @@ export function HistoryView({
               }}
             >
               <StatusBadge status={entry.status} />
-              <div
-                className="flex flex-col"
-                style={{ minWidth: 130 }}
-              >
+              <div className="flex flex-col" style={{ minWidth: 130 }}>
                 <span
                   className="text-[11px]"
                   style={{
@@ -356,10 +355,7 @@ export function HistoryView({
                 >
                   {formatTimestamp(entry.createdAt)}
                 </span>
-                <span
-                  className="text-[10px]"
-                  style={{ color: 'var(--text-faint)' }}
-                >
+                <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
                   {providerLabel(entry)}
                 </span>
               </div>
@@ -374,32 +370,43 @@ export function HistoryView({
                 data-testid={`history-counts-${entry.id}`}
                 className="text-[11px] shrink-0"
                 style={{
-                  color:
-                    entry.status === 'applied'
-                      ? 'var(--accent-green-on)'
-                      : 'var(--text-faint)',
+                  color: entry.status === 'applied' ? 'var(--accent-green-on)' : 'var(--text-faint)',
                   fontFamily: 'var(--font-mono, monospace)',
                 }}
               >
-                {(() => {
-                  const n = countRecommendations(entry.recommendations);
-                  const k = entry.status === 'applied' ? n : 0;
-                  return `${n} rec${n === 1 ? '' : 's'} · ${k} applied`;
-                })()}
+                {recCount} rec{recCount === 1 ? '' : 's'} · {appliedCount} applied
               </span>
+              {/* Q7: View navigates to Current Analysis with the snapshot KPIs. */}
               <button
                 type="button"
-                onClick={() => setExpandedId(isOpen ? null : entry.id)}
+                onClick={() => onLoadIntoCurrent(entry)}
                 data-testid={`history-view-${entry.id}`}
                 className="px-2 py-1 rounded text-[10px] font-medium shrink-0"
                 style={{
-                  background: isOpen ? 'var(--accent-blue)' : 'var(--bg-elevated)',
-                  color: isOpen ? 'var(--text-on-accent)' : 'var(--text-secondary)',
-                  border: `1px solid ${isOpen ? 'var(--accent-blue)' : 'var(--border)'}`,
+                  background: 'var(--accent-blue)',
+                  color: 'var(--text-on-accent)',
+                  border: '1px solid var(--accent-blue)',
                   cursor: 'pointer',
                 }}
+                title="Load this snapshot into Current Analysis tab"
               >
-                {isOpen ? 'Hide' : 'View'}
+                View
+              </button>
+              {/* Details (⋯) toggle for notes / status controls / delete. */}
+              <button
+                type="button"
+                onClick={() => setExpandedId(isOpen ? null : entry.id)}
+                data-testid={`history-details-${entry.id}`}
+                className="px-2 py-1 rounded text-[10px] font-medium shrink-0"
+                style={{
+                  background: isOpen ? 'var(--bg-elevated)' : 'transparent',
+                  color: 'var(--text-faint)',
+                  border: `1px solid ${isOpen ? 'var(--border)' : 'transparent'}`,
+                  cursor: 'pointer',
+                }}
+                title="Show notes, status controls, and delete"
+              >
+                {isOpen ? '−' : '⋯'}
               </button>
             </div>
             {isOpen && (

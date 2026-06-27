@@ -6,7 +6,7 @@ import { X, ExternalLink } from 'lucide-react';
 import { BacktestResult, Strategy } from '@/lib/strategy-builder/types';
 import { useAiSettings } from '@/hooks/useAiSettings';
 import { useAiProviderAvailability } from '@/hooks/useAiProviderAvailability';
-import { useAiRecsHistory, AiRecsHistoryEntry } from '@/hooks/useAiRecsHistory';
+import { useAiRecsHistory, AiRecsHistoryEntry, HistorySnapshotKpis } from '@/hooks/useAiRecsHistory';
 import {
   AI_RECS_CACHE_VERSION,
   CachedAnalysis,
@@ -348,6 +348,10 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   const [goalModalOpen, setGoalModalOpen] = useState(false);
   const [activeRec, setActiveRec] = useState<ActiveRec | null>(null);
   const [optimizationGoal, setOptimizationGoal] = useState<string | null>(null);
+  // Q7 (BTCAAAAA-38564): when the user clicks "View" on a history row the entry is
+  // stored here so the Current Analysis tab can show the snapshot KPIs + banner.
+  // Cleared when a new analysis starts or the user clicks Re-analyze.
+  const [viewingHistoryEntry, setViewingHistoryEntry] = useState<AiRecsHistoryEntry | null>(null);
 
   // BTCAAAAA-38300 — AI Response tab metadata (provider / tokens / duration).
   // Populated after each successful analyze; the response tab header reads
@@ -817,6 +821,8 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           durationMs: Date.now() - sentAt,
         });
         setLastAnalysisHash(computeReanalyzeHash(strategy ?? null, backtestConfig ?? null));
+        // Q7: clear any history-snapshot view now that a fresh analysis arrived.
+        setViewingHistoryEntry(null);
         if (history.hydrated) {
           const entry = history.add({
             prompt: systemPrompt,
@@ -824,6 +830,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
             recommendations: parsed.recommendations,
             raw: parsed.raw,
             ...(strategy?.name ? { strategyName: strategy.name } : {}),
+            snapshotKpis: baselineKpis as HistorySnapshotKpis,
           });
           lastHistoryEntryIdRef.current = entry.id;
         }
@@ -881,6 +888,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
       settings.apiKeys,
       settings.ollamaBaseUrl,
       history,
+      baselineKpis,
     ],
   );
 
@@ -1062,6 +1070,8 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
 
   // AC3: history Load → hydrate current analysis view AND set first parsed
   // rec as the active rec so the user can re-send with that context.
+  // Q7 (BTCAAAAA-38564): also stores the entry so the KPI bar renders the
+  // snapshot's before-values and the banner is shown.
   const loadHistoryIntoCurrent = useCallback(
     (entry: AiRecsHistoryEntry) => {
       // BTCAAAAA-36917 v4 UX: user explicitly loaded a history entry —
@@ -1073,6 +1083,12 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
         recommendations: entry.recommendations,
         raw: entry.raw,
       });
+      // Q7: track which entry is being viewed so snapshot KPIs can be shown.
+      setViewingHistoryEntry(entry);
+      // Reset apply state — the loaded recs may have different IDs than the
+      // current session's recs, so stale toggles would be misleading.
+      setAppliedRecIds([]);
+      setPreApplySnapshots([]);
       const recs = parseRecommendations(entry.recommendations);
       const first = recs[0];
       if (first) {
@@ -1943,11 +1959,47 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
         )}
       </div>
 
-      {/* BTCAAAAA-37774 Sprint A2 — Strategy Impact KPI bar. */}
-      {result && (
+      {/* Q7 (BTCAAAAA-38564): when viewing a past analysis, show a read-only
+          banner above the KPI bar so the user knows they're in snapshot mode. */}
+      {viewingHistoryEntry && (
+        <div
+          data-testid="ai-recs-history-snapshot-banner"
+          className="rounded px-3 py-2 text-xs flex items-center justify-between gap-2"
+          style={{
+            background: 'var(--accent-blue-soft)',
+            border: '1px solid var(--accent-blue)',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          <span>
+            Viewing past analysis —{' '}
+            <span style={{ color: 'var(--text-muted)' }}>
+              Re-analyze to return to live mode.
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setViewingHistoryEntry(null)}
+            className="text-[10px] px-2 py-0.5 rounded"
+            style={{
+              background: 'var(--bg-elevated)',
+              color: 'var(--text-muted)',
+              border: '1px solid var(--border)',
+              cursor: 'pointer',
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* BTCAAAAA-37774 Sprint A2 — Strategy Impact KPI bar.
+          Q7: when viewing a history snapshot use the stored KPIs; otherwise
+          fall back to the live backtest result. */}
+      {(result || viewingHistoryEntry?.snapshotKpis) && (
         <StrategyImpactKpiBar
-          baseline={baselineKpis}
-          appliedImpacts={appliedImpacts}
+          baseline={viewingHistoryEntry?.snapshotKpis ?? baselineKpis}
+          appliedImpacts={viewingHistoryEntry ? [] : appliedImpacts}
         />
       )}
 

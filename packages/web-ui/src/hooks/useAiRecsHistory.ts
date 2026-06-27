@@ -5,6 +5,17 @@ import { FeedbackValue, setFeedback as persistFeedback } from '@/components/back
 
 export type AiRecsHistoryStatus = 'new' | 'applied' | 'dismissed';
 
+// Q7 (BTCAAAAA-38564): snapshot of the Strategy Impact KPIs captured at
+// analysis time so the History tab can render the before/after KPI bar when
+// the user views a past analysis.
+export interface HistorySnapshotKpis {
+  winRate: number;
+  netLiquidity: number;
+  maxDrawdown: number;
+  profitFactor: number;
+  entries: number;
+}
+
 export interface AiRecsHistoryEntry {
   id: string;
   createdAt: string;
@@ -16,6 +27,8 @@ export interface AiRecsHistoryEntry {
   strategyName?: string;
   status: AiRecsHistoryStatus;
   notes: string;
+  /** Q7: KPI snapshot captured at analysis time for Strategy Impact bar replay. */
+  snapshotKpis?: HistorySnapshotKpis;
 }
 
 const STORAGE_KEY = 'btc-paperclip:ai-recs:v1';
@@ -49,7 +62,20 @@ function coerceEntry(raw: unknown): AiRecsHistoryEntry | null {
     status: e.status,
     notes: e.notes,
     ...(typeof e.strategyName === 'string' ? { strategyName: e.strategyName } : {}),
+    ...(isSnapshotKpis(e.snapshotKpis) ? { snapshotKpis: e.snapshotKpis as HistorySnapshotKpis } : {}),
   };
+}
+
+function isSnapshotKpis(v: unknown): boolean {
+  if (!v || typeof v !== 'object') return false;
+  const k = v as Record<string, unknown>;
+  return (
+    typeof k.winRate === 'number' &&
+    typeof k.netLiquidity === 'number' &&
+    typeof k.maxDrawdown === 'number' &&
+    typeof k.profitFactor === 'number' &&
+    typeof k.entries === 'number'
+  );
 }
 
 function loadStored(): AiRecsHistoryEntry[] {
@@ -100,6 +126,7 @@ export interface UseAiRecsHistoryResult {
     recommendations: string;
     raw: string;
     strategyName?: string;
+    snapshotKpis?: HistorySnapshotKpis;
   }) => AiRecsHistoryEntry;
   updateStatus: (id: string, status: AiRecsHistoryStatus) => void;
   updateNotes: (id: string, notes: string) => void;
@@ -139,6 +166,7 @@ export function useAiRecsHistory(): UseAiRecsHistoryResult {
         status: 'new',
         notes: '',
         ...(input.strategyName ? { strategyName: input.strategyName } : {}),
+        ...(input.snapshotKpis ? { snapshotKpis: input.snapshotKpis } : {}),
       };
       setEntries((prev) => {
         const next = [entry, ...prev].slice(0, MAX_ENTRIES);
