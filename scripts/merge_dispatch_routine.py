@@ -599,6 +599,39 @@ def pre_dispatch_already_merged_check(fix_sha: str) -> tuple[bool, str]:
     return False, ""
 
 
+def find_branch_by_issue_id(issue_identifier: str) -> str | None:
+    """Fallback branch lookup by issue identifier when SHA-based lookup fails (BTCAAAAA-38557).
+
+    When an agent records Fix-SHA then rebases, the SHA is orphaned from the branch tip.
+    This searches remote branches whose names contain the issue ID (e.g. BTCAAAAA-38567).
+    Returns the short branch name (without 'origin/') or None.
+    """
+    # Extract numeric suffix from BTCAAAAA-38567 → 38567
+    m = re.search(r"(\d+)$", issue_identifier)
+    if not m:
+        return None
+    issue_num = m.group(1)
+    try:
+        result = subprocess.run(
+            ["git", "branch", "-r"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            return None
+        for line in result.stdout.decode().strip().splitlines():
+            branch = line.strip()
+            if issue_num in branch and "origin/" in branch:
+                # Skip HEAD pseudo-ref and main
+                if "HEAD" in branch or branch.endswith("/main"):
+                    continue
+                return branch.replace("origin/", "")
+    except Exception as exc:
+        logger.warning("find_branch_by_issue_id failed for %s: %s", issue_identifier, exc)
+    return None
+
+
 def find_existing_pr(session: requests.Session, branch_name: str) -> dict | None:
     """Check if PR already exists for branch."""
     try:
@@ -835,15 +868,25 @@ def process_issue(issue: dict[str, Any]) -> dict[str, Any]:
         }
 
     # Step 4: Find the pushed remote branch containing the SHA.
-    # No remote branch means the commit is local-only (push lag) — skip, do not escalate.
+    # Primary: git branch -r --contains <sha>.
+    # Fallback (BTCAAAAA-38557): if the agent rebased after recording Fix-SHA, the SHA
+    # is no longer reachable from any remote branch tip. Try branch-name pattern matching
+    # on the issue identifier instead so we don't silently skip a ready PR.
     branch = find_branch_for_sha(sha)
     if not branch:
-        logger.info("No remote branch contains SHA %s for %s (push lag)", sha[:8], issue_identifier)
-        return {
-            "issue": issue_identifier,
-            "action": "skip",
-            "reason": "branch_not_pushed",
-        }
+        branch = find_branch_by_issue_id(issue_identifier)
+        if branch:
+            logger.info(
+                "SHA %s not on remote; found branch %s via issue-ID fallback for %s",
+                sha[:8], branch, issue_identifier,
+            )
+        else:
+            logger.info("No remote branch contains SHA %s for %s (push lag)", sha[:8], issue_identifier)
+            return {
+                "issue": issue_identifier,
+                "action": "skip",
+                "reason": "branch_not_pushed",
+            }
 
     logger.info("Found branch %s for SHA %s", branch, sha[:8])
 
