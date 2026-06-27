@@ -888,6 +888,7 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
       baseline: 'requires per-trade signal telemetry' },
   );
 
+
   return (
     <div>
       {/* Hero strip: 4 large KPIs with vs-Buy&Hold deltas (mockup top row) */}
