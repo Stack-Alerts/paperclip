@@ -27,7 +27,6 @@ import {
 } from './analysisUtils';
 import { HistoryView } from './HistoryView';
 import { ConfirmationModal } from './ConfirmationModal';
-import { SplitPanel } from './SplitPanel';
 import {
   executeApply,
   type ApplyOrchestratorDeps,
@@ -2507,15 +2506,19 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           className="flex gap-3"
           style={{ flexWrap: 'wrap', alignItems: 'flex-start' }}
         >
-          <div style={{ flex: '1 1 720px', minWidth: 0 }}>
-            <SplitPanel left={leftPane} right={rightPane} />
+          <div style={{ flex: '1 1 0', minWidth: 0 }}>
+            {rightPane}
           </div>
-          <StrategyAfterChangesRail
-            items={afterChangesItems}
-            toggleOn={appliedRecIdSet}
-            onToggleCurrent={handleRailToggleCurrent}
-            onJumpToOriginEntry={handleRailJumpToOriginEntry}
-          />
+          {/* marginTop offsets the sub-tab bar (py-1.5 + text-xs + border-b ≈ 29px) plus gap-3 (12px)
+              so the rail top-edge aligns with the Strategy Diagnosis card below the tabs. */}
+          <div style={{ marginTop: '41px' }}>
+            <StrategyAfterChangesRail
+              items={afterChangesItems}
+              toggleOn={appliedRecIdSet}
+              onToggleCurrent={handleRailToggleCurrent}
+              onJumpToOriginEntry={handleRailJumpToOriginEntry}
+            />
+          </div>
         </div>
       ) : currentView === 'request' ? (
         <div id="ai-recs-panel-request" role="tabpanel" aria-labelledby="ai-recs-tab-request" data-testid="ai-recs-view-request">{leftPane}</div>
@@ -2618,7 +2621,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           );
         })()
       ) : (
-        <div id="ai-recs-panel-history" role="tabpanel" aria-labelledby="ai-recs-tab-history">
+        <div id="ai-recs-panel-history" role="tabpanel" aria-labelledby="ai-recs-tab-history" style={{ minWidth: 0, overflow: 'hidden' }}>
           <HistoryView
             entries={history.entries}
             hydrated={history.hydrated}

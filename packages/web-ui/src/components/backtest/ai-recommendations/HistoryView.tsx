@@ -342,6 +342,8 @@ export function HistoryView({
               style={{
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border)',
+                minWidth: 0,
+                overflow: 'hidden',
               }}
             >
               <StatusBadge status={entry.status} />

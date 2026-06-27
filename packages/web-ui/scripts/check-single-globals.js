@@ -7,7 +7,9 @@
  * Canonical source: packages/web-ui/app/globals.css
  */
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const fs = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require('path');
 
 const appGlobals = path.resolve(__dirname, '../app/globals.css');
