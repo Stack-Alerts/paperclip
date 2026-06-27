@@ -567,5 +567,114 @@ class TestFormatRoutineReportDeferrals:
         assert "24h window" in report
 
 
+class TestNoShaEvidenceVerifier:
+    """BTCAAAAA-38590 / BTCAAAAA-38603 — [no-sha: reason] evidence verifier."""
+
+    def test_extract_no_sha_tag_valid_reason(self):
+        from closure_gate_routine import extract_no_sha_tag_from_comments
+        comments = [{"body": "Closing this issue.\n\n[no-sha: redeploy]\n"}]
+        assert extract_no_sha_tag_from_comments(comments) == "redeploy"
+
+    def test_extract_no_sha_tag_all_reasons(self):
+        from closure_gate_routine import extract_no_sha_tag_from_comments
+        for reason in ("redeploy", "install", "config", "process"):
+            comments = [{"body": f"[no-sha: {reason}]\n"}]
+            assert extract_no_sha_tag_from_comments(comments) == reason
+
+    def test_extract_no_sha_tag_newest_wins(self):
+        from closure_gate_routine import extract_no_sha_tag_from_comments
+        comments = [
+            {"body": "[no-sha: install]\n"},
+            {"body": "[no-sha: redeploy]\n"},
+        ]
+        # reversed() picks the last comment first — redeploy wins
+        assert extract_no_sha_tag_from_comments(comments) == "redeploy"
+
+    def test_extract_no_sha_tag_inline_does_not_match(self):
+        from closure_gate_routine import extract_no_sha_tag_from_comments
+        comments = [{"body": "text [no-sha: redeploy] mid-line\n"}]
+        assert extract_no_sha_tag_from_comments(comments) is None
+
+    def test_extract_no_sha_tag_unknown_reason_returns_none(self):
+        from closure_gate_routine import extract_no_sha_tag_from_comments
+        comments = [{"body": "[no-sha: unknown]\n"}]
+        assert extract_no_sha_tag_from_comments(comments) is None
+
+    def test_extract_no_sha_tag_no_tag_returns_none(self):
+        from closure_gate_routine import extract_no_sha_tag_from_comments
+        assert extract_no_sha_tag_from_comments([{"body": "no tag here"}]) is None
+
+    def test_verify_no_sha_evidence_found(self):
+        from closure_gate_routine import verify_no_sha_evidence
+        comments = [
+            {"body": "Some preamble."},
+            {"body": "Action Dispatch — Redeploy Complete\n\nService restarted at 12:00Z."},
+        ]
+        assert verify_no_sha_evidence("BTCAAAAA-100", "redeploy", comments) is True
+
+    def test_verify_no_sha_evidence_not_found(self):
+        from closure_gate_routine import verify_no_sha_evidence
+        comments = [{"body": "Just a comment, no evidence."}]
+        assert verify_no_sha_evidence("BTCAAAAA-100", "redeploy", comments) is False
+
+    def test_verify_no_sha_evidence_unknown_reason_returns_false(self):
+        from closure_gate_routine import verify_no_sha_evidence
+        assert verify_no_sha_evidence("BTCAAAAA-100", "unknown", []) is False
+
+    def test_verify_no_sha_evidence_per_reason_signatures(self):
+        from closure_gate_routine import verify_no_sha_evidence, NO_SHA_EVIDENCE_SIGNATURES
+        for reason, signature in NO_SHA_EVIDENCE_SIGNATURES.items():
+            comments = [{"body": f"Header\n\n{signature}\n\nFooter"}]
+            assert verify_no_sha_evidence("BTCAAAAA-999", reason, comments) is True
+
+    @patch("closure_gate_routine.fetch_issue_comments")
+    def test_process_issue_no_sha_tag_evidence_present(self, mock_fetch_comments):
+        """[no-sha: redeploy] with evidence comment → verified, no reopen."""
+        mock_fetch_comments.return_value = [
+            {"body": "[no-sha: redeploy]\n"},
+            {"body": "Action Dispatch — Redeploy Complete\n\nDone at 10:00Z."},
+        ]
+        issue = {
+            "id": "issue-noshaok",
+            "identifier": "BTCAAAAA-38700",
+            "status": "done",
+            "originKind": "manual",
+        }
+        action_type, success = process_issue(issue, {})
+        assert action_type == "verified"
+        assert success is True
+
+    @patch("closure_gate_routine.reopen_no_sha_missing_evidence")
+    @patch("closure_gate_routine.fetch_issue_comments")
+    def test_process_issue_no_sha_tag_evidence_missing(self, mock_fetch, mock_reopen):
+        """[no-sha: redeploy] without evidence comment → reopened to in_review."""
+        mock_fetch.return_value = [{"body": "[no-sha: redeploy]\n"}]
+        mock_reopen.return_value = True
+        issue = {
+            "id": "issue-noshabad",
+            "identifier": "BTCAAAAA-38701",
+            "status": "done",
+            "originKind": "manual",
+        }
+        action_type, success = process_issue(issue, {})
+        assert action_type == "no_sha_missing_evidence"
+        assert success is True
+        mock_reopen.assert_called_once_with("issue-noshabad", "BTCAAAAA-38701", "redeploy")
+
+    def test_format_report_includes_no_sha_stat(self):
+        stats = {
+            "verified": 3,
+            "reopened": 0,
+            "requested_sha": 0,
+            "flagged_fabrication": 0,
+            "smoke_failed": 0,
+            "no_sha_missing_evidence": 2,
+            "errors": 0,
+        }
+        report = format_routine_report(5, stats)
+        assert "no-sha" in report
+        assert "2" in report
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

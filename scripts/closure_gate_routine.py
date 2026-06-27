@@ -11,6 +11,9 @@ This routine:
 6. Reopens issues with unmerged SHAs to in_review, assigns to closer's manager
 7. Requests Fix-SHA tags for orphaned done issues without commit evidence
 8. Aggregates unfiled-deferral flags into routine report at BTCAAAAA-36129
+9. [v2 Step 2] Verifies evidence for [no-sha: redeploy|install|config|process] closures
+   (BTCAAAAA-38590): checks that action_dispatch_routine posted the expected evidence
+   comment before accepting the done status.
 
 Usage:
     python scripts/closure_gate_routine.py
@@ -92,6 +95,26 @@ FIX_SHA_PATTERN = re.compile(r"^Fix-SHA: ([0-9a-f]{40})$", re.MULTILINE)
 # (rclone reauth, routine pause/resume, manual rollback, etc.). Closure-gate
 # treats issues carrying this marker as verified and skips Fix-SHA requests.
 FIX_SHA_NONE_PATTERN = re.compile(r"^Fix-SHA: NONE\b", re.MULTILINE)
+
+# v2 Step 2 (BTCAAAAA-38590): line-anchored [no-sha: reason] tag for board-action
+# closures that have no git artifact but have verifiable action evidence.
+# action_dispatch_routine.py posts an evidence comment after executing the action;
+# closure-gate checks for that comment instead of a SHA ancestor check.
+NO_SHA_TAG_PATTERN = re.compile(
+    r"^\[no-sha:\s*(redeploy|install|config|process)\]",
+    re.MULTILINE,
+)
+VALID_NO_SHA_REASONS: frozenset[str] = frozenset(["redeploy", "install", "config", "process"])
+
+# Evidence signatures posted by action_dispatch_routine.py per reason.
+# The closure gate checks for these exact substrings in comments to confirm
+# the action actually ran before accepting the done status.
+NO_SHA_EVIDENCE_SIGNATURES: dict[str, str] = {
+    "redeploy": "Action Dispatch — Redeploy Complete",
+    "install": "Action Dispatch — Plugin Install Complete",
+    "config": "Action Dispatch — Config Applied",
+    "process": "Action Dispatch — Process Step Complete",
+}
 
 # CEO mention for notifications
 CEO_MENTION = "@CEO"
@@ -429,6 +452,105 @@ def has_fix_sha_none_exemption(comments: list[dict[str, Any]]) -> bool:
         if FIX_SHA_NONE_PATTERN.search(comment.get("body", "") or ""):
             return True
     return False
+
+
+# === No-SHA Evidence Verifier (BTCAAAAA-38590, v2 Step 2) ===
+
+def extract_no_sha_tag_from_comments(
+    comments: list[dict[str, Any]],
+) -> str | None:
+    """Return the [no-sha: reason] reason from the newest matching comment.
+
+    Searches newest-first so a later comment overrides an earlier one.
+    Returns the reason string (one of redeploy|install|config|process)
+    or None if no valid tag is found.
+    """
+    for comment in reversed(comments):
+        body = comment.get("body", "") or ""
+        match = NO_SHA_TAG_PATTERN.search(body)
+        if match:
+            reason = match.group(1).strip()
+            if reason in VALID_NO_SHA_REASONS:
+                return reason
+    return None
+
+
+def verify_no_sha_evidence(
+    issue_identifier: str,
+    reason: str,
+    comments: list[dict[str, Any]],
+) -> bool:
+    """Return True if action_dispatch_routine posted expected evidence for reason.
+
+    Checks for the per-reason signature string in any comment. The signature
+    is posted by action_dispatch_routine.py's handler after the action succeeds.
+    """
+    signature = NO_SHA_EVIDENCE_SIGNATURES.get(reason)
+    if not signature:
+        logger.warning(
+            "Issue %s: unknown [no-sha: %s] reason; cannot verify evidence",
+            issue_identifier, reason,
+        )
+        return False
+
+    for comment in comments:
+        if signature in (comment.get("body", "") or ""):
+            logger.info(
+                "Issue %s: [no-sha: %s] evidence verified (found %r)",
+                issue_identifier, reason, signature,
+            )
+            return True
+
+    logger.info(
+        "Issue %s: [no-sha: %s] evidence NOT found (expected %r)",
+        issue_identifier, reason, signature,
+    )
+    return False
+
+
+def reopen_no_sha_missing_evidence(
+    issue_id: str,
+    issue_identifier: str,
+    reason: str,
+) -> bool:
+    """Reopen an issue whose [no-sha: reason] evidence comment is missing.
+
+    Posts a diagnostic comment and PATCHes status back to in_review so
+    action_dispatch_routine can retry or an operator can intervene.
+    """
+    signature = NO_SHA_EVIDENCE_SIGNATURES.get(reason, "")
+    comment_body = (
+        f"**Closure-Gate: [no-sha: {reason}] Evidence Missing**\n\n"
+        f"This issue was closed with a `[no-sha: {reason}]` tag but the expected "
+        f"evidence comment from `action_dispatch_routine` was not found.\n\n"
+        f"**Expected:** a comment containing `{signature}`\n\n"
+        f"**Action:** Status reset to `in_review`. Once `action_dispatch_routine` "
+        f"posts the evidence comment (or an operator manually verifies), the next "
+        f"closure-gate pass will accept the done status.\n\n"
+        f"_Closure-Gate v2 Step 2 (BTCAAAAA-38590)_"
+    )
+    try:
+        with _http_session() as sess:
+            resp = sess.patch(
+                f"{_base()}/api/issues/{issue_id}",
+                json={"status": "in_review", "comment": comment_body},
+                timeout=API_TIMEOUT,
+            )
+            resp.raise_for_status()
+            logger.info(
+                "Reopened issue %s to in_review (missing [no-sha: %s] evidence)",
+                issue_identifier, reason,
+            )
+            return True
+    except Exception as exc:
+        logger.error(
+            "Failed to reopen %s for missing no-sha evidence: %s",
+            issue_identifier, exc,
+        )
+        return False
+
+
+# === End No-SHA Evidence Verifier ===
 
 
 # === Fabrication Detection Functions (Phase 6c) ===
@@ -802,6 +924,108 @@ def fetch_origin_main() -> bool:
         return False
 
 
+def get_files_changed_by_commit(sha: str) -> list[str] | None:
+    """Return list of files changed by the given commit.
+
+    Uses git diff-tree to list files touched by the commit.
+    Returns None on error, empty list for commits that touched no files.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "diff-tree", "--no-commit-id", "-r", "--name-only", sha],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if result.returncode != 0:
+            logger.warning(
+                "git diff-tree rc=%d for SHA %s: %s",
+                result.returncode, sha[:8], result.stderr.strip(),
+            )
+            return None
+        return [f.strip() for f in result.stdout.splitlines() if f.strip()]
+    except Exception as exc:
+        logger.error("Failed to get changed files for SHA %s: %s", sha[:8], exc)
+        return None
+
+
+def _file_content_hash(ref: str, file_path: str) -> str | None:
+    """Return SHA256 of file content at the given git ref, or None if absent."""
+    try:
+        result = subprocess.run(
+            ["git", "show", f"{ref}:{file_path}"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            timeout=15,
+        )
+        if result.returncode != 0:
+            return None
+        return hashlib.sha256(result.stdout).hexdigest()
+    except Exception as exc:
+        logger.error("Failed to hash %s at %s: %s", file_path, ref[:12], exc)
+        return None
+
+
+def verify_sha_byte_identity(sha: str) -> bool:
+    """Fall back to byte-identity check when is-ancestor fails (squash-merge gap).
+
+    After a squash-merge the pre-squash Fix-SHA is not an ancestor of
+    origin/main, but the content it introduced IS present on main byte-for-byte
+    (because squash collapses commits into a new commit with the same tree).
+    This function checks that every file touched by `sha` has identical content
+    on `origin/main`, confirming the fix landed even though the SHA was replaced.
+
+    Limits the diff to files touched by the Fix-SHA commit so we don't walk
+    the entire tree. Logs `closure_path: byte_identical_via_archive` on success.
+
+    Returns True if byte-identical (or commit touched no files), False otherwise.
+    """
+    changed_files = get_files_changed_by_commit(sha)
+    if changed_files is None:
+        logger.warning(
+            "SHA %s: could not list changed files; skipping byte-identity check",
+            sha[:8],
+        )
+        return False
+    if not changed_files:
+        logger.info(
+            "closure_path: byte_identical_via_archive sha=%s files=0 (no-op commit)",
+            sha[:8],
+        )
+        return True
+
+    mismatches: list[str] = []
+    for file_path in changed_files:
+        sha_hash = _file_content_hash(sha, file_path)
+        main_hash = _file_content_hash("origin/main", file_path)
+        # Both absent: file was deleted in Fix-SHA and is still absent on main — match.
+        if sha_hash is None and main_hash is None:
+            continue
+        if sha_hash != main_hash:
+            mismatches.append(file_path)
+            logger.debug(
+                "SHA %s: file %s hash mismatch (fix=%s, main=%s)",
+                sha[:8], file_path,
+                sha_hash[:8] if sha_hash else "MISSING",
+                main_hash[:8] if main_hash else "MISSING",
+            )
+
+    if mismatches:
+        logger.info(
+            "SHA %s: byte-identity check FAILED (%d/%d files differ: %s)",
+            sha[:8], len(mismatches), len(changed_files),
+            ", ".join(mismatches[:5]),
+        )
+        return False
+
+    logger.info(
+        "closure_path: byte_identical_via_archive sha=%s files=%d",
+        sha[:8], len(changed_files),
+    )
+    return True
+
+
 def verify_sha_on_main(sha: str, skip_fetch: bool = False) -> bool:
     """Verify that SHA is an ancestor of origin/main using git.
 
@@ -1090,6 +1314,35 @@ def process_issue(
         )
         return "verified", True
 
+    # v2 Step 2 (BTCAAAAA-38590): [no-sha: reason] board-action lane. These issues
+    # are closed by action_dispatch_routine.py which posts a per-reason evidence
+    # comment after executing the action. Verify that evidence comment exists;
+    # if absent, reopen to in_review so the routine can retry.
+    no_sha_reason = extract_no_sha_tag_from_comments(comments)
+    if no_sha_reason is not None:
+        logger.info(
+            "Issue %s carries [no-sha: %s] tag; running evidence verifier",
+            issue_identifier, no_sha_reason,
+        )
+        if verify_no_sha_evidence(issue_identifier, no_sha_reason, comments):
+            return "verified", True
+
+        # Evidence missing — action_dispatch_routine hasn't run yet or failed.
+        action_hash = compute_action_hash(issue_id, no_sha_reason, "no_sha_missing_evidence")
+        action_key = f"{issue_id}:{action_hash}"
+        if action_key not in state:
+            if reopen_no_sha_missing_evidence(issue_id, issue_identifier, no_sha_reason):
+                state[action_key] = {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "issue_identifier": issue_identifier,
+                    "action": "no_sha_missing_evidence",
+                    "reason": no_sha_reason,
+                }
+                return "no_sha_missing_evidence", True
+            return "no_sha_missing_evidence", False
+        # Already acted; don't keep retrying
+        return "no_sha_missing_evidence", False
+
     sha = extract_fix_sha_from_comments(comments)
 
     if not sha:
@@ -1176,6 +1429,17 @@ def process_issue(
 
         return "verified", True
     else:
+        # is-ancestor check failed. Before reopening, try byte-identity fallback
+        # (Gap 3 — BTCAAAAA-38471): squash-merge replaces the SHA but the fix
+        # content lands byte-for-byte on origin/main.
+        if verify_sha_byte_identity(sha):
+            logger.info(
+                "Issue %s SHA %s not ancestor but byte-identical on main "
+                "(squash-merge gap BTCAAAAA-38471); marking verified",
+                issue_identifier, sha[:8],
+            )
+            return "verified", True
+
         logger.info("Issue %s SHA %s is NOT on main - reopening", issue_identifier, sha[:8])
         action_hash = compute_action_hash(issue_id, sha, "reopen")
         action_key = f"{issue_id}:{action_hash}"
@@ -1306,6 +1570,7 @@ def main(argv: list[str] | None = None) -> None:
         "requested_sha": 0,
         "flagged_fabrication": 0,
         "smoke_failed": 0,
+        "no_sha_missing_evidence": 0,
         "errors": 0,
     }
     deferral_flags: list[dict[str, Any]] = []
@@ -1338,6 +1603,11 @@ def main(argv: list[str] | None = None) -> None:
                 stats["smoke_failed"] += 1
             else:
                 stats["errors"] += 1
+        elif action_type == "no_sha_missing_evidence":
+            if success:
+                stats["no_sha_missing_evidence"] += 1
+            else:
+                stats["errors"] += 1
 
     # Save updated state
     if (
@@ -1345,6 +1615,7 @@ def main(argv: list[str] | None = None) -> None:
         or stats["requested_sha"] > 0
         or stats["flagged_fabrication"] > 0
         or stats["smoke_failed"] > 0
+        or stats["no_sha_missing_evidence"] > 0
     ):
         save_state(state)
         logger.info("Saved updated closure-gate state")
@@ -1399,6 +1670,7 @@ def format_routine_report(
         f"**Reopened (unmerged):** {stats['reopened']}",
         f"**Flagged (fabrication):** {stats['flagged_fabrication']}",
         f"**Reopened (smoke failed):** {stats.get('smoke_failed', 0)}",
+        f"**Reopened ([no-sha] evidence missing):** {stats.get('no_sha_missing_evidence', 0)}",
         f"**Requested Fix-SHA tag:** {stats['requested_sha']}",
         f"**Unfiled deferrals:** {len(deferral_flags)}",
         f"**Errors:** {stats['errors']}",
@@ -1421,6 +1693,16 @@ def format_routine_report(
         lines.extend([
             "### Fix-SHA Requests",
             f"Requested Fix-SHA tags on {stats['requested_sha']} issue(s) without closure commit evidence.",
+        ])
+
+    if stats.get("no_sha_missing_evidence", 0) > 0:
+        lines.extend([
+            "### No-SHA Evidence Missing",
+            (
+                f"Reopened {stats['no_sha_missing_evidence']} issue(s) with `[no-sha: reason]` tags "
+                "whose action_dispatch_routine evidence comment was not found (BTCAAAAA-38590). "
+                "These will re-verify on the next pass once the evidence comment appears."
+            ),
         ])
 
     if deferral_flags:
