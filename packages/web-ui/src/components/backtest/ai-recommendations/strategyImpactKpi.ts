@@ -71,7 +71,7 @@ export function applyDelta(base: KpiSet, delta: ProjectedDelta): KpiSet {
   };
 }
 
-// Re-backtest stub used while the real Sprint B/B4 endpoint is in flight.
+// Re-backtest stub used as a fallback when no reProjectFn is provided.
 // Resolves with the locally-summed projected deltas.
 export async function rebacktestStub(
   base: KpiSet,
@@ -88,6 +88,30 @@ export async function rebacktestStub(
     }
   });
   return applyDelta(base, sumDeltas(deltas));
+}
+
+// BTCAAAAA-37772 Sprint B/B4 — calls the real /api/backtest/re-project
+// endpoint to get confirmed KPIs from the Python backtest pipeline.
+// Returns null on any error so callers can fall back gracefully.
+export async function reProjectFromServer(
+  strategyId: string,
+  backtestConfig: unknown,
+  signal?: AbortSignal,
+): Promise<KpiSet | null> {
+  try {
+    const res = await fetch('/api/backtest/re-project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ strategyId, backtestConfig }),
+      signal,
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { ok?: boolean; kpis?: KpiSet };
+    if (!data.ok || !data.kpis) return null;
+    return data.kpis;
+  } catch {
+    return null;
+  }
 }
 
 function numberOr(v: unknown, fallback: number): number {

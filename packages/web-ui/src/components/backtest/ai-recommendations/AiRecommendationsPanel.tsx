@@ -52,10 +52,11 @@ import {
   extractReverseViewPattern,
   ReverseViewInput,
 } from './reverseViewPattern';
-import { StrategyImpactKpiBar } from './StrategyImpactKpiBar';
+import { StrategyImpactKpiBar, type ReProjectFn } from './StrategyImpactKpiBar';
 import {
   AppliedRecImpact,
   deriveBaselineKpis,
+  reProjectFromServer,
 } from './strategyImpactKpi';
 import { computeReanalyzeHash } from './dirtyHash';
 import { buildAiRecsSystemPrompt } from './prompts/systemPrompt';
@@ -612,6 +613,17 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
 
   // BTCAAAAA-37774 Sprint A2 — baseline + applied impacts feed the KPI bar.
   const baselineKpis = useMemo(() => deriveBaselineKpis(result ?? null), [result]);
+
+  // BTCAAAAA-37772 Sprint B/B4 — real re-projection function passed to the
+  // KPI bar. When a strategy ID is available, fires /api/backtest/re-project
+  // after the bar's 250ms debounce so the indicator flips Preview → Confirmed.
+  const _reProjectFn = useCallback(
+    (signal: AbortSignal) =>
+      reProjectFromServer(strategy?.id ?? '', backtestConfig ?? {}, signal),
+    [strategy?.id, backtestConfig],
+  );
+  const reProjectFn: ReProjectFn | undefined = strategy?.id ? _reProjectFn : undefined;
+
   const appliedImpacts = useMemo<AppliedRecImpact[]>(() => {
     if (parsedRecs.length === 0 || appliedRecIds.length === 0) return [];
     const byId = new Map(parsedRecs.map((r) => [r.id, r] as const));
@@ -1995,11 +2007,13 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
 
       {/* BTCAAAAA-37774 Sprint A2 — Strategy Impact KPI bar.
           Q7: when viewing a history snapshot use the stored KPIs; otherwise
-          fall back to the live backtest result. */}
+          fall back to the live backtest result.
+          BTCAAAAA-37772 Sprint B/B4 — reProjectFn wires in the real endpoint. */}
       {(result || viewingHistoryEntry?.snapshotKpis) && (
         <StrategyImpactKpiBar
           baseline={viewingHistoryEntry?.snapshotKpis ?? baselineKpis}
           appliedImpacts={viewingHistoryEntry ? [] : appliedImpacts}
+          reProjectFn={viewingHistoryEntry ? undefined : reProjectFn}
         />
       )}
 

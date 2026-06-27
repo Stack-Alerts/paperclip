@@ -27,6 +27,11 @@ import {
   sumDeltas,
 } from './strategyImpactKpi';
 
+// B4: function signature for a server-side re-projection call. When provided,
+// the bar fires this after the 250ms debounce and flips to "Confirmed" on
+// success. Falls back to rebacktestStub (local delta sum) when absent.
+export type ReProjectFn = (signal: AbortSignal) => Promise<KpiSet | null>;
+
 const DEBOUNCE_MS = 250;
 
 export type ImpactBarMode = 'live' | 'snapshot';
@@ -36,8 +41,12 @@ export interface StrategyImpactKpiBarProps {
   appliedImpacts: AppliedRecImpact[];
   mode?: ImpactBarMode;
   snapshotAfter?: KpiSet;
-  // Sprint B/B4 confirmed-rebacktest flag. Default false keeps the bar in
-  // Preview indefinitely so this card can land before the server endpoint.
+  // Sprint B/B4: when provided, the bar calls this after the 250ms debounce
+  // to get confirmed KPIs from the real backtest pipeline. Omitting it keeps
+  // the bar in Preview (local delta sum) indefinitely — safe for all callers
+  // that predate Sprint B.
+  reProjectFn?: ReProjectFn;
+  /** @deprecated Use reProjectFn instead. Kept for backward compat. */
   enableConfirmed?: boolean;
 }
 
@@ -124,6 +133,7 @@ export function StrategyImpactKpiBar({
   appliedImpacts,
   mode = 'live',
   snapshotAfter,
+  reProjectFn,
   enableConfirmed = false,
 }: StrategyImpactKpiBarProps) {
   const deltas = useMemo(
@@ -153,8 +163,11 @@ export function StrategyImpactKpiBar({
     [appliedImpacts],
   );
 
-  // 250ms debounced re-backtest. Aborts in-flight stub and re-arms whenever
+  // 250ms debounced re-backtest. Aborts in-flight request and re-arms whenever
   // the applied set changes. Snapshot mode skips this — the pair is final.
+  // When reProjectFn is provided (Sprint B/B4), it's called instead of the
+  // stub; if the server call returns null (unavailable) we fall back to the
+  // local delta sum so the indicator never sticks on "Re-running…".
   useEffect(() => {
     if (mode === 'snapshot') return;
     if (abortRef.current) {
@@ -174,7 +187,13 @@ export function StrategyImpactKpiBar({
       const controller = new AbortController();
       abortRef.current = controller;
       setConfirming(true);
-      rebacktestStub(baseline, deltas, controller.signal)
+      const resolveFn: Promise<KpiSet> = reProjectFn
+        ? reProjectFn(controller.signal).then(
+            (serverResult) =>
+              serverResult ?? rebacktestStub(baseline, deltas, controller.signal),
+          )
+        : rebacktestStub(baseline, deltas, controller.signal);
+      resolveFn
         .then((result) => {
           if (controller.signal.aborted) return;
           setConfirmedResult({ forKey: appliedKey, after: result });
@@ -195,11 +214,11 @@ export function StrategyImpactKpiBar({
         abortRef.current = null;
       }
     };
-  }, [appliedImpacts, baseline, deltas, mode, appliedKey]);
+  }, [appliedImpacts, baseline, deltas, mode, appliedKey, reProjectFn]);
 
   const showConfirmed =
     mode === 'live' &&
-    enableConfirmed &&
+    (enableConfirmed || reProjectFn != null) &&
     confirmedResult !== null &&
     confirmedResult.forKey === appliedKey;
   const after = showConfirmed && confirmedResult ? confirmedResult.after : previewAfter;
