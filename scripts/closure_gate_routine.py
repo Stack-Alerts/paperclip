@@ -1672,6 +1672,7 @@ def format_routine_report(
         f"**Reopened (smoke failed):** {stats.get('smoke_failed', 0)}",
         f"**Reopened ([no-sha] evidence missing):** {stats.get('no_sha_missing_evidence', 0)}",
         f"**Requested Fix-SHA tag:** {stats['requested_sha']}",
+        f"**Reopened ([no-sha] evidence missing):** {stats.get('no_sha_missing_evidence', 0)}",
         f"**Unfiled deferrals:** {len(deferral_flags)}",
         f"**Errors:** {stats['errors']}",
         "",

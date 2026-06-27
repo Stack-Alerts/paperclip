@@ -29,6 +29,29 @@ the fix existed on a branch.
 The automation closes it after the merge lands. Setting `done` early bypasses all
 merge-gate and ancestry checks.
 
+### Board-action issues with no code artifact (v2)
+
+For issues that require an operational action (redeploy, install, config, process) but
+have **no git commit**, use the `[no-sha: <reason>]` tag convention instead of Fix-SHA:
+
+1. In the closing Paperclip comment, include the exact line:
+   ```
+   [no-sha: redeploy]
+   [no-sha: install] <plugin-id>
+   [no-sha: config] KEY=value
+   [no-sha: process]
+   ```
+2. Set the issue status to **`in_review`**.
+3. **Trigger the action dispatch immediately**:
+   ```
+   python3 scripts/action_dispatch_routine.py --issue <issue-id>
+   ```
+   This executes the action, posts an evidence comment, and flips the issue to `done`.
+   The periodic sweep is a backup; always trigger manually for prompt resolution.
+
+**Never mix a `[no-sha: ...]` tag with a `Fix-SHA:` line.** If both are present,
+`merge_dispatch_routine` takes the SHA; the action routine skips the issue.
+
 ### When it is safe to set `done` directly
 
 Only if ALL of the following are true:
