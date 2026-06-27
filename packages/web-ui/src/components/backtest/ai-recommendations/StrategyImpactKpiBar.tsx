@@ -341,18 +341,20 @@ function DeltaChip({
 }) {
   const palette = DELTA_PALETTE[direction];
   const arrow = direction === 'up' ? '▲' : direction === 'down' ? '▼' : '·';
+  const dirWord = direction === 'up' ? 'up' : direction === 'down' ? 'down' : 'no change';
   return (
     <span
       className="self-start text-[10px] font-mono px-1.5 py-0.5 rounded"
       data-testid={testId}
       data-direction={direction}
+      aria-label={`${dirWord}: ${label}`}
       style={{
         background: palette.bg,
         color: palette.fg,
         border: `1px solid ${palette.border}`,
       }}
     >
-      {arrow} {label}
+      <span aria-hidden="true">{arrow}</span>{' '}{label}
     </span>
   );
 }

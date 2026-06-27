@@ -1279,6 +1279,45 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
     [setView],
   );
 
+  // BTCAAAAA-38566: stable refs for tab focus management (WAI-ARIA APG roving-tabindex pattern)
+  const mainTabRefs = useRef<Map<View, HTMLButtonElement>>(new Map());
+  const rightTabRefs = useRef<Map<'recs' | 'diagnose', HTMLButtonElement>>(new Map());
+
+  const handleMainTabKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>, v: View) => {
+      const idx = VIEW_ORDER.indexOf(v);
+      let next: View | null = null;
+      if (e.key === 'ArrowRight') next = VIEW_ORDER[(idx + 1) % VIEW_ORDER.length];
+      else if (e.key === 'ArrowLeft') next = VIEW_ORDER[(idx - 1 + VIEW_ORDER.length) % VIEW_ORDER.length];
+      else if (e.key === 'Home') next = VIEW_ORDER[0];
+      else if (e.key === 'End') next = VIEW_ORDER[VIEW_ORDER.length - 1];
+      if (next !== null) {
+        e.preventDefault();
+        setView(next);
+        const nextTab = next;
+        Promise.resolve().then(() => mainTabRefs.current.get(nextTab)?.focus());
+      }
+    },
+    [setView],
+  );
+
+  const handleRightTabKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>, t: 'recs' | 'diagnose') => {
+      const tabs = ['recs', 'diagnose'] as const;
+      const idx = tabs.indexOf(t);
+      let next: 'recs' | 'diagnose' | null = null;
+      if (e.key === 'ArrowRight') next = tabs[(idx + 1) % tabs.length];
+      else if (e.key === 'ArrowLeft') next = tabs[(idx - 1 + tabs.length) % tabs.length];
+      if (next !== null) {
+        e.preventDefault();
+        setRightTab(next);
+        const nextTab = next;
+        Promise.resolve().then(() => rightTabRefs.current.get(nextTab)?.focus());
+      }
+    },
+    [setRightTab],
+  );
+
   // ── LEFT pane: config + active-form + Approve flow ──
   const leftPane = (
     <div className="flex flex-col gap-3">
@@ -1841,10 +1880,15 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           return (
             <button
               key={t}
+              id={`ai-recs-right-tab-${t}`}
               type="button"
               role="tab"
               aria-selected={isActive}
+              aria-controls={`ai-recs-right-panel-${t}`}
+              tabIndex={isActive ? 0 : -1}
               onClick={() => setRightTab(t)}
+              onKeyDown={(e) => handleRightTabKeyDown(e, t)}
+              ref={(el) => { if (el) rightTabRefs.current.set(t, el); else rightTabRefs.current.delete(t); }}
               data-testid={`ai-recs-right-tab-${t}`}
               className="px-3 py-1.5 text-xs font-medium rounded-t"
               style={{
@@ -1862,7 +1906,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
         })}
       </div>
 
-      {rightTab === 'recs' && (<>
+      {rightTab === 'recs' && (<div id="ai-recs-right-panel-recs" role="tabpanel" aria-labelledby="ai-recs-right-tab-recs">
       {/* Diagnosis card: compact summary at the top so the grid below has
           room. The detailed prose is still rendered in full; we just do
           not crowd it next to the per-rec cards. */}
@@ -2273,19 +2317,21 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
 
       {/* Per-tile saves are now the action surface (AC20). No more
           sticky "Apply all" footer — apply is per-card. */}
-      </>)}
+      </div>)}
 
       {parsedRecs.length > 0 && (
         <ReverseViewBanner pattern={extractReverseViewPattern(reverseViewInputs)} />
       )}
 
       {rightTab === 'diagnose' && (
-        <DiagnosePane
-          diagnosis={aiAnalysis?.diagnosis ?? aiAnalysis?.raw ?? ''}
-          rows={diagnoseRows}
-          stagedSentence={stagedSentence}
-          hasResult={!!result}
-        />
+        <div id="ai-recs-right-panel-diagnose" role="tabpanel" aria-labelledby="ai-recs-right-tab-diagnose">
+          <DiagnosePane
+            diagnosis={aiAnalysis?.diagnosis ?? aiAnalysis?.raw ?? ''}
+            rows={diagnoseRows}
+            stagedSentence={stagedSentence}
+            hasResult={!!result}
+          />
+        </div>
       )}
     </div>
   );
@@ -2318,7 +2364,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
             style={{ background: 'var(--accent-green)' }}
           />
           <span>Realtime</span>
-          <span style={{ color: 'var(--text-faint)' }}>·</span>
+          <span style={{ color: 'var(--text-faint)' }} aria-hidden="true">·</span>
           <span data-testid="ai-recs-realtime-count">
             {appliedRecIds.length} {appliedRecIds.length === 1 ? 'change' : 'changes'} applied
           </span>
@@ -2334,11 +2380,11 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           <span data-testid="ai-recs-chip-entries" title="Trade count from the last backtest">
             {entriesChip} entries
           </span>
-          <span style={{ color: 'var(--text-faint)' }}>·</span>
+          <span style={{ color: 'var(--text-faint)' }} aria-hidden="true">·</span>
           <span data-testid="ai-recs-chip-pf" title="Profit factor">PF {pfChip}</span>
-          <span style={{ color: 'var(--text-faint)' }}>·</span>
+          <span style={{ color: 'var(--text-faint)' }} aria-hidden="true">·</span>
           <span data-testid="ai-recs-chip-wr" title="Win rate">WR {wrChip}</span>
-          <span style={{ color: 'var(--text-faint)' }}>·</span>
+          <span style={{ color: 'var(--text-faint)' }} aria-hidden="true">·</span>
           <button
             type="button"
             onClick={handleReanalyzeClick}
@@ -2388,10 +2434,15 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           return (
             <button
               key={v}
+              id={`ai-recs-tab-${v}`}
               type="button"
               role="tab"
               aria-selected={isActive}
+              aria-controls={`ai-recs-panel-${v}`}
+              tabIndex={isActive ? 0 : -1}
               onClick={() => setView(v)}
+              onKeyDown={(e) => handleMainTabKeyDown(e, v)}
+              ref={(el) => { if (el) mainTabRefs.current.set(v, el); else mainTabRefs.current.delete(v); }}
               data-testid={`ai-recs-tab-${v}`}
               className="px-3 py-1.5 text-xs font-medium rounded-t"
               style={{
@@ -2416,6 +2467,9 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
 
 {currentView === 'current' ? (
         <div
+          id="ai-recs-panel-current"
+          role="tabpanel"
+          aria-labelledby="ai-recs-tab-current"
           data-testid="ai-recs-current-with-rail"
           className="flex gap-3"
           style={{ flexWrap: 'wrap', alignItems: 'flex-start' }}
@@ -2431,13 +2485,16 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           />
         </div>
       ) : currentView === 'request' ? (
-        <div data-testid="ai-recs-view-request">{leftPane}</div>
+        <div id="ai-recs-panel-request" role="tabpanel" aria-labelledby="ai-recs-tab-request" data-testid="ai-recs-view-request">{leftPane}</div>
       ) : currentView === 'response' ? (
         (() => {
           const rawReply =
             history.entries[0]?.raw || aiAnalysis?.raw || '';
           return (
             <div
+              id="ai-recs-panel-response"
+              role="tabpanel"
+              aria-labelledby="ai-recs-tab-response"
               data-testid="ai-recs-view-response"
               className="flex flex-col gap-2"
             >
@@ -2528,15 +2585,17 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           );
         })()
       ) : (
-        <HistoryView
-          entries={history.entries}
-          hydrated={history.hydrated}
-          onUpdateStatus={history.updateStatus}
-          onUpdateNotes={history.updateNotes}
-          onRequestDelete={requestDelete}
-          onRequestClearAll={requestClearAll}
-          onLoadIntoCurrent={loadHistoryIntoCurrent}
-        />
+        <div id="ai-recs-panel-history" role="tabpanel" aria-labelledby="ai-recs-tab-history">
+          <HistoryView
+            entries={history.entries}
+            hydrated={history.hydrated}
+            onUpdateStatus={history.updateStatus}
+            onUpdateNotes={history.updateNotes}
+            onRequestDelete={requestDelete}
+            onRequestClearAll={requestClearAll}
+            onLoadIntoCurrent={loadHistoryIntoCurrent}
+          />
+        </div>
       )}
 
       {confirmation && (

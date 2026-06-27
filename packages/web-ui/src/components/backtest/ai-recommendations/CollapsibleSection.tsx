@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useId } from 'react';
 import { ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
 
 export function CollapsibleSection({
@@ -17,6 +17,7 @@ export function CollapsibleSection({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [copied, setCopied] = useState(false);
+  const contentId = useId();
 
   const handleCopy = useCallback(
     async (e: React.MouseEvent) => {
@@ -53,26 +54,30 @@ export function CollapsibleSection({
       className="rounded mb-2"
       style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
     >
-      <button
-        className="w-full flex items-center gap-2 px-3 py-2 text-left"
-        onClick={() => setOpen((v) => !v)}
-        type="button"
-      >
-        {open ? (
-          <ChevronDown size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-        ) : (
-          <ChevronRight size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-        )}
-        <span className="text-xs font-semibold uppercase tracking-wide flex-1" style={{ color: 'var(--text-secondary)' }}>
-          {title}
-        </span>
-        <span className="text-xs" style={{ color: 'var(--text-faint)' }}>
-          {description}
-        </span>
+      <div className="w-full flex items-center gap-2 px-3 py-2">
+        <button
+          className="flex items-center gap-2 text-left flex-1"
+          onClick={() => setOpen((v) => !v)}
+          type="button"
+          aria-expanded={open}
+          aria-controls={contentId}
+        >
+          {open ? (
+            <ChevronDown size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          ) : (
+            <ChevronRight size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          )}
+          <span className="text-xs font-semibold uppercase tracking-wide flex-1" style={{ color: 'var(--text-secondary)' }}>
+            {title}
+          </span>
+          <span className="text-xs" style={{ color: 'var(--text-faint)' }}>
+            {description}
+          </span>
+        </button>
         {copyText !== undefined && (
-          <span
-            role="button"
-            aria-label={`Copy ${title}`}
+          <button
+            type="button"
+            aria-label={copied ? `Copied ${title}` : `Copy ${title}`}
             data-testid={`collapsible-copy-${title.replace(/\s+/g, '-').toLowerCase()}`}
             onClick={handleCopy}
             className="ml-2 px-1.5 py-0.5 rounded flex items-center gap-1 text-[10px] font-medium shrink-0"
@@ -89,11 +94,11 @@ export function CollapsibleSection({
               <Copy size={10} aria-hidden="true" />
             )}
             {copied ? 'Copied' : 'Copy'}
-          </span>
+          </button>
         )}
-      </button>
+      </div>
       {open && (
-        <div className="px-3 pb-3">
+        <div id={contentId} className="px-3 pb-3">
           {children}
         </div>
       )}
