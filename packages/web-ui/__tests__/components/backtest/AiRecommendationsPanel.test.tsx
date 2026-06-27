@@ -1413,16 +1413,9 @@ describe('AiRecommendationsPanel — history tab swap-in (Sprint B6)', () => {
       expect(screen.getByTestId(`history-row-${HISTORY_ENTRY.id}`)).toBeInTheDocument();
     });
 
-    // Expand the history card by clicking "View" on the compact row
+    // The compact row's "View" button directly loads the entry into the current
+    // analysis tab (Q7 / BTCAAAAA-38564 refactor — no intermediate card needed).
     fireEvent.click(screen.getByTestId(`history-view-${HISTORY_ENTRY.id}`));
-
-    // HistoryCard only renders when the row is expanded
-    await waitFor(() => {
-      expect(screen.getByTestId(`history-load-${HISTORY_ENTRY.id}`)).toBeInTheDocument();
-    });
-
-    // Click "Load into current analysis"
-    fireEvent.click(screen.getByTestId(`history-load-${HISTORY_ENTRY.id}`));
 
     // Panel should switch back to the "current" view
     await waitFor(() => {
