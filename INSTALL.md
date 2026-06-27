@@ -154,6 +154,95 @@ nohup /home/sirrus/.npm/_npx/43414d9b790239bb/node_modules/.bin/paperclipai \
 #   exec "$CACHE/.bin/paperclipai" "$@"
 ```
 
+#### 4.4 — Patch the Paperclip Service Worker (`sw.js`)
+
+Paperclip ships a `sw.js` whose `fetch` handler can resolve to
+`undefined` from the network-failure fallback:
+
+```js
+.catch(() => {
+  if (request.mode === "navigate") {
+    return caches.match("/") || new Response("Offline", { status: 503 });
+  }
+  return caches.match(request);   // ← undefined when not cached
+})
+```
+
+`event.respondWith(undefined)` makes Chrome reject the FetchEvent
+("Failed to convert value to 'Response'"), which leaves the host
+bundle in a half-loaded state and the page stuck on its spinner.
+Compounding this, the service-worker update race means an old,
+buggy SW can control a tab while a new one activates, producing
+**intermittent** "Loading…" hangs after a fresh plugin install.
+
+Patch `sw.js` so the fallback always returns a `Response` and the
+new SW force-reloads any tabs that were under the old SW:
+
+```sh
+NPX_CACHE=/home/sirrus/.npm/_npx/43414d9b790239bb/node_modules
+SW="$NPX_CACHE/@paperclipai/server/ui-dist/sw.js"
+cp "$SW" "$SW.bak"
+
+# Replace the buggy fetch handler with a safe one.
+cat > "$SW" <<'SWJS'
+const CACHE_NAME = "paperclip-v2";
+const OFFLINE_FALLBACK = "/";
+
+self.addEventListener("install", () => { self.skipWaiting(); });
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((key) => caches.delete(key)));
+    await self.clients.claim();
+    // Only force-reload when there was a previous cache — the very
+    // first install must NOT reload every open tab.
+    if (keys.length > 0) {
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of clients) {
+        try { await client.navigate(client.url); } catch {}
+      }
+    }
+  })());
+});
+
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+  if (request.method !== "GET" || url.pathname.startsWith("/api")) return;
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        if (response.ok && url.origin === self.location.origin) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        }
+        return response;
+      })
+      .catch(async () => {
+        if (request.mode === "navigate") {
+          const cached = (await caches.match(OFFLINE_FALLBACK)) ||
+            (await caches.match(request)) ||
+            new Response("Offline", { status: 503 });
+          return cached;
+        }
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        return new Response("Offline", { status: 503 });
+      })
+  );
+});
+SWJS
+
+# Verify the patched file is valid JS.
+node --check "$SW" && echo "sw.js OK"
+```
+
+After patching, **hard refresh** the browser once so the new SW
+takes over. If the page still hangs after a fresh install,
+close all `127.0.0.1:3100` tabs and reopen — this guarantees every
+tab is born under the new SW.
+
 ### 5. Start Paperclip and install the plugins
 
 ```sh
@@ -215,7 +304,7 @@ If you're rebuilding from scratch and only have this repo:
 - [ ] `pnpm install && pnpm build` in `paperclip-plugin-dev`
 - [ ] Verify `dist/manifest.js`, `dist/worker.js`, `dist/ui/index.js` exist in `packages/plugins/plugin-git-merges/`
 - [ ] `git worktree add …fix-38557 origin/fix/BTCAAAAA-38557-merge-ready-watcher` and symlink `.env` (see §3)
-- [ ] Apply the two `plugin-loader.js` patches and fix the wrapper (see §4)
+- [ ] Apply the two `plugin-loader.js` patches, fix the wrapper, and patch `sw.js` (see §4)
 - [ ] Start Paperclip (direct invocation, see §5)
 - [ ] Install both plugins
 - [ ] Restart Paperclip

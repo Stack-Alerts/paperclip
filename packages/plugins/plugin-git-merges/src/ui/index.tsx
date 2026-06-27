@@ -191,6 +191,142 @@ const codeInlineStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--muted, #888) 14%, transparent)",
 };
 
+// Inline link style — same color as surrounding text but underlined and
+// cursor:pointer so the user can tell at a glance that the identifier
+// is clickable. Hover deepens the color. Used for the issue identifier
+// and the GitHub PR link inside MergeBlockCard.
+const inlineLinkStyle: CSSProperties = {
+  color: "inherit",
+  textDecoration: "underline",
+  textDecorationStyle: "dotted",
+  textUnderlineOffset: "3px",
+  textDecorationThickness: "1px",
+  cursor: "pointer",
+  fontWeight: 500,
+};
+
+// "Visited" pill — shown next to the issue/PR link after the user has
+// clicked it since the last scan. Persisted in localStorage so the
+// marker survives page reloads but resets automatically when a new
+// scan's `startedAt` arrives (because the storage key changes).
+const visitedPillStyle: CSSProperties = {
+  fontSize: "10px",
+  padding: "1px 7px",
+  borderRadius: "999px",
+  border: "1px solid color-mix(in srgb, #16a34a 60%, var(--border))",
+  background: "color-mix(in srgb, #16a34a 14%, transparent)",
+  color: "#86efac",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "4px",
+  cursor: "help",
+  whiteSpace: "nowrap",
+};
+
+// localStorage key used to persist which blocks the user has clicked
+// into since a given scan started. The full value is a JSON object
+// keyed by scan `startedAt` ISO string; values are arrays of diffKey.
+// Stale entries (scans no longer in the snapshot) are pruned lazily.
+const VISITED_STORAGE_KEY = "paperclip.git-merges.visited-blocks";
+
+type VisitedMap = Record<string, string[]>;
+
+function readVisitedMap(): VisitedMap {
+  if (typeof localStorage === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(VISITED_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    const out: VisitedMap = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (typeof k !== "string") continue;
+      if (Array.isArray(v) && v.every((x) => typeof x === "string")) {
+        out[k] = v.slice();
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writeVisitedMap(map: VisitedMap): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(VISITED_STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    // localStorage may be full or unavailable (private mode, etc.) —
+    // silently ignore so the marker becomes a no-op rather than
+    // breaking the rest of the UI.
+  }
+}
+
+/**
+ * Returns a `Set` of diffKeys the user has clicked into during the
+ * current scan, plus a `markVisited(diffKey)` callback that persists
+ * the click. The set resets automatically when the host reports a
+ * fresh `latestStartedAt`, because the storage key is the scan
+ * timestamp itself.
+ */
+function useVisitedBlocks(currentScanStartedAt: string | null): {
+  visited: Set<string>;
+  markVisited: (diffKey: string) => void;
+  clearVisited: () => void;
+} {
+  const [visited, setVisited] = useState<Set<string>>(() => {
+    if (!currentScanStartedAt) return new Set();
+    const map = readVisitedMap();
+    return new Set(map[currentScanStartedAt] ?? []);
+  });
+
+  // When the scan changes (or first arrives), reload the set from
+  // localStorage for the new key. This handles both the "no snapshot
+  // yet → snapshot arrives" and "scan A → scan B" transitions.
+  useEffect(() => {
+    if (!currentScanStartedAt) {
+      setVisited(new Set());
+      return;
+    }
+    const map = readVisitedMap();
+    setVisited(new Set(map[currentScanStartedAt] ?? []));
+  }, [currentScanStartedAt]);
+
+  const markVisited = useCallback(
+    (diffKey: string) => {
+      if (!currentScanStartedAt) return;
+      setVisited((prev) => {
+        if (prev.has(diffKey)) return prev;
+        const next = new Set(prev);
+        next.add(diffKey);
+        const map = readVisitedMap();
+        const arr = map[currentScanStartedAt] ?? [];
+        if (!arr.includes(diffKey)) {
+          map[currentScanStartedAt] = [...arr, diffKey];
+          // Prune anything older than the current scan so the storage
+          // doesn't grow unboundedly across many scans.
+          for (const k of Object.keys(map)) {
+            if (k !== currentScanStartedAt) delete map[k];
+          }
+          writeVisitedMap(map);
+        }
+        return next;
+      });
+    },
+    [currentScanStartedAt],
+  );
+
+  const clearVisited = useCallback(() => {
+    if (!currentScanStartedAt) return;
+    const map = readVisitedMap();
+    delete map[currentScanStartedAt];
+    writeVisitedMap(map);
+    setVisited(new Set());
+  }, [currentScanStartedAt]);
+
+  return { visited, markVisited, clearVisited };
+}
+
 const fieldLabelStyle: CSSProperties = {
   display: "grid",
   gap: "6px",
@@ -519,12 +655,19 @@ export function GitMergesPage(_props: PluginPageProps) {
   // writer. When the scan completes we drop back to a 30 s heartbeat. The
   // host's stream bridge is not enabled in this Paperclip release, so we
   // can't rely on SSE — polling is the universal fallback.
+  //
+  // We depend on the *stable* refresh function and the running flag, not
+  // the entire `snapshotQuery` object. The host's usePluginData returns a
+  // fresh object reference every render, so depending on the whole object
+  // would tear down and re-create this interval on every render.
+  const snapshotRefresh = snapshotQuery.refresh;
+  const runningNow = Boolean(snapshotQuery.data?.status?.running);
   useEffect(() => {
     const id = window.setInterval(() => {
-      void snapshotQuery.refresh();
-    }, snapshotQuery.data?.status?.running ? 1500 : 30_000);
+      void snapshotRefresh();
+    }, runningNow ? 1500 : 30_000);
     return () => window.clearInterval(id);
-  }, [snapshotQuery]);
+  }, [snapshotRefresh, runningNow]);
 
   const snapshot = snapshotQuery.data;
   const config = snapshot?.config ?? { ...DEFAULT_CONFIG };
@@ -574,6 +717,13 @@ export function GitMergesPage(_props: PluginPageProps) {
   const running = Boolean(status?.running);
   const effectiveStdout = latest?.stdout ?? "";
   const effectiveStderr = latest?.stderr ?? "";
+
+  // Track which blocks the user has clicked into since the current scan
+  // started. The set persists in localStorage and auto-resets when a
+  // new scan arrives (because the storage key is the scan timestamp).
+  const { visited, markVisited } = useVisitedBlocks(
+    snapshot?.latestStartedAt ?? null,
+  );
 
   // Build a delta lookup table by diffKey, shared by the Blocks and Diff
   // views so each card can show elapsed time + per-block check-count delta.
@@ -963,6 +1113,8 @@ export function GitMergesPage(_props: PluginPageProps) {
           blocks={snapshot?.blocks ?? []}
           previousBlocks={snapshot?.previousBlocks ?? null}
           deltaByKey={deltaByKey}
+          visited={visited}
+          onVisit={markVisited}
           totals={snapshot?.totals ?? null}
           stdout={effectiveStdout}
           stderr={effectiveStderr}
@@ -1025,6 +1177,8 @@ function QueueTabs({
   blocks,
   previousBlocks,
   deltaByKey,
+  visited,
+  onVisit,
   totals: _totals,
   stdout,
   stderr,
@@ -1033,6 +1187,8 @@ function QueueTabs({
   blocks: MergeBlock[];
   previousBlocks: MergeBlock[] | null;
   deltaByKey: Map<string, BlockDelta>;
+  visited: Set<string>;
+  onVisit: (diffKey: string) => void;
   totals: MergeQueueSnapshot["totals"] | null;
   stdout: string;
   stderr: string;
@@ -1078,6 +1234,8 @@ function QueueTabs({
         <BlocksView
           blocks={blocks}
           deltaByKey={deltaByKey}
+          visited={visited}
+          onVisit={onVisit}
           companyPrefix={companyPrefix}
         />
       ) : tab === "diff" ? (
@@ -1085,6 +1243,8 @@ function QueueTabs({
           current={blocks}
           previous={previousBlocks ?? []}
           deltaByKey={deltaByKey}
+          visited={visited}
+          onVisit={onVisit}
           companyPrefix={companyPrefix}
         />
       ) : (
@@ -1265,12 +1425,17 @@ function MergeBlockCard({
   companyPrefix,
   diffBadge,
   delta,
+  isVisited,
+  onVisit,
 }: {
   block: MergeBlock;
   companyPrefix: string | null;
   diffBadge?: ReactNode;
   delta?: BlockDelta | null;
+  isVisited?: boolean;
+  onVisit?: (diffKey: string) => void;
 }) {
+  const hostNavigation = useHostNavigation();
   const issueHref =
     companyPrefix && block.issueIdentifier
       ? `/${companyPrefix}/issues/${block.issueIdentifier}`
@@ -1278,6 +1443,25 @@ function MergeBlockCard({
   const prHref = block.prNumber
     ? `https://github.com/Stack-Alerts/BTC-Trade-Engine-PaperClip/pull/${block.prNumber}`
     : null;
+
+  // Build link props via the host SPA router so internal Paperclip
+  // navigation does not reload the document. External (GitHub) links
+  // use a plain anchor with target=_blank since they leave the app.
+  const issueLinkProps = issueHref
+    ? hostNavigation.linkProps(issueHref)
+    : null;
+
+  // Compose click handlers so the visited marker is recorded when the
+  // user actually navigates. We wrap the host-router onClick (and the
+  // default action for external links) so the marker fires only on
+  // intentional clicks, not on prefetch/right-click/etc.
+  const handleIssueClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    onVisit?.(block.diffKey);
+    issueLinkProps?.onClick(event);
+  };
+  const handlePrClick = () => {
+    onVisit?.(block.diffKey);
+  };
 
   return (
     <div style={blockCardStyle}>
@@ -1289,28 +1473,40 @@ function MergeBlockCard({
           </h4>
           <div style={blockMetaStyle}>
             <span>in review {block.inReviewFor}</span>
-            {issueHref ? (
+            {issueLinkProps ? (
               <a
-                href={issueHref}
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: "inherit" }}
+                {...issueLinkProps}
+                onClick={handleIssueClick}
+                style={inlineLinkStyle}
+                title={`Open ${block.issueIdentifier} in Paperclip`}
               >
                 {block.issueIdentifier}
               </a>
             ) : block.issueIdentifier ? (
-              <span>{block.issueIdentifier}</span>
+              <span title="Issue identifier (no company prefix in host context)">
+                {block.issueIdentifier}
+              </span>
             ) : (
               <span style={{ opacity: 0.5 }}>
                 {block.issueUuid.slice(0, 8)}…
               </span>
             )}
+            {isVisited ? (
+              <span
+                style={visitedPillStyle}
+                title="You opened this block's link since the last scan. Marker clears on the next scan."
+              >
+                ✓ checked
+              </span>
+            ) : null}
             {prHref ? (
               <a
                 href={prHref}
                 target="_blank"
                 rel="noreferrer"
-                style={{ color: "inherit" }}
+                onClick={handlePrClick}
+                style={inlineLinkStyle}
+                title={`Open PR #${block.prNumber} on GitHub`}
               >
                 PR #{block.prNumber}
               </a>
@@ -1330,6 +1526,7 @@ function MergeBlockCard({
                   fontFamily:
                     "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
                 }}
+                title={block.fixSha}
               >
                 {block.fixSha.slice(0, 7)}
               </code>
@@ -1367,10 +1564,14 @@ function MergeBlockCard({
 function BlocksView({
   blocks,
   deltaByKey,
+  visited,
+  onVisit,
   companyPrefix,
 }: {
   blocks: MergeBlock[];
   deltaByKey: Map<string, BlockDelta>;
+  visited: Set<string>;
+  onVisit: (diffKey: string) => void;
   companyPrefix: string | null;
 }) {
   if (blocks.length === 0) {
@@ -1390,6 +1591,8 @@ function BlocksView({
             block={block}
             companyPrefix={companyPrefix}
             delta={delta}
+            isVisited={visited.has(block.diffKey)}
+            onVisit={onVisit}
           />
         );
       })}
@@ -1706,11 +1909,15 @@ function DiffView({
   current,
   previous,
   deltaByKey,
+  visited,
+  onVisit,
   companyPrefix,
 }: {
   current: MergeBlock[];
   previous: MergeBlock[];
   deltaByKey: Map<string, BlockDelta>;
+  visited: Set<string>;
+  onVisit: (diffKey: string) => void;
   companyPrefix: string | null;
 }) {
   if (previous.length === 0) {
@@ -1750,6 +1957,10 @@ function DiffView({
         // the user doesn't see confusing "+0 passed" math.
         const delta =
           kind === "previous" ? null : (deltaByKey.get(block.diffKey) ?? null);
+        // Marker only on current rows — a removed block can't have been
+        // visited during the current scan (it wasn't in the scan).
+        const isVisited =
+          kind === "current" ? visited.has(block.diffKey) : false;
         return (
           <MergeBlockCard
             key={`${kind}-${block.issueUuid}`}
@@ -1757,6 +1968,8 @@ function DiffView({
             companyPrefix={companyPrefix}
             diffBadge={badge}
             delta={delta}
+            isVisited={isVisited}
+            onVisit={onVisit}
           />
         );
       })}
