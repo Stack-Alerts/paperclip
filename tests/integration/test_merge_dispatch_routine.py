@@ -120,6 +120,29 @@ class TestMergeGate:
         assert result["action"] == "skip"
         assert result["reason"] == "branch_not_pushed"
 
+    def test_closes_directly_when_squash_merged(self):
+        """Squash-merged SHA (byte-identity match) closes the issue directly.
+
+        Regression guard for BTCAAAAA-38602: the old code posted a comment
+        saying 'closure-gate will flip to done' but the closure-gate only
+        processes *done* issues, causing an infinite wake loop. The fix closes
+        the issue here instead.
+        """
+        mod = self._load()
+        sha = "d" * 40
+        issue = {"id": "id", "identifier": "BTCAAAAA-9", "status": "in_review"}
+        with patch.object(mod, "fetch_issue_comments", return_value=[{"body": f"Fix-SHA: {sha}"}]), \
+            patch.object(mod, "sha_exists_locally", return_value=True), \
+            patch.object(mod, "is_ancestor_of_main", return_value=False), \
+            patch.object(mod, "pre_dispatch_already_merged_check", return_value=(True, "byte-identity: all 1 file(s) match")), \
+            patch.object(mod, "comment_on_issue") as mock_comment, \
+            patch.object(mod, "update_issue_status") as mock_status:
+            result = mod.process_issue(issue)
+        assert result["action"] == "closed_squash_detected"
+        assert result["reason"] == "already_merged_squash"
+        mock_status.assert_called_once_with("id", "done")
+        mock_comment.assert_called_once()
+
 
 class TestAgentFinishDispatch:
     """Test the --issue agent-finish single-issue dispatch path (board opt2)."""

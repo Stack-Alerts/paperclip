@@ -31,7 +31,7 @@ on:
 
 concurrency:
   group: blast-radius-worker
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   worker:

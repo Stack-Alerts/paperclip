@@ -809,22 +809,27 @@ def process_issue(issue: dict[str, Any]) -> dict[str, Any]:
             "Pre-dispatch already-merged check fired for %s on %s: %s",
             sha[:8], issue_identifier, skip_reason,
         )
-        audit_body = (
-            f"**Pre-dispatch already-merged detection**\n\n"
+        # Close the issue directly here. The closure-gate only processes *done*
+        # issues and cannot close an in_review issue — delegating to it caused
+        # an infinite wake loop (BTCAAAAA-38602).
+        close_body = (
+            f"**Pre-dispatch already-merged detection — closing issue**\n\n"
             f"Fix-SHA: `{sha}`\n"
             f"Detection: {skip_reason}\n\n"
-            f"Skipping dispatch — the closure-gate routine will flip this issue to `done` "
-            f"once the SHA is detected as ancestor of `origin/main`.\n\n"
+            f"All files touched by the Fix-SHA are byte-identical to `origin/main` "
+            f"(squash-merge gap — SHA not a direct ancestor but content is present). "
+            f"Closing directly rather than delegating to closure-gate.\n\n"
             f"Tracking: [{MERGE_DISPATCH_TRACKING}](/BTCAAAAA/issues/{MERGE_DISPATCH_TRACKING})"
         )
         comment_on_issue(
             issue_id,
-            audit_body,
+            close_body,
             idempotency_key=f"pre_dispatch_already_merged:{issue_id}:{sha[:8]}",
         )
+        update_issue_status(issue_id, "done")
         return {
             "issue": issue_identifier,
-            "action": "skip",
+            "action": "closed_squash_detected",
             "reason": "already_merged_squash",
             "detail": skip_reason,
         }
