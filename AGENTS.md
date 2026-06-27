@@ -30,6 +30,10 @@ Before making changes, read in this order:
 - `packages/adapter-utils/`: shared adapter utilities
 - `packages/plugins/`: plugin system packages
 - `doc/`: operational and product docs
+- `INSTALL.md`: rebuild-from-scratch recipe for the local plugin stack
+  (Git Merges + Agent Config Presets + the BTC script worktree). Read this
+  if you ever need to rebuild the workspace from a fresh machine —
+  it's the canonical recovery guide.
 
 ## 4. Dev Setup (Auto DB)
 
