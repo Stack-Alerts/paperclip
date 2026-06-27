@@ -401,7 +401,41 @@ const plugin = definePlugin({
         ctx.state.get({ scopeKind: "instance", stateKey: ISSUE_MAP_KEY }),
       ]);
       const config = coerceConfig(configValue);
-      const status = coerceStatus(statusValue);
+      const rawStatus = coerceStatus(statusValue);
+      // Safety net for stale `running: true` from a worker that crashed
+      // mid-scan before the try/finally could reset the flag. If the
+      // flag has been true for more than `scanTimeoutSeconds * 2`, treat
+      // it as a leaked running flag and clear it. The UI would otherwise
+      // show the indeterminate "Loading…" bar indefinitely until the
+      // next successful scan finally overwrites it.
+      const RUNNING_LEAK_TIMEOUT_MS = Math.max(
+        30_000,
+        config.scanTimeoutSeconds * 2 * 1000,
+      );
+      let status = rawStatus;
+      if (rawStatus.running) {
+        const startedAtMs = rawStatus.lastAttemptAt
+          ? new Date(rawStatus.lastAttemptAt).getTime()
+          : 0;
+        const ageMs = startedAtMs > 0 ? Date.now() - startedAtMs : 0;
+        if (ageMs > RUNNING_LEAK_TIMEOUT_MS) {
+          // Best-effort self-heal. We don't await this write because
+          // we're already inside a data handler that should respond
+          // quickly; the next scan will overwrite status anyway.
+          void ctx.state
+            .set(
+              { scopeKind: "instance", stateKey: STATUS_STATE_KEY },
+              { ...rawStatus, running: false },
+            )
+            .catch((err) => {
+              ctx.logger.warn("Git Merges: leaked running flag self-heal failed", {
+                error:
+                  err instanceof Error ? err.message : String(err),
+              });
+            });
+          status = { ...rawStatus, running: false };
+        }
+      }
       const latest = isScanRecord(latestValue) ? latestValue : null;
       const history = coerceHistory(historyValue);
       const previousBlocks = isMergeBlocksArray(previousBlocksValue)
@@ -589,17 +623,79 @@ async function runMergeScan(
     return null;
   }
 
+  // Capture the startedAt BEFORE setting running: true so the finally
+  // block can record the start time on its forced reset even if the
+  // scan crashes before reaching the happy-path final-write below.
+  const scanStartedAt = new Date().toISOString();
   status.running = true;
-  status.lastAttemptAt = new Date().toISOString();
+  status.lastAttemptAt = scanStartedAt;
   status.lastSkipped = false;
   await ctx.state.set(
     { scopeKind: "instance", stateKey: STATUS_STATE_KEY },
     status,
   );
 
+  // CRITICAL: every code path from here to the bottom MUST reach the
+  // happy-path final write, otherwise `running` stays true forever
+  // and the UI shows the indeterminate "Loading…" bar indefinitely.
+  // We guarantee the flag is reset by wrapping the entire scan body
+  // in try/finally. If anything throws (DB error, parse failure,
+  // hot-reload crash, etc.) the finally still flips `running` to
+  // false and records the failure timestamp.
+  let scanError: string | null = null;
+  try {
+    return await executeScan(ctx, config, opts, scanStartedAt);
+  } catch (err) {
+    scanError = err instanceof Error ? err.message : String(err);
+    ctx.logger.error("Git Merges: scan crashed", {
+      error: scanError,
+      trigger: opts.trigger,
+      durationMs: Date.now() - new Date(scanStartedAt).getTime(),
+    });
+    return { skipped: false };
+  } finally {
+    // Always reset the running flag, even if executeScan threw or the
+    // worker was hot-reloaded mid-scan. This is the single source of
+    // truth for `running: false` — the happy-path final write also
+    // sets it, but a duplicated write here is idempotent and safe.
+    try {
+      const currentStatus = coerceStatus(
+        await ctx.state.get({
+          scopeKind: "instance",
+          stateKey: STATUS_STATE_KEY,
+        }),
+      );
+      const finalStatus: ScanStatus = {
+        running: false,
+        lastRunAt: scanError ? scanStartedAt : currentStatus.lastRunAt,
+        lastAttemptAt: scanStartedAt,
+        lastExitCode: scanError ? null : currentStatus.lastExitCode,
+        lastSkipped: scanError ? false : currentStatus.lastSkipped,
+      };
+      await ctx.state.set(
+        { scopeKind: "instance", stateKey: STATUS_STATE_KEY },
+        finalStatus,
+      );
+    } catch (cleanupErr) {
+      // Last-resort: if even the cleanup write fails, log loudly so
+      // an operator can manually reset the flag.
+      ctx.logger.error("Git Merges: failed to reset running flag", {
+        error:
+          cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+      });
+    }
+  }
+}
+
+async function executeScan(
+  ctx: Parameters<NonNullable<Parameters<typeof definePlugin>[0]["setup"]>>[0],
+  config: GitMergesConfig,
+  opts: { trigger: ScanTrigger; force: boolean },
+  scanStartedAt: string,
+): Promise<{ skipped: boolean } | null> {
   ctx.streams.emit(STREAM_CHANNELS.output, {
     kind: "scan-start",
-    startedAt: status.lastAttemptAt,
+    startedAt: scanStartedAt,
     trigger: opts.trigger,
   });
 
