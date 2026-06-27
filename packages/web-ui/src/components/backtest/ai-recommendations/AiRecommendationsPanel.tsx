@@ -94,19 +94,14 @@ const PHASE_INFO: Record<Exclude<SendPhase, 'idle' | 'error'>, PhaseInfo> = {
 };
 
 // AC8: rough ETA shown next to the percent while we are waiting for the
-// provider to respond. 30s is a conservative default for first-token latency
-// across the providers the webui currently routes through.
-const AWAITING_PROVIDER_ETA_SECONDS = 30;
+// provider to respond. Starts at 60s and counts down; once it passes zero
+// it continues into negative numbers (e.g. -5s) — the request is never
+// aborted by the countdown; the negative value signals the response is
+// taking longer than estimated without killing the in-flight call.
+const AWAITING_PROVIDER_ETA_SECONDS = 60;
 
 // AC10: how long the green "Applied" banner stays visible before fading out.
 const APPLY_SUCCESS_DISMISS_MS = 3000;
-
-// BTCAAAAA-38466 (Stream 5, B2) — hard ceiling on a single analyze request.
-// Past this we surface the timeout banner with a Retry button instead of
-// leaving the user waiting on a stalled provider. Mirrors
-// AWAITING_PROVIDER_ETA_SECONDS so the visible ETA and the abort trip stay
-// in sync.
-const PREFLIGHT_TIMEOUT_MS = 30_000;
 
 // BTCAAAAA-36917 v4 UX: hardcoded sample payload for the empty-state
 // "Preview the new layout" + "Load demo data" affordances. The preview card
@@ -248,9 +243,6 @@ export function AiRecommendationsPanel({
   const [lastPreflightDurationMs, setLastPreflightDurationMs] = useState<number | null>(null);
   const [lastRawResponse, setLastRawResponse] = useState<string | null>(null);
   const [lastParseResult, setLastParseResult] = useState<{ diagnosis: string; recommendations: string } | null>(null);
-  // Distinguishes a user-driven abort (handleCancel) from a 30s timeout.
-  // Without this ref both paths surface as a generic "request cancelled"
-  // message and the timeout banner never fires.
   const timedOutRef = useRef(false);
 
 const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
@@ -468,7 +460,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
       prev === AWAITING_PROVIDER_ETA_SECONDS ? prev : AWAITING_PROVIDER_ETA_SECONDS,
     );
     const interval = setInterval(() => {
-      setAwaitingEta((prev) => (prev === null ? null : Math.max(0, prev - 1)));
+      setAwaitingEta((prev) => (prev === null ? null : prev - 1));
     }, 1000);
     return () => clearInterval(interval);
   }, [phase]);
@@ -757,16 +749,6 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
         blockCatalog,
       });
 
-      // BTCAAAAA-38466 (Stream 5, B2) — hard 30s timeout. Fires only if
-      // neither the response nor a user cancel arrives first. The flag on
-      // timedOutRef is what the catch block uses to distinguish a
-      // provider-stall timeout from a user-driven cancel (both surface as
-      // an AbortError otherwise).
-      const timeoutId = setTimeout(() => {
-        timedOutRef.current = true;
-        controller.abort();
-      }, PREFLIGHT_TIMEOUT_MS);
-
       try {
         const res = await fetch('/api/ai/analyze', {
           method: 'POST',
@@ -782,7 +764,6 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           }),
           signal: controller.signal,
         });
-        clearTimeout(timeoutId);
         const data = (await res.json()) as {
           ok: boolean;
           text?: string;
@@ -853,22 +834,8 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           dismissTimerRef.current = null;
         }, 1200);
       } catch (err) {
-        clearTimeout(timeoutId);
         if (err instanceof DOMException && err.name === 'AbortError') {
-          if (timedOutRef.current) {
-            // BTCAAAAA-38466 — provider stalled past PREFLIGHT_TIMEOUT_MS.
-            // Record the timeout so classifyPreflight emits the timeout
-            // banner with a Retry button. We do NOT set analysisError
-            // here so the existing analysisError banner doesn't compete
-            // with the new one.
-            setLastPreflightError({
-              kind: 'timeout',
-              message: `The AI provider did not respond in ${Math.round(PREFLIGHT_TIMEOUT_MS / 1000)}s.`,
-            });
-            setLastPreflightDurationMs(Date.now() - sentAt);
-          } else {
-            setAnalysisError('Request cancelled.');
-          }
+          setAnalysisError('Request cancelled.');
         } else {
           // BTCAAAAA-38466 — generic fetch failure (DNS, CORS, server
           // crash). Surface via the existing analysisError banner; the
@@ -1705,7 +1672,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
             <p className="font-semibold">AI provider timed out</p>
             <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>
               The provider did not respond in{' '}
-              {Math.round((preflightState.durationMs || PREFLIGHT_TIMEOUT_MS) / 1000)}s.
+              {preflightState.durationMs ? Math.round(preflightState.durationMs / 1000) : '?'}s.
             </p>
           </div>
           <button
