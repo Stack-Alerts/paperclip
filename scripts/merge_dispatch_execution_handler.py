@@ -53,7 +53,35 @@ MERGE_DISPATCH_ROUTINE_ID = "908726dc-c9be-4b0f-91fc-f990ffbfcf5c"
 # The AutomationEngineer agent ID (the routine's assignee).
 AUTOMATION_ENGINEER_AGENT_ID = "2b9152a6-07f6-4ae9-87fa-c824012c9ff6"
 
+# Upstream repository for `gh` CLI calls (Gap 2 — BTCAAAAA-38470).
+REPO_OWNER = "Stack-Alerts"
+REPO_NAME = "BTC-Trade-Engine-PaperClip"
+REPO_FULL = f"{REPO_OWNER}/{REPO_NAME}"
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+class MergeVerificationFailed(Exception):
+    """Raised when post-merge verification sees upstream state != MERGED.
+
+    BTCAAAAA-38470 Gap 2 — closes the local-vs-upstream merge-state divergence
+    documented in BTC-38125. `merge_pr()` returns success on a 200 response, but
+    the upstream view can lag (webhook delay, wrong-target fork, insufficient
+    token scope). The routine catches this exception and escalates with the
+    actual upstream view as a structured payload instead of trusting the local
+    log line.
+
+    Attributes:
+        pr_number: The PR number that failed verification.
+        upstream_view: The dict returned by `gh pr view --json` showing the
+            actual upstream state (state, mergedAt, mergeCommit, url, etc.).
+        message: Human-readable description of the failure.
+    """
+
+    def __init__(self, pr_number: int, upstream_view: dict, message: str) -> None:
+        self.pr_number = pr_number
+        self.upstream_view = upstream_view
+        super().__init__(message)
 
 
 def _api_url() -> str:
@@ -232,6 +260,148 @@ def add_comment(issue_id: str, body: str) -> bool:
         return False
 
 
+def _run_gh_pr_view(pr_number: int, timeout: int = 15) -> dict | None:
+    """Run `gh pr view <N> --json state,mergedAt,mergeCommit,url` and parse.
+
+    Returns the parsed JSON dict on success (exit 0, valid JSON). Returns None
+    on any failure (gh not on PATH, non-zero exit, invalid JSON, network
+    error). Caller decides whether a None means "retry" or "escalate".
+    """
+    import shutil
+    import subprocess
+
+    gh = shutil.which("gh")
+    if gh is None:
+        logger.error("gh CLI not found on PATH — cannot verify PR state")
+        return None
+
+    try:
+        proc = subprocess.run(
+            [
+                gh, "pr", "view", str(pr_number),
+                "--repo", REPO_FULL,
+                "--json", "state,mergedAt,mergeCommit,url,headRefName,number",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(REPO_ROOT),
+        )
+    except subprocess.TimeoutExpired:
+        logger.error("gh pr view %s timed out after %ss", pr_number, timeout)
+        return None
+    except Exception as exc:
+        logger.error("gh pr view %s failed: %s", pr_number, exc)
+        return None
+
+    if proc.returncode != 0:
+        stderr_excerpt = (proc.stderr or "")[:200].strip()
+        logger.warning(
+            "gh pr view %s returned rc=%d: %s",
+            pr_number, proc.returncode, stderr_excerpt,
+        )
+        return None
+
+    try:
+        return json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        logger.error("gh pr view %s returned invalid JSON: %s", pr_number, exc)
+        return None
+
+
+def verify_pr_merged(pr_number: int) -> dict:
+    """Confirm upstream reports PR as MERGED. Sleeps 5s, then re-queries.
+
+    Raises:
+        MergeVerificationFailed: if the upstream view is missing or its
+            `state` field is not exactly `MERGED`. The exception carries the
+            full upstream view so the routine can post a structured escalation
+            comment instead of trusting the local log line.
+
+    Returns:
+        The upstream view dict (state=MERGED) on success.
+    """
+    logger.info("Post-merge verification: sleeping 5s before re-querying PR %s", pr_number)
+    import time
+    time.sleep(5)
+
+    upstream = _run_gh_pr_view(pr_number)
+    if upstream is None:
+        raise MergeVerificationFailed(
+            pr_number=pr_number,
+            upstream_view={},
+            message=(
+                f"PR #{pr_number} post-merge verification could not query upstream "
+                f"(gh pr view returned no data). Local log may show success but "
+                f"upstream state is unknown."
+            ),
+        )
+
+    state = upstream.get("state")
+    if state != "MERGED":
+        raise MergeVerificationFailed(
+            pr_number=pr_number,
+            upstream_view=upstream,
+            message=(
+                f"PR #{pr_number} local log claims merged, but upstream "
+                f"gh pr view reports state={state!r} (mergedAt="
+                f"{upstream.get('mergedAt')!r}, mergeCommit="
+                f"{upstream.get('mergeCommit')!r}). Possible wrong-target fork, "
+                f"insufficient token scope, or webhook lag."
+            ),
+        )
+
+    logger.info(
+        "Post-merge verification OK: PR %s state=MERGED mergedAt=%s",
+        pr_number, upstream.get("mergedAt"),
+    )
+    return upstream
+
+
+def token_scope_preflight() -> tuple[bool, str]:
+    """Confirm `gh` can list PRs in upstream repo. Returns (success, detail).
+
+    BTCAAAAA-38470 Gap 2 — runs `gh pr list --repo Stack-Alerts/BTC-Trade-Engine-PaperClip
+    --limit 1`. Returns (True, "ok") on success, (False, detail) on auth or
+    network failure. The detail string for auth failures includes the return
+    code so the routine can surface `routine_token_has_no_upstream_access`
+    with a precise error code.
+    """
+    import shutil
+    import subprocess
+
+    gh = shutil.which("gh")
+    if gh is None:
+        return False, "gh_cli_not_on_path"
+
+    try:
+        proc = subprocess.run(
+            [
+                gh, "pr", "list",
+                "--repo", REPO_FULL,
+                "--limit", "1",
+                "--state", "all",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            cwd=str(REPO_ROOT),
+        )
+    except subprocess.TimeoutExpired:
+        return False, "preflight_timeout"
+    except Exception as exc:
+        return False, f"preflight_exception:{type(exc).__name__}"
+
+    rc = proc.returncode
+    if rc == 0:
+        return True, "ok"
+
+    stderr_excerpt = (proc.stderr or "")[:200].strip()
+    if rc in (401, 403):
+        return False, f"auth_failed_rc_{rc}:{stderr_excerpt}"
+    return False, f"preflight_failed_rc_{rc}:{stderr_excerpt}"
+
+
 def run_merge_dispatch(dry_run: bool = False) -> dict:
     """Run merge_dispatch_routine.py and return its parsed output."""
     script = REPO_ROOT / "scripts" / "merge_dispatch_routine.py"
@@ -379,6 +549,22 @@ def main(argv: list[str] | None = None) -> int:
         "Merge-dispatch execution handler starting (dry_run=%s)",
         args.dry_run,
     )
+
+    # BTCAAAAA-38470 Gap 2 — token-scope preflight. Refuse to do any work
+    # (including checking out issues) if `gh` cannot reach the upstream repo.
+    preflight_ok, preflight_detail = token_scope_preflight()
+    if not preflight_ok:
+        if preflight_detail.startswith("auth_failed_rc_"):
+            logger.error(
+                "Token-scope preflight failed (%s) — escalating "
+                "routine_token_has_no_upstream_access before any work",
+                preflight_detail,
+            )
+            return 2
+        logger.warning(
+            "Token-scope preflight failed (%s) — continuing cautiously",
+            preflight_detail,
+        )
 
     try:
         issue = get_routine_active_issue()

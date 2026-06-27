@@ -45,6 +45,27 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
+# BTCAAAAA-38470 Gap 2 — import post-merge verification + token preflight from
+# the execution handler. The handler is the canonical owner of `gh` CLI calls
+# and exposes the typed exception so the routine can escalate with a structured
+# upstream-view payload instead of trusting the local log line.
+try:
+    from merge_dispatch_execution_handler import (
+        MergeVerificationFailed,
+        verify_pr_merged,
+        token_scope_preflight,
+    )
+    _GAP2_IMPORTS_OK = True
+except ImportError as _gap2_err:
+    logger.warning(
+        "Could not import Gap 2 helpers from merge_dispatch_execution_handler: %s",
+        _gap2_err,
+    )
+    MergeVerificationFailed = None  # type: ignore[assignment]
+    verify_pr_merged = None  # type: ignore[assignment]
+    token_scope_preflight = None  # type: ignore[assignment]
+    _GAP2_IMPORTS_OK = False
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "src"))
@@ -415,6 +436,169 @@ def is_ancestor_of_main(sha: str) -> bool:
         return False
 
 
+def _run_git_text(args: list[str], timeout: int = 10) -> str | None:
+    """Run a git command and return stdout text on success, None on failure.
+
+    Centralizes subprocess error handling for pre-dispatch checks.
+    """
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (subprocess.SubprocessError, OSError) as exc:
+        logger.error("git %s failed: %s", " ".join(args), exc)
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout
+
+
+def list_files_changed_by_commit(sha: str) -> list[str]:
+    """Return the list of files touched by `sha` (compared to its first parent)."""
+    out = _run_git_text(["diff-tree", "--no-commit-id", "-r", "--name-only", f"{sha}^", sha])
+    if out is None:
+        return []
+    return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def _fetch_file_blob(sha: str, path: str) -> bytes | None:
+    """Return the bytes of <sha>:<path>, or None if the path is missing/error."""
+    out = _run_git_text(
+        ["show", f"{sha}:{path}"],
+        timeout=15,
+    )
+    if out is None:
+        return None
+    return out.encode("utf-8", errors="replace")
+
+
+def _bytes_match_at_sha(fix_sha: str, path: str) -> tuple[bool, str]:
+    """Compare `git show <fix-sha>:<path>` bytes against `git show origin/main:<path>`.
+
+    Returns (equal, detail). detail is human-readable for audit comments.
+    Missing files (e.g. deletions on either side) are an automatic non-match so the
+    dispatcher proceeds — a single missing file does not prove byte-identity.
+    """
+    try:
+        fix_proc = subprocess.run(
+            ["git", "show", f"{fix_sha}:{path}"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            timeout=15,
+        )
+    except subprocess.SubprocessError:
+        return False, f"git show {fix_sha[:8]}:{path} failed"
+    if fix_proc.returncode != 0:
+        return False, f"git show {fix_sha[:8]}:{path} failed (rc={fix_proc.returncode})"
+    fix_bytes = fix_proc.stdout
+
+    try:
+        main_proc = subprocess.run(
+            ["git", "show", f"origin/main:{path}"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            timeout=15,
+        )
+    except subprocess.SubprocessError:
+        return False, f"git show origin/main:{path} failed"
+    if main_proc.returncode != 0:
+        return False, f"git show origin/main:{path} failed (rc={main_proc.returncode})"
+    main_bytes = main_proc.stdout
+
+    if fix_bytes == main_bytes:
+        return True, f"{path} byte-identical between {fix_sha[:8]} and origin/main"
+    return False, f"{path} differs ({len(fix_bytes)}B vs {len(main_bytes)}B on origin/main)"
+
+
+def find_squash_merge_by_short_sha(short_sha: str) -> bool:
+    """True iff origin/main contains a commit whose message references short_sha.
+
+    Used as a heuristic for "this branch was squash-merged before local tracking
+    was lost": post-squash, the merge commit is on origin/main, the original
+    branch ref is gone, and `git branch -r --contains <fix-sha>` returns empty.
+    """
+    if not short_sha or len(short_sha) < 7:
+        return False
+    out = _run_git_text(["log", "origin/main", f"--grep={short_sha}", "--oneline"])
+    if out is None:
+        return False
+    return bool(out.strip())
+
+
+def pre_dispatch_already_merged_check(fix_sha: str) -> tuple[bool, str]:
+    """Return (should_skip, reason) if the Fix-SHA's content is already on origin/main.
+
+    BTCAAAAA-38470 Gap 1 — closes the BTC-30048 chronic "Failed to create PR" loop on
+    issues whose fix landed on main via squash-merge before the routine could open
+    a fresh PR. Two complementary strategies:
+
+    1. Byte-identity: every file touched by fix_sha is byte-equal between the
+       fix commit and origin/main. Survives squash-merge and detects partial
+       back-ports (only when *all* files match).
+    2. Squash-merge short-circuit: when the remote branch ref is gone (so strategy 1
+       can still try, but only as a tie-breaker) AND origin/main's log references
+       fix_sha's short SHA, the squash-merge already absorbed the fix.
+
+    Returns:
+        (True, reason)  → caller should skip dispatch and let the closure gate
+                          flip the issue to done.
+        (False, "")     → caller should proceed with normal dispatch.
+    """
+    if not fix_sha or len(fix_sha) != 40:
+        return False, ""
+
+    # Strategy 1: byte-identity per file.
+    try:
+        files = list_files_changed_by_commit(fix_sha)
+    except Exception as exc:
+        logger.warning("pre_dispatch: list_files_changed_by_commit(%s) raised: %s", fix_sha[:8], exc)
+        files = []
+
+    if files:
+        all_match = True
+        mismatches: list[str] = []
+        for path in files:
+            equal, detail = _bytes_match_at_sha(fix_sha, path)
+            if equal:
+                continue
+            all_match = False
+            mismatches.append(detail)
+        if all_match:
+            return True, (
+                f"byte-identity: all {len(files)} file(s) touched by {fix_sha[:8]} "
+                f"are already on origin/main"
+            )
+        logger.info(
+            "pre_dispatch: byte-identity failed for %s — %d file(s) differ (%s)",
+            fix_sha[:8], len(mismatches), "; ".join(mismatches[:3]),
+        )
+    else:
+        # No parent commit (root commit) or diff-tree failed — fall through to strategy 2.
+        logger.info(
+            "pre_dispatch: diff-tree empty for %s, relying on squash-merge short-circuit",
+            fix_sha[:8],
+        )
+
+    # Strategy 2: squash-merge short-circuit.
+    branches_out = _run_git_text(["branch", "-r", "--contains", fix_sha])
+    branches = (branches_out or "").strip()
+    if branches:
+        # A remote branch still points at the SHA — normal path, no skip.
+        return False, ""
+
+    if find_squash_merge_by_short_sha(fix_sha[:8]):
+        return True, (
+            f"squash-merge short-circuit: no remote branch contains {fix_sha[:8]}, "
+            f"but origin/main log references it"
+        )
+
+    return False, ""
+
+
 def find_existing_pr(session: requests.Session, branch_name: str) -> dict | None:
     """Check if PR already exists for branch."""
     try:
@@ -613,6 +797,38 @@ def process_issue(issue: dict[str, Any]) -> dict[str, Any]:
             "reason": "already_merged",
         }
 
+    # Step 3.5 (BTCAAAAA-38470 Gap 1): squash-merge / post-merge-detection. The
+    # ancestor check above catches cases where fix_sha survived as-is into a
+    # regular merge commit, but squash-merge rewrites history into a fresh
+    # commit — the fix_sha is no longer an ancestor. Detect that pattern via
+    # byte-identity on the touched files plus a squash-merge short-circuit, then
+    # post an audit comment so the closure gate flips the issue to done.
+    should_skip, skip_reason = pre_dispatch_already_merged_check(sha)
+    if should_skip:
+        logger.info(
+            "Pre-dispatch already-merged check fired for %s on %s: %s",
+            sha[:8], issue_identifier, skip_reason,
+        )
+        audit_body = (
+            f"**Pre-dispatch already-merged detection**\n\n"
+            f"Fix-SHA: `{sha}`\n"
+            f"Detection: {skip_reason}\n\n"
+            f"Skipping dispatch — the closure-gate routine will flip this issue to `done` "
+            f"once the SHA is detected as ancestor of `origin/main`.\n\n"
+            f"Tracking: [{MERGE_DISPATCH_TRACKING}](/BTCAAAAA/issues/{MERGE_DISPATCH_TRACKING})"
+        )
+        comment_on_issue(
+            issue_id,
+            audit_body,
+            idempotency_key=f"pre_dispatch_already_merged:{issue_id}:{sha[:8]}",
+        )
+        return {
+            "issue": issue_identifier,
+            "action": "skip",
+            "reason": "already_merged_squash",
+            "detail": skip_reason,
+        }
+
     # Step 4: Find the pushed remote branch containing the SHA.
     # No remote branch means the commit is local-only (push lag) — skip, do not escalate.
     branch = find_branch_for_sha(sha)
@@ -686,6 +902,64 @@ def process_issue(issue: dict[str, Any]) -> dict[str, Any]:
     merge_sha = merge_result.get("sha", sha)
     logger.info("PR #%d merged with commit %s", pr_number, merge_sha[:8])
 
+    # Step 7.5: BTCAAAAA-38470 Gap 2 — verify upstream agrees the PR is MERGED.
+    # Local log line may show success while upstream view lags or the wrong fork
+    # was targeted. Re-query `gh pr view` after 5s; raise typed exception on
+    # state mismatch so we escalate with the actual upstream view, not the
+    # local log.
+    if verify_pr_merged is not None:
+        try:
+            upstream_view = verify_pr_merged(pr_number)
+            logger.info(
+                "PR #%d verified MERGED on upstream (mergedAt=%s)",
+                pr_number, upstream_view.get("mergedAt"),
+            )
+        except MergeVerificationFailed as mvf:
+            upstream = mvf.upstream_view or {}
+            upstream_state = upstream.get("state", "UNKNOWN")
+            upstream_merged_at = upstream.get("mergedAt")
+            upstream_merge_commit = upstream.get("mergeCommit")
+            upstream_url = upstream.get("url") or pr_url
+            audit_comment = f"""**Merge Verification FAILED (BTCAAAAA-38470 Gap 2)**
+
+Local log claims PR #{pr_number} merged, but `gh pr view` after 5s shows:
+- `state`: `{upstream_state}` (expected `MERGED`)
+- `mergedAt`: `{upstream_merged_at}`
+- `mergeCommit`: `{upstream_merge_commit}`
+- `url`: `{upstream_url}`
+
+This typically means wrong-target fork, insufficient token scope, or webhook lag.
+Manual investigation required before any retry.
+
+Original Fix-SHA: `{sha}`
+PR: {pr_url}
+"""
+            logger.error(
+                "Merge verification failed for PR #%d: %s",
+                pr_number, mvf,
+            )
+            comment_on_issue(issue_id, audit_comment)
+            update_issue_status(
+                issue_id, "blocked",
+                f"Merge verification failed for PR #{pr_number}: {mvf}",
+            )
+            return {
+                "issue": issue_identifier,
+                "action": "failed",
+                "reason": "merge_verification_failed",
+                "pr_number": pr_number,
+                "upstream_state": upstream_state,
+                "upstream_merged_at": upstream_merged_at,
+                "upstream_merge_commit": upstream_merge_commit,
+                "upstream_url": upstream_url,
+            }
+    else:
+        logger.warning(
+            "verify_pr_merged not importable (Gap 2 helper unavailable) — "
+            "skipping post-merge verification for PR #%d",
+            pr_number,
+        )
+
     # Step 8: Comment on issue and set status to done
     comment_body = f"""**Merge Complete**
 
@@ -755,6 +1029,30 @@ def main(argv: list[str] | None = None) -> int:
             logger.error("--issue requires an issue id")
             return 2
         return dispatch_for_issue(argv[idx + 1])
+
+    # BTCAAAAA-38470 Gap 2 — token-scope preflight BEFORE any work. Refuse to
+    # scan or merge if `gh` cannot reach the upstream repo. Prevents silent
+    # silent success on tokens lacking upstream scope.
+    if token_scope_preflight is not None:
+        preflight_ok, preflight_detail = token_scope_preflight()
+        if not preflight_ok and preflight_detail.startswith("auth_failed_rc_"):
+            logger.error(
+                "Routine token-scope preflight failed (%s) — escalating "
+                "routine_token_has_no_upstream_access before any work",
+                preflight_detail,
+            )
+            print(json.dumps({
+                "routine": "merge_dispatch",
+                "action": "blocked",
+                "reason": "routine_token_has_no_upstream_access",
+                "preflight_detail": preflight_detail,
+            }, indent=2))
+            return 2
+        if not preflight_ok:
+            logger.warning(
+                "Routine token-scope preflight soft-failed (%s) — continuing",
+                preflight_detail,
+            )
 
     fired_at = datetime.now(timezone.utc)
     logger.info("Starting merge-dispatch routine (backup sweep)")
