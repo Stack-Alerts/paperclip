@@ -334,8 +334,10 @@ if [[ "$DRY_RUN" == "false" ]]; then
     local br="$1"
     local target="archive/${br}"
     echo "  Archiving: $br → $target"
-    # Push the branch under archive/ prefix, then delete the original
-    git push origin "refs/remotes/origin/${br}:refs/heads/${target}" 2>&1
+    # Push the branch under archive/ prefix (|| true: skip if archive ref already exists), then delete the original
+    git push origin "refs/remotes/origin/${br}:refs/heads/${target}" 2>&1 || {
+      echo "  WARN: archive push failed (ref may already exist) — attempting delete anyway"
+    }
     git push origin --delete "$br" 2>&1 || true
     echo "  Done: $br → $target"
   }
