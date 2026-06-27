@@ -1,0 +1,6 @@
+# Runtime artifacts — produced by sample_loop.sh, never checked in.
+loop.pid
+loop.stop
+loop.stdout
+stream.ndjson
+samples/
