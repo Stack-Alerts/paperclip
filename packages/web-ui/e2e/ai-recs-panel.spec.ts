@@ -70,6 +70,84 @@ for (const width of WIDTHS) {
   });
 }
 
+// Sprint B7 (BTCAAAAA-38568) — pixel-diff tests for mockups 4, 5, 6.
+// mockup-4: AI Request tab (5 collapsible sections + copy buttons).
+// mockup-5: AI Response tab (chip strip + MarkdownRenderer).
+// mockup-6: History tab (HistoryView with snapshot KPIs).
+
+const B7_WIDTHS = [1920, 1439] as const;
+
+for (const width of B7_WIDTHS) {
+  test.describe(`AI Recs Panel B7 @ ${width}px`, () => {
+    test.use({ viewport: { width, height: 1080 } });
+
+    test(`mockup-4 — AI Request tab (B1) matches board mockup`, async ({
+      page,
+    }) => {
+      await page.goto(STORYBOOK_URL);
+      await page.waitForSelector('[data-testid="mockup-4"]', { timeout: 10_000 });
+      await page.waitForTimeout(50);
+      const section = page.locator('[data-testid="mockup-4"]');
+      await expect(section).toBeVisible();
+      await expect(section).toHaveScreenshot(`mockup-4-${width}.png`);
+    });
+
+    test(`mockup-5 — AI Response tab chip strip + markdown (B2) matches board mockup`, async ({
+      page,
+    }) => {
+      await page.goto(STORYBOOK_URL);
+      await page.waitForSelector('[data-testid="mockup-5"]', { timeout: 10_000 });
+      await page.waitForTimeout(50);
+      const section = page.locator('[data-testid="mockup-5"]');
+      await expect(section).toBeVisible();
+      await expect(section).toHaveScreenshot(`mockup-5-${width}.png`);
+    });
+
+    test(`mockup-6 — History tab with snapshot KPIs (B3) matches board mockup`, async ({
+      page,
+    }) => {
+      await page.goto(STORYBOOK_URL);
+      await page.waitForSelector('[data-testid="mockup-6"]', { timeout: 10_000 });
+      await page.waitForTimeout(50);
+      const section = page.locator('[data-testid="mockup-6"]');
+      await expect(section).toBeVisible();
+      await expect(section).toHaveScreenshot(`mockup-6-${width}.png`);
+    });
+  });
+}
+
+test.describe('AI Recs Panel B7 — structural invariants', () => {
+  test('mockup-4 renders all 5 collapsible sections', async ({ page }) => {
+    await page.goto(STORYBOOK_URL);
+    await page.waitForSelector('[data-testid="mockup-4"]');
+    const sections = page.locator('[data-testid="mockup-4"] [aria-expanded]');
+    await expect(sections).toHaveCount(5);
+  });
+
+  test('mockup-5 renders provider, tokens, and latency chips', async ({ page }) => {
+    await page.goto(STORYBOOK_URL);
+    await page.waitForSelector('[data-testid="mockup-5"]');
+    await expect(page.locator('[data-testid="ai-recs-chip-provider"]')).toBeVisible();
+    await expect(page.locator('[data-testid="ai-recs-chip-tokens"]')).toBeVisible();
+    await expect(page.locator('[data-testid="ai-recs-chip-latency"]')).toBeVisible();
+  });
+
+  test('mockup-6 renders all 3 history cards', async ({ page }) => {
+    await page.goto(STORYBOOK_URL);
+    await page.waitForSelector('[data-testid="mockup-6"]');
+    const cards = page.locator('[data-testid="mockup-6"] [data-testid^="history-row-"]');
+    await expect(cards).toHaveCount(3);
+  });
+
+  test('mockup-4 copy buttons all present at 1439px wrap boundary', async ({ page }) => {
+    await page.setViewportSize({ width: 1439, height: 1080 });
+    await page.goto(STORYBOOK_URL);
+    await page.waitForSelector('[data-testid="mockup-4"]');
+    const copyBtns = page.locator('[data-testid="mockup-4"] [data-testid^="collapsible-copy-"]');
+    await expect(copyBtns).toHaveCount(5);
+  });
+});
+
 /**
  * Acceptance probe — the recommendation row should always render exactly
  * five cards regardless of viewport (BTCAAAAA-37781 row contract), and
