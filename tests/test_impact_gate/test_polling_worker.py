@@ -5,16 +5,26 @@ All external I/O (Paperclip API, Blast Radius) is mocked.
 
 from __future__ import annotations
 
+import json
+import tempfile
 from datetime import datetime as datetime_cls, timezone
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 import pytest
 from freezegun import freeze_time
 
+from impact_gate import polling_worker as pw
 from impact_gate.polling_worker import (
+    _WATERMARK_FILE,
+    _compute_since,
     _fetch_done_fix_issues,
+    _format_iso,
     _has_scan_done_comment,
+    _load_watermark,
+    _parse_iso,
     _post_comment,
     _render_gate_comment,
+    _save_watermark,
     process_issue,
     run_once,
 )
@@ -384,3 +394,225 @@ class TestProcessIssueIdempotency:
         call_kwargs = mock_session.return_value.__enter__.return_value.post.call_args
         payload = call_kwargs[1]["json"] if call_kwargs[1] else call_kwargs[0][1]
         assert payload.get("idempotencyKey") == "scan-done:issue-xyz"
+
+
+# ---------------------------------------------------------------------------
+# TestWatermarkPersistence (BTCAAAAA-38448)
+# ---------------------------------------------------------------------------
+
+
+class TestWatermarkPersistence:
+    def test_load_returns_none_when_file_missing(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(pw, "_WATERMARK_FILE", tmp_path / "no-such.json")
+        assert _load_watermark() is None
+
+    def test_save_then_load_roundtrip(self, tmp_path, monkeypatch):
+        target = tmp_path / "impact_gate_watermark.json"
+        monkeypatch.setattr(pw, "_WATERMARK_FILE", target)
+        _save_watermark("2026-06-26T07:30:00.000Z")
+        assert target.exists()
+        payload = json.loads(target.read_text())
+        assert payload == {"lastRunAt": "2026-06-26T07:30:00.000Z"}
+        assert _load_watermark() == "2026-06-26T07:30:00.000Z"
+
+    def test_load_returns_none_on_malformed_json(self, tmp_path, monkeypatch):
+        target = tmp_path / "impact_gate_watermark.json"
+        target.write_text("{not valid json")
+        monkeypatch.setattr(pw, "_WATERMARK_FILE", target)
+        assert _load_watermark() is None
+
+    def test_load_returns_none_when_lastRunAt_missing(self, tmp_path, monkeypatch):
+        target = tmp_path / "impact_gate_watermark.json"
+        target.write_text(json.dumps({"other": "value"}))
+        monkeypatch.setattr(pw, "_WATERMARK_FILE", target)
+        assert _load_watermark() is None
+
+    def test_save_creates_parent_dir(self, tmp_path, monkeypatch):
+        nested = tmp_path / "deeply" / "nested" / "watermark.json"
+        monkeypatch.setattr(pw, "_WATERMARK_FILE", nested)
+        _save_watermark("2026-06-26T08:00:00.000Z")
+        assert nested.exists()
+
+
+# ---------------------------------------------------------------------------
+# TestParseFormatIso
+# ---------------------------------------------------------------------------
+
+
+class TestParseFormatIso:
+    def test_roundtrip(self):
+        epoch = 1740000000.123
+        ts = _format_iso(epoch)
+        assert ts.endswith("Z")
+        assert _parse_iso(ts) == pytest.approx(epoch, abs=1e-3)
+
+    def test_parse_with_z_suffix(self):
+        assert _parse_iso("2026-06-26T07:30:00Z") == pytest.approx(
+            datetime_cls(2026, 6, 26, 7, 30, 0, tzinfo=timezone.utc).timestamp()
+        )
+
+    def test_parse_with_offset_suffix(self):
+        ts = "2026-06-26T07:30:00+00:00"
+        assert _parse_iso(ts) == pytest.approx(
+            datetime_cls(2026, 6, 26, 7, 30, 0, tzinfo=timezone.utc).timestamp()
+        )
+
+    def test_parse_malformed_raises(self):
+        with pytest.raises(ValueError):
+            _parse_iso("not-a-timestamp")
+
+
+# ---------------------------------------------------------------------------
+# TestComputeSince
+# ---------------------------------------------------------------------------
+
+
+class TestComputeSince:
+    @freeze_time("2026-06-26T07:30:00Z")
+    def test_no_watermark_returns_24h_ago(self):
+        since = _compute_since(None)
+        expected = _format_iso(
+            datetime_cls(2026, 6, 26, 7, 30, 0, tzinfo=timezone.utc).timestamp()
+            - 24 * 3600
+        )
+        assert since == expected
+
+    @freeze_time("2026-06-26T07:30:00Z")
+    def test_with_watermark_pulls_back_30_minutes(self):
+        wm = "2026-06-26T07:00:00Z"
+        since = _compute_since(wm)
+        # 07:00 - 30min safety lookback = 06:30
+        expected = _format_iso(
+            datetime_cls(2026, 6, 26, 6, 30, 0, tzinfo=timezone.utc).timestamp()
+        )
+        assert since == expected
+
+    @freeze_time("2026-06-26T07:30:00Z")
+    def test_malformed_watermark_falls_back_to_24h(self):
+        since = _compute_since("definitely not iso8601")
+        expected = _format_iso(
+            datetime_cls(2026, 6, 26, 7, 30, 0, tzinfo=timezone.utc).timestamp()
+            - 24 * 3600
+        )
+        assert since == expected
+
+
+# ---------------------------------------------------------------------------
+# TestFetchDoneFixIssuesWithWatermark
+# ---------------------------------------------------------------------------
+
+
+class TestFetchDoneFixIssuesWithWatermark:
+    @freeze_time("2026-06-26T07:30:00Z")
+    def test_no_args_uses_watermark_cursor(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(pw, "_WATERMARK_FILE", tmp_path / "no-such.json")
+        with patch("impact_gate.polling_worker._paginate") as mock_paginate, \
+             patch("impact_gate.polling_worker._is_fix_issue", return_value=True):
+            mock_paginate.return_value = []
+            _fetch_done_fix_issues()
+
+        args, kwargs = mock_paginate.call_args
+        params = args[1] if len(args) > 1 else kwargs.get("params", {})
+        assert "updatedAfter" in params
+        # First-run: should be ~24h ago from 07:30, i.e. 2026-06-25T07:30
+        assert params["updatedAfter"].startswith("2026-06-25T07:30:00")
+
+    @freeze_time("2026-06-26T07:30:00Z")
+    def test_with_watermark_uses_watermark_cursor(self, tmp_path, monkeypatch):
+        target = tmp_path / "watermark.json"
+        target.write_text(json.dumps({"lastRunAt": "2026-06-26T07:00:00Z"}))
+        monkeypatch.setattr(pw, "_WATERMARK_FILE", target)
+
+        with patch("impact_gate.polling_worker._paginate") as mock_paginate, \
+             patch("impact_gate.polling_worker._is_fix_issue", return_value=True):
+            mock_paginate.return_value = []
+            _fetch_done_fix_issues()
+
+        args, kwargs = mock_paginate.call_args
+        params = args[1] if len(args) > 1 else kwargs.get("params", {})
+        # Watermark 07:00 minus 30min safety lookback = 06:30
+        assert params["updatedAfter"].startswith("2026-06-26T06:30:00")
+
+    def test_explicit_updated_after_forwarded(self):
+        with patch("impact_gate.polling_worker._paginate") as mock_paginate, \
+             patch("impact_gate.polling_worker._is_fix_issue", return_value=True):
+            mock_paginate.return_value = []
+            _fetch_done_fix_issues(updated_after="2026-06-25T00:00:00Z")
+
+        args, kwargs = mock_paginate.call_args
+        params = args[1] if len(args) > 1 else kwargs.get("params", {})
+        assert params["updatedAfter"] == "2026-06-25T00:00:00Z"
+
+    def test_explicit_lookback_uses_sliding_window(self):
+        with patch("impact_gate.polling_worker._paginate") as mock_paginate, \
+             patch("impact_gate.polling_worker._is_fix_issue", return_value=True):
+            mock_paginate.return_value = []
+            _fetch_done_fix_issues(lookback_minutes=15)
+
+        args, kwargs = mock_paginate.call_args
+        params = args[1] if len(args) > 1 else kwargs.get("params", {})
+        assert "updatedAfter" in params
+        # Format is YYYY-MM-DDTHH:MM:SSZ (no millis); just check it's recent.
+        assert params["updatedAfter"].endswith("Z")
+
+    def test_filters_completedAt_to_cursor(self):
+        # Issues completed before the cursor should be dropped client-side
+        # as a defense-in-depth check even when the server returns them.
+        recent_iso = "2026-06-26T07:00:00Z"
+        stale_iso = "2026-06-20T00:00:00Z"
+        with patch("impact_gate.polling_worker._paginate") as mock_paginate, \
+             patch("impact_gate.polling_worker._is_fix_issue", return_value=True):
+            mock_paginate.return_value = [
+                _make_issue(issue_id="r", identifier="BTCAAAAA-RECENT", completed_at=recent_iso),
+                _make_issue(issue_id="s", identifier="BTCAAAAA-STALE", completed_at=stale_iso),
+            ]
+            result = _fetch_done_fix_issues(
+                updated_after="2026-06-26T06:00:00Z"
+            )
+
+        assert [i["id"] for i in result] == ["r"]
+
+
+# ---------------------------------------------------------------------------
+# TestRunOnceAdvancesWatermark
+# ---------------------------------------------------------------------------
+
+
+class TestRunOnceAdvancesWatermark:
+    @freeze_time("2026-06-26T07:30:00Z")
+    def test_run_once_persists_watermark(self, tmp_path, monkeypatch):
+        target = tmp_path / "watermark.json"
+        monkeypatch.setattr(pw, "_WATERMARK_FILE", target)
+
+        with patch("impact_gate.polling_worker._fetch_done_fix_issues", return_value=[]), \
+             patch("impact_gate.polling_worker.process_issue") as mock_process:
+            result = run_once()
+
+        assert result == {"gated": 0, "skipped": 0, "errors": 0, "results": []}
+        assert target.exists()
+        payload = json.loads(target.read_text())
+        assert payload["lastRunAt"] == "2026-06-26T07:30:00.000Z"
+        mock_process.assert_not_called()  # No issues to process
+
+    @freeze_time("2026-06-26T07:30:00Z")
+    def test_run_once_can_skip_watermark_advance(self, tmp_path, monkeypatch):
+        target = tmp_path / "watermark.json"
+        monkeypatch.setattr(pw, "_WATERMARK_FILE", target)
+
+        with patch("impact_gate.polling_worker._fetch_done_fix_issues", return_value=[]):
+            run_once(advance_watermark=False)
+
+        assert not target.exists()
+
+    @freeze_time("2026-06-26T07:30:00Z")
+    def test_run_once_advances_after_empty_fetch(self, tmp_path, monkeypatch):
+        # Even when the API returns no issues, the watermark must advance so a
+        # quiet stretch doesn't trigger a backlog re-scan on the next fire.
+        target = tmp_path / "watermark.json"
+        monkeypatch.setattr(pw, "_WATERMARK_FILE", target)
+
+        with patch("impact_gate.polling_worker._fetch_done_fix_issues", return_value=[]):
+            run_once()
+
+        assert target.exists()
+        assert json.loads(target.read_text())["lastRunAt"] == "2026-06-26T07:30:00.000Z"

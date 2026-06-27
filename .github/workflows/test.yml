@@ -9,6 +9,16 @@ on:
   pull_request:
     branches: ["main", "master"]
 
+# BTCAAAAA-38611: prevent new commits from cancelling queued/in-progress test
+# runs. Without this, a retrigger commit pushed to a PR branch causes GitHub to
+# cancel the existing pull_request run, which the retrigger agent interprets as
+# a new cancellation and pushes yet another commit — creating an infinite loop.
+# cancel-in-progress: false means multiple commits will queue but never kill
+# each other; the oldest run completes and frees the runner for the next.
+concurrency:
+  group: test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
 env:
   PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
   PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}

@@ -23,11 +23,13 @@ Defaults to ``fix,bug,bugfix,regression,hotfix``.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import re
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Sequence
 
 from touch_index.paperclip_client import (
@@ -57,6 +59,15 @@ PAPERCLIP_RUN_ID = os.environ.get("PAPERCLIP_RUN_ID", "")
 # Matches the header produced by _render_gate_comment — used to detect prior runs.
 _SCAN_DONE_RE = re.compile(r"^## Impact Gate — Scan Done", re.MULTILINE)
 
+# Watermark for incremental scans — only fetch done issues updated after this timestamp.
+# Persisted under data/ so it survives across daemon runs and routine fires (BTCAAAAA-38448).
+_WATERMARK_FILE = Path(__file__).parent.parent.parent / "data" / "impact_gate_watermark.json"
+# Safety lookback in minutes: when watermark is stale, widen the window this many minutes
+# into the past so a missed run doesn't drop issues that flipped to done in the gap.
+_LOOKBACK_MINUTES = 30
+# First-run fallback: when there is no watermark yet, scan the most recent window only.
+_FIRST_RUN_LOOKBACK_HOURS = 24
+
 
 def _run_headers() -> dict[str, str]:
     if PAPERCLIP_RUN_ID:
@@ -64,18 +75,114 @@ def _run_headers() -> dict[str, str]:
     return {}
 
 
-def _fetch_done_fix_issues(lookback_minutes: int = 10) -> list[dict]:
-    """Return done fix/bug issues completed within the lookback window."""
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=lookback_minutes)
+def _load_watermark() -> str | None:
+    """Load last-run timestamp from watermark file. Returns ISO8601 string or None.
+
+    Returns None on any read/parse error so the caller falls back to the first-run
+    lookback window rather than crashing the poll cycle.
+    """
+    if not _WATERMARK_FILE.exists():
+        return None
+    try:
+        with open(_WATERMARK_FILE, "r") as f:
+            data = json.load(f)
+        ts = data.get("lastRunAt")
+        if isinstance(ts, str) and ts:
+            return ts
+    except Exception as exc:
+        log.warning("[watermark-load-error] %s", exc)
+    return None
+
+
+def _save_watermark(timestamp: str) -> None:
+    """Persist last-run timestamp so the next poll is incremental.
+
+    Called after every successful ``_fetch_done_fix_issues`` invocation —
+    including empty runs — so a quiet stretch doesn't trigger a backlog re-scan
+    on the next fire.
+    """
+    try:
+        _WATERMARK_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(_WATERMARK_FILE, "w") as f:
+            json.dump({"lastRunAt": timestamp}, f)
+    except Exception as exc:
+        log.warning("[watermark-save-error] %s", exc)
+
+
+def _compute_since(watermark: str | None) -> str:
+    """Compute the ``updatedAfter`` cursor for the next fetch.
+
+    - No watermark (first run): scan the last ``_FIRST_RUN_LOOKBACK_HOURS`` hours only.
+    - With watermark: reuse it but pull ``_LOOKBACK_MINUTES`` back to absorb clock skew
+      and missed runs without losing issues.
+    - Malformed watermark: fall back to the first-run window rather than crashing.
+    """
+    now = time.time()
+    if not watermark:
+        cutoff = now - _FIRST_RUN_LOOKBACK_HOURS * 3600
+    else:
+        try:
+            wm_epoch = _parse_iso(watermark)
+            cutoff = wm_epoch - _LOOKBACK_MINUTES * 60
+        except Exception:
+            cutoff = now - _FIRST_RUN_LOOKBACK_HOURS * 3600
+    return _format_iso(cutoff)
+
+
+def _parse_iso(ts: str) -> float:
+    """Parse ISO8601 (with or without trailing Z) to epoch seconds."""
+    s = ts.strip()
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    return datetime.fromisoformat(s).timestamp()
+
+
+def _format_iso(epoch: float) -> str:
+    """Format epoch seconds as ISO8601 UTC with trailing Z and millisecond precision."""
+    dt = datetime.fromtimestamp(epoch, tz=timezone.utc)
+    ms = int((epoch % 1) * 1000)
+    return dt.strftime("%Y-%m-%dT%H:%M:%S") + f".{ms:03d}Z"
+
+
+def _fetch_done_fix_issues(
+    lookback_minutes: int | None = None,
+    *,
+    updated_after: str | None = None,
+) -> list[dict]:
+    """Return done fix/bug issues updated at-or-after the cursor.
+
+    Cursor selection (BTCAAAAA-38448):
+    - ``updated_after``: caller-supplied ISO8601 cursor; wins when provided.
+    - ``lookback_minutes``: explicit sliding-window lookback (preserves the original
+      CLI flag behavior for manual / dry-run use).
+    - Neither: persisted watermark cursor with a 30-minute safety lookback, falling
+      back to a 24h first-run window when no watermark exists yet.
+
+    The cursor is forwarded as ``updatedAfter`` on the API call so the server
+    returns only the recently-touched page; the client-side ``completedAt``
+    filter is retained as defense in depth.
+    """
+    if updated_after is None:
+        if lookback_minutes is not None:
+            cutoff = datetime.now(timezone.utc) - timedelta(minutes=lookback_minutes)
+            updated_after = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
+        else:
+            updated_after = _compute_since(_load_watermark())
+
     issues = _paginate(
         f"/api/companies/{_company()}/issues",
-        {"status": "done", "originKind": "manual"},
+        {
+            "status": "done",
+            "originKind": "manual",
+            "updatedAfter": updated_after,
+        },
         page_size=100,
     )
     recent = []
+    cutoff_dt = _parse_iso_ts(updated_after)
     for issue in issues:
         ts = _parse_iso_ts(issue.get("completedAt"))
-        if ts is None or ts >= cutoff:
+        if ts is None or ts >= cutoff_dt:
             recent.append(issue)
     return [i for i in recent if _is_fix_issue(i)]
 
@@ -242,14 +349,26 @@ def process_issue(
 
 
 def run_once(
-    lookback_minutes: int = 10,
+    lookback_minutes: int | None = None,
     dry_run: bool = False,
     processed_cache: set[str] | None = None,
+    *,
+    advance_watermark: bool = True,
 ) -> dict:
     """Scan for recently done fix/bug issues and run the impact gate on each.
 
     *processed_cache* is an in-memory set used to deduplicate across calls in
     the same daemon run.  Pass None to start with an empty set for this cycle.
+
+    *lookback_minutes* defaults to ``None``, which selects the persisted
+    watermark cursor (BTCAAAAA-38448).  Pass an integer to override with an
+    explicit sliding-window lookback (used by the ``--lookback-minutes`` CLI
+    flag and by tests).
+
+    *advance_watermark* controls whether the watermark is advanced after the
+    fetch. Defaults to True so each routine fire persists its cursor and quiet
+    stretches do not trigger a backlog re-scan. Tests that exercise many
+    invocations against a fixed watermark can pass False to avoid mutation.
 
     Returns a summary dict with counts.
     """
@@ -258,10 +377,13 @@ def run_once(
 
     issues = _fetch_done_fix_issues(lookback_minutes=lookback_minutes)
     log.info(
-        "Fetched %d recently done fix/bug issue(s) (lookback=%dm)",
+        "Fetched %d recently done fix/bug issue(s) (lookback=%s)",
         len(issues),
-        lookback_minutes,
+        f"{lookback_minutes}m" if lookback_minutes is not None else "watermark",
     )
+
+    if advance_watermark:
+        _save_watermark(_format_iso(time.time()))
 
     results: list[dict] = []
     for issue in issues:
@@ -295,14 +417,17 @@ def run_once(
 
 def run_loop(
     poll_interval: int = 300,
-    lookback_minutes: int = 10,
+    lookback_minutes: int | None = None,
     dry_run: bool = False,
 ) -> None:
     """Poll continuously, sleeping *poll_interval* seconds between runs."""
+    lookback_label = (
+        f"{lookback_minutes}m" if lookback_minutes is not None else "watermark"
+    )
     log.info(
-        "Starting Impact Gate scan-done loop (interval=%ds, lookback=%dm, dry_run=%s)",
+        "Starting Impact Gate scan-done loop (interval=%ds, lookback=%s, dry_run=%s)",
         poll_interval,
-        lookback_minutes,
+        lookback_label,
         dry_run,
     )
     processed_cache: set[str] = set()
@@ -337,9 +462,13 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--lookback-minutes",
         type=int,
-        default=10,
+        default=None,
         metavar="MINUTES",
-        help="How far back to look for recently done issues (default: 10).",
+        help=(
+            "How far back to look for recently done issues. Omit to use the "
+            "persisted watermark cursor (BTCAAAAA-38448); pass an integer to "
+            "force an explicit sliding-window lookback."
+        ),
     )
     p.add_argument(
         "--dry-run",

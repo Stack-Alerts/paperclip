@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -53,6 +54,103 @@ REQUIRED_CHECK_SUBSTRINGS = (
     "Lock Module Requirement Verification",
     "UI CI",
 )
+
+# BTCAAAAA-38612 — CANCELLED retrigger guard constants.
+# When a required check is CANCELLED, we retrigger via `gh workflow run` (not an
+# empty commit push) — but only after both guards pass:
+#   1. Imminent-push guard: PR HEAD is NOT a recent automation retrigger commit.
+#   2. Cooldown guard: last retrigger for this PR was >RETRIGGER_COOLDOWN_MINUTES ago.
+# This prevents the infinite cancel-loop caused by the automation's own pushes
+# triggering GitHub's "auto-cancel redundant runs" repo setting.
+RETRIGGER_COOLDOWN_MINUTES: int = int(
+    os.environ.get("MERGE_MONITOR_RETRIGGER_COOLDOWN_MINUTES", "30")
+)
+_RETRIGGER_STATE_FILE = Path("/tmp/merge-monitor-retrigger-state.json")
+_RETRIGGER_MSG_RE = re.compile(r"ci:\s*(?:re)?trigger", re.IGNORECASE)
+_RETRIGGER_AUTHORS = frozenset({"AutomationEngineer", "github-actions[bot]"})
+
+
+def load_retrigger_state() -> dict[str, str]:
+    """Load per-PR last-retrigger timestamps from state file. Returns {} on missing/corrupt."""
+    try:
+        return json.loads(_RETRIGGER_STATE_FILE.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save_retrigger_state(state: dict[str, str]) -> None:
+    """Persist per-PR last-retrigger timestamps to state file."""
+    try:
+        _RETRIGGER_STATE_FILE.write_text(json.dumps(state))
+    except OSError as exc:
+        logger.warning("Failed to save retrigger state: %s", exc)
+
+
+def _has_cancelled_required_check(checks: dict[str, dict[str, str]]) -> bool:
+    """Return True if any REQUIRED_CHECK_SUBSTRINGS check has conclusion 'cancelled'."""
+    for sub in REQUIRED_CHECK_SUBSTRINGS:
+        for name, data in checks.items():
+            if sub.lower() in name.lower():
+                if (data.get("conclusion") or "").lower() == "cancelled":
+                    return True
+    return False
+
+
+def _fetch_commit(session: requests.Session, sha: str) -> dict[str, Any] | None:
+    """Fetch git commit object from GitHub API. Returns None on any error."""
+    url = f"{GITHUB_API_BASE}/repos/{REPO_OWNER}/{REPO_NAME}/git/commits/{sha}"
+    try:
+        r = session.get(url, timeout=10)
+        if r.status_code == 200:
+            return r.json()
+        logger.warning("fetch_commit %s: HTTP %s", sha[:8], r.status_code)
+    except Exception as exc:
+        logger.warning("fetch_commit %s failed: %s", sha[:8], exc)
+    return None
+
+
+def _is_own_push_imminent(
+    pr: dict[str, Any],
+    session: requests.Session,
+    now: datetime,
+    max_age_minutes: int | None = None,
+) -> bool:
+    """Return True if the PR HEAD is a recent automation retrigger commit.
+
+    BTCAAAAA-38612 imminent-push guard: when the automation pushes a retrigger
+    commit, GitHub's repo-level "auto-cancel redundant runs" cancels the existing
+    CI for that branch. If we immediately retrigger again, we create an infinite
+    loop. This guard detects our own recent retrigger push and suppresses a second
+    retrigger until RETRIGGER_COOLDOWN_MINUTES has passed.
+
+    A commit is considered "own push" when:
+      - its author matches any name in _RETRIGGER_AUTHORS, OR
+      - its message matches _RETRIGGER_MSG_RE (e.g. "ci: retrigger …")
+    AND the commit was authored within max_age_minutes.
+    """
+    if max_age_minutes is None:
+        max_age_minutes = RETRIGGER_COOLDOWN_MINUTES
+    sha = pr.get("head", {}).get("sha", "")
+    if not sha:
+        return False
+    commit = _fetch_commit(session, sha)
+    if not commit:
+        return False
+    message = commit.get("message", "")
+    author_name = commit.get("author", {}).get("name", "") or ""
+    author_date_str = commit.get("author", {}).get("date", "") or ""
+    if not author_date_str:
+        return False
+    try:
+        author_date = datetime.fromisoformat(author_date_str.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return False
+    age_min = (now - author_date).total_seconds() / 60
+    if age_min > max_age_minutes:
+        return False
+    is_retrigger_msg = bool(_RETRIGGER_MSG_RE.search(message))
+    is_automation_author = any(a in author_name for a in _RETRIGGER_AUTHORS)
+    return is_retrigger_msg or is_automation_author
 
 
 def _http_session(token: str | None = None) -> requests.Session:
@@ -348,6 +446,55 @@ def main() -> int:
             if retest_pr(pr_num, gh_token):
                 retested.append(pr_num)
 
+    # 4b. BTCAAAAA-38612 — Retrigger PRs with CANCELLED required checks.
+    # Uses `gh workflow run` (NOT an empty git commit) so we don't feed the
+    # auto-cancel loop. Two guards must both pass before any retrigger:
+    #   - Imminent-push guard: HEAD commit is not a recent automation retrigger.
+    #   - Cooldown guard: last retrigger for this PR was >RETRIGGER_COOLDOWN_MINUTES ago.
+    retrigger_state = load_retrigger_state()
+    cancelled_retriggered: list[int] = []
+    for pr in open_prs:
+        pr_num = pr["number"]
+        checks = parse_checks(pr)
+        if not _has_cancelled_required_check(checks):
+            continue
+
+        # Guard 1: cooldown — skip if we retrigggered this PR recently.
+        last_retrigger_str = retrigger_state.get(str(pr_num))
+        if last_retrigger_str:
+            try:
+                last_retrigger = datetime.fromisoformat(last_retrigger_str)
+                if last_retrigger.tzinfo is None:
+                    last_retrigger = last_retrigger.replace(tzinfo=timezone.utc)
+                age_min = (now - last_retrigger).total_seconds() / 60
+                if age_min < RETRIGGER_COOLDOWN_MINUTES:
+                    logger.info(
+                        "PR #%d CANCELLED retrigger skipped — cooldown active"
+                        " (%.0f min remaining)",
+                        pr_num, RETRIGGER_COOLDOWN_MINUTES - age_min,
+                    )
+                    continue
+            except (TypeError, ValueError):
+                pass  # Corrupt state — proceed with retrigger
+
+        # Guard 2: imminent-push — HEAD is a recent automation retrigger commit.
+        if _is_own_push_imminent(pr, s, now):
+            logger.info(
+                "PR #%d CANCELLED retrigger skipped — HEAD is recent automation"
+                " retrigger commit (imminent-push guard)",
+                pr_num,
+            )
+            continue
+
+        if dry_run:
+            logger.info("[DRY] would retrigger CANCELLED PR #%d", pr_num)
+            cancelled_retriggered.append(pr_num)
+        elif retest_pr(pr_num, gh_token):
+            retrigger_state[str(pr_num)] = now.isoformat()
+            cancelled_retriggered.append(pr_num)
+
+    save_retrigger_state(retrigger_state)
+
     # 5. CEO-bypass squash-merge eligible PRs
     merged = []
     merge_blocked = []
@@ -402,6 +549,7 @@ def main() -> int:
         "waste_cancelled": cancelled_waste,
         "duplicate_cancelled": dup_cancelled,
         "retested_prs": retested,
+        "cancelled_retriggered": cancelled_retriggered,
         "merged": merged,
         "merge_blocked": merge_blocked,
         "intervention_posted": intervention_needed and not dry_run,
