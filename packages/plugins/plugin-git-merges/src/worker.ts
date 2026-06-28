@@ -8,6 +8,8 @@ import {
   DEFAULT_CONFIG,
   PLUGIN_ID,
   STREAM_CHANNELS,
+  type BlockedChain,
+  type ChainNode,
   type GitMergesConfig,
   type MergeBlock,
   type MergeQueueSnapshot,
@@ -333,6 +335,23 @@ function coerceHistory(value: unknown): ScanRecord[] {
   return value.filter(isScanRecord);
 }
 
+/**
+ * Build a uuid → { chainId, node } lookup so the Awaiting Approval tab
+ * can quickly show "this approval unblocks N issues in chain-X" without
+ * walking every chain. Empty if there are no chains.
+ */
+function buildApprovalChainLookup(
+  chains: BlockedChain[],
+): Record<string, { chainId: string; node: ChainNode }> {
+  const out: Record<string, { chainId: string; node: ChainNode }> = {};
+  for (const chain of chains) {
+    for (const [uuid, node] of Object.entries(chain.nodes)) {
+      out[uuid] = { chainId: chain.id, node };
+    }
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Plugin definition
 // ---------------------------------------------------------------------------
@@ -460,6 +479,12 @@ const plugin = definePlugin({
         totals,
         latestStartedAt: latest?.startedAt ?? null,
         latestFinishedAt: latest?.finishedAt ?? null,
+        blockedChains: latest?.blockedChains ?? [],
+        approvalRequests: latest?.approvalRequests ?? [],
+        approvalChainLookup: buildApprovalChainLookup(latest?.blockedChains ?? []),
+        blockedCount: latest?.blockedCount ?? 0,
+        chainCount: latest?.chainCount ?? 0,
+        approvalCount: latest?.approvalCount ?? 0,
       };
     });
 
@@ -772,7 +797,12 @@ async function executeScan(
     ctx.logger.warn("Git Merges: scriptPath validation failed", { error: message });
     return { skipped: false };
   }
-  const args = config.showJson ? ["--json", "--quiet"] : ["--quiet"];
+  // Always request --json output. The plugin parses the structured JSON
+  // payload to extract blocked chains + approval requests, which the
+  // human-readable table does not carry. The `showJson` config flag is
+  // preserved as a no-op so existing user settings don't surface an
+  // unknown-field validation error.
+  const args = ["--json", "--quiet"];
 
   let stdout = "";
   let stderr = "";
@@ -949,6 +979,11 @@ async function executeScan(
   // for diffs, and so the UI's `latest` payload has everything it needs.
   record.blocks = parsed.blocks;
   record.totals = parsed.totals;
+  record.blockedChains = parsed.blockedChains;
+  record.approvalRequests = parsed.approvalRequests;
+  record.blockedCount = parsed.blockedCount;
+  record.chainCount = parsed.chainCount;
+  record.approvalCount = parsed.approvalCount;
 
   // Final write directly (NOT via persistPartial, which would build a
   // fresh object and drop the blocks/totals we just attached).

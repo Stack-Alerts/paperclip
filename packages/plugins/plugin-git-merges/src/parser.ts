@@ -10,6 +10,9 @@
  * tweak to the script's format doesn't break the dashboard outright.
  */
 import type {
+  ApprovalRequest,
+  BlockedChain,
+  ChainNode,
   MergeBlock,
   MergeCheck,
   MergeStatus,
@@ -93,9 +96,25 @@ function isInsideBlock(lines: string[], idx: number): boolean {
 export interface ParseResult {
   blocks: MergeBlock[];
   totals: MergeTotals;
+  /** Blocked-issue dependency chains (from the script's --json output). */
+  blockedChains?: BlockedChain[];
+  /** Pending board-approval requests (from the script's --json output). */
+  approvalRequests?: ApprovalRequest[];
+  /** Snapshot-level counters from the script. */
+  blockedCount?: number;
+  chainCount?: number;
+  approvalCount?: number;
 }
 
 export function parseMergeQueueOutput(stdout: string): ParseResult {
+  // First try to parse the whole stdout as JSON (the script's --json path
+  // emits a single JSON document with no table). This unlocks the blocked-
+  // chain + approval data that only the --json output carries.
+  const jsonResult = tryParseJsonOutput(stdout);
+  if (jsonResult) {
+    return jsonResult;
+  }
+
   const lines = stdout.split(/\r?\n/);
   const blocks: MergeBlock[] = [];
   const totals: MergeTotals = {
@@ -367,4 +386,219 @@ export function diffBlocks(
     }
   }
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// JSON output parser
+// ---------------------------------------------------------------------------
+
+/**
+ * Try to parse the script's `--json` output. The script writes a single
+ * JSON document with `queue` (the in-review list, same shape as the table
+ * parser's output) plus blocked-chain data + approval requests.
+ *
+ * Returns `null` when the stdout doesn't look like a JSON document (e.g.
+ * the table output from `--quiet`). Caller falls back to the table parser.
+ */
+function tryParseJsonOutput(stdout: string): ParseResult | null {
+  // The worker's clampOutput() prepends "[... truncated to last N characters ...]"
+  // when the stdout exceeds maxOutputChars (default 200_000). The script's
+  // --json output is a single-line JSON document, so any truncation happens at
+  // the front of the line — which means our JSON.parse would see the
+  // truncation marker instead of `{`. Strip the marker before parsing.
+  let trimmed = stdout.trim();
+  const truncationPrefix = "[... truncated to last";
+  const truncationEnd = "characters ...]";
+  if (trimmed.startsWith(truncationPrefix)) {
+    const closeIdx = trimmed.indexOf(truncationEnd);
+    if (closeIdx > 0) {
+      trimmed = trimmed.slice(closeIdx + truncationEnd.length).trim();
+    }
+  }
+  if (!trimmed.startsWith("{")) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const obj = parsed as Record<string, unknown>;
+  const queueRaw = obj["queue"];
+  const chainsRaw = obj["blocked_chains"];
+  const approvalsRaw = obj["approval_requests"];
+
+  // We treat this as JSON only if we recognize the shape — must have
+  // either `blocked_chains`, `approval_requests`, or `queue`. Otherwise
+  // fall back to the table parser.
+  if (!Array.isArray(queueRaw) && !Array.isArray(chainsRaw) && !Array.isArray(approvalsRaw)) {
+    return null;
+  }
+
+  const blocks: MergeBlock[] = [];
+  if (Array.isArray(queueRaw)) {
+    let i = 1;
+    for (const item of queueRaw) {
+      if (!item || typeof item !== "object") {
+        i += 1;
+        continue;
+      }
+      const it = item as Record<string, unknown>;
+      const issueId = typeof it["issue_id"] === "string" ? (it["issue_id"] as string) : "";
+      if (!issueId) {
+        i += 1;
+        continue;
+      }
+      const checks = Array.isArray(it["checks"])
+        ? (it["checks"] as Array<Record<string, unknown>>).map((c) => ({
+            state: (c["state"] as MergeCheck["state"]) ?? "unknown",
+            name: (c["name"] as string) ?? "",
+            detail: (c["detail"] as string | null) ?? null,
+          }))
+        : [];
+      const statusRaw = (it["pr_mergeable"] as string | null) ?? "";
+      const passed = Number.parseInt((it["passed"] as string) ?? "0", 10) || 0;
+      const total = Number.parseInt((it["total"] as string) ?? "0", 10) || 0;
+      blocks.push({
+        index: i++,
+        issueUuid: issueId,
+        issueIdentifier: (it["display_key"] as string | null) ?? null,
+        title: (it["title"] as string) ?? "(no title)",
+        inReviewFor: "",
+        fixSha: (it["fix_sha"] as string | null) ?? null,
+        fixShaMissing: !it["fix_sha"],
+        prNumber: typeof it["pr_number"] === "number" ? (it["pr_number"] as number) : null,
+        prMergeable: statusRaw || null,
+        prTitle: (it["pr_title"] as string | null) ?? null,
+        status: deriveStatus(it),
+        statusLabel: "",
+        progressPassed: Number.isFinite(passed) ? passed : null,
+        progressTotal: Number.isFinite(total) ? total : null,
+        checks,
+        diffKey: issueId,
+      });
+    }
+  }
+
+  const blockedChains: BlockedChain[] = [];
+  if (Array.isArray(chainsRaw)) {
+    for (const c of chainsRaw) {
+      if (!c || typeof c !== "object") continue;
+      const ch = c as Record<string, unknown>;
+      const nodes: Record<string, ChainNode> = {};
+      const nodesRaw = ch["nodes"];
+      if (nodesRaw && typeof nodesRaw === "object") {
+        for (const [uuid, raw] of Object.entries(nodesRaw as Record<string, unknown>)) {
+          if (!raw || typeof raw !== "object") continue;
+          const n = raw as Record<string, unknown>;
+          nodes[uuid] = {
+            uuid: (n["uuid"] as string) ?? uuid,
+            identifier: (n["identifier"] as string | null) ?? null,
+            title: (n["title"] as string) ?? "(no title)",
+            status: (n["status"] as string) ?? "blocked",
+            priority: (n["priority"] as string | null) ?? null,
+            labels: Array.isArray(n["labels"]) ? (n["labels"] as string[]) : [],
+            depth: typeof n["depth"] === "number" ? (n["depth"] as number) : 0,
+            isLeaf: Boolean(n["is_leaf"]),
+            isRoot: Boolean(n["is_root"]),
+            blockedBy: Array.isArray(n["blocked_by"]) ? (n["blocked_by"] as string[]) : [],
+            blocks: Array.isArray(n["blocks"]) ? (n["blocks"] as string[]) : [],
+            downstreamCount: typeof n["downstream_count"] === "number" ? (n["downstream_count"] as number) : 0,
+          };
+        }
+      }
+      blockedChains.push({
+        id: (ch["id"] as string) ?? "",
+        rootIds: Array.isArray(ch["root_ids"]) ? (ch["root_ids"] as string[]) : [],
+        leafIds: Array.isArray(ch["leaf_ids"]) ? (ch["leaf_ids"] as string[]) : [],
+        nodeCount: typeof ch["node_count"] === "number" ? (ch["node_count"] as number) : 0,
+        nodes,
+      });
+    }
+  }
+
+  const approvalRequests: ApprovalRequest[] = [];
+  if (Array.isArray(approvalsRaw)) {
+    for (const a of approvalsRaw) {
+      if (!a || typeof a !== "object") continue;
+      const ar = a as Record<string, unknown>;
+      const chainNodeRaw = ar["chain_node"];
+      const chainNode: ChainNode | null =
+        chainNodeRaw && typeof chainNodeRaw === "object"
+          ? {
+              uuid: ((chainNodeRaw as Record<string, unknown>)["uuid"] as string) ?? "",
+              identifier: ((chainNodeRaw as Record<string, unknown>)["identifier"] as string | null) ?? null,
+              title: ((chainNodeRaw as Record<string, unknown>)["title"] as string) ?? "(no title)",
+              status: ((chainNodeRaw as Record<string, unknown>)["status"] as string) ?? "blocked",
+              priority: ((chainNodeRaw as Record<string, unknown>)["priority"] as string | null) ?? null,
+              labels: [],
+              depth: ((chainNodeRaw as Record<string, unknown>)["depth"] as number) ?? 0,
+              isLeaf: Boolean((chainNodeRaw as Record<string, unknown>)["is_leaf"]),
+              isRoot: Boolean((chainNodeRaw as Record<string, unknown>)["is_root"]),
+              blockedBy: [],
+              blocks: [],
+              downstreamCount:
+                typeof (chainNodeRaw as Record<string, unknown>)["downstream_count"] === "number"
+                  ? ((chainNodeRaw as Record<string, unknown>)["downstream_count"] as number)
+                  : 0,
+            }
+          : null;
+      approvalRequests.push({
+        issueId: (ar["issue_id"] as string) ?? "",
+        issueIdentifier: (ar["issue_identifier"] as string | null) ?? null,
+        issueTitle: (ar["issue_title"] as string) ?? "(no title)",
+        issueStatus: (ar["issue_status"] as string) ?? "blocked",
+        issuePriority: (ar["issue_priority"] as string | null) ?? null,
+        interactionId: (ar["interaction_id"] as string) ?? "",
+        kind: (ar["kind"] as string) ?? "request_confirmation",
+        title: (ar["title"] as string) ?? "",
+        body: (ar["body"] as string) ?? "",
+        createdAt: (ar["created_at"] as string | null) ?? null,
+        createdBy: (ar["created_by"] as string | null) ?? null,
+        idempotencyKey: (ar["idempotency_key"] as string | null) ?? null,
+        chainId: (ar["chain_id"] as string | null) ?? null,
+        chainNode,
+        unblocksCount: typeof ar["unblocks_count"] === "number" ? (ar["unblocks_count"] as number) : 0,
+      });
+    }
+  }
+
+  const totals: MergeTotals = {
+    inReview: typeof obj["in_review_count"] === "number" ? (obj["in_review_count"] as number) : blocks.length,
+    openPrs: typeof obj["open_pr_count"] === "number" ? (obj["open_pr_count"] as number) : 0,
+    queuedRuns: typeof obj["queued_runs"] === "number" ? (obj["queued_runs"] as number) : 0,
+    inProgressRuns: typeof obj["in_progress_runs"] === "number" ? (obj["in_progress_runs"] as number) : 0,
+    ready: 0,
+    waiting: 0,
+    failing: 0,
+    noPrOrSha: 0,
+  };
+
+  return {
+    blocks,
+    totals,
+    blockedChains,
+    approvalRequests,
+    blockedCount: typeof obj["blocked_count"] === "number" ? (obj["blocked_count"] as number) : 0,
+    chainCount: typeof obj["chain_count"] === "number" ? (obj["chain_count"] as number) : 0,
+    approvalCount: typeof obj["approval_count"] === "number" ? (obj["approval_count"] as number) : 0,
+  };
+}
+
+/**
+ * Status heuristic matching the table parser's behavior. Without the
+ * exact table lines we can't replicate every nuance; this picks the
+ * safest bucket so the UI shows something reasonable for parsed-JSON
+ * queue items.
+ */
+function deriveStatus(item: Record<string, unknown>): MergeStatus {
+  if (!item["pr_number"]) return "no-pr";
+  const passed = Number.parseInt((item["passed"] as string) ?? "0", 10) || 0;
+  const total = Number.parseInt((item["total"] as string) ?? "0", 10) || 0;
+  const failed = Number.parseInt((item["failed"] as string) ?? "0", 10) || 0;
+  const mergeable = item["pr_mergeable"] as string | null;
+  if (total > 0 && passed === total && mergeable === "clean") return "ready";
+  if (failed > 0) return "failing";
+  if (total > 0 && passed < total) return "waiting";
+  return "unknown";
 }

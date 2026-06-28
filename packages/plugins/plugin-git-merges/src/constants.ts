@@ -59,7 +59,10 @@ export const DEFAULT_CONFIG = {
   // Show the JSON output alongside the table.
   showJson: false,
   // Cap on how many characters to keep per scan in the output buffer.
-  maxOutputChars: 200_000,
+  // The script's --json output (with chains + approvals) is typically
+  // ~1–2 MB on a busy company; the 200 KB default was tuned for the
+  // human-readable table. Raise the default so the full JSON survives.
+  maxOutputChars: 5_000_000,
   // Soft timeout for a single scan.
   scanTimeoutSeconds: 120,
 } as const;
@@ -97,6 +100,14 @@ export type ScanRecord = {
   blocks?: MergeBlock[];
   /** Totals parsed from the script summary + TOTALS line. */
   totals?: MergeTotals;
+  /** Blocked-issue dependency chains (from the script's JSON output). */
+  blockedChains?: BlockedChain[];
+  /** Pending board-approval requests (from the script's JSON output). */
+  approvalRequests?: ApprovalRequest[];
+  /** Snapshot-level counters from the script. */
+  blockedCount?: number;
+  chainCount?: number;
+  approvalCount?: number;
 };
 
 export type ScanStatus = {
@@ -142,6 +153,25 @@ export type MergeQueueSnapshot = {
   latestStartedAt: string | null;
   /** Wall-clock time the latest scan finished. */
   latestFinishedAt: string | null;
+  /**
+   * Blocked-issue dependency chains. Built from the Paperclip DB's
+   * `issue_relations` table (graph edges) combined with REST API metadata
+   * (node labels). Each chain is a connected component in the
+   * directed `blocks` graph.
+   */
+  blockedChains: BlockedChain[];
+  /**
+   * Pending board-approval requests (`request_confirmation` interactions
+   * with status='pending'). Sorted by unblocks_count DESC then created_at
+   * DESC, so the most impactful approval floats to the top.
+   */
+  approvalRequests: ApprovalRequest[];
+  /** Quick lookup table uuid → chain_node for approval cross-references. */
+  approvalChainLookup: Record<string, { chainId: string; node: ChainNode }>;
+  /** Snapshot-level counters for the new tabs. */
+  blockedCount: number;
+  chainCount: number;
+  approvalCount: number;
 };
 
 /**
@@ -216,4 +246,68 @@ export type MergeTotals = {
   waiting: number;
   failing: number;
   noPrOrSha: number;
+};
+
+// ---------------------------------------------------------------------------
+// Blocked-chain + awaiting-approval types (added for the new tabs)
+// ---------------------------------------------------------------------------
+
+export type ChainNode = {
+  uuid: string;
+  identifier: string | null;
+  title: string;
+  status: string;
+  priority: string | null;
+  labels: string[];
+  /**
+   * Distance from the nearest leaf in this chain. 0 = leaf (nothing blocks
+   * it; resolving this node unblocks its downstream). Higher = deeper in
+   * the dependency tree.
+   */
+  depth: number;
+  isLeaf: boolean;
+  isRoot: boolean;
+  /** Direct blockers (uuids) inside the same chain. */
+  blockedBy: string[];
+  /** Direct downstream issues (uuids) inside the same chain. */
+  blocks: string[];
+  /** Total transitive downstream issues this node unblocks if resolved. */
+  downstreamCount: number;
+};
+
+export type BlockedChain = {
+  id: string;
+  /** Chain heads: issues that are blocked by others but themselves block nothing in this chain. */
+  rootIds: string[];
+  /** Actionable leaves: issues that nothing in this chain blocks (resolving them unblocks downstream). */
+  leafIds: string[];
+  nodeCount: number;
+  nodes: Record<string, ChainNode>;
+};
+
+export type ApprovalRequest = {
+  issueId: string;
+  issueIdentifier: string | null;
+  issueTitle: string;
+  issueStatus: string;
+  issuePriority: string | null;
+  interactionId: string;
+  kind: string;
+  title: string;
+  body: string;
+  createdAt: string | null;
+  createdBy: string | null;
+  idempotencyKey: string | null;
+  /**
+   * Chain this issue belongs to (when the issue is part of a dependency
+   * chain). null if the issue stands alone.
+   */
+  chainId: string | null;
+  /** The matching chain node, if any. */
+  chainNode: ChainNode | null;
+  /**
+   * How many issues would unblock if this approval is granted. 0 when
+   * the issue isn't part of a chain or the chain has no downstream issues.
+   */
+  unblocksCount: number;
 };
