@@ -428,7 +428,7 @@ describe.sequential("agent permission routes", () => {
     expect(res.body.runtimeConfig).toEqual({});
   }, 20_000);
 
-  it("keeps board agent detail unredacted for low-trust agents", async () => {
+it("keeps board agent detail unredacted for low-trust agents", async () => {
     mockAgentService.getById.mockResolvedValue({
       ...baseAgent,
       permissions: {
@@ -467,6 +467,60 @@ describe.sequential("agent permission routes", () => {
       },
     });
     expect(res.body.permissions).toMatchObject({ trustPreset: LOW_TRUST_REVIEW_PRESET });
+  }, 20_000);
+
+  it("blanks adapterConfig.env on un-prefixed GET /api/agents/:id for admins (CAR-295)", async () => {
+    const leakyEnv = {
+      ANTHROPIC_AUTH_TOKEN: { type: "plain", value: "sk-cp-leak-test" },
+      ANTHROPIC_BASE_URL: { type: "plain", value: "https://api.example.com" },
+      PAPERCLIP_API_KEY: { type: "plain", value: "leak-key" },
+      MYSQL_PASSWORD: "leak-pw",
+      SLACK_WEBHOOK_URL: "https://hooks.slack.com/leak",
+      AWS_ACCESS_KEY_ID: "AKIA-leak",
+      AWS_SECRET_ACCESS_KEY: "leak-secret",
+      GITHUB_TOKEN: "leak-gh",
+      GITHUB_PAT: "leak-pat",
+      NANGO_SECRET_KEY: "leak-nango",
+    };
+    const leakyRuntime = {
+      apiKey: "sk-runtime-leak",
+      authorization: "Bearer runtime-leak",
+      nested: { password: "deep-leak" },
+    };
+    mockAgentService.getById.mockResolvedValue({
+      ...baseAgent,
+      adapterConfig: { env: leakyEnv, command: ["echo", "ok"] },
+      runtimeConfig: leakyRuntime,
+    });
+    mockAgentService.getChainOfCommand.mockResolvedValue([]);
+
+    const app = await createApp({
+      type: "board",
+      userId: "admin-user",
+      source: "session",
+      isInstanceAdmin: true,
+      companyIds: [companyId],
+    });
+
+    const res = await requestApp(app, (baseUrl) =>
+      request(baseUrl).get(`/api/agents/${agentId}`),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.adapterConfig.env).toEqual({});
+    const serialized = JSON.stringify(res.body);
+    for (const leak of Object.values(leakyEnv)) {
+      const value = typeof leak === "string" ? leak : (leak as { value?: string }).value;
+      if (value) expect(serialized).not.toContain(value);
+    }
+    for (const value of [
+      leakyRuntime.apiKey,
+      leakyRuntime.authorization,
+      leakyRuntime.nested.password,
+    ]) {
+      expect(serialized).not.toContain(value);
+    }
+    expect(res.body.adapterConfig.command).toEqual(["echo", "ok"]);
   }, 20_000);
 
   it("redacts company agent list for authenticated company members without agent admin permission", async () => {
