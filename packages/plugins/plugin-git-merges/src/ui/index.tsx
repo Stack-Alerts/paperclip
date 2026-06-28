@@ -25,6 +25,9 @@ import {
   DEFAULT_CONFIG,
   PAGE_ROUTE,
   PLUGIN_ID,
+  type ApprovalRequest,
+  type BlockedChain,
+  type ChainNode,
   type GitMergesConfig,
   type MergeBlock,
   type MergeCheck,
@@ -1248,6 +1251,12 @@ export function GitMergesPage(_props: PluginPageProps) {
           stdout={effectiveStdout}
           stderr={effectiveStderr}
           companyPrefix={hostContext.companyPrefix}
+          blockedChains={snapshot?.blockedChains ?? []}
+          approvalRequests={snapshot?.approvalRequests ?? []}
+          approvalChainLookup={snapshot?.approvalChainLookup ?? {}}
+          blockedCount={snapshot?.blockedCount ?? 0}
+          chainCount={snapshot?.chainCount ?? 0}
+          approvalCount={snapshot?.approvalCount ?? 0}
         />
       </section>
 
@@ -1276,16 +1285,17 @@ export function GitMergesPage(_props: PluginPageProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Queue tabs — Blocks / Diff / Raw
+// Queue tabs — Blocks / Diff / Blocked Chain / Awaiting Approval / Raw
 // ---------------------------------------------------------------------------
 
-type QueueTab = "blocks" | "diff" | "raw";
+type QueueTab = "blocks" | "diff" | "chains" | "approvals" | "raw";
 
 const tabBarStyle: CSSProperties = {
   display: "flex",
   gap: "4px",
   borderBottom: "1px solid var(--border)",
   marginBottom: "10px",
+  flexWrap: "wrap",
 };
 
 const tabButtonStyle = (active: boolean): CSSProperties => ({
@@ -1312,6 +1322,12 @@ function QueueTabs({
   stdout,
   stderr,
   companyPrefix,
+  blockedChains,
+  approvalRequests,
+  approvalChainLookup,
+  blockedCount,
+  chainCount,
+  approvalCount,
 }: {
   blocks: MergeBlock[];
   previousBlocks: MergeBlock[] | null;
@@ -1322,6 +1338,12 @@ function QueueTabs({
   stdout: string;
   stderr: string;
   companyPrefix: string | null;
+  blockedChains: BlockedChain[];
+  approvalRequests: ApprovalRequest[];
+  approvalChainLookup: Record<string, { chainId: string; node: ChainNode }>;
+  blockedCount: number;
+  chainCount: number;
+  approvalCount: number;
 }) {
   const [tab, setTab] = useState<QueueTab>("blocks");
   const hasPrevious = previousBlocks !== null && previousBlocks.length > 0;
@@ -1352,6 +1374,36 @@ function QueueTabs({
         <button
           type="button"
           role="tab"
+          aria-selected={tab === "chains"}
+          style={tabButtonStyle(tab === "chains")}
+          onClick={() => setTab("chains")}
+          disabled={blockedChains.length === 0}
+          title={
+            blockedChains.length > 0
+              ? `${chainCount} chains across ${blockedCount} blocked issues`
+              : "No blocked chains"
+          }
+        >
+          Blocked Chain ({chainCount})
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "approvals"}
+          style={tabButtonStyle(tab === "approvals")}
+          onClick={() => setTab("approvals")}
+          disabled={approvalRequests.length === 0}
+          title={
+            approvalRequests.length > 0
+              ? `${approvalCount} pending board-approval requests`
+              : "No pending approvals"
+          }
+        >
+          Awaiting Approval ({approvalCount})
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={tab === "raw"}
           style={tabButtonStyle(tab === "raw")}
           onClick={() => setTab("raw")}
@@ -1372,6 +1424,21 @@ function QueueTabs({
           current={blocks}
           previous={previousBlocks ?? []}
           deltaByKey={deltaByKey}
+          visited={visited}
+          onVisit={onVisit}
+          companyPrefix={companyPrefix}
+        />
+      ) : tab === "chains" ? (
+        <BlockedChainsView
+          chains={blockedChains}
+          visited={visited}
+          onVisit={onVisit}
+          companyPrefix={companyPrefix}
+        />
+      ) : tab === "approvals" ? (
+        <AwaitingApprovalView
+          approvals={approvalRequests}
+          approvalChainLookup={approvalChainLookup}
           visited={visited}
           onVisit={onVisit}
           companyPrefix={companyPrefix}
@@ -2102,6 +2169,446 @@ function DiffView({
           />
         );
       })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Blocked Chain view — one card per connected chain in the issue_relations
+// graph, with hierarchy rendered via indentation. Leaves (issues nothing
+// blocks in this chain — resolving them unblocks downstream) are surfaced
+// first and highlighted with the "needs attention" rose pill.
+// ---------------------------------------------------------------------------
+
+function statusPillStyleFor(status: string): CSSProperties {
+  // Color-code by status so "todo", "in_progress", "done", "cancelled"
+  // are visually distinct.
+  if (status === "done") {
+    return {
+      ...pillStyle,
+      borderColor: "color-mix(in srgb, #16a34a 60%, var(--border))",
+      background: "color-mix(in srgb, #16a34a 14%, transparent)",
+      color: "#86efac",
+    };
+  }
+  if (status === "cancelled") {
+    return {
+      ...pillStyle,
+      borderColor: "color-mix(in srgb, #6b7280 60%, var(--border))",
+      background: "color-mix(in srgb, #6b7280 14%, transparent)",
+      color: "#9ca3af",
+    };
+  }
+  if (status === "in_progress" || status === "in_review") {
+    return {
+      ...pillStyle,
+      borderColor: "color-mix(in srgb, #d97706 60%, var(--border))",
+      background: "color-mix(in srgb, #d97706 14%, transparent)",
+      color: "#fcd34d",
+    };
+  }
+  // default: blocked / todo / etc.
+  return {
+    ...pillStyle,
+    borderColor: "color-mix(in srgb, #dc2626 60%, var(--border))",
+    background: "color-mix(in srgb, #dc2626 14%, transparent)",
+    color: "#fca5a5",
+  };
+}
+
+function IssueLink({
+  node,
+  companyPrefix,
+  visited,
+  onVisit,
+}: {
+  node: ChainNode;
+  companyPrefix: string | null;
+  visited: boolean;
+  onVisit: (diffKey: string) => void;
+}) {
+  const hostNavigation = useHostNavigation();
+  const issueHref =
+    companyPrefix && node.identifier
+      ? `/${companyPrefix}/issues/${node.identifier}`
+      : null;
+  const props = issueHref ? hostNavigation.linkProps(issueHref) : null;
+  const handleClick: React.MouseEventHandler<HTMLAnchorElement> = (e) => {
+    onVisit(node.uuid);
+    if (props) props.onClick(e);
+  };
+  return (
+    <span style={{ display: "inline-flex", gap: "6px", alignItems: "center" }}>
+      {node.identifier && props ? (
+        <a
+          {...props}
+          target="_blank"
+          rel="noreferrer"
+          onClick={handleClick}
+          style={inlineLinkStyle}
+          title={`Open ${node.identifier} in Paperclip`}
+        >
+          {node.identifier}
+        </a>
+      ) : node.identifier ? (
+        <span style={inlineLinkStyle}>{node.identifier}</span>
+      ) : (
+        <span style={{ ...mutedTextStyle, fontSize: "10px" }}>
+          {node.uuid.slice(0, 8)}…
+        </span>
+      )}
+      {visited ? (
+        <span style={visitedPillStyle} title="You opened this since the last scan">
+          ✓ checked
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function ChainNodeRow({
+  node,
+  depth,
+  isActionable,
+  isLeaf,
+  visited,
+  onVisit,
+  companyPrefix,
+}: {
+  node: ChainNode;
+  depth: number;
+  isActionable: boolean;
+  isLeaf: boolean;
+  visited: boolean;
+  onVisit: (diffKey: string) => void;
+  companyPrefix: string | null;
+}) {
+  const indent = depth * 18;
+  return (
+    <div
+      style={{
+        display: "grid",
+        gap: "4px",
+        paddingLeft: `${indent}px`,
+        borderLeft: depth > 0 ? "1px dashed var(--border)" : "none",
+        marginLeft: depth > 0 ? "8px" : "0",
+        paddingTop: "6px",
+        paddingBottom: "6px",
+      }}
+    >
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
+        <IssueLink
+          node={node}
+          companyPrefix={companyPrefix}
+          visited={visited}
+          onVisit={onVisit}
+        />
+        <span style={statusPillStyleFor(node.status)}>{node.status}</span>
+        {node.priority ? (
+          <span style={pillStyle}>{node.priority}</span>
+        ) : null}
+        {isLeaf && isActionable ? (
+          <span style={chainActionablePillStyle} title="Nothing blocks this issue in this chain — resolving it unblocks the whole chain">
+            ⚡ needs attention
+          </span>
+        ) : isLeaf ? (
+          <span style={chainLeafPillStyle}>leaf</span>
+        ) : null}
+      </div>
+      <div style={{ ...mutedTextStyle, fontSize: "11px" }}>
+        {node.title.length > 120 ? node.title.slice(0, 120) + "…" : node.title}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center", fontSize: "10px" }}>
+        <span style={chainMetaPillStyle}>depth {node.depth}</span>
+        {node.blockedBy.length > 0 ? (
+          <span style={chainMetaPillStyle}>blocked by {node.blockedBy.length}</span>
+        ) : null}
+        {node.blocks.length > 0 ? (
+          <span style={chainMetaPillStyle}>blocks {node.blocks.length} downstream</span>
+        ) : null}
+        {node.downstreamCount > 0 ? (
+          <span style={chainUnblocksPillStyle}>
+            resolving unblocks {node.downstreamCount}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+const chainActionablePillStyle: CSSProperties = {
+  fontSize: "10px",
+  padding: "1px 8px",
+  borderRadius: "999px",
+  border: "1px solid color-mix(in srgb, #f43f5e 60%, var(--border))",
+  background: "color-mix(in srgb, #f43f5e 14%, transparent)",
+  color: "#fda4af",
+  fontWeight: 600,
+};
+
+const chainLeafPillStyle: CSSProperties = {
+  fontSize: "10px",
+  padding: "1px 8px",
+  borderRadius: "999px",
+  border: "1px solid color-mix(in srgb, #6b7280 60%, var(--border))",
+  background: "color-mix(in srgb, #6b7280 14%, transparent)",
+  color: "#9ca3af",
+};
+
+const chainMetaPillStyle: CSSProperties = {
+  fontSize: "10px",
+  padding: "1px 7px",
+  borderRadius: "999px",
+  border: "1px solid var(--border)",
+  background: "color-mix(in srgb, var(--muted, #888) 14%, transparent)",
+};
+
+const chainUnblocksPillStyle: CSSProperties = {
+  fontSize: "10px",
+  padding: "1px 7px",
+  borderRadius: "999px",
+  border: "1px solid color-mix(in srgb, #16a34a 60%, var(--border))",
+  background: "color-mix(in srgb, #16a34a 14%, transparent)",
+  color: "#86efac",
+  fontWeight: 500,
+};
+
+const chainCardStyle: CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: "10px",
+  padding: "12px",
+  display: "grid",
+  gap: "8px",
+  background: "color-mix(in srgb, var(--card, transparent) 50%, transparent)",
+};
+
+const chainCardActionableStyle: CSSProperties = {
+  ...chainCardStyle,
+  borderColor: "color-mix(in srgb, #f43f5e 60%, var(--border))",
+};
+
+function BlockedChainCard({
+  chain,
+  visited,
+  onVisit,
+  companyPrefix,
+}: {
+  chain: BlockedChain;
+  visited: Set<string>;
+  onVisit: (diffKey: string) => void;
+  companyPrefix: string | null;
+}) {
+  // Decide "actionable": chain has at least one leaf that isn't done/cancelled.
+  const actionableLeaves = chain.leafIds.filter((uuid) => {
+    const n = chain.nodes[uuid];
+    if (!n) return false;
+    return n.status !== "done" && n.status !== "cancelled";
+  });
+  const isActionable = actionableLeaves.length > 0;
+  // Sort nodes by (depth ASC, is_leaf DESC, title) so leaves surface first.
+  const sortedNodes = Object.values(chain.nodes).sort((a, b) => {
+    if (a.depth !== b.depth) return a.depth - b.depth;
+    if (a.isLeaf !== b.isLeaf) return a.isLeaf ? -1 : 1;
+    return (a.title || "").localeCompare(b.title || "");
+  });
+  return (
+    <div style={isActionable ? chainCardActionableStyle : chainCardStyle}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
+        <strong style={{ fontSize: "13px" }}>{chain.id}</strong>
+        <span style={chainMetaPillStyle}>
+          {chain.nodeCount} issue{chain.nodeCount === 1 ? "" : "s"}
+        </span>
+        {chain.leafIds.length > 0 ? (
+          <span style={chainMetaPillStyle}>
+            {chain.leafIds.length} actionable leaf{chain.leafIds.length === 1 ? "" : "s"}
+          </span>
+        ) : null}
+        {isActionable ? (
+          <span style={chainActionablePillStyle}>⚡ needs attention</span>
+        ) : null}
+      </div>
+      <div style={{ display: "grid", gap: "4px" }}>
+        {sortedNodes.map((node) => (
+          <ChainNodeRow
+            key={node.uuid}
+            node={node}
+            depth={node.depth}
+            isActionable={
+              isActionable && node.isLeaf && actionableLeaves.includes(node.uuid)
+            }
+            isLeaf={node.isLeaf}
+            visited={visited.has(node.uuid)}
+            onVisit={onVisit}
+            companyPrefix={companyPrefix}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BlockedChainsView({
+  chains,
+  visited,
+  onVisit,
+  companyPrefix,
+}: {
+  chains: BlockedChain[];
+  visited: Set<string>;
+  onVisit: (diffKey: string) => void;
+  companyPrefix: string | null;
+}) {
+  if (chains.length === 0) {
+    return (
+      <div style={mutedTextStyle}>
+        No blocked-issue chains. Run a scan to populate.
+      </div>
+    );
+  }
+  // Surface actionable chains first (smallest leaf count first = most
+  // targeted), then by node count ascending.
+  const sorted = [...chains].sort((a, b) => {
+    const aLeaves = a.leafIds.filter((u) => {
+      const n = a.nodes[u];
+      return n && n.status !== "done" && n.status !== "cancelled";
+    }).length;
+    const bLeaves = b.leafIds.filter((u) => {
+      const n = b.nodes[u];
+      return n && n.status !== "done" && n.status !== "cancelled";
+    }).length;
+    if (aLeaves !== bLeaves) return aLeaves - bLeaves;
+    return a.nodeCount - b.nodeCount;
+  });
+  return (
+    <div style={{ display: "grid", gap: "8px" }}>
+      <div style={{ ...mutedTextStyle, fontSize: "11px" }}>
+        {chains.length} chain{chains.length === 1 ? "" : "s"} — actionable
+        (smallest actionable leaf count first). Click any identifier to
+        open the issue in a new tab; it is also marked ✓ checked.
+      </div>
+      {sorted.map((chain) => (
+        <BlockedChainCard
+          key={chain.id}
+          chain={chain}
+          visited={visited}
+          onVisit={onVisit}
+          companyPrefix={companyPrefix}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Awaiting Approval view — pending board-approval requests, with chain
+// cross-reference so the operator can see which approvals would unblock
+// downstream work.
+// ---------------------------------------------------------------------------
+
+function AwaitingApprovalView({
+  approvals,
+  approvalChainLookup,
+  visited,
+  onVisit,
+  companyPrefix,
+}: {
+  approvals: ApprovalRequest[];
+  approvalChainLookup: Record<string, { chainId: string; node: ChainNode }>;
+  visited: Set<string>;
+  onVisit: (diffKey: string) => void;
+  companyPrefix: string | null;
+}) {
+  if (approvals.length === 0) {
+    return (
+      <div style={mutedTextStyle}>
+        No pending board-approval requests. The agent will surface any
+        new ones on the next scan.
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "grid", gap: "8px" }}>
+      <div style={{ ...mutedTextStyle, fontSize: "11px" }}>
+        {approvals.length} pending request_confirmation interaction
+        {approvals.length === 1 ? "" : "s"}, ordered by unblocks-count DESC
+        then newest. Click an identifier to open the issue in a new tab.
+      </div>
+      {approvals.map((a) => (
+        <ApprovalCard
+          key={a.interactionId || `${a.issueId}-${a.kind}`}
+          approval={a}
+          chain={a.issueId ? approvalChainLookup[a.issueId] : undefined}
+          visited={a.issueId ? visited.has(a.issueId) : false}
+          onVisit={onVisit}
+          companyPrefix={companyPrefix}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ApprovalCard({
+  approval,
+  chain,
+  visited,
+  onVisit,
+  companyPrefix,
+}: {
+  approval: ApprovalRequest;
+  chain?: { chainId: string; node: ChainNode };
+  visited: boolean;
+  onVisit: (diffKey: string) => void;
+  companyPrefix: string | null;
+}) {
+  const isHighImpact = approval.unblocksCount > 0;
+  return (
+    <div style={isHighImpact ? chainCardActionableStyle : chainCardStyle}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
+        <IssueLink
+          node={{
+            uuid: approval.issueId,
+            identifier: approval.issueIdentifier,
+            title: approval.issueTitle,
+            status: approval.issueStatus,
+            priority: approval.issuePriority,
+            labels: [],
+            depth: chain?.node.depth ?? 0,
+            isLeaf: chain?.node.isLeaf ?? false,
+            isRoot: chain?.node.isRoot ?? false,
+            blockedBy: chain?.node.blockedBy ?? [],
+            blocks: chain?.node.blocks ?? [],
+            downstreamCount: chain?.node.downstreamCount ?? 0,
+          }}
+          companyPrefix={companyPrefix}
+          visited={visited}
+          onVisit={onVisit}
+        />
+        <span style={statusPillStyleFor(approval.issueStatus)}>
+          {approval.issueStatus}
+        </span>
+        {approval.issuePriority ? (
+          <span style={pillStyle}>{approval.issuePriority}</span>
+        ) : null}
+        <span style={pillStyle}>request_confirmation</span>
+        {chain ? (
+          <span style={chainMetaPillStyle}>chain {chain.chainId}</span>
+        ) : null}
+        {approval.unblocksCount > 0 ? (
+          <span style={chainUnblocksPillStyle}>
+            ⚡ unblocks {approval.unblocksCount}
+          </span>
+        ) : null}
+      </div>
+      <div style={{ ...mutedTextStyle, fontSize: "11px" }}>
+        <strong style={{ color: "inherit" }}>{approval.title || "(no request title)"}</strong>
+      </div>
+      {approval.body ? (
+        <pre style={outputStyle}>{approval.body.slice(0, 800)}</pre>
+      ) : null}
+      <div style={{ ...mutedTextStyle, fontSize: "10px" }}>
+        requested {approval.createdAt || "—"}
+        {approval.createdBy ? ` by ${approval.createdBy.slice(0, 8)}…` : ""}
+      </div>
     </div>
   );
 }
