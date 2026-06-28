@@ -20,16 +20,18 @@ echo "[redeploy_dev] repo root: ${REPO_ROOT}"
 # Fetch latest refs so the SHA is available locally
 git -C "${REPO_ROOT}" fetch origin --prune 2>&1
 
-# Verify the commit exists
-if ! git -C "${REPO_ROOT}" cat-file -e "${COMMIT}^{commit}" 2>/dev/null; then
+# Resolve and verify the commit — get the full 40-char SHA before touching the tree
+RESOLVED_SHA="$(git -C "${REPO_ROOT}" rev-parse --verify "${COMMIT}^{commit}" 2>/dev/null || true)"
+if [[ -z "${RESOLVED_SHA}" ]]; then
     echo "[redeploy_dev] ERROR: commit ${COMMIT} not found after fetch" >&2
     exit 1
 fi
+echo "[redeploy_dev] resolved SHA: ${RESOLVED_SHA}"
 
 # Check out the target commit (skip if HEAD was requested)
 if [[ "${COMMIT}" != "HEAD" ]]; then
-    echo "[redeploy_dev] checking out ${COMMIT}..."
-    git -C "${REPO_ROOT}" checkout "${COMMIT}" -- 2>&1
+    echo "[redeploy_dev] checking out ${RESOLVED_SHA}..."
+    git -C "${REPO_ROOT}" checkout "${RESOLVED_SHA}" 2>&1
 fi
 
 echo "[redeploy_dev] installing dependencies..."

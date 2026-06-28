@@ -29,12 +29,11 @@ the fix existed on a branch.
 The automation closes it after the merge lands. Setting `done` early bypasses all
 merge-gate and ancestry checks.
 
-### Board-action issues with no code artifact (v2)
+### Non-code board actions (redeploy / install / config / process)
 
-For issues that require an operational action (redeploy, install, config, process) but
-have **no git commit**, use the `[no-sha: <reason>]` tag convention instead of Fix-SHA:
+For issues with **no git artifact** (redeploys, plugin installs, config changes, process steps):
 
-1. In the closing Paperclip comment, include the exact line:
+1. Post a comment with the exact line (line-anchored, no markdown formatting):
    ```
    [no-sha: redeploy]
    [no-sha: install] <plugin-id>
