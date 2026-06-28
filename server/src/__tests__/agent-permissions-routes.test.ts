@@ -424,7 +424,10 @@ describe.sequential("agent permission routes", () => {
     const res = await requestApp(app, (baseUrl) => request(baseUrl).get(`/api/agents/${agentId}`));
 
     expect(res.status).toBe(200);
-    expect(res.body.adapterConfig).toEqual({});
+    // CAR-295: env is always blanked on the un-prefixed path, even for board
+    // users. adapterConfig shape changes from `{}` to `{ env: {} }` to make
+    // the redaction visible/asserted.
+    expect(res.body.adapterConfig).toEqual({ env: {} });
     expect(res.body.runtimeConfig).toEqual({});
   }, 20_000);
 
@@ -457,9 +460,11 @@ it("keeps board agent detail unredacted for low-trust agents", async () => {
     const res = await requestApp(app, (baseUrl) => request(baseUrl).get(`/api/agents/${agentId}`));
 
     expect(res.status).toBe(200);
+    // CAR-295: un-prefixed GET /api/agents/:id now blanks adapterConfig.env
+    // on the admin/self branch (env redaction is not gated on trust preset).
     expect(res.body.adapterConfig).toMatchObject({
       command: "pnpm agent:run",
-      env: { PAPERCLIP_API_KEY: "secret-test-key" },
+      env: {},
     });
     expect(res.body.runtimeConfig).toMatchObject({
       modelProfiles: {
