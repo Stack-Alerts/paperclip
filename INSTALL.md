@@ -198,13 +198,11 @@ Patch `sw.js` so the fallback always returns a `Response` and the
 new SW force-reloads any tabs that were under the old SW:
 
 ```sh
-NPX_CACHE=/home/sirrus/.npm/_npx/43414d9b790239bb/node_modules
-SW="$NPX_CACHE/@paperclipai/server/ui-dist/sw.js"
-cp "$SW" "$SW.bak"
-
-# Replace the buggy fetch handler with a safe one.
-cat > "$SW" <<'SWJS'
-const CACHE_NAME = "paperclip-v2";
+# Three locations to patch — the SW gets copied from public/ → dist/ by
+# Vite, and from dist/ → the npx cache by the install workflow. Any build
+# that re-runs (e.g. UI dev-watch) re-copies from public/, so all three
+# must be patched or the next build reverts the fix.
+SWJS='const CACHE_NAME = "paperclip-v2";
 const OFFLINE_FALLBACK = "/";
 
 self.addEventListener("install", () => { self.skipWaiting(); });
@@ -250,10 +248,25 @@ self.addEventListener("fetch", (event) => {
         return new Response("Offline", { status: 503 });
       })
   );
-});
-SWJS
+});'
 
-# Verify the patched file is valid JS.
+# 1. Source — Vite copies this to dist/ on every build
+PAPERCLIP_UI=/home/sirrus/projects/paperclip/ui
+[ -f "$PAPERCLIP_UI/public/sw.js" ] && cp "$PAPERCLIP_UI/public/sw.js" "$PAPERCLIP_UI/public/sw.js.bak"
+echo "$SWJS" > "$PAPERCLIP_UI/public/sw.js"
+
+# 2. Vite dist — must match public/ or the next build reverts
+[ -f "$PAPERCLIP_UI/dist/sw.js" ] && cp "$PAPERCLIP_UI/dist/sw.js" "$PAPERCLIP_UI/dist/sw.js.bak"
+echo "$SWJS" > "$PAPERCLIP_UI/dist/sw.js"
+
+# 3. npx cache — runtime copy that the browser actually fetches
+NPX_CACHE=/home/sirrus/.npm/_npx/43414d9b790239bb/node_modules
+SW="$NPX_CACHE/@paperclipai/server/ui-dist/sw.js"
+[ -f "$SW" ] && cp "$SW" "$SW.bak"
+echo "$SWJS" > "$SW"
+
+# Verify all three are in sync and valid JS.
+md5sum "$PAPERCLIP_UI/public/sw.js" "$PAPERCLIP_UI/dist/sw.js" "$SW"
 node --check "$SW" && echo "sw.js OK"
 ```
 
