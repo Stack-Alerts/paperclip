@@ -14,6 +14,7 @@ import {
   usePluginAction,
   usePluginData,
   usePluginToast,
+  type PluginDataResult,
   type PluginPageProps,
   type PluginSettingsPageProps,
   type PluginSidebarProps,
@@ -555,6 +556,80 @@ async function copyTextToClipboard(value: string): Promise<boolean> {
   }
 }
 
+/**
+ * Refresh button with a self-healing "refreshing" state.
+ *
+ * Why this exists: the host's `usePluginData` returns a `loading` flag that
+ * becomes true at the start of every fetch and false on success/error. If
+ * the fetch hangs (server timeout, dropped connection, bridge stuck), the
+ * flag can stay true indefinitely — the button stays "Refreshing…" forever.
+ *
+ * To guarantee the button can always recover, we keep our own
+ * `refreshing` state with a hard 8-second timeout. We also trust the host's
+ * `loading` flag when it resolves correctly.
+ */
+function RefreshButton({
+  snapshotQuery,
+}: {
+  snapshotQuery: PluginDataResult<unknown>;
+}) {
+  const [refreshing, setRefreshing] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // If the host says loading went false, drop our local flag too.
+  useEffect(() => {
+    if (!snapshotQuery.loading && refreshing) {
+      setRefreshing(false);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  }, [snapshotQuery.loading, refreshing]);
+
+  // Cleanup on unmount.
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
+
+  async function handleClick() {
+    if (refreshing || snapshotQuery.loading) return;
+    setRefreshing(true);
+    // Hard timeout — if the refresh takes longer than 8s, reset the
+    // button so the user isn't stuck looking at "Refreshing…".
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      setRefreshing(false);
+      timerRef.current = null;
+    }, 8_000);
+    try {
+      await snapshotQuery.refresh();
+    } catch {
+      // Errors are surfaced via the host's toast; just reset the local flag.
+      setRefreshing(false);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  }
+
+  const showRefreshing = refreshing || snapshotQuery.loading;
+  return (
+    <button
+      type="button"
+      style={buttonStyle}
+      onClick={handleClick}
+      disabled={showRefreshing}
+    >
+      {showRefreshing ? "Refreshing…" : "Refresh"}
+    </button>
+  );
+}
+
 function CopyButton({
   value,
   label = "Copy",
@@ -919,14 +994,7 @@ export function GitMergesPage(_props: PluginPageProps) {
           >
             {draftDirty ? "Save changes" : "Saved"}
           </button>
-          <button
-            type="button"
-            style={buttonStyle}
-            onClick={handleRefresh}
-            disabled={snapshotQuery.loading}
-          >
-            {snapshotQuery.loading ? "Refreshing…" : "Refresh"}
-          </button>
+          <RefreshButton snapshotQuery={snapshotQuery} />
         </div>
       </section>
 
