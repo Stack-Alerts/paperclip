@@ -73,7 +73,7 @@ import {
   refreshAdapterModels,
   requireServerAdapter,
 } from "../adapters/index.js";
-import { redactEventPayload } from "../redaction.js";
+import { redactAdapterConfigEnvForResponse, redactEventPayload } from "../redaction.js";
 import { redactCurrentUserValue } from "../log-redaction.js";
 import { renderOrgChartSvg, renderOrgChartPng, type OrgNode, type OrgChartStyle, ORG_CHART_STYLES } from "./org-chart-svg.js";
 import { instanceSettingsService } from "../services/instance-settings.js";
@@ -1737,9 +1737,10 @@ export function agentRoutes(
         ? (agent.adapterConfig as Record<string, unknown>)
         : {};
     const baseRuntimeConfig = redactEventPayload(agent.runtimeConfig) ?? {};
+    const { env: safeEnv } = redactAdapterConfigEnvForResponse(baseAdapterConfig.env);
     const safeAgent = {
       ...agent,
-      adapterConfig: { ...baseAdapterConfig, env: {} },
+      adapterConfig: { ...baseAdapterConfig, env: safeEnv },
       runtimeConfig: baseRuntimeConfig,
     } as NonNullable<Awaited<ReturnType<typeof svc.getById>>>;
     res.json(await buildAgentDetail(safeAgent));
@@ -1824,9 +1825,10 @@ export function agentRoutes(
         ? (agent.adapterConfig as Record<string, unknown>)
         : {};
     const baseRuntimeConfig = redactEventPayload(agent.runtimeConfig) ?? {};
+    const { env: safeEnv } = redactAdapterConfigEnvForResponse(baseAdapterConfig.env);
     const safeAgent = {
       ...agent,
-      adapterConfig: { ...baseAdapterConfig, env: {} },
+      adapterConfig: { ...baseAdapterConfig, env: safeEnv },
       runtimeConfig: baseRuntimeConfig,
     } as NonNullable<Awaited<ReturnType<typeof svc.getById>>>;
     res.json(await buildAgentDetail(safeAgent));
