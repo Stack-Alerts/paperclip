@@ -630,6 +630,74 @@ function RefreshButton({
   );
 }
 
+/**
+ * "Run scan now" button with the same self-healing pattern as
+ * RefreshButton. The host's usePluginAction returns a function that
+ * resolves a promise — but the promise can hang indefinitely if the
+ * bridge stalls. We add a hard 10-second timeout (scans are slow
+ * but the *action dispatch* should be near-instant; the scan runs
+ * in the background) so the button can always recover.
+ *
+ * We also disable the button while `running` is true (driven by the
+ * snapshot's status.running) so the user doesn't double-fire the
+ * action while a scan is in flight.
+ */
+function RunScanButton({
+  runScanAction,
+  running,
+  onSuccess,
+  onError,
+}: {
+  runScanAction: (params: { force: boolean }) => Promise<unknown>;
+  running: boolean;
+  onSuccess: () => void;
+  onError: (err: unknown) => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
+
+  async function handleClick() {
+    if (submitting || running) return;
+    setSubmitting(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      setSubmitting(false);
+      timerRef.current = null;
+    }, 10_000);
+    try {
+      await runScanAction({ force: true });
+      onSuccess();
+    } catch (err) {
+      onError(err);
+    } finally {
+      setSubmitting(false);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  }
+
+  const showBusy = submitting || running;
+  return (
+    <button
+      type="button"
+      style={showBusy ? disabledButtonStyle : primaryButtonStyle}
+      disabled={showBusy}
+      onClick={handleClick}
+    >
+      {showBusy ? "Scanning…" : "Run scan now"}
+    </button>
+  );
+}
+
 function CopyButton({
   value,
   label = "Copy",
@@ -828,20 +896,6 @@ export function GitMergesPage(_props: PluginPageProps) {
     return map;
   }, [snapshot]);
 
-  async function handleRunScan() {
-    try {
-      await runScanAction({ force: true });
-      toast({ title: "Git Merges scan started", tone: "info" });
-      void snapshotQuery.refresh();
-    } catch (err) {
-      toast({
-        title: "Could not start scan",
-        body: getErrorMessage(err),
-        tone: "error",
-      });
-    }
-  }
-
   async function handleClear() {
     try {
       await clearAction({});
@@ -970,14 +1024,21 @@ export function GitMergesPage(_props: PluginPageProps) {
           <strong style={{ fontSize: "14px" }}>Controls</strong>
         </div>
         <div style={rowStyle}>
-          <button
-            type="button"
-            style={running ? disabledButtonStyle : primaryButtonStyle}
-            disabled={running}
-            onClick={handleRunScan}
-          >
-            {running ? "Scanning…" : "Run scan now"}
-          </button>
+          <RunScanButton
+            runScanAction={runScanAction}
+            running={running}
+            onSuccess={() => {
+              toast({ title: "Git Merges scan started", tone: "info" });
+              void snapshotQuery.refresh();
+            }}
+            onError={(err) =>
+              toast({
+                title: "Could not start scan",
+                body: getErrorMessage(err),
+                tone: "error",
+              })
+            }
+          />
           <button
             type="button"
             style={destructiveButtonStyle}
