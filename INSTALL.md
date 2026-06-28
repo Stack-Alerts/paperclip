@@ -108,7 +108,7 @@ worktree and point the plugin at `BTC-Trade-Engine-PaperClip` directly.
 ### 4. Required patches (Paperclip npx cache)
 
 Paperclip's `npx paperclipai@latest` workflow installs in
-`~/.npm/_npx/<hash>/node_modules/`. Two patches are required for
+`~/.npm/_npx/<hash>/node_modules/`. Three patches are required for
 local-path plugins (like this one) to load successfully because the
 upstream host has known gaps. These patches live in the running cache
 and are gitignored — they're regenerated automatically on each
@@ -134,7 +134,26 @@ sed -i 's|activePlugin = await refreshPluginManifestFromPackage(activePlugin, pa
     "$NPX_CACHE/@paperclipai/server/dist/services/plugin-loader.js"
 ```
 
-#### 4.3 — Fix `paperclipai-patched` wrapper script
+#### 4.3 — Bundle the worker (don't rely on runtime `.ts` resolution)
+
+The plugin SDK and shared package both use `tsc` to build, which
+leaves `import "@paperclipai/shared"` as a bare external import in
+the SDK's `dist/index.js`. At runtime Node tries to resolve
+`@paperclipai/shared` via the workspace's `exports` map, which
+points at `./src/index.ts` — and the host's tsx loader is not
+applied transitively to that path. Symptom: on worker startup,
+`ERR_UNKNOWN_FILE_EXTENSION: Unknown file extension ".ts" for
+.../packages/shared/src/index.ts`.
+
+Fix: the plugin's own `build` script bundles the worker with
+esbuild so the SDK + shared are inlined into a single self-contained
+file. The plugin's `package.json` already has this set as the
+`build` script — if you copied the source elsewhere, make sure the
+`build` script in your `package.json` includes the
+`pnpm exec esbuild src/worker.ts --bundle ...` invocation, not a
+plain `tsc`.
+
+#### 4.4 — Fix `paperclipai-patched` wrapper script
 
 The wrapper at `~/.local/bin/paperclipai-patched` has a hard-coded
 cache path that goes stale as soon as npx rotates to a new cache
@@ -154,7 +173,7 @@ nohup /home/sirrus/.npm/_npx/43414d9b790239bb/node_modules/.bin/paperclipai \
 #   exec "$CACHE/.bin/paperclipai" "$@"
 ```
 
-#### 4.4 — Patch the Paperclip Service Worker (`sw.js`)
+#### 4.5 — Patch the Paperclip Service Worker (`sw.js`)
 
 Paperclip ships a `sw.js` whose `fetch` handler can resolve to
 `undefined` from the network-failure fallback:
@@ -304,7 +323,7 @@ If you're rebuilding from scratch and only have this repo:
 - [ ] `pnpm install && pnpm build` in `paperclip-plugin-dev`
 - [ ] Verify `dist/manifest.js`, `dist/worker.js`, `dist/ui/index.js` exist in `packages/plugins/plugin-git-merges/`
 - [ ] `git worktree add …fix-38557 origin/fix/BTCAAAAA-38557-merge-ready-watcher` and symlink `.env` (see §3)
-- [ ] Apply the two `plugin-loader.js` patches, fix the wrapper, and patch `sw.js` (see §4)
+- [ ] Apply the three `plugin-loader.js` patches, fix the wrapper, and patch `sw.js` (see §4)
 - [ ] Start Paperclip (direct invocation, see §5)
 - [ ] Install both plugins
 - [ ] Restart Paperclip
