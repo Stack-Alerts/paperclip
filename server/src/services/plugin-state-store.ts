@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
 import { plugins, pluginState } from "@paperclipai/db";
 import type {
@@ -109,10 +109,18 @@ export function pluginStateStore(db: Db) {
         namespace = DEFAULT_NAMESPACE,
       }: { scopeId?: string; namespace?: string } = {},
     ): Promise<unknown> => {
+      // Order by updated_at DESC so the most recent write wins. The unique
+      // constraint already prevents true duplicates, but the plugin's
+      // two-phase write (partial → full) can leave a stale partial behind if
+      // the dev-watcher kills the worker between phases. Returning the latest
+      // makes the API call always reflect the most recent successful write
+      // even when the partial is still in the table.
       const rows = await db
         .select()
         .from(pluginState)
-        .where(scopeConditions(pluginId, scopeKind, scopeId, namespace, stateKey));
+        .where(scopeConditions(pluginId, scopeKind, scopeId, namespace, stateKey))
+        .orderBy(desc(pluginState.updatedAt))
+        .limit(1);
 
       return rows[0]?.valueJson ?? null;
     },
