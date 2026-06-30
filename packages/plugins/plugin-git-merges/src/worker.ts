@@ -138,6 +138,33 @@ function buildChildEnv(): NodeJS.ProcessEnv {
     LC_ALL: process.env.LC_ALL ?? "C.UTF-8",
     TZ: process.env.TZ ?? "UTC",
   };
+  // Derive PAPERCLIP_API_URL from the running paperclip server's config when
+  // the host hasn't already set one. The Paperclip worker is launched by the
+  // host server and is given PAPERCLIP_CONFIG in its environment; reading the
+  // port + bind host from that config gives us the right URL for the script
+  // to call back into, regardless of whether the host happens to be on 3100
+  // (default), 3101 (this fork), 3199 (proxy), or anything else. Without
+  // this, the script falls back to its baked-in 3100/3199 list and returns
+  // "Paperclip API unreachable" while the real server is happily on 3101.
+  const explicit = (process.env.PAPERCLIP_API_URL ?? "").trim();
+  if (!explicit) {
+    const configPath = (process.env.PAPERCLIP_CONFIG ?? "").trim();
+    if (configPath) {
+      try {
+        const raw = readFileSync(configPath, "utf8");
+        const cfg = JSON.parse(raw) as {
+          server?: { host?: string; port?: number };
+        };
+        const host = cfg.server?.host ?? "127.0.0.1";
+        const port = cfg.server?.port;
+        if (typeof port === "number" && port > 0) {
+          env.PAPERCLIP_API_URL = `http://${host}:${port}`;
+        }
+      } catch {
+        // Best-effort: fall through to the script's own .env lookup.
+      }
+    }
+  }
   return env;
 }
 
