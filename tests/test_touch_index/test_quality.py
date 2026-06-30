@@ -83,7 +83,7 @@ def _make_freshness(**kw):
         total_rows=0,
         max_age_hours=0.0,
         min_age_hours=0.0,
-        stale_rows=0,
+        last_write_age_hours=0.0,
         stale_threshold_hours=168,
     )
     defaults.update(kw)
@@ -212,7 +212,6 @@ class TestComputeFreshness:
                 _make_scalar_result(0),  # COUNT(*)
                 _make_scalar_result(None),  # MIN(updated_at) — None
                 _make_scalar_result(None),  # MAX(updated_at) — None
-                _make_scalar_result(0),  # stale count
             ]
         )
 
@@ -223,7 +222,7 @@ class TestComputeFreshness:
 
         assert report.total_rows == 0
         assert report.max_age_hours == 0.0
-        assert report.stale_rows == 0
+        assert report.last_write_age_hours == 0.0
 
     def test_fresh_data(self):
         now = datetime(2026, 5, 12, 12, 0, 0, tzinfo=timezone.utc)
@@ -234,7 +233,6 @@ class TestComputeFreshness:
                 _make_scalar_result(5),  # COUNT(*)
                 _make_scalar_result(old_dt),  # MIN
                 _make_scalar_result(now),  # MAX
-                _make_scalar_result(0),  # stale
             ]
         )
 
@@ -245,7 +243,7 @@ class TestComputeFreshness:
 
         assert report.total_rows == 5
         assert report.max_age_hours == 24.0
-        assert report.stale_rows == 0
+        assert report.last_write_age_hours == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -438,7 +436,7 @@ class TestRunQualityChecks:
 
         assert report.passed is False
 
-    def test_stale_rows_fails(self):
+    def test_worker_inactive_fails(self):
         engine = MagicMock()
 
         with (
@@ -451,7 +449,9 @@ class TestRunQualityChecks:
             patch(
                 "touch_index.quality.compute_freshness",
                 return_value=_make_freshness(
-                    total_rows=5, stale_rows=3, stale_threshold_hours=168
+                    total_rows=5,
+                    last_write_age_hours=200.0,
+                    stale_threshold_hours=168,
                 ),
             ),
             patch(
@@ -1621,11 +1621,12 @@ class TestReportToDict:
             total_rows=10,
             max_age_hours=24.0,
             min_age_hours=1.0,
-            stale_rows=0,
+            last_write_age_hours=1.0,
             stale_threshold_hours=168,
         )
         d = r.to_dict()
         assert d["stale_threshold_hours"] == 168
+        assert d["last_write_age_hours"] == 1.0
 
     def test_consistency_report_to_dict(self):
         r = ConsistencyReport(
@@ -1726,7 +1727,7 @@ class TestReportToDictExtended:
             total_rows=5,
             max_age_hours=12.0,
             min_age_hours=1.0,
-            stale_rows=0,
+            last_write_age_hours=1.0,
             stale_threshold_hours=168,
         )
         r = QualityReport(coverage=None, freshness=fresh, consistency=None, passed=True)
@@ -1760,7 +1761,7 @@ class TestReportToDictExtended:
             total_rows=5,
             max_age_hours=12.0,
             min_age_hours=1.0,
-            stale_rows=0,
+            last_write_age_hours=1.0,
             stale_threshold_hours=168,
         )
         cons = ConsistencyReport(

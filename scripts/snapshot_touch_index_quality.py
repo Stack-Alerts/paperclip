@@ -48,7 +48,7 @@ def _build_fr_report(fr_report) -> dict:
     }
     if fr_report.freshness is not None:
         d["total_rows"] = fr_report.freshness.total_rows
-        d["stale_rows"] = fr_report.freshness.stale_rows
+        d["last_write_age_hours"] = fr_report.freshness.last_write_age_hours
         d["max_age_hours"] = fr_report.freshness.max_age_hours
     if fr_report.consistency is not None:
         d["null_owner_rows"] = fr_report.consistency.null_owner_rows

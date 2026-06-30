@@ -335,16 +335,19 @@ if [[ "$DRY_RUN" == "false" ]]; then
     local target="archive/${br}"
     echo "  Archiving: $br → $target"
     local src_sha target_sha
-    src_sha=$(git rev-parse "refs/remotes/origin/${br}" 2>/dev/null || true)
-    target_sha=$(git rev-parse "refs/remotes/origin/${target}" 2>/dev/null || true)
+    # Use --verify so non-existent refs return empty instead of DWIM-matching
+    # another ref by partial name (the previous behavior caused invalid
+    # push refspec parsing).
+    src_sha=$(git rev-parse --verify "refs/remotes/origin/${br}" 2>/dev/null || true)
+    target_sha=$(git rev-parse --verify "refs/remotes/origin/${target}" 2>/dev/null || true)
     if [[ -n "$target_sha" && "$src_sha" == "$target_sha" ]]; then
       echo "  SKIP: archive ref already at same SHA — proceeding to delete source"
     elif [[ -n "$target_sha" ]]; then
       # Archive ref exists but is stale — overwrite only if remote still matches our cached view
       git push --force-with-lease="refs/heads/${target}:${target_sha}" \
-        origin "refs/remotes/origin/${br}:refs/heads/${target}" 2>&1
+        origin "${src_sha}:refs/heads/${target}" 2>&1
     else
-      git push origin "refs/remotes/origin/${br}:refs/heads/${target}" 2>&1
+      git push origin "${src_sha}:refs/heads/${target}" 2>&1
     fi
     git push origin --delete "$br" 2>&1 || true
     echo "  Done: $br → $target"

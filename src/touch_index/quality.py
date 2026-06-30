@@ -40,7 +40,7 @@ class FreshnessReport:
     total_rows: int
     max_age_hours: float
     min_age_hours: float
-    stale_rows: int
+    last_write_age_hours: float
     stale_threshold_hours: int
 
     def to_dict(self) -> dict:
@@ -121,7 +121,15 @@ def compute_freshness(
     engine: Engine,
     stale_threshold_hours: int = 168,
 ) -> FreshnessReport:
-    """Report age statistics for touch_index_fr_files entries."""
+    """Report age statistics for touch_index_fr_files entries.
+
+    ``last_write_age_hours`` measures worker activity: it is the age of the
+    newest row's ``updated_at``. The pass/fail gate in
+    ``run_quality_checks`` uses this — not ``stale_rows`` — because once the
+    index reaches steady state (every FDR issue is captured), individual rows
+    can legitimately go weeks without being re-written. The signal we want
+    is *worker inactivity*, not *data age*.
+    """
     with engine.connect() as conn:
         total = (
             conn.execute(text("SELECT COUNT(*) FROM touch_index_fr_files")).scalar()
@@ -139,24 +147,11 @@ def compute_freshness(
     max_age = (now - oldest).total_seconds() / 3600 if oldest else 0.0
     min_age = (now - newest).total_seconds() / 3600 if newest else 0.0
 
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=stale_threshold_hours)
-
-    with engine.connect() as conn:
-        stale = (
-            conn.execute(
-                text(
-                    "SELECT COUNT(*) FROM touch_index_fr_files WHERE updated_at < :cutoff"
-                ),
-                {"cutoff": cutoff},
-            ).scalar()
-            or 0
-        )
-
     return FreshnessReport(
         total_rows=total,
         max_age_hours=round(max_age, 1),
         min_age_hours=round(min_age, 1),
-        stale_rows=stale,
+        last_write_age_hours=round(min_age, 1),
         stale_threshold_hours=stale_threshold_hours,
     )
 
@@ -278,19 +273,19 @@ def run_quality_checks(
 
     try:
         freshness = compute_freshness(engine, stale_threshold_hours)
-        if freshness.stale_rows > 0:
+        if freshness.last_write_age_hours > freshness.stale_threshold_hours:
             logger.warning(
-                "FRESHNESS: %d stale rows (>%d hours), max age %.1f hours",
-                freshness.stale_rows,
+                "FRESHNESS: worker last wrote %.1f hours ago (threshold %d h), %d rows",
+                freshness.last_write_age_hours,
                 freshness.stale_threshold_hours,
-                freshness.max_age_hours,
+                freshness.total_rows,
             )
             failures += 1
         else:
             logger.info(
-                "FRESHNESS: %d rows, max age %.1f hours",
+                "FRESHNESS: %d rows, last write %.1f hours ago",
                 freshness.total_rows,
-                freshness.max_age_hours,
+                freshness.last_write_age_hours,
             )
     except Exception:
         logger.exception("Freshness check failed")
