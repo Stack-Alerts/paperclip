@@ -16,7 +16,8 @@
     "prebuild": "pnpm --filter @paperclipai/plugin-sdk ensure-build-deps",
     "build": "pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && pnpm exec esbuild src/worker.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/worker.js --external:electron --external:fsevents && tsc --emitDeclarationOnly --outDir dist && node ./scripts/build-ui.mjs",
     "clean": "rm -rf dist",
-    "typecheck": "pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && tsc --noEmit"
+    "typecheck": "pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && tsc --noEmit",
+    "test": "pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && vitest run"
   },
   "dependencies": {
     "@paperclipai/plugin-sdk": "workspace:*",

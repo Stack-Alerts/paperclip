@@ -596,8 +596,20 @@ function deriveStatus(item: Record<string, unknown>): MergeStatus {
   const passed = Number.parseInt((item["passed"] as string) ?? "0", 10) || 0;
   const total = Number.parseInt((item["total"] as string) ?? "0", 10) || 0;
   const failed = Number.parseInt((item["failed"] as string) ?? "0", 10) || 0;
-  const mergeable = item["pr_mergeable"] as string | null;
-  if (total > 0 && passed === total && mergeable === "clean") return "ready";
+  const mergeable = (item["pr_mergeable"] as string | null) ?? "";
+  const ciAllGreen = total > 0 && passed === total && failed === 0;
+  // `mergeable` is GitHub's `mergeable_state`. Only "clean" and "blocked"
+  // count as functionally ready from the agent's POV (the latter means
+  // "branch protection / required review", which is the merge-dispatch
+  // routine's job, not the agent's). "dirty" / "behind" / "draft" /
+  // "unstable" mean the agent still has work to do, so don't classify
+  // those as ready even when CI is green.
+  if (ciAllGreen) {
+    if (mergeable === "" || mergeable === "clean" || mergeable === "blocked") {
+      return "ready";
+    }
+    return "waiting";
+  }
   if (failed > 0) return "failing";
   if (total > 0 && passed < total) return "waiting";
   return "unknown";
