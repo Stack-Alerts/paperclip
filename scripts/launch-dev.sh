@@ -62,6 +62,14 @@ if [[ -n "$NODE_BIN" ]]; then
 fi
 ENV_PREFIX+="PAPERCLIP_HOME='/home/sirrus/.paperclip-worktrees' "
 
+# Read the configured server port from config.json so the dev-runner's
+# health-polling URL points at the right port. Without this the runner
+# defaults to 3100 (its hardcoded fallback) and tries to poll the
+# actual configured port (3101 / 3102 / ...), gets a connection
+# refused, and aborts the restart cycle silently with "fetch failed".
+SERVER_PORT=$(python3 -c "import json; print(json.load(open('$REPO_ROOT/.paperclip/config.json'))['server']['port'])")
+ENV_PREFIX+="PORT='$SERVER_PORT' "
+
 # Source the .env via `set -a` so every variable it sets is auto-exported
 # into the tmux session.
 set -a
@@ -80,7 +88,10 @@ export PAPERCLIP_DEV_SERVER_STATUS_FILE="$REPO_ROOT/.paperclip/dev-server-status
 # in previous launches. The first command (`PATH=... cd`) sets PATH for
 # the cd builtin only; the subsequent `export PATH=...` makes the new
 # PATH stick for every command in the shell session so pnpm/node pick
-# up v24 first.
+# up v24 first. PORT must also be exported explicitly — a leading
+# `PORT=... cd` only sets it for the cd builtin, not for pnpm or its
+# children (including the dev-runner, which reads PORT to compute its
+# health-polling URL).
 if [[ -n "$NODE_BIN" ]]; then
   EXPORT_PATH="export PATH='$NODE_BIN':\$PATH"
 else
@@ -89,6 +100,7 @@ fi
 
 INNER_CMD="${ENV_PREFIX}cd '$REPO_ROOT' && "
 INNER_CMD+="${EXPORT_PATH} && "
+INNER_CMD+="export PORT='$SERVER_PORT' && "
 INNER_CMD+="export PAPERCLIP_DEV_SERVER_STATUS_FILE='$REPO_ROOT/.paperclip/dev-server-status.json' && "
 INNER_CMD+="pnpm dev:once 2>&1 | tee '$LOG_FILE'"
 

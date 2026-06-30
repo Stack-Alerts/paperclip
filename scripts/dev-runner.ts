@@ -603,7 +603,8 @@ async function maybeAutoRestartChild() {
   let health: { devServer?: { enabled?: boolean; autoRestartEnabled?: boolean; activeRunCount?: number } } | null = null;
   try {
     health = await getDevHealthPayload();
-  } catch {
+  } catch (err) {
+    process.stderr.write(`[dev-runner] health fetch failed: ${(err as Error).message}\n`);
     restartInFlight = false;
     return;
   }
