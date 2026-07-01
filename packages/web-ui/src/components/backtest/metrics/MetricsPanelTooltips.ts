@@ -931,3 +931,181 @@ export const TT_CURRENCY: TooltipContent = {
     },
   ],
 };
+
+// ── New metrics (BTCAAAAA-35862 — metrics panel enrichment) ───────────────────
+
+export const TT_ANNUALIZED_RETURN: TooltipContent = {
+  title: 'Annualized Return (%)',
+  body: 'Total return normalised to a 365-day year using compound annualisation. Removes the duration variable so strategies tested over different periods can be compared on equal footing.',
+  sections: [
+    {
+      header: 'Formula:',
+      items: [
+        'Annualized Return = ((1 + Total Return %) ^ (365 / days)) − 1',
+        'Uses compound growth — not simple pro-rata scaling',
+        'Requires at least 7 days of backtest data to be meaningful',
+      ],
+    },
+    {
+      header: 'Benchmarks:',
+      items: [
+        '< 0%: Strategy loses money annualised',
+        '0–20%: Below typical crypto buy-and-hold',
+        '20–80%: Competitive — compare vs BTC buy-and-hold over same period',
+        '> 80%: Very high — validate robustness; may reflect short test window',
+      ],
+    },
+    {
+      header: 'Why it matters:',
+      items: [
+        'A 30% return over 3 months annualises to ~185% — very different from 30% over 12 months',
+        'Always cross-check with number of trades and Max Drawdown for context',
+      ],
+    },
+  ],
+};
+
+export const TT_MARGIN_OF_SAFETY: TooltipContent = {
+  title: 'Margin of Safety (%)',
+  body: 'Actual Win Rate minus Breakeven Win Rate. Measures how much the strategy\'s win rate can deteriorate before it becomes unprofitable. A wide margin absorbs real-world regime changes, slippage, and signal decay.',
+  sections: [
+    {
+      header: 'Formula:',
+      items: [
+        'Margin = Actual Win Rate % − Breakeven Win Rate %',
+        'Breakeven Win Rate = |Avg Loss| / (|Avg Win| + |Avg Loss|) × 100',
+        'Positive margin: strategy is profitable; negative: strategy is losing',
+      ],
+    },
+    {
+      header: 'Benchmarks:',
+      items: [
+        '< 5%: Fragile — small signal decay or slippage kills profitability',
+        '5–10%: Thin edge — acceptable for highly selective entries',
+        '10–20%: Solid — absorbs typical live-trading friction',
+        '> 20%: Robust — strong edge, well above breakeven',
+      ],
+    },
+    {
+      header: 'Usage:',
+      items: [
+        'Monitor this metric as you extend the backtest window — shrinking margin = strategy is overfit',
+        'Combine with Profit Factor to confirm edge: PF > 1.5 + margin > 10% = deploy candidate',
+      ],
+    },
+  ],
+};
+
+export const TT_AVG_TRADE_DURATION: TooltipContent = {
+  title: 'Avg Trade Duration (real time)',
+  body: 'Mean wall-clock time a position was held open, measured from entry timestamp to exit timestamp across all closed trades.',
+  sections: [
+    {
+      header: 'Why it differs from Avg Bars Held:',
+      items: [
+        'Bars Held counts price candles — pauses during weekends or low-liquidity gaps are excluded',
+        'Real duration counts calendar time including overnight and weekend gaps',
+        'Use Bars Held for strategy logic analysis; use real duration for risk exposure (overnight, gap)',
+      ],
+    },
+    {
+      header: 'Implications:',
+      items: [
+        'Duration < 4h: intraday — transaction costs and fills dominate performance',
+        'Duration 4–24h: short swing — gap risk on close/open is significant',
+        'Duration > 1 day: multi-day swing — weekend gap risk and funding rate exposure in futures',
+      ],
+    },
+  ],
+};
+
+export const TT_KELLY_CRITERION: TooltipContent = {
+  title: 'Kelly Criterion (optimal fraction)',
+  body: 'Optimal fraction of capital to risk per trade, derived from the win rate and average win/loss ratio. The full Kelly fraction maximises long-run geometric growth but is aggressive — most traders use half-Kelly (50%) for practical risk management.',
+  sections: [
+    {
+      header: 'Formula:',
+      items: [
+        'Kelly % = Win Rate − (Loss Rate / Risk:Reward)',
+        'Risk:Reward = |Avg Win| / |Avg Loss|',
+        'Negative Kelly: strategy has no mathematical edge — do not trade',
+      ],
+    },
+    {
+      header: 'Practical usage:',
+      items: [
+        'Full Kelly: maximum long-run growth but very high variance — not recommended',
+        'Half Kelly (50%): preferred starting point — balances growth with drawdown control',
+        'Quarter Kelly (25%): conservative — suitable for live deployment during validation',
+      ],
+    },
+    {
+      header: 'Watch for:',
+      items: [
+        'Kelly > 50%: strategy is over-estimated — backtest likely overfitted',
+        'Kelly 10–25%: realistic range for well-calibrated strategies',
+        'Kelly < 5%: thin edge — transaction costs may overwhelm it in live trading',
+      ],
+    },
+  ],
+};
+
+export const TT_GROSS_PROFIT: TooltipContent = {
+  title: 'Gross Profit (USD)',
+  body: 'Sum of all winning trade P&L before netting against losses. Together with Gross Loss, decomposes the Profit Factor into its components — useful for understanding whether improvements should target more wins or larger wins.',
+  sections: [
+    {
+      header: 'Usage:',
+      items: [
+        'Gross Profit / Total Trades = Avg contribution per trade (including losers)',
+        'Gross Profit / Winning Trades = Avg Win (confirms Avg Win card)',
+        'Gross Profit / Gross Loss = Profit Factor (alternative computation path)',
+      ],
+    },
+  ],
+};
+
+export const TT_GROSS_LOSS: TooltipContent = {
+  title: 'Gross Loss (USD)',
+  body: 'Sum of absolute losses across all losing trades. The denominator of the Profit Factor. Reducing Gross Loss (via tighter stops or fewer losing trades) is often easier than increasing Gross Profit.',
+  sections: [
+    {
+      header: 'Usage:',
+      items: [
+        'Gross Loss / Total Trades = Avg loss contribution per trade (including winners)',
+        'Gross Loss / Losing Trades = Avg Loss (confirms Avg Loss card)',
+        'Keep Gross Loss < Gross Profit for any viable strategy (Profit Factor > 1)',
+      ],
+    },
+  ],
+};
+
+export const TT_LONG_WIN_RATE: TooltipContent = {
+  title: 'Long Win Rate (%)',
+  body: 'Win rate calculated exclusively over long (buy) trades. Compared with Short Win Rate, reveals whether the strategy\'s edge is directional or regime-neutral.',
+  sections: [
+    {
+      header: 'Interpretation:',
+      items: [
+        'Long WR >> Short WR: bullish-biased edge — underperforms in bear markets',
+        'Long WR ≈ Short WR: balanced — strategy works across both directions',
+        'Long WR < 40% with positive overall result: short trades carry the strategy',
+      ],
+    },
+  ],
+};
+
+export const TT_SHORT_WIN_RATE: TooltipContent = {
+  title: 'Short Win Rate (%)',
+  body: 'Win rate calculated exclusively over short (sell) trades. In historically bullish crypto markets, short win rates are typically lower than long win rates — a strategy with strong short WR has meaningful bearish edge.',
+  sections: [
+    {
+      header: 'Interpretation:',
+      items: [
+        'Short WR > Long WR: bearish-biased — rare, valuable in bear markets',
+        'Short WR < 40%: typical for crypto — evaluate short P&L separately',
+        'Short WR ≈ 0 with 0 short trades: long-only strategy — label bias clearly',
+      ],
+    },
+  ],
+};

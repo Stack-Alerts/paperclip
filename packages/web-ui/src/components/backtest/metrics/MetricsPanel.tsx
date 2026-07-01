@@ -26,6 +26,9 @@ import {
   TT_PAYOFF_RATIO, TT_LARGEST_WIN, TT_LARGEST_LOSS, TT_CURRENCY,
   TT_ADDITIONAL_METRICS, TT_SIGNALS_REQUIRED, TT_RECHECKS,
   TT_EXIT_SIGNALS, TT_STOP_LOSS_ADJUSTMENTS,
+  TT_ANNUALIZED_RETURN, TT_MARGIN_OF_SAFETY, TT_AVG_TRADE_DURATION,
+  TT_KELLY_CRITERION, TT_GROSS_PROFIT, TT_GROSS_LOSS,
+  TT_LONG_WIN_RATE, TT_SHORT_WIN_RATE,
 } from './MetricsPanelTooltips';
 
 // TT_ADDITIONAL_METRICS is the umbrella tooltip for the expandable section
@@ -192,6 +195,15 @@ function computeBuyHoldDelta(trades: Trade[]): { pct: number; abs: number; entry
   if (entry <= 0) return null;
   const pct = ((exit - entry) / entry) * 100;
   return { pct, abs: exit - entry, entry, exit };
+}
+
+function formatTradeDuration(ms: number): string {
+  const h = ms / 3_600_000;
+  if (h < 1) return `${Math.round(ms / 60_000)} min`;
+  if (h < 24) return `${h.toFixed(1)} h`;
+  const days = h / 24;
+  if (days < 30) return `${days.toFixed(1)} d`;
+  return `${(days / 30.44).toFixed(1)} mo`;
 }
 
 function formatBuyHoldDeltaPct(d: { pct: number } | null): string {
@@ -396,8 +408,23 @@ function computeTradeStats(trades: Trade[]) {
   const largestLoss = lossPnls.length ? Math.min(...lossPnls) : 0;
   const avgBars = source.reduce((s, t) => s + (t.bars ?? 0), 0) / source.length;
 
-  const longs = source.filter(t => (t.side ?? '').toUpperCase() === 'LONG').length;
-  const shorts = source.filter(t => (t.side ?? '').toUpperCase() === 'SHORT').length;
+  const longTrades = source.filter(t => (t.side ?? '').toUpperCase() === 'LONG');
+  const shortTrades = source.filter(t => (t.side ?? '').toUpperCase() === 'SHORT');
+  const longs = longTrades.length;
+  const shorts = shortTrades.length;
+  const longWinRate = longs > 0 ? (longTrades.filter(t => t.pnl > 0).length / longs) * 100 : null;
+  const shortWinRate = shorts > 0 ? (shortTrades.filter(t => t.pnl > 0).length / shorts) * 100 : null;
+
+  const durations: number[] = [];
+  for (const t of source) {
+    if (t.entryTime && t.exitTime) {
+      const d = new Date(t.exitTime).getTime() - new Date(t.entryTime).getTime();
+      if (d > 0) durations.push(d);
+    }
+  }
+  const avgTradeDurationMs = durations.length > 0
+    ? durations.reduce((s, d) => s + d, 0) / durations.length
+    : null;
 
   const exitTypes: Record<string, number> = {};
   for (const t of source) {
@@ -437,6 +464,7 @@ function computeTradeStats(trades: Trade[]) {
     bestTrade, worstTrade, largestWin, largestLoss, avgBars, longs, shorts,
     exitTypes, maxConsecWins, maxConsecLosses,
     winsSum, lossesSum, var95, cvar95, returnVolatility,
+    longWinRate, shortWinRate, avgTradeDurationMs,
     count: source.length,
   };
 }
@@ -598,6 +626,17 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
 
   const sparkEquity = equityValues;
   const sparkDrawdown = drawdownPcts;
+
+  /* ── Enrichment metrics (BTCAAAAA-35862) ─────────────────────────────────── */
+  const annualizedReturn = durationDays && durationDays > 7
+    ? (Math.pow(1 + strategyReturn / 100, 365 / durationDays) - 1) * 100
+    : null;
+  const breakevenNum = parseFloat(breakevenWinRate);
+  const marginOfSafety = !isNaN(breakevenNum) ? parseFloat(winPct) - breakevenNum : null;
+  const rrNum = parseFloat(rrRatio);
+  const kellyCriterion = !isNaN(rrNum) && rrNum > 0 && result.averageLoss !== 0
+    ? result.winRate - (lossRate / rrNum)
+    : null;
 
   /* ── Hero strip (4 large KPIs from mockup) ─────────────────────────────── */
   const heroCards = [
@@ -872,6 +911,78 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
     if (tradeStats.returnVolatility != null) {
       additionalRows.push({ label: 'Return σ (per trade %)', value: `${tradeStats.returnVolatility.toFixed(2)}%`, tooltip: TT_VOLATILITY, icon: BarChart2, accent: 'neutral' });
     }
+  }
+
+  /* Enrichment metrics (BTCAAAAA-35862) */
+  if (annualizedReturn != null) {
+    additionalRows.push({
+      label: 'Annualized Return',
+      value: `${annualizedReturn >= 0 ? '+' : ''}${annualizedReturn.toFixed(2)}%`,
+      color: annualizedReturn >= 0 ? 'var(--accent-green)' : 'var(--accent-red)',
+      tooltip: TT_ANNUALIZED_RETURN, icon: TrendingUp,
+      accent: (annualizedReturn >= 0 ? 'green' : 'red') as Accent,
+    });
+  }
+  if (marginOfSafety != null) {
+    additionalRows.push({
+      label: 'Margin of Safety',
+      value: `${marginOfSafety >= 0 ? '+' : ''}${marginOfSafety.toFixed(1)}%`,
+      color: marginOfSafety >= 10 ? 'var(--accent-green)' : marginOfSafety >= 0 ? 'var(--accent-orange)' : 'var(--accent-red)',
+      tooltip: TT_MARGIN_OF_SAFETY, icon: Sparkles,
+      accent: (marginOfSafety >= 10 ? 'green' : marginOfSafety >= 0 ? 'orange' : 'red') as Accent,
+    });
+  }
+  if (kellyCriterion != null) {
+    const kellyPct = kellyCriterion * 100;
+    additionalRows.push({
+      label: 'Kelly Criterion',
+      value: `${kellyPct.toFixed(1)}%`,
+      color: kellyPct > 0 ? 'var(--accent-green)' : 'var(--accent-red)',
+      tooltip: TT_KELLY_CRITERION, icon: Activity,
+      accent: (kellyPct > 0 ? 'green' : 'red') as Accent,
+      baseline: `Half-Kelly: ${(kellyPct / 2).toFixed(1)}%`,
+    });
+  }
+  if (tradeStats && tradeStats.winsSum > 0) {
+    additionalRows.push(
+      {
+        label: 'Gross Profit',
+        value: `+$${tradeStats.winsSum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        color: 'var(--accent-green)',
+        tooltip: TT_GROSS_PROFIT, icon: ArrowUpCircle, accent: 'green' as Accent,
+      },
+      {
+        label: 'Gross Loss',
+        value: `-$${tradeStats.lossesSum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        color: 'var(--accent-red)',
+        tooltip: TT_GROSS_LOSS, icon: ArrowDownCircle, accent: 'red' as Accent,
+      },
+    );
+  }
+  if (tradeStats?.longWinRate != null) {
+    additionalRows.push({
+      label: 'Long Win Rate',
+      value: `${tradeStats.longWinRate.toFixed(1)}%`,
+      color: tradeStats.longWinRate >= 50 ? 'var(--accent-green)' : 'var(--accent-red)',
+      tooltip: TT_LONG_WIN_RATE, icon: ArrowUp,
+      accent: (tradeStats.longWinRate >= 50 ? 'green' : 'red') as Accent,
+    });
+  }
+  if (tradeStats?.shortWinRate != null) {
+    additionalRows.push({
+      label: 'Short Win Rate',
+      value: `${tradeStats.shortWinRate.toFixed(1)}%`,
+      color: tradeStats.shortWinRate >= 50 ? 'var(--accent-green)' : 'var(--accent-red)',
+      tooltip: TT_SHORT_WIN_RATE, icon: ArrowDown,
+      accent: (tradeStats.shortWinRate >= 50 ? 'green' : 'red') as Accent,
+    });
+  }
+  if (tradeStats?.avgTradeDurationMs != null) {
+    additionalRows.push({
+      label: 'Avg Trade Duration',
+      value: formatTradeDuration(tradeStats.avgTradeDurationMs),
+      tooltip: TT_AVG_TRADE_DURATION, icon: Clock, accent: 'neutral' as Accent,
+    });
   }
 
   /* Building-block signal diagnostics (BTC-37920 v3). Backend does not yet
