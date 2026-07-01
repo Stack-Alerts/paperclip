@@ -29,12 +29,48 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "src"))
 # Load .env for non-conflicting vars (e.g. GH_TOKEN).
 # PAPERCLIP_* vars are injected by systemd Environment= and must NOT be overridden.
-if (REPO_ROOT / ".env").exists():
+
+
+def _load_env_file(path: Path, *, override: bool = False) -> None:
+    """Load KEY=VALUE pairs from a .env file into os.environ.
+
+    Prefers python-dotenv, but falls back to a dependency-free inline parser
+    when the package is unavailable. The systemd service runs the host
+    /usr/bin/python3 (PEP-668 externally-managed, no pip, no python-dotenv);
+    a silently swallowed ImportError there left GH_TOKEN unloaded and made the
+    monitor falsely report gh_blind (BTCAAAAA-38803 / parent BTCAAAAA-38797).
+    """
     try:
         from dotenv import load_dotenv
-        load_dotenv(REPO_ROOT / ".env", override=False)
+        load_dotenv(path, override=override)
+        return
     except ImportError:
         pass
+    try:
+        text = path.read_text()
+    except OSError:
+        return
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].lstrip()
+        key, sep, value = line.partition("=")
+        if not sep:
+            continue
+        key = key.strip()
+        if not key:
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        if override or key not in os.environ:
+            os.environ[key] = value
+
+
+if (REPO_ROOT / ".env").exists():
+    _load_env_file(REPO_ROOT / ".env", override=False)
 
 from touch_index.paperclip_client import _session, _base, _company
 
