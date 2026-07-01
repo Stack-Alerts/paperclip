@@ -6,7 +6,7 @@ import { AppBrand } from '@/components/shared/AppBrand';
 import { ThemeSelector } from './ThemeSelector';
 import { useTooltipSettings } from './TooltipSettingsContext';
 import { useStrategyStore } from '@/hooks/strategy-builder/useStrategyStore';
-import { BacktestConfig, BacktestConfigFull, BacktestStatusMessage } from '@/lib/strategy-builder/types';
+import { BacktestConfig, BacktestConfigFull, BacktestStatusMessage, BacktestResult, Trade } from '@/lib/strategy-builder/types';
 import { RichTooltip, type TooltipContent } from './RichTooltip';
 import {
   TT_LOOKBACK, TT_TRAINING, TT_TESTING,
@@ -102,6 +102,13 @@ const FONT_SCALES: Record<FontScale, BacktestFontSizes> = {
 };
 
 const FONT_SCALE_STORAGE_KEY = 'backtestConfigDialog.fontScale';
+const ALWAYS_CONFIG_TAB_KEY = 'backtestConfigDialog.alwaysOpenConfigTab';
+
+function readStoredAlwaysConfigTab(): boolean {
+  if (typeof window === 'undefined') return false;
+  try { return window.localStorage.getItem(ALWAYS_CONFIG_TAB_KEY) === 'true'; }
+  catch { return false; }
+}
 
 function readStoredFontScale(): FontScale {
   if (typeof window === 'undefined') return 'Normal';
@@ -434,6 +441,258 @@ function ChipRow({
   );
 }
 
+// ─── Run summary panel — right-side of STATUS section (BTCAAAAA-38676 rev2) ──
+//
+// 4-column results dashboard shown alongside the status log on the Config tab:
+//   [Cumulative P&L sparkline] [Win/Loses donut] [Exit Type donut] [Recent Trades bars]
+
+function exitTypeColor(key: string): string {
+  const u = key.toUpperCase();
+  if (u === 'TP1') return '#22c55e';
+  if (u === 'TP2') return '#4ade80';
+  if (u === 'TP3') return '#86efac';
+  if (u === 'SL' || u === 'STOP_LOSS') return '#ef4444';
+  if (u === 'MAX_BARS' || u === 'TIME_LIMIT') return '#f97316';
+  return '#6b7280';
+}
+
+function MiniDonut({
+  segments,
+  centerLabel,
+  size = 60,
+  strokeWidth = 10,
+}: {
+  segments: Array<{ value: number; color: string }>;
+  centerLabel?: string;
+  size?: number;
+  strokeWidth?: number;
+}) {
+  const r = (size - strokeWidth) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const C = 2 * Math.PI * r;
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+  let cumArc = 0;
+  const arcs = segments.map(seg => {
+    const dashLen = total > 0 ? (seg.value / total) * C : 0;
+    const dashOffset = C / 4 - cumArc;
+    cumArc += dashLen;
+    return { dashLen, dashOffset, color: seg.color };
+  });
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block', flexShrink: 0 }}>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth={strokeWidth} strokeOpacity="0.25" />
+      {total > 0 && arcs.map((arc, i) => (
+        <circle
+          key={i}
+          cx={cx} cy={cy} r={r}
+          fill="none"
+          stroke={arc.color}
+          strokeWidth={strokeWidth}
+          strokeDasharray={`${arc.dashLen} ${C - arc.dashLen}`}
+          strokeDashoffset={arc.dashOffset}
+        />
+      ))}
+      {centerLabel && (
+        <text
+          x={cx} y={cy}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={size * 0.2}
+          fontWeight="600"
+          fill="var(--text-secondary)"
+        >
+          {centerLabel}
+        </text>
+      )}
+    </svg>
+  );
+}
+
+function MiniTradesBars({ trades, height = 52 }: { trades: Trade[]; height?: number }) {
+  if (trades.length === 0) return <div style={{ height }} />;
+  const pnls = trades.map(t => t.pnl);
+  const maxAbs = Math.max(...pnls.map(p => Math.abs(p)), 1);
+  const W = 200;
+  const H = height;
+  const midY = H / 2;
+  const slot = W / trades.length;
+  const bw = Math.max(1.5, slot - 1);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height, display: 'block' }}>
+      <line x1="0" y1={midY} x2={W} y2={midY} stroke="var(--border)" strokeWidth="0.5" strokeOpacity="0.6" />
+      {trades.map((t, i) => {
+        const barH = Math.max(2, (Math.abs(t.pnl) / maxAbs) * (midY - 2));
+        const isWin = t.pnl >= 0;
+        return (
+          <rect
+            key={i}
+            x={i * slot}
+            y={isWin ? midY - barH : midY}
+            width={bw}
+            height={barH}
+            fill={isWin ? 'var(--accent-green)' : 'var(--accent-red)'}
+            fillOpacity="0.85"
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+function SummaryCol({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col min-h-0 h-full flex-1 min-w-0" style={{ borderLeft: '1px solid var(--border)' }}>
+      <div
+        className="flex-shrink-0 px-2 pb-0.5 text-[9px] font-semibold uppercase tracking-wider whitespace-nowrap"
+        style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
+      >
+        {title}
+      </div>
+      <div className="flex-1 min-h-0 px-2 py-1 overflow-hidden">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function RunSummaryPanel({ result }: { result: BacktestResult | null | undefined }) {
+  if (!result || result.status !== 'completed') {
+    return (
+      <div
+        className="flex h-full items-center justify-center"
+        style={{ borderLeft: '1px solid var(--border)' }}
+      >
+        <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>No results yet</span>
+      </div>
+    );
+  }
+
+  const trades = result.trades ?? [];
+
+  // Cumulative P&L series — prefer equityCurve, fall back to running sum of trade P&L
+  const pnlValues: number[] = (() => {
+    const eq = (result.equityCurve ?? []).map(p => p.value - result.initialCapital);
+    if (eq.length >= 2) return eq;
+    let running = 0;
+    return trades.map(t => { running += t.pnl; return running; });
+  })();
+
+  // Exit type aggregation
+  const exitCounts: Record<string, number> = {};
+  for (const t of trades) {
+    const key = (t.exitType ?? 'Unknown').toUpperCase();
+    exitCounts[key] = (exitCounts[key] ?? 0) + 1;
+  }
+  const exitEntries = Object.entries(exitCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+
+  const recentTrades = trades.slice(-50);
+  const recentWins = recentTrades.filter(t => t.pnl >= 0).length;
+
+  const winLossSegments = [
+    { value: result.winningTrades, color: 'var(--accent-green)' },
+    { value: result.losingTrades, color: 'var(--accent-red)' },
+  ];
+  const exitSegments = exitEntries.map(([key, count]) => ({ value: count, color: exitTypeColor(key) }));
+
+  return (
+    <div className="flex h-full min-h-0">
+
+      {/* ── Col 1: Cumulative P&L ── */}
+      <SummaryCol title="Cumulative P&L">
+        <div className="text-[9px] mb-0.5" style={{ color: 'var(--text-muted)' }}>
+          Total Trades: {result.totalTrades}
+        </div>
+        {pnlValues.length >= 2 ? (() => {
+          const min = Math.min(...pnlValues);
+          const max = Math.max(...pnlValues);
+          const range = max - min || 1;
+          const W = 200; const H = 100;
+          const pts = pnlValues.map((v, i) =>
+            `${((i / (pnlValues.length - 1)) * W).toFixed(1)},${(H - ((v - min) / range) * H).toFixed(1)}`
+          ).join(' ');
+          const color = (pnlValues[pnlValues.length - 1] ?? 0) >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+          return (
+            <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 52, display: 'block' }}>
+              <polygon points={`0,${H} ${pts} ${W},${H}`} fill={color} fillOpacity="0.12" />
+              <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+            </svg>
+          );
+        })() : <div style={{ height: 52 }} />}
+        <div
+          className="mt-1 text-[10px] font-semibold tabular-nums"
+          style={{ color: result.returnPercentage >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}
+        >
+          {result.returnPercentage >= 0 ? '+' : ''}{result.returnPercentage.toFixed(2)}%
+        </div>
+      </SummaryCol>
+
+      {/* ── Col 2: Win / Loses ── */}
+      <SummaryCol title="Win / Loses">
+        <div className="flex flex-col items-center gap-1">
+          <MiniDonut
+            segments={winLossSegments}
+            centerLabel={`${result.totalTrades}`}
+            size={58}
+            strokeWidth={9}
+          />
+          <div className="w-full space-y-px">
+            <div className="flex justify-between text-[9px]">
+              <span style={{ color: 'var(--accent-green)' }}>Win</span>
+              <span className="tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                {(result.winRate * 100).toFixed(1)}%
+              </span>
+            </div>
+            <div className="flex justify-between text-[9px]">
+              <span style={{ color: 'var(--accent-red)' }}>Loss</span>
+              <span className="tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                {((1 - result.winRate) * 100).toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        </div>
+      </SummaryCol>
+
+      {/* ── Col 3: Exit Type Breakdown ── */}
+      <SummaryCol title="Exit Type Breakdown">
+        <div className="flex gap-2 items-start">
+          <MiniDonut segments={exitSegments} size={52} strokeWidth={9} />
+          <div className="flex-1 min-w-0 space-y-px pt-0.5">
+            {exitEntries.slice(0, 4).map(([key, count]) => {
+              const pct = trades.length > 0 ? (count / trades.length) * 100 : 0;
+              return (
+                <div key={key} className="flex items-center gap-1 text-[9px]">
+                  <span
+                    className="inline-block rounded-full flex-shrink-0"
+                    style={{ width: 5, height: 5, background: exitTypeColor(key) }}
+                  />
+                  <span className="truncate" style={{ color: 'var(--text-muted)', maxWidth: 36 }}>{key}</span>
+                  <span className="ml-auto tabular-nums flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                    {pct.toFixed(0)}%
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </SummaryCol>
+
+      {/* ── Col 4: Recent Trade Outcomes ── */}
+      <SummaryCol title="Recent Trade Outcomes">
+        <div className="text-[9px] mb-0.5" style={{ color: 'var(--text-muted)' }}>
+          Last {recentTrades.length} Trades
+        </div>
+        <MiniTradesBars trades={recentTrades} height={52} />
+        <div className="mt-1 flex justify-between text-[9px]">
+          <span className="tabular-nums" style={{ color: 'var(--accent-green)' }}>{recentWins}W</span>
+          <span className="tabular-nums" style={{ color: 'var(--accent-red)' }}>{recentTrades.length - recentWins}L</span>
+        </div>
+      </SummaryCol>
+
+    </div>
+  );
+}
+
 // ─── Config Tab — 3-column grid layout matching thick-client exactly ─────────────────
 //
 // Layout: three bordered section cards [Configuration | Adaptive SL v2.0 | Risk/Reward].
@@ -614,6 +873,7 @@ function ConfigTab({
   maxBarsHeld,
   setMaxBarsHeld,
   onLoadPreset,
+  result,
 }: {
   config: Omit<BacktestConfig, 'strategyId'>;
   onChange: (patch: Partial<Omit<BacktestConfig, 'strategyId'>>) => void;
@@ -665,6 +925,7 @@ function ConfigTab({
   maxBarsHeld: ChipValue;
   setMaxBarsHeld: (v: ChipValue) => void;
   onLoadPreset: (record: import('@/lib/strategy-builder/types').BacktestRunRecord) => void;
+  result?: BacktestResult | null;
 }) {
 
   // Auto-Custom: re-evaluate whether the current 8 Adaptive SL values still
@@ -1286,14 +1547,21 @@ function ConfigTab({
           stretch to fill this wrapper — cycle-21's fixed `statusMaxHeight`
           clamp is gone, so the internal scroll bar now appears only when
           content truly exceeds the available room. */}
-      <div className="px-2 pt-1 flex-1 min-h-0 flex flex-col">
-        <StatusColumn
-          logs={outputLogs}
-          isRunning={isRunning}
-          headerRight={
-            <FontScalePicker scale={fontScale} onChange={onFontScaleChange} />
-          }
-        />
+      <div className="px-2 pt-1 flex-1 min-h-0 flex gap-3">
+        {/* Left: existing status log */}
+        <div className="flex-1 min-h-0 flex flex-col">
+          <StatusColumn
+            logs={outputLogs}
+            isRunning={isRunning}
+            headerRight={
+              <FontScalePicker scale={fontScale} onChange={onFontScaleChange} />
+            }
+          />
+        </div>
+        {/* Right: 4-column results dashboard (BTCAAAAA-38676 rev2) */}
+        <div className="flex-[3] min-w-0 min-h-0">
+          <RunSummaryPanel result={result} />
+        </div>
       </div>
     </div>
   );
@@ -1402,6 +1670,21 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (open) setFontScale(readStoredFontScale());
   }, [open]);
+
+  // BTCAAAAA-38676: "Always open Config Tab" utility checkbox.
+  // When enabled, every dialog open resets the active tab to 'config'
+  // so the user always lands on the config form regardless of which tab
+  // was active when the dialog was last dismissed.
+  // Lazy initializer reads localStorage once on mount to avoid setState-in-effect.
+  const [alwaysOpenConfig, setAlwaysOpenConfig] = useState<boolean>(() => readStoredAlwaysConfigTab());
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting tab on dialog open is intentional UX
+    if (open && alwaysOpenConfig) setActiveTab('config');
+  }, [open, alwaysOpenConfig]);
+  const updateAlwaysOpenConfig = useCallback((checked: boolean) => {
+    setAlwaysOpenConfig(checked);
+    try { window.localStorage.setItem(ALWAYS_CONFIG_TAB_KEY, String(checked)); } catch { /* ignore */ }
+  }, []);
   const updateFontScale = useCallback((next: FontScale) => {
     setFontScale(next);
     if (typeof window !== 'undefined') {
@@ -2104,6 +2387,17 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
             <ThemeSelector />
             {/* Tooltip delay — shared singleton with BacktestWindow / strategy builder */}
             <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-faint)' }}>
+              {/* BTCAAAAA-38676: utility checkbox — always land on Config tab on open */}
+              <label className="flex items-center gap-1 cursor-pointer select-none" title="When enabled, opening this dialog always navigates to the Config tab">
+                <input
+                  type="checkbox"
+                  checked={alwaysOpenConfig}
+                  onChange={e => updateAlwaysOpenConfig(e.target.checked)}
+                  style={{ accentColor: 'var(--toolbar-accent)', width: 11, height: 11 }}
+                />
+                Always Config Tab
+              </label>
+              <div className="w-px h-3" style={{ background: 'var(--border)' }} />
               <label className="flex items-center gap-1 cursor-pointer select-none" title="Toggle institutional-grade tooltips on all configuration fields">
                 <input
                   type="checkbox"
@@ -2262,6 +2556,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
               maxBarsHeld={maxBarsHeld}
               setMaxBarsHeld={setMaxBarsHeld}
               onLoadPreset={applyRunConfig}
+              result={backTestResult}
             />
           )}
           {activeTab === 'output' && (
