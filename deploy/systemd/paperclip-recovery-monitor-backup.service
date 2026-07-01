@@ -17,7 +17,7 @@ WorkingDirectory=/home/sirrus/projects/BTC-Trade-Engine-PaperClip
 # The Python script calls load_dotenv(REPO_ROOT/".env") with override=False, so non-conflicting
 # vars (POSTGRES_*, GH_TOKEN, …) still load while the systemd Environment= below wins.
 Environment=PAPERCLIP_LISTEN_HOST=127.0.0.1
-Environment=PAPERCLIP_LISTEN_PORT=3100
+Environment=PAPERCLIP_LISTEN_PORT=3101
 Environment=PAPERCLIP_API_KEY=local_trusted
 Environment=PAPERCLIP_COMPANY_ID=73419cf3-bd37-4a7c-8782-311ccb47fced
 

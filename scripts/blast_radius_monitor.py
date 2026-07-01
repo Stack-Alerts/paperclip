@@ -182,6 +182,15 @@ def create_alert(
     if mode == "single-issue" and result.get("error"):
         body_lines.append(f"\n### Error Detail\n```\n{result['error'][:3000]}\n```")
 
+    errors = data.get("errors", [])
+    if errors:
+        failed_lines = ["\n### Failed issues\n"]
+        for entry in errors:
+            issue_id = entry.get("issue", "unknown")
+            err_txt = entry.get("error_truncated", "")
+            failed_lines.append(f"- **{issue_id}**: `{err_txt}`")
+        body_lines.append("\n".join(failed_lines))
+
     body_lines.append(
         "\n---\n"
         "### Action Required\n\n"
@@ -259,6 +268,15 @@ def _append_update_comment(
     )
     if run_url:
         body += f"- CI Run: {run_url}\n"
+
+    errors = data.get("errors", [])
+    if errors:
+        body += "\n### Failed issues\n\n"
+        for entry in errors:
+            issue_ref = entry.get("issue", "unknown")
+            err_txt = entry.get("error_truncated", "")
+            body += f"- **{issue_ref}**: `{err_txt}`\n"
+
     body += "\n_The issue persists — see above for initial alert details._"
 
     try:

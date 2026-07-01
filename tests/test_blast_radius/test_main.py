@@ -5,6 +5,7 @@ All subcommands (worker, query, generate, serve) are tested via argv patching.
 
 from __future__ import annotations
 
+import json
 import sys
 from unittest.mock import patch
 
@@ -302,4 +303,78 @@ class TestJsonSummary:
         assert result == 0
         kwargs = mock_log.call_args.kwargs
         assert kwargs.get("level") == 10  # DEBUG
+
+    def test_json_summary_errors_array_empty_when_no_errors(self, capsys):
+        with (
+            patch.object(sys, "argv", ["blast-radius", "worker", "--json-summary"]),
+            patch("blast_radius.worker.run_once", return_value=[
+                {"issue": "BTCAAAAA-1", "status": "posted"},
+                {"issue": "BTCAAAAA-2", "status": "posted"},
+            ]),
+        ):
+            from blast_radius.__main__ import main
+            result = main()
+        assert result == 0
+        data = json.loads(capsys.readouterr().out)
+        assert data["issues_processed"] == 2
+        assert data["issues_with_errors"] == 0
+        assert data["errors"] == []
+
+    def test_json_summary_errors_array_contains_failed_issues(self, capsys):
+        with (
+            patch.object(sys, "argv", ["blast-radius", "worker", "--json-summary"]),
+            patch("blast_radius.worker.run_once", return_value=[
+                {"issue": "BTCAAAAA-100", "status": "posted"},
+                {"issue": "BTCAAAAA-200", "error": "Connection timeout after 30s"},
+            ]),
+        ):
+            from blast_radius.__main__ import main
+            result = main()
+        assert result == 0
+        data = json.loads(capsys.readouterr().out)
+        assert data["issues_processed"] == 2
+        assert data["issues_with_errors"] == 1
+        assert len(data["errors"]) == 1
+        assert data["errors"][0]["issue"] == "BTCAAAAA-200"
+        assert data["errors"][0]["error_truncated"] == "Connection timeout after 30s"
+
+    def test_json_summary_errors_truncated_to_500_chars(self, capsys):
+        long_error = "x" * 600
+        with (
+            patch.object(sys, "argv", ["blast-radius", "worker", "--json-summary"]),
+            patch("blast_radius.worker.run_once", return_value=[
+                {"issue": "BTCAAAAA-999", "error": long_error},
+            ]),
+        ):
+            from blast_radius.__main__ import main
+            result = main()
+        assert result == 0
+        data = json.loads(capsys.readouterr().out)
+        assert len(data["errors"][0]["error_truncated"]) == 500
+
+    def test_json_summary_errors_capped_at_20_entries(self, capsys):
+        many_errors = [{"issue": f"BTCAAAAA-{i}", "error": "fail"} for i in range(25)]
+        with (
+            patch.object(sys, "argv", ["blast-radius", "worker", "--json-summary"]),
+            patch("blast_radius.worker.run_once", return_value=many_errors),
+        ):
+            from blast_radius.__main__ import main
+            result = main()
+        assert result == 0
+        data = json.loads(capsys.readouterr().out)
+        assert data["issues_with_errors"] == 25
+        assert len(data["errors"]) == 20
+
+    def test_json_summary_errors_missing_issue_key_uses_unknown(self, capsys):
+        with (
+            patch.object(sys, "argv", ["blast-radius", "worker", "--json-summary"]),
+            patch("blast_radius.worker.run_once", return_value=[
+                {"error": "no issue key present"},
+            ]),
+        ):
+            from blast_radius.__main__ import main
+            result = main()
+        assert result == 0
+        data = json.loads(capsys.readouterr().out)
+        assert data["errors"][0]["issue"] == "unknown"
 

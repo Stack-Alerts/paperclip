@@ -70,6 +70,10 @@ def _setup_logging(verbose: bool = False) -> None:
     logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(message)s")
 
 
+_MAX_ERROR_ENTRIES = 20
+_MAX_ERROR_STR_LEN = 500
+
+
 def _emit_json_summary(
     args: argparse.Namespace,
     *,
@@ -86,10 +90,16 @@ def _emit_json_summary(
     if result is not None:
         summary["result"] = result
     if results is not None:
-        issues_processed = len(results)
-        errors = [r for r in results if "error" in r]
-        summary["issues_processed"] = issues_processed
-        summary["issues_with_errors"] = len(errors)
+        error_entries = [r for r in results if "error" in r]
+        summary["issues_processed"] = len(results)
+        summary["issues_with_errors"] = len(error_entries)
+        summary["errors"] = [
+            {
+                "issue": r.get("issue", "unknown"),
+                "error_truncated": str(r["error"])[:_MAX_ERROR_STR_LEN],
+            }
+            for r in error_entries[:_MAX_ERROR_ENTRIES]
+        ]
     sys.stdout.write(json.dumps(summary, default=str) + "\n")
 
 
