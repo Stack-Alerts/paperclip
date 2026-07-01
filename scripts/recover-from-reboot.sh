@@ -190,16 +190,76 @@ start_paperclip() {
   if [ ! -x "$PAPERCLIP_BIN" ]; then
     fail "paperclipai binary missing at $PAPERCLIP_BIN — run: npx paperclipai@latest --help"
   fi
+
+  # Ensure the canonical port is free BEFORE we start. A previous instance
+  # (often a `pnpm dev:watch` from /home/sirrus/projects/paperclip) may
+  # have bound to :3101 because :3100 was occupied at that time. Without
+  # this step the new server would also bind to :3101 (its next-free
+  # attempt) and we'd be back in port-drift hell.
+  free_port() {
+    local port="$1"
+    if port_listening "$port"; then
+      local pids
+      pids=$(ss -tlnpH 2>/dev/null | awk -v p=":${port} " '$0 ~ p { print $0 }' \
+             | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u)
+      if [ -z "$pids" ]; then
+        log "WARN: port $port is in use but I can't identify the process — refusing to kill"
+        return 1
+      fi
+      log "killing processes holding port $port: $pids"
+      for pid in $pids; do
+        kill "$pid" 2>/dev/null || log "WARN: kill $pid failed (already gone?)"
+      done
+      for _ in $(seq 1 10); do
+        port_listening "$port" || return 0
+        sleep 1
+      done
+      fail "port $port still occupied after kill"
+    fi
+  }
+  free_port 3100
+
+  # Sweep adjacent ports (3101-3110) and kill any *paperclip* process
+  # still holding them. These are always drift artifacts from prior
+  # failed starts; killing them prevents confusion about which server
+  # is the canonical one.
+  log "sweeping 3101-3110 for stray paperclip instances"
+  for port in $(seq 3101 3110); do
+    if port_listening "$port"; then
+      # Only kill if the holder is a paperclip process (cmdline match).
+      local holder_pid
+      holder_pid=$(ss -tlnpH 2>/dev/null | awk -v p=":${port} " '$0 ~ p' \
+                   | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)
+      if [ -n "$holder_pid" ]; then
+        local cmdline
+        cmdline=$(tr '\0' ' ' < "/proc/$holder_pid/cmdline" 2>/dev/null || echo "")
+        if echo "$cmdline" | grep -q "paperclipai\|paperclip.*dist/index"; then
+          log "killing stray paperclip PID $holder_pid on :$port"
+          kill "$holder_pid" 2>/dev/null || true
+        else
+          log "port $port held by non-paperclip PID $holder_pid ($cmdline) — leaving alone"
+        fi
+      fi
+    fi
+  done
+
   if curl -sf -o /dev/null --max-time 2 http://127.0.0.1:3100/api/health; then
     log "paperclip already healthy on :3100"
     return
   fi
+
   log "starting paperclip (log → $LOG_FILE)"
   nohup "$PAPERCLIP_BIN" run --instance default > "$LOG_FILE" 2>&1 < /dev/null & disown
+
   for _ in $(seq 1 60); do
     if curl -sf -o /dev/null --max-time 2 http://127.0.0.1:3100/api/health; then
-      log "paperclip healthy after ${_}s"
-      return
+      # Sanity-check we actually bound to the canonical port, not :3101+
+      if port_listening 3100; then
+        log "paperclip healthy on :3100 after ${_}s"
+        return
+      else
+        fail "paperclip started but is NOT listening on :3100 — check $LOG_FILE"
+      fi
     fi
     sleep 1
   done
