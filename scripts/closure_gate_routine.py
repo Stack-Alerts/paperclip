@@ -454,6 +454,79 @@ def has_fix_sha_none_exemption(comments: list[dict[str, Any]]) -> bool:
     return False
 
 
+# === Gap 4 (BTCAAAAA-38472) — done-status Fix-SHA guard ===
+#
+# `require_fix_sha_for_done_status` lint: any routine that PATCHes an issue
+# to `done` directly (merge-dispatch, action-dispatch handler, etc.) must first
+# verify the MOST RECENT comment carries a parseable Fix-SHA. If it does not,
+# the PATCH is deferred (logged as `defer_missing_fix_sha`) so the closure-gate
+# can catch the gap on its next sweep instead of letting a fix-less done land.
+#
+# Rationale: BTC-30048 cohort showed that any routine that flips a `done` PATCH
+# *without* anchoring to a Fix-SHA leaves the closure-gate blind — the gate
+# scans `done` issues, finds no SHA, and has to escalate via "request Fix-SHA",
+# which adds an entire extra cycle. Catching it at the PATCH site is cheaper
+# and keeps the audit trail explicit (`defer_missing_fix_sha` log marker).
+#
+# Backward compat: the existing `Fix-SHA: NONE` exemption marker (BTC-35382)
+# remains respected — non-code operational work keeps its escape hatch.
+
+def most_recent_fix_sha_present(comments: list[dict[str, Any]]) -> bool:
+    """Return True if the chronologically-most-recent comment carries a Fix-SHA.
+
+    "Most recent" = last entry in `comments` (Paperclip returns comments in
+    ascending createdAt order on this endpoint). Accepts either:
+      - line-anchored `Fix-SHA: <40-hex>` (FIX_SHA_PATTERN), OR
+      - line-anchored `Fix-SHA: NONE` exemption marker (FIX_SHA_NONE_PATTERN).
+
+    Returns False for empty lists or when no marker is present in the tail.
+    """
+    if not comments:
+        return False
+    latest = comments[-1]
+    body = latest.get("body", "") or ""
+    if FIX_SHA_PATTERN.search(body):
+        return True
+    if FIX_SHA_NONE_PATTERN.search(body):
+        return True
+    return False
+
+
+def log_defer_missing_fix_sha(routine: str, issue_identifier: str) -> None:
+    """Emit the structured `defer_missing_fix_sha` log marker.
+
+    Centralized so the lint log shape stays uniform across routines. Format:
+      `defer_missing_fix_sha routine=<routine> issue=<id>`
+    so grep/jq extraction is trivial.
+    """
+    logger.info(
+        "defer_missing_fix_sha routine=%s issue=%s",
+        routine, issue_identifier,
+    )
+
+
+def require_fix_sha_for_done_status(
+    routine: str,
+    issue_identifier: str,
+    comments: list[dict[str, Any]],
+) -> bool:
+    """Gap 4 lint: gate a `done` PATCH on the most recent comment carrying a Fix-SHA.
+
+    Returns True when the PATCH may proceed. Returns False (and emits
+    `defer_missing_fix_sha`) when the latest comment lacks a Fix-SHA line —
+    callers must skip the `done` PATCH in that case so the closure-gate can
+    catch the gap on its next sweep instead of letting a fix-less done land.
+
+    The `routine` argument identifies which caller is invoking the lint
+    (e.g. "merge_dispatch_routine", "merge_dispatch_execution_handler") so the
+    log marker pinpoints the PATCH site.
+    """
+    if most_recent_fix_sha_present(comments):
+        return True
+    log_defer_missing_fix_sha(routine, issue_identifier)
+    return False
+
+
 # === No-SHA Evidence Verifier (BTCAAAAA-38590, v2 Step 2) ===
 
 def extract_no_sha_tag_from_comments(

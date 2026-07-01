@@ -206,6 +206,7 @@ def test_dispatch_for_issue_bypasses_watermark(tmp_path, monkeypatch):
     expected_result = {"issue": "BTCAAAAA-1", "action": "skip", "reason": "no_fix_sha"}
 
     with patch.object(mdr, "fetch_issue", return_value=issue), \
+         patch.object(mdr, "fetch_issue_comments", return_value=[{"body": "Fix-SHA: " + "a" * 40}]), \
          patch.object(mdr, "process_issue", return_value=expected_result) as mock_proc, \
          patch.object(mdr, "load_watermark") as mock_load, \
          patch.object(mdr, "save_watermark") as mock_save:

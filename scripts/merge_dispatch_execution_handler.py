@@ -61,6 +61,27 @@ REPO_FULL = f"{REPO_OWNER}/{REPO_NAME}"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
+# BTCAAAAA-38472 Gap 4 — import the done-status Fix-SHA guard from the
+# closure-gate routine (canonical home for Fix-SHA helpers). The handler
+# PATCHes `done` after a successful dispatch (line ~524), so it must run
+# the same lint as the routine itself to keep the audit trail consistent.
+try:
+    from closure_gate_routine import require_fix_sha_for_done_status
+    _GAP4_IMPORTS_OK = True
+except ImportError as _gap4_err:
+    logger.warning(
+        "Could not import Gap 4 helper from closure_gate_routine: %s",
+        _gap4_err,
+    )
+    def require_fix_sha_for_done_status(  # type: ignore[no-redef]
+        routine: str, issue_identifier: str, comments: list,
+    ) -> bool:
+        # Fallback no-op: see merge_dispatch_routine.py for rationale. The
+        # handler's success path must remain runnable in degraded test envs.
+        return True
+    _GAP4_IMPORTS_OK = False
+
+
 class MergeVerificationFailed(Exception):
     """Raised when post-merge verification sees upstream state != MERGED.
 
@@ -203,6 +224,34 @@ def get_full_issue(issue_id: str) -> dict | None:
             return resp.json()
         logger.error("Failed to fetch issue %s: %s", issue_id, resp.status_code)
         return None
+
+
+def get_full_issue_comments(issue_id: str) -> list[dict]:
+    """Fetch the full comments list for an issue. Returns [] on failure.
+
+    BTCAAAAA-38472 Gap 4 — used by the done-status Fix-SHA lint to inspect
+    the most recent comment before PATCHing `done`. Returning [] on failure
+    is safe: the lint treats an empty comment list as "no Fix-SHA" and
+    defers the PATCH, which is the correct conservative behavior.
+    """
+    with _http_session() as sess:
+        try:
+            resp = sess.get(
+                f"{_api_url()}/api/issues/{issue_id}/comments",
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, list):
+                    return data
+                return []
+            logger.error(
+                "Failed to fetch comments for %s: %s",
+                issue_id, resp.status_code,
+            )
+        except Exception as exc:
+            logger.error("Exception fetching comments for %s: %s", issue_id, exc)
+    return []
 
 
 def checkout_execution_issue(issue_id: str) -> bool:
@@ -513,6 +562,19 @@ Handler: `scripts/merge_dispatch_execution_handler.py` (standalone daemon, indep
         return True
 
     add_comment(issue_id, comment)
+
+    # BTCAAAAA-38472 Gap 4 lint: defer done-PATCH when latest comment lacks
+    # a Fix-SHA. The handler's success path PATCHes done directly, so the lint
+    # must fire here to keep the audit trail consistent with the routine.
+    if not require_fix_sha_for_done_status(
+        "merge_dispatch_execution_handler", identifier,
+        get_full_issue_comments(issue_id),
+    ):
+        # Leave issue in current status (todo/in_progress) so the next sweep
+        # can retry. Do NOT PATCH `done` without a Fix-SHA — the closure-gate
+        # would otherwise escalate with "request Fix-SHA" and burn an extra
+        # cycle. The structured log marker above is the audit trail.
+        return False
 
     if failed > 0 or errors > 0:
         update_issue(

@@ -172,6 +172,7 @@ class TestAgentFinishDispatch:
         mod = self._load()
         issue = {"id": "x", "identifier": "BTCAAAAA-6", "status": "in_review"}
         with patch.object(mod, "fetch_issue", return_value=issue), \
+            patch.object(mod, "fetch_issue_comments", return_value=[{"body": "Fix-SHA: " + "a" * 40}]), \
             patch.object(mod, "process_issue", return_value={"issue": "BTCAAAAA-6", "action": "skip", "reason": "sha_not_pushed"}) as proc:
             rc = mod.dispatch_for_issue("x")
         assert rc == 0

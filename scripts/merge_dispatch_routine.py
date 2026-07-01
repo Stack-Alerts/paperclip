@@ -66,6 +66,27 @@ except ImportError as _gap2_err:
     token_scope_preflight = None  # type: ignore[assignment]
     _GAP2_IMPORTS_OK = False
 
+# BTCAAAAA-38472 Gap 4 — import the done-status Fix-SHA guard from the
+# closure-gate routine (canonical home for Fix-SHA helpers). The lint lives
+# there so all routines that touch Fix-SHA stay anchored to one parser.
+try:
+    from closure_gate_routine import require_fix_sha_for_done_status
+    _GAP4_IMPORTS_OK = True
+except ImportError as _gap4_err:
+    logger.warning(
+        "Could not import Gap 4 helper from closure_gate_routine: %s",
+        _gap4_err,
+    )
+    def require_fix_sha_for_done_status(  # type: ignore[no-redef]
+        routine: str, issue_identifier: str, comments: list,
+    ) -> bool:
+        # Fallback no-op: if closure_gate_routine is not importable (e.g. test
+        # env without src/ on path), allow the PATCH to proceed. The lint
+        # becomes a no-op rather than a hard error so this routine still
+        # runs in the rare scenario the helper is unavailable.
+        return True
+    _GAP4_IMPORTS_OK = False
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "src"))
@@ -354,6 +375,67 @@ def extract_fix_sha_from_comments(comments: list[dict[str, Any]]) -> str | None:
         if find_branch_for_sha(sha):
             return sha
     return candidates[0]
+
+
+# === Gap 5 (BTCAAAAA-38472) — wait-for-Fix-SHA at dispatch ===
+#
+# When the agent-finish trigger (`dispatch_for_issue`) fires immediately
+# after the agent sets the issue to `in_review` with a Fix-SHA comment,
+# there is a small window where Paperclip's comments API has not yet indexed
+# the new comment. Without a wait, the dispatch finds no Fix-SHA and skips,
+# pushing the merge out to the next periodic sweep (minutes to hours later).
+# This helper re-fetches with a bounded retry loop to absorb the indexing lag.
+
+_FIX_SHA_WAIT_DEFAULT_RETRIES = 3
+_FIX_SHA_WAIT_DEFAULT_SLEEP_S = 10
+
+
+def wait_for_fix_sha_comment(
+    issue_id: str,
+    max_retries: int = _FIX_SHA_WAIT_DEFAULT_RETRIES,
+    sleep_s: float = _FIX_SHA_WAIT_DEFAULT_SLEEP_S,
+) -> str | None:
+    """Re-fetch comments up to `max_retries` times until a Fix-SHA appears.
+
+    Returns the Fix-SHA string (40-hex) on success, or None if still missing
+    after all retries. On persistent absence, emits the structured
+    `defer_missing_fix_sha_at_dispatch` log marker and returns None WITHOUT
+    raising — callers must handle None (typically by skipping dispatch and
+    letting the next periodic sweep retry).
+
+    Args:
+        issue_id: Paperclip issue UUID.
+        max_retries: Number of total fetch attempts (default 3 — first try +
+            two retries).
+        sleep_s: Seconds to sleep between attempts (default 10 — bounded so
+            the routine stays inside its overall wall-clock budget of ~5min).
+    """
+    import time
+
+    last_sha: str | None = None
+    for attempt in range(1, max_retries + 1):
+        comments = fetch_issue_comments(issue_id)
+        sha = extract_fix_sha_from_comments(comments)
+        if sha:
+            if attempt > 1:
+                logger.info(
+                    "wait_for_fix_sha_comment: Fix-SHA appeared on attempt %d/%d for %s",
+                    attempt, max_retries, issue_id,
+                )
+            return sha
+        last_sha = None
+        logger.debug(
+            "wait_for_fix_sha_comment: no Fix-SHA yet for %s (attempt %d/%d)",
+            issue_id, attempt, max_retries,
+        )
+        if attempt < max_retries:
+            time.sleep(sleep_s)
+
+    logger.info(
+        "defer_missing_fix_sha_at_dispatch issue=%s retries=%d",
+        issue_id, max_retries,
+    )
+    return None
 
 
 def sha_exists_locally(sha: str) -> bool:
@@ -859,6 +941,20 @@ def process_issue(issue: dict[str, Any]) -> dict[str, Any]:
             close_body,
             idempotency_key=f"pre_dispatch_already_merged:{issue_id}:{sha[:8]}",
         )
+        # BTCAAAAA-38472 Gap 4 lint: defer done-PATCH when latest comment
+        # lacks a Fix-SHA (or NONE marker). The close_body above is the new
+        # most-recent comment and embeds `Fix-SHA: \`{sha}\``, so the lint
+        # should always pass here; re-fetch fresh comments to be safe.
+        fresh_comments = fetch_issue_comments(issue_id)
+        if not require_fix_sha_for_done_status(
+            "merge_dispatch_routine", issue_identifier, fresh_comments,
+        ):
+            return {
+                "issue": issue_identifier,
+                "action": "deferred",
+                "reason": "defer_missing_fix_sha_pre_dispatch",
+                "detail": skip_reason,
+            }
         update_issue_status(issue_id, "done")
         return {
             "issue": issue_identifier,
@@ -1022,6 +1118,25 @@ This issue is now marked as done.
     if not comment_on_issue(issue_id, comment_body):
         logger.warning("Failed to post comment, but PR was merged")
 
+    # BTCAAAAA-38472 Gap 4 lint: defer done-PATCH when latest comment lacks
+    # a Fix-SHA. The comment_body above embeds merge info but NOT a Fix-SHA
+    # line (it lives in the original close-out comment), so we re-fetch and
+    # trust the original Fix-SHA comment to still be the latest-or-near-
+    # latest entry. Lint catches the regression case where the close-out
+    # comment was deleted or never posted.
+    fresh_comments = fetch_issue_comments(issue_id)
+    if not require_fix_sha_for_done_status(
+        "merge_dispatch_routine", issue_identifier, fresh_comments,
+    ):
+        return {
+            "issue": issue_identifier,
+            "action": "deferred",
+            "reason": "defer_missing_fix_sha_post_dispatch",
+            "pr_number": pr_number,
+            "pr_url": pr_url,
+            "merge_sha": merge_sha,
+        }
+
     if not update_issue_status(issue_id, "done", "Merged via automated dispatch"):
         logger.warning("Failed to update status, but PR was merged")
 
@@ -1050,6 +1165,21 @@ def dispatch_for_issue(issue_id: str) -> int:
         result = {"issue": issue.get("identifier", issue_id), "action": "skip",
                   "reason": f"status_{issue.get('status')}"}
         print(json.dumps(result, indent=2))
+        return 0
+
+    # BTCAAAAA-38472 Gap 5 — wait for the close-out Fix-SHA comment to be
+    # indexed by the comments API before proceeding. Without this, an
+    # immediate dispatch can race the agent's PATCH and skip with
+    # `no_fix_sha`, pushing the merge out to the next periodic sweep.
+    wait_sha = wait_for_fix_sha_comment(issue_id)
+    if wait_sha is None:
+        result = {
+            "issue": issue.get("identifier", issue_id),
+            "action": "deferred",
+            "reason": "defer_missing_fix_sha_at_dispatch",
+        }
+        print(json.dumps(result, indent=2))
+        logger.info("Agent-finish dispatch deferred: %s", result.get("reason"))
         return 0
 
     try:
