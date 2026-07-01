@@ -54,7 +54,7 @@ jobs:
             echo "ERROR: GH_TOKEN not set in secrets"
             exit 1
           fi
-          echo "GH_TOKEN is configured (length: ${#{{ secrets.GH_TOKEN }}})"
+          echo "GH_TOKEN is configured"
 
       - name: Run closure-gate routine
         id: gate

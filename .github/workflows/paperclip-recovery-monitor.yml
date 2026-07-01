@@ -45,14 +45,16 @@ jobs:
         if: ${{ github.event.inputs.matches_only == 'true' || github.event_name == 'schedule' }}
         id: matches
         env:
-          PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+          PAPERCLIP_LISTEN_HOST: '127.0.0.1'
+          PAPERCLIP_LISTEN_PORT: '3100'
           PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
           PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
           PAPERCLIP_BOARD_API_KEY: ${{ secrets.PAPERCLIP_BOARD_API_KEY }}
+          INPUT_SCENARIO: ${{ github.event.inputs.scenario }}
         run: |
           FLAGS="matches"
-          if [ -n "${{ github.event.inputs.scenario }}" ]; then
-            FLAGS="$FLAGS --scenario ${{ github.event.inputs.scenario }}"
+          if [ -n "$INPUT_SCENARIO" ]; then
+            FLAGS="$FLAGS --scenario $INPUT_SCENARIO"
           fi
           python scripts/paperclip_recovery_monitor.py $FLAGS > /tmp/recovery-matches.json
           echo "Matches written to /tmp/recovery-matches.json"
@@ -61,17 +63,20 @@ jobs:
         if: ${{ github.event.inputs.matches_only != 'true' && github.event_name != 'schedule' }}
         id: recovery
         env:
-          PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+          PAPERCLIP_LISTEN_HOST: '127.0.0.1'
+          PAPERCLIP_LISTEN_PORT: '3100'
           PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
           PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
           PAPERCLIP_BOARD_API_KEY: ${{ secrets.PAPERCLIP_BOARD_API_KEY }}
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+          INPUT_SCENARIO: ${{ github.event.inputs.scenario }}
         run: |
           FLAGS="run --json-summary"
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+          if [ "$INPUT_DRY_RUN" = "true" ]; then
             FLAGS="$FLAGS --dry-run"
           fi
-          if [ -n "${{ github.event.inputs.scenario }}" ]; then
-            FLAGS="$FLAGS --scenario ${{ github.event.inputs.scenario }}"
+          if [ -n "$INPUT_SCENARIO" ]; then
+            FLAGS="$FLAGS --scenario $INPUT_SCENARIO"
           fi
           python scripts/paperclip_recovery_monitor.py $FLAGS > /tmp/recovery-summary.json
           echo "Summary written to /tmp/recovery-summary.json"
