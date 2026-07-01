@@ -115,6 +115,33 @@ def _github_session(token: str | None) -> requests.Session:
 # Data fetching
 # ---------------------------------------------------------------------------
 
+def _candidate_bases(api_url: str) -> list[str]:
+    """Return ordered list of base URLs to probe.
+
+    The configured ``PAPERCLIP_API_URL`` is tried first; if it points to a
+    port that is unreachable we fall back to common Paperclip dev ports.
+    This makes the script resilient to operators whose ``.env`` still
+    points to an older default (port 3100) while the live server is on
+    3101 (or vice versa).
+    """
+    if not api_url:
+        return []
+    bases = [api_url]
+    # Strip the configured port, then probe common Paperclip dev ports in
+    # priority order. 3101 is the canonical local server (see
+    # ``paperclip-btcaaaaa-main`` config.json); 3100 is the legacy
+    # default; 3199 is the proxy fallback.
+    from urllib.parse import urlparse, urlunparse
+    parsed = urlparse(api_url)
+    host = parsed.hostname or "127.0.0.1"
+    scheme = parsed.scheme or "http"
+    for fallback_port in (3101, 3100, 3199):
+        candidate = urlunparse((scheme, f"{host}:{fallback_port}", "", "", "", ""))
+        if candidate not in bases:
+            bases.append(candidate)
+    return bases
+
+
 def fetch_in_review_issues(pc: requests.Session) -> list[dict[str, Any]]:
     api_url    = os.environ.get("PAPERCLIP_API_URL", "").rstrip("/")
     company_id = os.environ.get("PAPERCLIP_COMPANY_ID", "")
@@ -122,8 +149,9 @@ def fetch_in_review_issues(pc: requests.Session) -> list[dict[str, Any]]:
         print("ERROR: PAPERCLIP_API_URL and PAPERCLIP_COMPANY_ID must be set.", file=sys.stderr)
         return []
 
-    # Try port 3199 proxy if 3100 is down
-    for base in [api_url, api_url.replace(":3100", ":3199")]:
+    tried: list[str] = []
+    for base in _candidate_bases(api_url):
+        tried.append(base)
         try:
             r = pc.get(f"{base}/api/companies/{company_id}/issues",
                        params={"status": "in_review", "limit": 200}, timeout=20)
@@ -135,13 +163,13 @@ def fetch_in_review_issues(pc: requests.Session) -> list[dict[str, Any]]:
                     return data["issues"]
         except requests.exceptions.ConnectionError:
             continue
-    print("ERROR: Paperclip API unreachable on both port 3100 and 3199.", file=sys.stderr)
+    print(f"ERROR: Paperclip API unreachable on tried bases: {tried}", file=sys.stderr)
     return []
 
 
 def fetch_comments(pc: requests.Session, issue_id: str) -> list[dict[str, Any]]:
     api_url = os.environ.get("PAPERCLIP_API_URL", "").rstrip("/")
-    for base in [api_url, api_url.replace(":3100", ":3199")]:
+    for base in _candidate_bases(api_url):
         try:
             r = pc.get(f"{base}/api/issues/{issue_id}/comments", timeout=15)
             if r.status_code == 200:
@@ -172,6 +200,29 @@ def extract_fix_sha(comments: list[dict[str, Any]]) -> str | None:
     return shas[0] if shas else None
 
 
+def _pr_mergeable_signal(pr: dict[str, Any], checks: list[dict[str, Any]]) -> str:
+    """Return a normalised ``pr_mergeable`` signal for the parser.
+
+    The Paperclip git-merges plugin's ``deriveStatus`` only classifies a
+    block as ``ready`` when ``mergeable === "clean"``. GitHub's
+    ``mergeable_state`` is more granular (``dirty`` / ``blocked`` /
+    ``behind`` / ``clean`` / ``draft`` / ``unknown``) and a PR with all
+    required CI green but blocked on branch-protection or a required
+    approval should still read as ready. Collapse that case to ``clean``
+    so the panel doesn't show false negatives for fully-passed PRs.
+    """
+    passed = sum(1 for c in checks
+                 if (c.get("conclusion") or "").lower() == "success")
+    failed = sum(1 for c in checks
+                 if (c.get("conclusion") or "").lower()
+                 in ("failure", "timed_out", "startup_failure"))
+    total = len(checks)
+    raw = (pr.get("mergeable_state") or "").lower() or "unknown"
+    if total > 0 and passed == total and failed == 0:
+        return "clean"
+    return raw
+
+
 def fetch_open_prs(gh: requests.Session) -> list[dict[str, Any]]:
     prs: list[dict[str, Any]] = []
     for page in range(1, 6):
@@ -183,6 +234,24 @@ def fetch_open_prs(gh: requests.Session) -> list[dict[str, Any]]:
         if not chunk:
             break
         prs.extend(chunk)
+    # The list endpoint does not populate ``mergeable_state`` (it's computed
+    # lazily per-PR); fetch each one individually so callers can see whether
+    # the merge button is currently enabled. This is what the paperclip
+    # git-merges plugin's ``deriveStatus`` looks at to classify a PR-backed
+    # block as ``ready`` vs ``waiting`` vs ``failing``.
+    for pr in prs:
+        num = pr.get("number")
+        if not isinstance(num, int):
+            continue
+        try:
+            r2 = gh.get(f"{GITHUB_API_BASE}/repos/{REPO_OWNER}/{REPO_NAME}/pulls/{num}",
+                        timeout=20)
+            if r2.status_code == 200:
+                d = r2.json()
+                pr["mergeable"] = d.get("mergeable")
+                pr["mergeable_state"] = d.get("mergeable_state")
+        except Exception:
+            pass
     return prs
 
 
@@ -405,6 +474,27 @@ def collect(verbose: bool = True) -> dict[str, Any]:
                 pr = pr_for_sha(open_prs, s)
                 if pr:
                     break
+        # Fallback: if no Fix-SHA tagged the issue, try to match by the issue
+        # identifier inside any open PR's branch name. This catches the case
+        # where an agent has pushed a PR for the issue but hasn't yet posted
+        # the closure-style `Fix-SHA:` comment. Without this fallback the
+        # issue shows up as ``no-pr / SHA issue`` even when an open PR exists.
+        if pr is None and not already_merged:
+            cands = [
+                (issue.get("identifier") or "").strip(),
+                (display_key or "").strip(),
+            ]
+            for ident in cands:
+                if not ident or "-" not in ident:
+                    # Skip UUIDs and other non-identifier strings
+                    continue
+                for p in open_prs:
+                    head_ref = p.get("head", {}).get("ref", "") or ""
+                    if ident in head_ref:
+                        pr = p
+                        break
+                if pr:
+                    break
         pr_num = pr["number"] if pr else None
 
         checks: list[dict[str, Any]] = []
@@ -420,8 +510,18 @@ def collect(verbose: bool = True) -> dict[str, Any]:
             "already_merged": already_merged,
             "pr_number":     pr_num,
             "pr_title":      pr["title"] if pr else None,
-            "pr_mergeable":  pr.get("mergeable_state") if pr else None,
+            "pr_mergeable":  _pr_mergeable_signal(pr, checks) if pr else None,
             "checks":        checks,
+            # Plugin-deriveStatus fields: aggregate from checks so the JSON
+            # parser can classify blocks as ready / waiting / failing. The
+            # script's text output already produces a ``M/N`` progress bar;
+            # mirror that into the JSON shape here.
+            "passed":        sum(1 for c in checks
+                                 if (c.get("conclusion") or "").lower() == "success"),
+            "failed":        sum(1 for c in checks
+                                 if (c.get("conclusion") or "").lower()
+                                 in ("failure", "timed_out", "startup_failure")),
+            "total":         len(checks),
         })
 
     return {
@@ -548,8 +648,11 @@ def main() -> int:
 
         if args.json:
             out = dict(data)
-            for item in out["queue"]:
-                item.pop("checks", None)
+            # Keep `checks` in JSON output — the Paperclip git-merges plugin
+            # parser derives ``ready``/``waiting``/``failing`` from these
+            # checks (see ``deriveStatus`` in plugin-git-merges/src/parser.ts).
+            # Stripping them here was leaving every PR-backed block as
+            # ``unknown`` even when all required CI gates had passed.
             print(json.dumps(out, indent=2))
         else:
             print_table(data)
