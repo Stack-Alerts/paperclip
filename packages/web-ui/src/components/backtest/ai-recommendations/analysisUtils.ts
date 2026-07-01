@@ -149,7 +149,10 @@ export function parseAnalysisResponse(text: string): {
     .replace(/\*{1,2}\s*(DIAGNOSIS)\s*\*{1,2}/gi, '$1:')
     .replace(/\*{1,2}\s*(RECOMMENDATIONS)\s*\*{1,2}/gi, '$1:')
     .replace(/^#{1,6}\s+(DIAGNOSIS)\s*[:\-]?\s*$/gim, 'DIAGNOSIS:')
-    .replace(/^#{1,6}\s+(RECOMMENDATIONS)\s*[:\-]?\s*$/gim, 'RECOMMENDATIONS:');
+    // BTCAAAAA-37067: DeepSeek emits `## Actionable Recommendations`; the prior
+    // regex required the heading to start exactly with RECOMMENDATIONS, so the
+    // RECOMMENDATIONS section was never split out and zero cards rendered.
+    .replace(/^#{1,6}\s+(?:Actionable\s+)?RECOMMENDATIONS\s*[:\-]?\s*$/gim, 'RECOMMENDATIONS:');
 
   const diagnosisMatch = normalized.match(
     /DIAGNOSIS\s*:\s*([\s\S]*?)(?=\n\s*RECOMMENDATIONS\s*:|$)/i,

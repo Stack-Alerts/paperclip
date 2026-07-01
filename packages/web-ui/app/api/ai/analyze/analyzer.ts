@@ -395,6 +395,7 @@ export async function analyze(
  * Handles plain text as well as common AI formatting deviations:
  * - Markdown bold: **DIAGNOSIS:** / **RECOMMENDATIONS:**
  * - Markdown headings: ## DIAGNOSIS / ## RECOMMENDATIONS
+ *   (and ## Actionable Recommendations, which DeepSeek emits by default)
  * - No headers: falls back to numbered-list split
  */
 export function parseAnalysisResponse(text: string): {
@@ -404,9 +405,12 @@ export function parseAnalysisResponse(text: string): {
 } {
   const normalized = text
     .replace(/\*{1,2}\s*(DIAGNOSIS)\s*\*{1,2}/gi, '$1:')
-    .replace(/\*{1,2}\s*(RECOMMENDATIONS)\s*\*{1,2}/gi, '$1:')
+    .replace(/\*{1,2}\s*(?:Actionable\s+)?RECOMMENDATIONS\s*\*{1,2}/gi, '$1:')
     .replace(/^#{1,6}\s+(DIAGNOSIS)\s*[:\-]?\s*$/gim, 'DIAGNOSIS:')
-    .replace(/^#{1,6}\s+(RECOMMENDATIONS)\s*[:\-]?\s*$/gim, 'RECOMMENDATIONS:');
+    .replace(
+      /^#{1,6}\s+(?:Actionable\s+)?RECOMMENDATIONS\s*[:\-]?\s*$/gim,
+      'RECOMMENDATIONS:',
+    );
 
   const diagnosisMatch = normalized.match(
     /DIAGNOSIS\s*:\s*([\s\S]*?)(?=\n\s*RECOMMENDATIONS\s*:|$)/i,
