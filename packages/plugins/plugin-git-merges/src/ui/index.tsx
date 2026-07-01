@@ -2547,6 +2547,30 @@ function AwaitingApprovalView({
   );
 }
 
+// Extract the first GitHub PR URL from an approval body. Most PR-merge
+// approvals link to a specific PR; plan-approvals don't, in which case
+// we return null and just render the body as text.
+function extractGithubPrUrl(body: string): { url: string; number: number } | null {
+  const m = body.match(/https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/(\d+)/);
+  if (!m) return null;
+  return { url: m[0], number: Number.parseInt(m[1], 10) };
+}
+
+const reviewButtonStyle: CSSProperties = {
+  fontSize: "12px",
+  padding: "4px 12px",
+  borderRadius: "999px",
+  border: "1px solid color-mix(in srgb, #16a34a 60%, var(--border))",
+  background: "color-mix(in srgb, #16a34a 18%, transparent)",
+  color: "#86efac",
+  fontWeight: 600,
+  textDecoration: "none",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "4px",
+  whiteSpace: "nowrap",
+};
+
 function ApprovalCard({
   approval,
   chain,
@@ -2561,6 +2585,7 @@ function ApprovalCard({
   companyPrefix: string | null;
 }) {
   const isHighImpact = approval.unblocksCount > 0;
+  const prLink = extractGithubPrUrl(approval.body);
   return (
     <div style={isHighImpact ? chainCardActionableStyle : chainCardStyle}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
@@ -2597,6 +2622,17 @@ function ApprovalCard({
           <span style={chainUnblocksPillStyle}>
             ⚡ unblocks {approval.unblocksCount}
           </span>
+        ) : null}
+        {prLink ? (
+          <a
+            href={prLink.url}
+            target="_blank"
+            rel="noreferrer"
+            style={reviewButtonStyle}
+            title={`Open PR #${prLink.number} on GitHub to review and approve`}
+          >
+            Review PR #{prLink.number} on GitHub →
+          </a>
         ) : null}
       </div>
       <div style={{ ...mutedTextStyle, fontSize: "11px" }}>
