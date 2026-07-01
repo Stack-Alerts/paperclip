@@ -539,11 +539,26 @@ Stderr excerpt:
     failed = summary.get("failed", 0)
     errors = summary.get("errors", 0)
     total = result.get("issues_processed", 0)
+    idempotency_skip = result.get("idempotency_skip", False)
 
     logger.info(
-        "Merge dispatch complete: %d processed, %d merged, %d skipped, %d failed, %d errors",
-        total, merged, skipped, failed, errors,
+        "Merge dispatch complete: %d processed, %d merged, %d skipped, %d failed, %d errors (idempotency_skip=%s)",
+        total, merged, skipped, failed, errors, idempotency_skip,
     )
+
+    # Zero-work cycle: watermark unchanged (idempotency skip) or no merges/failures.
+    # Close silently without posting a comment — no activity noise for housekeeping ticks.
+    zero_work = idempotency_skip or (merged == 0 and failed == 0 and errors == 0)
+    if zero_work:
+        logger.info(
+            "Zero-work cycle for %s (idempotency_skip=%s, merged=%d, failed=%d, errors=%d) — closing silently",
+            identifier, idempotency_skip, merged, failed, errors,
+        )
+        if dry_run:
+            logger.info("[DRY RUN] Would silently close execution issue (no comment)")
+            return True
+        update_issue(issue_id, "done", "")
+        return True
 
     comment = f"""## Merge Dispatch — Execution Complete
 
