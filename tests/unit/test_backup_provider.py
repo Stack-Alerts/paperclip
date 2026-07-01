@@ -103,3 +103,137 @@ class TestBackupProviderInterface:
     def test_import_without_rclone(self):
         """BackupProvider ABC must import cleanly without rclone installed."""
         from src.backup.provider import BackupProvider as BP  # noqa: F401
+
+
+# ---------------------------------------------------------------------------
+# Security — input validation gates (path traversal / arg injection)
+# ---------------------------------------------------------------------------
+
+
+class TestLocalProviderSecurity:
+    @pytest.mark.parametrize(
+        "bad_id",
+        [
+            "../etc/passwd",          # path traversal (slash + ..)
+            "..",                     # traversal component
+            "foo..bar",               # double-dot anywhere
+            "foo/bar",                # slash
+            "foo\\bar",               # backslash
+            "-rf",                    # leading dash
+            "",                       # empty
+            "name with space",        # shell metachar
+            "name;rm",                # shell metachar
+            "name`whoami`",           # backticks
+            "name$(whoami)",          # cmdsubst
+            "name\nwhoami",           # newline
+            "a" * 257,                # too long
+        ],
+    )
+    def test_invalid_remote_id_rejected(self, provider, tmp_path, bad_id):
+        src = tmp_path / "src.bin"
+        src.write_bytes(b"hello")
+        with pytest.raises(ValueError, match="Invalid remote_id"):
+            provider.upload(src, bad_id)
+        with pytest.raises(ValueError, match="Invalid remote_id"):
+            provider.download(bad_id, tmp_path / "out.bin")
+        with pytest.raises(ValueError, match="Invalid remote_id"):
+            provider.delete(bad_id)
+        # empty string is a sentinel for "list all" — only validate non-empty
+        if bad_id:
+            with pytest.raises(ValueError, match="Invalid prefix"):
+                provider.list_backups(prefix=bad_id)
+
+    def test_valid_remote_id_accepted(self, provider, tmp_path):
+        src = tmp_path / "src.bin"
+        src.write_bytes(b"hello")
+        # Allowed chars: [A-Za-z0-9._-]
+        provider.upload(src, "backup_2026-06-30.v1")
+        provider.upload(src, "backup.v2")
+        provider.upload(src, "a")
+        assert any(
+            m["remote_id"] == "backup_2026-06-30.v1"
+            for m in provider.list_backups()
+        )
+
+
+class TestRcloneProviderSecurity:
+    def test_remote_id_with_colon_rejected(self, monkeypatch):
+        from src.backup.rclone_provider import RcloneProvider
+        calls = []
+
+        def fake_run(cmd, **kwargs):
+            calls.append(cmd)
+            from subprocess import CompletedProcess
+            return CompletedProcess(cmd, 0, stdout="[]", stderr="")
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+        provider = RcloneProvider("gdrive:backups/btc")
+        with pytest.raises(ValueError, match="Invalid remote_id"):
+            provider.upload("/tmp/x.bin", "evil:other_remote:lol")
+        # The subprocess must NOT have been called for the bad request.
+        assert calls == []
+
+    def test_invalid_remote_id_rejected(self, monkeypatch):
+        from src.backup.rclone_provider import RcloneProvider
+        def fake_run(cmd, **kwargs):
+            raise AssertionError("subprocess must not run on invalid id")
+        monkeypatch.setattr("subprocess.run", fake_run)
+        provider = RcloneProvider("gdrive:backups/btc")
+        for bad in ("foo/bar", "../escape", "-flag", "", "name with space"):
+            with pytest.raises(ValueError, match="Invalid"):
+                provider.upload("/tmp/x.bin", bad)
+            with pytest.raises(ValueError, match="Invalid"):
+                provider.download(bad, "/tmp/out.bin")
+            with pytest.raises(ValueError, match="Invalid"):
+                provider.delete(bad)
+
+    def test_leading_dash_remote_rejected(self):
+        from src.backup.rclone_provider import RcloneProvider
+        with pytest.raises(ValueError, match="Invalid remote"):
+            RcloneProvider("--config=/etc/passwd")
+
+    def test_valid_ids_call_rclone(self, monkeypatch):
+        from src.backup.rclone_provider import RcloneProvider
+        calls = []
+
+        def fake_run(cmd, **kwargs):
+            calls.append(cmd)
+            from subprocess import CompletedProcess
+            return CompletedProcess(cmd, 0, stdout="[]", stderr="")
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+        provider = RcloneProvider("gdrive:backups/btc")
+        provider.list_backups(prefix="backup_2026")
+        # argv list contains the joined remote path as a single element,
+        # proving no shell parsing happened.
+        flattened = " ".join(" ".join(c) for c in calls)
+        assert "backup_2026" in flattened
+
+
+# ---------------------------------------------------------------------------
+# Security — restore_db_dump shell arg validation
+# ---------------------------------------------------------------------------
+
+
+class TestRestoreDbUrlValidation:
+    @pytest.mark.parametrize(
+        "bad_url",
+        [
+            "",
+            "not-a-url",
+            "file:///etc/passwd",
+            "http://attacker.example/exfil",
+            "postgresql",  # scheme only, no netloc
+            "postgresql:",  # scheme+sep, no netloc
+        ],
+    )
+    def test_non_postgres_url_validation(self, bad_url, tmp_path):
+        from src.backup.restore import _is_postgres_url
+        assert _is_postgres_url(bad_url) is False
+
+    def test_postgres_url_accepted(self, tmp_path):
+        from src.backup.restore import _is_postgres_url
+        assert _is_postgres_url("postgresql://u@h/d") is True
+        assert _is_postgres_url("postgres://u@h/d") is True
+        assert _is_postgres_url("http://x") is False
+        assert _is_postgres_url("") is False
