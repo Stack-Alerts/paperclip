@@ -138,6 +138,17 @@ TICKET_REF_PATTERN = re.compile(r"\b(BTCAAAAA-\d+)\b")
 PARAGRAPH_SPLIT_RE = re.compile(r"\n\s*\n")
 DEFERRAL_SNIPPET_MAX = 400
 
+# Line-anchored deferral-resolution marker (BTCAAAAA-38706). Mirrors the
+# `Fix-SHA: NONE` design: an explicit, durable, greppable CEO/board assertion
+# that a closure's promised follow-up is already tracked by the named ticket.
+# Any comment carrying this marker suppresses unfiled-deferral flags for the
+# issue, giving immutable historical prose (which cannot be edited to add an
+# inline ref) a resolution path instead of being re-flagged on every scan.
+DEFERRAL_TRACKED_PATTERN = re.compile(
+    r"^Deferral-Tracked:\s*(BTCAAAAA-\d+)\b",
+    re.MULTILINE,
+)
+
 
 def _http_session() -> requests.Session:
     """Create HTTP session with retries and proper headers."""
@@ -450,6 +461,20 @@ def has_fix_sha_none_exemption(comments: list[dict[str, Any]]) -> bool:
     """
     for comment in comments:
         if FIX_SHA_NONE_PATTERN.search(comment.get("body", "") or ""):
+            return True
+    return False
+
+
+def has_deferral_tracked_marker(comments: list[dict[str, Any]]) -> bool:
+    """Return True if any comment carries a line-anchored `Deferral-Tracked:` marker.
+
+    BTCAAAAA-38706 resolution path: an explicit CEO/board assertion that a
+    closure's promised follow-up is tracked by the named ticket. Presence of the
+    marker suppresses unfiled-deferral flags for the issue (mirrors the
+    `Fix-SHA: NONE` operational-closure exemption).
+    """
+    for comment in comments:
+        if DEFERRAL_TRACKED_PATTERN.search(comment.get("body", "") or ""):
             return True
     return False
 
@@ -905,8 +930,70 @@ def detect_unfiled_deferrals(
     source_id = issue.get("id", "")
     source_identifier = issue.get("identifier", "")
     source_project_id = issue.get("projectId")
+    comments = comments or []
 
-    for comment in comments or []:
+    # Fast exit: no comment in this thread trips the deferral lexicon, so there
+    # is nothing to flag or suppress.
+    if not any(DEFERRAL_REGEX.search(c.get("body", "") or "") for c in comments):
+        return flags
+
+    # Issue-wide suppression paths (BTCAAAAA-38706). Both are durable, greppable
+    # resolution markers that clear ALL deferral flags for the issue:
+    #   1. `Deferral-Tracked: BTCAAAAA-NNNNN` — explicit CEO/board assertion.
+    #   2. `Fix-SHA: NONE` — board-directed operational closures carry lexicon
+    #      prose ("will report status next") but have no code follow-up to file.
+    if has_deferral_tracked_marker(comments):
+        return flags
+    if has_fix_sha_none_exemption(comments):
+        return flags
+
+    # Fetch each unique candidate ticket ref at most once per run, respecting the
+    # shared API budget. Cache is reused by both the thread-wide pre-scan and the
+    # per-paragraph fallback so a ref is never re-fetched.
+    followup_cache: dict[str, dict[str, Any] | None] = {}
+
+    def resolve_ref(ref: str) -> dict[str, Any] | None:
+        if ref in followup_cache:
+            return followup_cache[ref]
+        if api_call_counter is not None:
+            if api_call_counter[0] >= MAX_DEFERRAL_API_CALLS:
+                logger.warning(
+                    "Deferral API call budget (%d) exhausted; skipping ref %s for issue %s",
+                    MAX_DEFERRAL_API_CALLS,
+                    ref,
+                    source_identifier,
+                )
+                followup_cache[ref] = None
+                return None
+            api_call_counter[0] += 1
+        followup = fetch_issue_by_identifier(ref)
+        followup_cache[ref] = followup
+        return followup
+
+    def ref_links_back(ref: str) -> bool:
+        followup = resolve_ref(ref)
+        return bool(
+            followup
+            and followup_links_to_source(
+                followup, source_id, source_identifier, source_project_id
+            )
+        )
+
+    # Thread-wide linked-ref recognition (BTCAAAAA-38706): a promised follow-up
+    # is genuinely tracked if ANY ticket referenced ANYWHERE in the thread links
+    # back to this issue — even when the reference lives in a different comment or
+    # paragraph than the lexicon prose (the BTCAAAAA-7277 false-positive shape).
+    seen_refs: set[str] = set()
+    for comment in comments:
+        for ref in TICKET_REF_PATTERN.findall(comment.get("body", "") or ""):
+            if ref == source_identifier or ref in seen_refs:
+                continue
+            seen_refs.add(ref)
+            if ref_links_back(ref):
+                return flags
+
+    # No thread-wide tracked follow-up exists — fall back to per-paragraph flagging.
+    for comment in comments:
         body = comment.get("body", "") or ""
         if not body or not DEFERRAL_REGEX.search(body):
             continue
@@ -935,25 +1022,7 @@ def detect_unfiled_deferrals(
                 })
                 continue
 
-            valid = False
-            for ref in candidate_refs:
-                if api_call_counter is not None:
-                    if api_call_counter[0] >= MAX_DEFERRAL_API_CALLS:
-                        logger.warning(
-                            "Deferral API call budget (%d) exhausted; skipping remaining refs for issue %s",
-                            MAX_DEFERRAL_API_CALLS,
-                            source_identifier,
-                        )
-                        break
-                    api_call_counter[0] += 1
-                followup = fetch_issue_by_identifier(ref)
-                if followup and followup_links_to_source(
-                    followup, source_id, source_identifier, source_project_id
-                ):
-                    valid = True
-                    break
-
-            if not valid:
+            if not any(ref_links_back(ref) for ref in candidate_refs):
                 flags.append({
                     "source_identifier": source_identifier,
                     "source_id": source_id,

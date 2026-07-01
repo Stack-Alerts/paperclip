@@ -514,6 +514,96 @@ class TestDetectUnfiledDeferrals:
         assert len(flags) == 1
         mock_fetch.assert_not_called()
 
+    # BTCAAAAA-38706 (a): a linked follow-up referenced ELSEWHERE in the thread
+    # (different comment, no inline ref in the lexicon paragraph) suppresses flags.
+    @patch("closure_gate_routine.fetch_issue_by_identifier")
+    def test_thread_wide_linked_ref_suppresses_flag(self, mock_fetch):
+        mock_fetch.return_value = {
+            "id": "f-1",
+            "identifier": "BTCAAAAA-200",
+            "parentId": "src-id-1",
+            "projectId": "proj-A",
+            "title": "Git-history purge",
+            "description": "Follow-up deferred from BTCAAAAA-100.",
+        }
+        comments = [
+            {
+                "id": "c-immutable",
+                # Immutable historical prose: lexicon words, NO inline ref.
+                "body": "Closing. Will report merge-queue status next; cleanup deferred.",
+            },
+            {
+                "id": "c-followup",
+                # The tracked follow-up is filed and referenced here instead.
+                "body": "Filed the tracked follow-up as BTCAAAAA-200.",
+            },
+        ]
+        flags = detect_unfiled_deferrals(self._source_issue(), comments)
+        assert flags == []
+        mock_fetch.assert_called_with("BTCAAAAA-200")
+
+    # BTCAAAAA-38706 (b): a line-anchored `Deferral-Tracked:` marker suppresses flags.
+    @patch("closure_gate_routine.fetch_issue_by_identifier")
+    def test_resolution_marker_suppresses_flag(self, mock_fetch):
+        comments = [
+            {
+                "id": "c-immutable",
+                "body": "Closing. Will report merge-queue status next; cleanup deferred.",
+            },
+            {
+                "id": "c-marker",
+                "body": "CEO resolution.\n\nDeferral-Tracked: BTCAAAAA-290",
+            },
+        ]
+        flags = detect_unfiled_deferrals(self._source_issue(), comments)
+        assert flags == []
+        # Marker suppression must NOT require an API round-trip.
+        mock_fetch.assert_not_called()
+
+    # BTCAAAAA-38706 (c): a genuine un-tracked promise still flags.
+    @patch("closure_gate_routine.fetch_issue_by_identifier")
+    def test_untracked_promise_still_flags(self, mock_fetch):
+        # A ref exists elsewhere in the thread but does NOT link back, and there
+        # is no resolution marker → must still raise a no_refs flag.
+        mock_fetch.return_value = {
+            "id": "f-99",
+            "identifier": "BTCAAAAA-900",
+            "parentId": "some-other-issue",
+            "projectId": "proj-Z",
+            "title": "Unrelated",
+            "description": "No mention of the source issue.",
+        }
+        comments = [
+            {
+                "id": "c-immutable",
+                "body": "Closing. Cleanup deferred; needs a follow-up audit.",
+            },
+            {
+                "id": "c-noise",
+                "body": "See BTCAAAAA-900 for something unrelated.",
+            },
+        ]
+        flags = detect_unfiled_deferrals(self._source_issue(), comments)
+        assert len(flags) == 1
+        assert flags[0]["reason"] == "no_refs"
+        assert flags[0]["comment_id"] == "c-immutable"
+
+    # BTCAAAAA-38706 (3): Fix-SHA: NONE operational closure suppresses deferral flags.
+    @patch("closure_gate_routine.fetch_issue_by_identifier")
+    def test_fix_sha_none_suppresses_deferral(self, mock_fetch):
+        comments = [
+            {
+                "id": "c-op",
+                "body": (
+                    "Redeployed the service; will report status next.\n\n"
+                    "Fix-SHA: NONE"
+                ),
+            }
+        ]
+        flags = detect_unfiled_deferrals(self._source_issue(), comments)
+        assert flags == []
+        mock_fetch.assert_not_called()
+
 
 class TestFormatRoutineReportDeferrals:
     """Verify unfiled_deferrals[] section renders into the routine report."""
