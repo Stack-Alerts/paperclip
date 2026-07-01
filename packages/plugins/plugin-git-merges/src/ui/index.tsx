@@ -25,6 +25,7 @@ import {
   DEFAULT_CONFIG,
   PAGE_ROUTE,
   PLUGIN_ID,
+  type ActionableBlock,
   type ApprovalRequest,
   type BlockedChain,
   type ChainNode,
@@ -1257,6 +1258,8 @@ export function GitMergesPage(_props: PluginPageProps) {
           blockedCount={snapshot?.blockedCount ?? 0}
           chainCount={snapshot?.chainCount ?? 0}
           approvalCount={snapshot?.approvalCount ?? 0}
+          actionableBlocks={snapshot?.actionableBlocks ?? []}
+          actionableBlockCount={snapshot?.actionableBlockCount ?? 0}
         />
       </section>
 
@@ -1285,10 +1288,19 @@ export function GitMergesPage(_props: PluginPageProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Queue tabs — Blocks / Diff / Blocked Chain / Awaiting Approval / Raw
+// Queue tabs — Merge Queue / Blocked / Diff / Blocked Chain / Awaiting Approval / Raw
+//
+// Per the operator's data model:
+//   - "Merge Queue" = in-review issues (the auto-merge dispatch system)
+//   - "Blocked"     = actionable status=blocked leaves of chains (what's
+//                      actually stuck and needs action)
+//   - "Blocked Chain" = the dependency graph showing HOW each blocked
+//                        issue fits into a chain
+//   - "Awaiting Approval" = pending board approvals on chain nodes
+//                            (approvals that, when granted, release blocks)
 // ---------------------------------------------------------------------------
 
-type QueueTab = "blocks" | "diff" | "chains" | "approvals" | "raw";
+type QueueTab = "mergeQueue" | "blocked" | "diff" | "chains" | "approvals" | "raw";
 
 const tabBarStyle: CSSProperties = {
   display: "flex",
@@ -1328,6 +1340,8 @@ function QueueTabs({
   blockedCount,
   chainCount,
   approvalCount,
+  actionableBlocks,
+  actionableBlockCount,
 }: {
   blocks: MergeBlock[];
   previousBlocks: MergeBlock[] | null;
@@ -1344,8 +1358,10 @@ function QueueTabs({
   blockedCount: number;
   chainCount: number;
   approvalCount: number;
+  actionableBlocks: ActionableBlock[];
+  actionableBlockCount: number;
 }) {
-  const [tab, setTab] = useState<QueueTab>("blocks");
+  const [tab, setTab] = useState<QueueTab>("mergeQueue");
   const hasPrevious = previousBlocks !== null && previousBlocks.length > 0;
 
   return (
@@ -1354,11 +1370,26 @@ function QueueTabs({
         <button
           type="button"
           role="tab"
-          aria-selected={tab === "blocks"}
-          style={tabButtonStyle(tab === "blocks")}
-          onClick={() => setTab("blocks")}
+          aria-selected={tab === "mergeQueue"}
+          style={tabButtonStyle(tab === "mergeQueue")}
+          onClick={() => setTab("mergeQueue")}
         >
-          Blocks ({blocks.length})
+          Merge Queue ({blocks.length})
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "blocked"}
+          style={tabButtonStyle(tab === "blocked")}
+          onClick={() => setTab("blocked")}
+          disabled={actionableBlocks.length === 0}
+          title={
+            actionableBlocks.length > 0
+              ? `${actionableBlockCount} actionable blocked leaves`
+              : "No actionable blocks"
+          }
+        >
+          Blocked ({actionableBlockCount})
         </button>
         <button
           type="button"
@@ -1395,7 +1426,7 @@ function QueueTabs({
           disabled={approvalRequests.length === 0}
           title={
             approvalRequests.length > 0
-              ? `${approvalCount} pending board-approval requests`
+              ? `${approvalCount} pending board-approval requests causing chain blocks`
               : "No pending approvals"
           }
         >
@@ -1411,10 +1442,19 @@ function QueueTabs({
           Raw
         </button>
       </div>
-      {tab === "blocks" ? (
+      {tab === "mergeQueue" ? (
         <BlocksView
           blocks={blocks}
           deltaByKey={deltaByKey}
+          visited={visited}
+          onVisit={onVisit}
+          companyPrefix={companyPrefix}
+        />
+      ) : tab === "blocked" ? (
+        <BlockedView
+          blocks={actionableBlocks}
+          approvalChainLookup={approvalChainLookup}
+          approvalRequests={approvalRequests}
           visited={visited}
           onVisit={onVisit}
           companyPrefix={companyPrefix}
@@ -1753,6 +1793,148 @@ function MergeBlockCard({
           {block.statusLabel}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Blocked view — actionable status=blocked leaves of chains.
+// "Actionable" = nothing in the issue's chain blocks it (isLeaf=true),
+// so resolving it will release the most downstream work.
+//
+// This is the operator's "Blocks" surface: what's actually stuck and
+// needs intervention. Distinct from the BlocksView (in_review merge
+// queue) which shows PRs awaiting the auto-merge dispatch system.
+// ---------------------------------------------------------------------------
+
+function statusPillForBlocked(status: string): CSSProperties {
+  if (status === "done") {
+    return {
+      ...pillStyle,
+      borderColor: "color-mix(in srgb, #16a34a 60%, var(--border))",
+      background: "color-mix(in srgb, #16a34a 14%, transparent)",
+      color: "#86efac",
+    };
+  }
+  if (status === "todo") {
+    return {
+      ...pillStyle,
+      borderColor: "color-mix(in srgb, #d97706 60%, var(--border))",
+      background: "color-mix(in srgb, #d97706 14%, transparent)",
+      color: "#fcd34d",
+    };
+  }
+  return {
+    ...pillStyle,
+    borderColor: "color-mix(in srgb, #dc2626 60%, var(--border))",
+    background: "color-mix(in srgb, #dc2626 14%, transparent)",
+    color: "#fca5a5",
+  };
+}
+
+function BlockedView({
+  blocks,
+  approvalChainLookup,
+  approvalRequests,
+  visited,
+  onVisit,
+  companyPrefix,
+}: {
+  blocks: ActionableBlock[];
+  approvalChainLookup: Record<string, { chainId: string; node: ChainNode }>;
+  approvalRequests: ApprovalRequest[];
+  visited: Set<string>;
+  onVisit: (diffKey: string) => void;
+  companyPrefix: string | null;
+}) {
+  if (blocks.length === 0) {
+    return (
+      <div style={mutedTextStyle}>
+        No actionable blocks. The dependency graph has no
+        status='blocked' leaves — everything is either progressing or
+        fully resolved. If the chain tab shows chains, they all have
+        their actionable work in non-blocked states.
+      </div>
+    );
+  }
+  // Build a set of issue_ids that have a pending approval on them, so
+  // we can mark them with a "blocked on approval" pill.
+  const approvalBlockedIssueIds = new Set<string>();
+  for (const a of approvalRequests) {
+    if (a.chainId) {
+      approvalBlockedIssueIds.add(a.issueId);
+    }
+  }
+  return (
+    <div style={{ display: "grid", gap: "8px" }}>
+      <div style={{ ...mutedTextStyle, fontSize: "11px" }}>
+        {blocks.length} actionable block{blocks.length === 1 ? "" : "s"} —
+        status='blocked' leaves of dependency chains. Sort by
+        downstream impact (most impactful first). Click an identifier
+        to open the issue; "needs attention ⚠ approval" marks leaves
+        where the bottleneck is a pending board approval.
+      </div>
+      {blocks.map((b) => {
+        const blockedOnApproval = approvalBlockedIssueIds.has(b.uuid);
+        return (
+          <div key={b.uuid} style={chainCardActionableStyle}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
+              <IssueLink
+                node={{
+                  uuid: b.uuid,
+                  identifier: b.identifier,
+                  title: b.title,
+                  status: b.status,
+                  priority: b.priority,
+                  labels: b.labels,
+                  depth: b.depth,
+                  isLeaf: b.isLeaf,
+                  isRoot: false,
+                  blockedBy: b.blockedBy,
+                  blocks: b.blocks,
+                  downstreamCount: b.downstreamCount,
+                }}
+                companyPrefix={companyPrefix}
+                visited={visited.has(b.uuid)}
+                onVisit={onVisit}
+              />
+              <span style={statusPillForBlocked(b.status)}>{b.status}</span>
+              {b.priority ? <span style={pillStyle}>{b.priority}</span> : null}
+              <span style={chainMetaPillStyle}>chain {b.chainId}</span>
+              {b.downstreamCount > 0 ? (
+                <span style={chainUnblocksPillStyle}>
+                  ⚡ unblocks {b.downstreamCount}
+                </span>
+              ) : (
+                <span style={chainLeafPillStyle}>leaf (no downstream)</span>
+              )}
+              {blockedOnApproval ? (
+                <span
+                  style={chainActionablePillStyle}
+                  title="This block is waiting on a pending board approval — see the Awaiting Approval tab"
+                >
+                  ⚠ needs approval
+                </span>
+              ) : null}
+            </div>
+            <div style={{ ...mutedTextStyle, fontSize: "11px" }}>
+              {b.title.length > 120 ? b.title.slice(0, 120) + "…" : b.title}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", fontSize: "10px" }}>
+              {b.blockedBy.length > 0 ? (
+                <span style={chainMetaPillStyle}>
+                  blocked by {b.blockedBy.length}
+                </span>
+              ) : null}
+              {b.blocks.length > 0 ? (
+                <span style={chainMetaPillStyle}>
+                  blocks {b.blocks.length} downstream
+                </span>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

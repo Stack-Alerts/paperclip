@@ -104,10 +104,13 @@ export type ScanRecord = {
   blockedChains?: BlockedChain[];
   /** Pending board-approval requests (from the script's JSON output). */
   approvalRequests?: ApprovalRequest[];
+  /** Actionable blocked issues (status=blocked leaves). */
+  actionableBlocks?: ActionableBlock[];
   /** Snapshot-level counters from the script. */
   blockedCount?: number;
   chainCount?: number;
   approvalCount?: number;
+  actionableBlockCount?: number;
 };
 
 export type ScanStatus = {
@@ -168,10 +171,18 @@ export type MergeQueueSnapshot = {
   approvalRequests: ApprovalRequest[];
   /** Quick lookup table uuid → chain_node for approval cross-references. */
   approvalChainLookup: Record<string, { chainId: string; node: ChainNode }>;
-  /** Snapshot-level counters for the new tabs. */
+  /** Snapshot-level counters from the new tabs. */
   blockedCount: number;
   chainCount: number;
   approvalCount: number;
+  /**
+   * Actionable blocked issues — status='blocked' AND nothing in their
+   * chain blocks them. The user's "Blocks" surface (what's actually
+   * stuck and needs action, vs the merge queue which shows in_review).
+   */
+  actionableBlocks: ActionableBlock[];
+  /** Count for the actionable_blocks field. */
+  actionableBlockCount: number;
 };
 
 /**
@@ -310,4 +321,35 @@ export type ApprovalRequest = {
    * the issue isn't part of a chain or the chain has no downstream issues.
    */
   unblocksCount: number;
+};
+
+/**
+ * An actionable blocked issue — a status='blocked' issue that is a leaf
+ * of its dependency chain (i.e. nothing blocks it within the chain).
+ * Resolving this issue releases the most downstream work in the chain.
+ *
+ * The user's data model:
+ *   - "Blocks" tab = this list (what's actually stuck and needs action)
+ *   - "Blocked Chain" tab = the full dependency graph (the context)
+ *   - "Awaiting Approval" tab = the approvals causing these blocks
+ */
+export type ActionableBlock = {
+  uuid: string;
+  identifier: string | null;
+  title: string;
+  status: string;
+  priority: string | null;
+  labels: string[];
+  /** Distance from the nearest leaf in the chain (0 = leaf). */
+  depth: number;
+  /** Always true for items in this list. */
+  isLeaf: boolean;
+  /** The chain this block belongs to. */
+  chainId: string;
+  /** Direct blockers (uuids) inside the same chain. */
+  blockedBy: string[];
+  /** Direct downstream issues (uuids) inside the same chain. */
+  blocks: string[];
+  /** Total transitive downstream issues this block unblocks if resolved. */
+  downstreamCount: number;
 };

@@ -485,6 +485,8 @@ const plugin = definePlugin({
         blockedCount: latest?.blockedCount ?? 0,
         chainCount: latest?.chainCount ?? 0,
         approvalCount: latest?.approvalCount ?? 0,
+        actionableBlocks: latest?.actionableBlocks ?? [],
+        actionableBlockCount: latest?.actionableBlockCount ?? 0,
       };
     });
 
@@ -981,9 +983,11 @@ async function executeScan(
   record.totals = parsed.totals;
   record.blockedChains = parsed.blockedChains;
   record.approvalRequests = parsed.approvalRequests;
+  record.actionableBlocks = parsed.actionableBlocks;
   record.blockedCount = parsed.blockedCount;
   record.chainCount = parsed.chainCount;
   record.approvalCount = parsed.approvalCount;
+  record.actionableBlockCount = parsed.actionableBlockCount;
 
   // Final write directly (NOT via persistPartial, which would build a
   // fresh object and drop the blocks/totals we just attached).

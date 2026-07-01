@@ -10,6 +10,7 @@
  * tweak to the script's format doesn't break the dashboard outright.
  */
 import type {
+  ActionableBlock,
   ApprovalRequest,
   BlockedChain,
   ChainNode,
@@ -100,10 +101,13 @@ export interface ParseResult {
   blockedChains?: BlockedChain[];
   /** Pending board-approval requests (from the script's --json output). */
   approvalRequests?: ApprovalRequest[];
+  /** Actionable blocked issues — status=blocked leaves of chains. */
+  actionableBlocks?: ActionableBlock[];
   /** Snapshot-level counters from the script. */
   blockedCount?: number;
   chainCount?: number;
   approvalCount?: number;
+  actionableBlockCount?: number;
 }
 
 export function parseMergeQueueOutput(stdout: string): ParseResult {
@@ -574,14 +578,37 @@ function tryParseJsonOutput(stdout: string): ParseResult | null {
     noPrOrSha: 0,
   };
 
+  // Actionable blocked issues (status=blocked leaves of chains).
+  const actionableBlocks: ActionableBlock[] = [];
+  if (Array.isArray(obj["actionable_blocks"])) {
+    for (const ab of obj["actionable_blocks"] as Array<Record<string, unknown>>) {
+      actionableBlocks.push({
+        uuid: (ab["uuid"] as string) ?? "",
+        identifier: (ab["identifier"] as string | null) ?? null,
+        title: (ab["title"] as string) ?? "(no title)",
+        status: (ab["status"] as string) ?? "blocked",
+        priority: (ab["priority"] as string | null) ?? null,
+        labels: Array.isArray(ab["labels"]) ? (ab["labels"] as string[]) : [],
+        depth: typeof ab["depth"] === "number" ? (ab["depth"] as number) : 0,
+        isLeaf: Boolean(ab["is_leaf"]),
+        chainId: (ab["chain_id"] as string) ?? "",
+        blockedBy: Array.isArray(ab["blocked_by"]) ? (ab["blocked_by"] as string[]) : [],
+        blocks: Array.isArray(ab["blocks"]) ? (ab["blocks"] as string[]) : [],
+        downstreamCount: typeof ab["downstream_count"] === "number" ? (ab["downstream_count"] as number) : 0,
+      });
+    }
+  }
+
   return {
     blocks,
     totals,
     blockedChains,
     approvalRequests,
+    actionableBlocks,
     blockedCount: typeof obj["blocked_count"] === "number" ? (obj["blocked_count"] as number) : 0,
     chainCount: typeof obj["chain_count"] === "number" ? (obj["chain_count"] as number) : 0,
     approvalCount: typeof obj["approval_count"] === "number" ? (obj["approval_count"] as number) : 0,
+    actionableBlockCount: typeof obj["actionable_block_count"] === "number" ? (obj["actionable_block_count"] as number) : 0,
   };
 }
 
