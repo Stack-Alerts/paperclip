@@ -13,19 +13,19 @@
 [data-theme="dark"] {
   /* ── Core tokens ─────────────────────────────────────── */
   --core-bg-app:         #04060D;
-  --core-bg-shell:       #07090F;
+  --core-bg-shell:       #070F1E;
   --core-bg-elevated:    #0E1828;
   --core-surface-panel:  #0C1220;
   --core-surface-card:   #111C2E;
-  --core-border-subtle:  #1B2840;
+  --core-border-subtle:  #42567A54;
   --core-text-primary:   #C0D6E8;
   --core-text-secondary: #8AAEC8;
   --core-text-muted:     #4E6481;
   --core-accent-blue:    #3B9EFF;
   --core-accent-cyan:    #2BE8F2;
   --core-accent-teal:    #1CC7D8;
-  --core-danger:         #C4515A;
-  --core-success:        #19C37D;
+  --core-danger:         #E25D68;
+  --core-success:        #039558;
   --core-warning:        #D6A756;
 
   /* ── Semantic surface / shell ────────────────────────── */
@@ -35,7 +35,7 @@
   --topbar-bg:           var(--core-bg-shell);
   --surface-panel:       var(--core-surface-panel);
   --surface-card:        var(--core-surface-card);
-  --surface-hover:       var(--core-bg-elevated);
+  --surface-hover:       #172D4F;
   --surface-selected:    var(--core-surface-panel);
 
   /* ── Additional semantic aliases ────────────────────── */
@@ -46,13 +46,13 @@
   --bg-panel-raised:     var(--core-surface-card);
   --bg-input:            var(--core-bg-elevated);
   --bg-header:           var(--core-bg-shell);
-  --text-placeholder:    var(--core-text-muted);
+  --text-placeholder:    #344D6E;
   --text-disabled:       color-mix(in srgb, var(--core-text-muted) 60%, transparent);
   --color-bullish:       var(--core-success);
   --color-bearish:       var(--core-danger);
   --color-warning:       var(--core-warning);
   --border-default:      #1B2840;
-  --border-strong:       #253550;
+  --border-strong:       #17428A;
 
   /* ── Semantic borders ────────────────────────────────── */
   --border:              var(--core-border-subtle);
@@ -141,7 +141,7 @@
   /* ── Sidebar semantic ────────────────────────────────── */
   --sidebar-item-default:      var(--core-text-secondary);
   --sidebar-item-hover:        var(--core-text-primary);
-  --sidebar-item-active-bg:    var(--core-surface-panel);
+  --sidebar-item-active-bg:    #0F1A31;
   --sidebar-item-active-border: var(--core-accent-blue);
 
   /* ── Toolbar controls ────────────────────────────────── */
@@ -343,10 +343,55 @@ body {
   }
 }
 
+/* Permanent fix for all updated elements including the select dropdown */
+input.rounded.border.text-xs,
+select.rounded.border.text-xs,
+button.rounded.border.text-xs {
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Update all building block borders */
+.rounded-md.border.mb-1\.5.transition-all.duration-300 {
+  border-color: rgba(26, 59, 120, 0.33) !important;
+}
+
+/* Inputs, Selects, and Buttons */
+input.rounded.border.text-xs,
+select.rounded.border.text-xs,
+button.rounded.border.text-xs {
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Building Blocks */
+.rounded-md.border.mb-1\.5.transition-all.duration-300 {
+  border-color: rgba(26, 59, 120, 0.33) !important;
+}
+
+/* Add as Entry/AND (Green) */
+button[data-testid$="-add"]:not([data-testid$="-add-or"]):not([data-testid$="-add-exit"]) {
+  background-color: rgb(5, 29, 22) !important;
+  color: rgb(3, 149, 88) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Add as Filter/OR (Blue) */
+button[data-testid$="-add-or"] {
+  background-color: rgb(7, 24, 48) !important;
+  color: rgb(59, 158, 255) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Add as Exit (Red) */
+button[data-testid$="-add-exit"] {
+  background-color: rgb(43, 13, 18) !important;
+  color: rgb(226, 93, 104) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
 /* ─── Scrollbars ─────────────────────────────────────────────────────────── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: #203252 transparent;
 }
 
 *::-webkit-scrollbar {
