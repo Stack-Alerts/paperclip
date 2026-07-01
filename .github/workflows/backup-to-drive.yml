@@ -25,6 +25,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4.3.1
 
+      - name: Ensure rclone (deterministic, pinned)
+        run: |
+          bash deploy/backup/ensure-rclone.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Run backup health check
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.skip_health_check != 'true'
         run: |

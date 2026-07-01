@@ -16,8 +16,15 @@ echo "========================================"
 echo ""
 
 if ! command -v rclone &>/dev/null; then
-    echo "rclone not found. Install it first:"
-    echo "  sudo apt update && sudo apt install rclone"
+    echo "rclone not found; running ensure-rclone.sh to install pinned version..."
+    SCRIPT_DIR_BOOTSTRAP="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+    if bash "${SCRIPT_DIR_BOOTSTRAP}/ensure-rclone.sh"; then
+        export PATH="${HOME}/.local/bin:${PATH}"
+    fi
+fi
+if ! command -v rclone &>/dev/null; then
+    echo "ERROR: rclone still not found after ensure-rclone.sh attempt."
+    echo "See docs/BACKUP.md for manual install instructions."
     exit 1
 fi
 

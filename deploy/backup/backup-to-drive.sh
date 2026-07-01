@@ -48,8 +48,14 @@ DEADMAN_STATE_FILE="$HOME/.paperclip/backup_deadman_switch_state.json"
 echo "--- Pre-flight: OAuth health check ---"
 
 if ! command -v rclone &>/dev/null; then
-    echo "ERROR: rclone is not installed."
-    echo "Fix: sudo apt update && sudo apt install rclone"
+    echo "  rclone not found on PATH; running ensure-rclone.sh..."
+    if bash "${SCRIPT_DIR}/ensure-rclone.sh"; then
+        export PATH="${HOME}/.local/bin:${PATH}"
+    fi
+fi
+if ! command -v rclone &>/dev/null; then
+    echo "ERROR: rclone is still not installed after ensure-rclone.sh attempt."
+    echo "Runbook: docs/BACKUP.md (section 'rclone install')."
     _update_deadman_on_auth_fail "rclone_missing"
     exit 1
 fi
