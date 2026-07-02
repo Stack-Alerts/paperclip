@@ -95,11 +95,33 @@ def test_smoke_catches_5xx_endpoint():
     with TestClient(broken, raise_server_exceptions=False) as client:
         resp = client.post("/strategies/seed/backtest", json={})
     allow = {200, 400, 404, 422, 503}
-    in_allow = resp.status_code in allow
-    is_5xx = 500 <= resp.status_code < 600
-    ok = in_allow and not is_5xx
     assert resp.status_code == 500
-    assert ok is False, "smoke classifier let a 5xx pass — regression not caught"
+    # 500 is NOT allow-listed, so it must fail via the runner's own classifier.
+    assert cgs._endpoint_ok(resp.status_code, allow) is False, (
+        "smoke classifier let an un-allow-listed 5xx pass — regression not caught"
+    )
+
+
+def test_allowlisted_503_passes():
+    """BTCAAAAA-38714: a 503 that is explicitly allow-listed must PASS.
+
+    The strategy canary endpoints allow-list 503 (dependency-not-ready is a
+    tolerated transient). A prior `in_allow and not is_5xx` guard overrode the
+    allow list and turned those tolerated 503s into false closure-gate reopens
+    (observed twice on BTCAAAAA-7290). The allow list is authoritative.
+    """
+    import sys
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    import closure_gate_smoke as cgs
+
+    allow = {200, 400, 404, 422, 503}
+    # Deliberately allow-listed 503 passes.
+    assert cgs._endpoint_ok(503, allow) is True
+    # Un-allow-listed 5xx still fails.
+    assert cgs._endpoint_ok(500, allow) is False
+    assert cgs._endpoint_ok(502, {200, 404}) is False
+    # Ordinary allow-listed non-5xx still passes.
+    assert cgs._endpoint_ok(404, allow) is True
 
 
 @pytest.mark.skipif(

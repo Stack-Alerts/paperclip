@@ -44,6 +44,19 @@ def _load_endpoints(path: Path) -> dict[str, Any]:
         return json.load(fh)
 
 
+def _endpoint_ok(status_code: int, allow: set[int]) -> bool:
+    """Return True iff the response status is in the per-endpoint allow list.
+
+    The allow list is authoritative. A 5xx that is *deliberately* allow-listed
+    (e.g. 503 dependency-not-ready on the strategy canaries — a tolerated
+    transient) passes; any status not in the allow list, including an
+    un-allow-listed 5xx crash, fails. (BTCAAAAA-38714: a prior
+    `in_allow and not is_5xx` guard overrode the allow list and turned tolerated
+    503s into false closure-gate reopens.)
+    """
+    return status_code in allow
+
+
 def _stub_auth(app: Any) -> None:
     """Bypass JWT auth for the in-process TestClient.
 
@@ -118,7 +131,7 @@ def _smoke_in_process(endpoints_doc: dict[str, Any]) -> dict[str, Any]:
                 status_code = resp.status_code
                 in_allow = status_code in allow
                 is_5xx = 500 <= status_code < 600
-                ok = in_allow and not is_5xx
+                ok = _endpoint_ok(status_code, allow)
                 snippet = ""
                 try:
                     snippet = resp.text[:300]
@@ -131,6 +144,7 @@ def _smoke_in_process(endpoints_doc: dict[str, Any]) -> dict[str, Any]:
                     "status": status_code,
                     "ok": ok,
                     "in_allow_list": in_allow,
+                    "is_5xx": is_5xx,
                     "snippet": snippet,
                 })
                 if not ok:
