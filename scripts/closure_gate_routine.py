@@ -1769,6 +1769,31 @@ def main(argv: list[str] | None = None) -> None:
         deferral_flags=deferral_flags,
         window_hours=hours,
     )
+
+    # BTCAAAAA-36131: a fully-clean report has nothing actionable, and posting
+    # it as a comment on the tracking issue reopens it (any comment on a `done`
+    # issue flips it back to in_progress), spawning a heartbeat that just
+    # re-closes it — an endless ~40-min noise loop. Suppress the comment when
+    # the report is clean AND the tracking issue is already `done`. The routine
+    # still runs on its schedule (the real liveness path) and still saves its
+    # watermark below; it re-posts the moment anything is actionable.
+    if not report_is_actionable(stats, deferral_flags):
+        tracking_issue = fetch_issue_by_identifier(TRACKING_ISSUE)
+        if tracking_issue and tracking_issue.get("status") == "done":
+            logger.info(
+                "Clean report and tracking issue %s already done; "
+                "suppressing report comment to avoid reopen loop",
+                TRACKING_ISSUE,
+            )
+            if current_main_sha:
+                save_watermark(
+                    main_sha=current_main_sha,
+                    done_issue_ids=done_ids_in_window,
+                    routine_origin_id=os.environ.get("PAPERCLIP_ROUTINE_ORIGIN_ID"),
+                    issue_id=os.environ.get("PAPERCLIP_TASK_ID"),
+                )
+            return
+
     if post_comment(TRACKING_ISSUE, report):
         logger.info(
             "Closure-gate routine completed successfully (deferral_flags=%d)",
@@ -1884,6 +1909,27 @@ def format_routine_report(
         ])
 
     return "\n".join(lines)
+
+
+def report_is_actionable(
+    stats: dict[str, int], deferral_flags: list[dict[str, Any]]
+) -> bool:
+    """True when a routine report contains something a human must act on.
+
+    BTCAAAAA-36131: a non-actionable (fully clean) report must not be posted as
+    a comment on an already-`done` tracking issue, because the comment reopens
+    it and spawns a re-close heartbeat loop. Any positive signal below makes the
+    report worth posting (which legitimately reopens the tracking issue).
+    """
+    return (
+        stats.get("reopened", 0) > 0
+        or stats.get("requested_sha", 0) > 0
+        or stats.get("flagged_fabrication", 0) > 0
+        or stats.get("smoke_failed", 0) > 0
+        or stats.get("no_sha_missing_evidence", 0) > 0
+        or stats.get("errors", 0) > 0
+        or bool(deferral_flags)
+    )
 
 
 def post_comment(issue_id: str, body: str) -> bool:

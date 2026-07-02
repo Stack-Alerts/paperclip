@@ -19,9 +19,49 @@ from closure_gate_routine import (
     followup_links_to_source,
     format_routine_report,
     process_issue,
+    report_is_actionable,
     split_paragraphs,
     verify_sha_on_main,
 )
+
+
+class TestReportIsActionable:
+    """BTCAAAAA-36131: clean reports must not reopen the done tracking issue."""
+
+    def _clean_stats(self):
+        return {
+            "reopened": 0,
+            "requested_sha": 0,
+            "flagged_fabrication": 0,
+            "smoke_failed": 0,
+            "no_sha_missing_evidence": 0,
+            "errors": 0,
+            "verified": 2,
+        }
+
+    def test_fully_clean_report_not_actionable(self):
+        assert report_is_actionable(self._clean_stats(), []) is False
+
+    def test_deferral_flags_make_actionable(self):
+        assert report_is_actionable(self._clean_stats(), [{"reason": "no_refs"}]) is True
+
+    def test_errors_make_actionable(self):
+        stats = self._clean_stats()
+        stats["errors"] = 1
+        assert report_is_actionable(stats, []) is True
+
+    def test_reopened_makes_actionable(self):
+        stats = self._clean_stats()
+        stats["reopened"] = 1
+        assert report_is_actionable(stats, []) is True
+
+    def test_requested_sha_makes_actionable(self):
+        stats = self._clean_stats()
+        stats["requested_sha"] = 1
+        assert report_is_actionable(stats, []) is True
+
+    def test_missing_keys_default_to_not_actionable(self):
+        assert report_is_actionable({}, []) is False
 
 
 class TestExtractFixSha:
