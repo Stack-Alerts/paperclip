@@ -749,11 +749,9 @@ const STATUS_IDLE_LINES: string[] = [
 function StatusColumn({
   logs,
   isRunning,
-  headerRight,
 }: {
   logs: BacktestStatusMessage[];
   isRunning: boolean;
-  headerRight?: React.ReactNode;
 }) {
   const fontSizes = useFontSizes();
   const showIdle = logs.length === 0 && !isRunning;
@@ -770,7 +768,6 @@ function StatusColumn({
         >
           Status
         </div>
-        {headerRight}
       </div>
       <div
         className="font-mono leading-tight space-y-0 overflow-y-auto flex-1 min-h-0"
@@ -828,8 +825,6 @@ function ConfigTab({
   disabled,
   outputLogs,
   isRunning,
-  fontScale,
-  onFontScaleChange,
   lookbackDays,
   setLookbackDays,
   trainingDays,
@@ -880,8 +875,6 @@ function ConfigTab({
   disabled: boolean;
   outputLogs: BacktestStatusMessage[];
   isRunning: boolean;
-  fontScale: FontScale;
-  onFontScaleChange: (next: FontScale) => void;
   lookbackDays: ChipValue;
   setLookbackDays: (v: ChipValue) => void;
   trainingDays: ChipValue;
@@ -1553,9 +1546,6 @@ function ConfigTab({
           <StatusColumn
             logs={outputLogs}
             isRunning={isRunning}
-            headerRight={
-              <FontScalePicker scale={fontScale} onChange={onFontScaleChange} />
-            }
           />
         </div>
         {/* Right: 4-column results dashboard (BTCAAAAA-38676 rev2) */}
@@ -2496,30 +2486,35 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
               </button>
             );
           })}
-          {/* BTCAAAAA-37771 — Realtime applied-changes indicator lives on the
-              tab bar row (board mockup 7aff6a2e), shown only on the AI tab. */}
-          {activeTab === 'ai' && (
-            <div
-              data-testid="ai-recs-realtime"
-              className="flex items-center gap-1.5 ml-auto pr-2 text-[11px] whitespace-nowrap self-center"
-              style={{
-                color: 'var(--text-muted)',
-                fontFamily: 'var(--font-mono, monospace)',
-              }}
-              title="Number of recommendations currently applied to the strategy."
-            >
-              <span
-                aria-hidden="true"
-                className="inline-block w-1.5 h-1.5 rounded-full"
-                style={{ background: 'var(--accent-green)' }}
-              />
-              <span>Realtime</span>
-              <span style={{ color: 'var(--text-faint)' }} aria-hidden="true">·</span>
-              <span data-testid="ai-recs-realtime-count">
-                {aiAppliedCount} {aiAppliedCount === 1 ? 'change' : 'changes'} applied
-              </span>
-            </div>
-          )}
+          {/* Right-aligned tab-bar controls. BTCAAAAA-38676: the Aa−/Aa+ text
+              size control moved here (right of the tab labels) per board
+              request. The BTCAAAAA-37771 Realtime applied-changes indicator
+              (board mockup 7aff6a2e, AI tab only) sits just left of it. */}
+          <div className="flex items-center gap-3 ml-auto pr-2 self-center">
+            {activeTab === 'ai' && (
+              <div
+                data-testid="ai-recs-realtime"
+                className="flex items-center gap-1.5 text-[11px] whitespace-nowrap"
+                style={{
+                  color: 'var(--text-muted)',
+                  fontFamily: 'var(--font-mono, monospace)',
+                }}
+                title="Number of recommendations currently applied to the strategy."
+              >
+                <span
+                  aria-hidden="true"
+                  className="inline-block w-1.5 h-1.5 rounded-full"
+                  style={{ background: 'var(--accent-green)' }}
+                />
+                <span>Realtime</span>
+                <span style={{ color: 'var(--text-faint)' }} aria-hidden="true">·</span>
+                <span data-testid="ai-recs-realtime-count">
+                  {aiAppliedCount} {aiAppliedCount === 1 ? 'change' : 'changes'} applied
+                </span>
+              </div>
+            )}
+            <FontScalePicker scale={fontScale} onChange={updateFontScale} />
+          </div>
         </div>
 
         {/* ── Tab content ── */}
@@ -2539,8 +2534,6 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
               disabled={backTestInProgress}
               outputLogs={outputLogs}
               isRunning={backTestInProgress}
-              fontScale={fontScale}
-              onFontScaleChange={updateFontScale}
               lookbackDays={lookbackDays}
               setLookbackDays={setLookbackDays}
               trainingDays={trainingDays}
