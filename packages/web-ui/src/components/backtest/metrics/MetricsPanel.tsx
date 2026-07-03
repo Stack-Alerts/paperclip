@@ -614,7 +614,7 @@ function RecentRunsSection({
   return (
     <>
       <SectionHeader title="Recent Runs" subtitle="Equity curves from the last 3 runs — apply any run's configuration" />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="flex flex-col gap-2">
         {records.map(record => {
           const r = record.result;
           const equityVals = resolveEquityCurve(r, r.trades ?? []).map(p => p.value);
@@ -625,10 +625,11 @@ function RecentRunsSection({
           return (
             <div
               key={record.runId}
-              className="rounded p-3 flex flex-col gap-2"
+              className="rounded px-3 flex items-center gap-3 h-16"
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
             >
-              <div className="min-w-0">
+              {/* Run identity — date + strategy name */}
+              <div className="min-w-0 w-40 flex-shrink-0">
                 <div className="flex items-center gap-1.5">
                   <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
                     {fmtDateTime(record.savedAt)}
@@ -640,28 +641,32 @@ function RecentRunsSection({
                   )}
                 </div>
                 <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-faint)' }}>{record.strategyName}</p>
-                <div className="flex items-center justify-between gap-2 mt-1">
-                  <span className="text-lg font-bold tabular-nums leading-none" style={{ color: accent }}>
-                    {r.returnPercentage >= 0 ? '+' : ''}{r.returnPercentage.toFixed(2)}%
-                  </span>
-                  <div className="flex flex-col items-end leading-tight text-[10px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
-                    <span>WR {(r.winRate * 100).toFixed(0)}%</span>
-                    <span>{r.totalTrades} tr</span>
-                    <span>DD {(r.maxDrawdown * 100).toFixed(1)}%</span>
-                  </div>
-                </div>
               </div>
-              <div className="min-w-0">
+              {/* Return % */}
+              <div className="w-20 flex-shrink-0 text-right">
+                <span className="text-base font-bold tabular-nums leading-none" style={{ color: accent }}>
+                  {r.returnPercentage >= 0 ? '+' : ''}{r.returnPercentage.toFixed(2)}%
+                </span>
+              </div>
+              {/* Equity sparkline — flexes to fill the row without growing its height */}
+              <div className="flex-1 min-w-0 h-10 flex items-center">
                 {equityVals.length >= 2 ? (
-                  <Sparkline values={equityVals} color={accent} fillBelow height={56} />
+                  <Sparkline values={equityVals} color={accent} fillBelow height={40} />
                 ) : (
                   <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>No equity curve captured</p>
                 )}
               </div>
+              {/* Stats */}
+              <div className="flex flex-col items-end leading-tight text-[10px] tabular-nums flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                <span>WR {(r.winRate * 100).toFixed(0)}%</span>
+                <span>{r.totalTrades} tr</span>
+                <span>DD {(r.maxDrawdown * 100).toFixed(1)}%</span>
+              </div>
+              {/* Apply — inline so it never changes the row height */}
               {onApplyConfig && record.fullConfig && (
                 <button
                   onClick={() => onApplyConfig(record)}
-                  className="flex items-center justify-center gap-1 text-[11px] px-2 py-1 rounded w-full"
+                  className="flex items-center justify-center gap-1 text-[11px] px-2.5 py-1 rounded flex-shrink-0"
                   title="Apply this run's configuration to the Config tab"
                   style={{ color: 'var(--accent-blue)', border: '1px solid rgba(46,140,255,0.35)', background: 'rgba(46,140,255,0.08)' }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(46,140,255,0.18)')}

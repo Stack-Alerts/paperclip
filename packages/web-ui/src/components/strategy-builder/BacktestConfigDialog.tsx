@@ -47,13 +47,13 @@ export interface BacktestConfigDialogProps {
 
 type TabKey = 'config' | 'output' | 'trades' | 'metrics' | 'ai' | 'compare';
 
-// Tab order mirrors thickclient: Config / Live Output / Trades / AI Recommendations / Metrics / Compare
+// Tab order: Config / Live Output / Trades / Metrics / AI Recommendations / Compare
 const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
   { key: 'config', label: 'Config', icon: <Settings size={14} /> },
   { key: 'output', label: 'Live Output', icon: <Terminal size={14} /> },
   { key: 'trades', label: 'Trades', icon: <TrendingUp size={14} /> },
-  { key: 'ai', label: 'AI Recommendations', icon: <Sparkles size={14} /> },
   { key: 'metrics', label: 'Metrics', icon: <BarChart3 size={14} /> },
+  { key: 'ai', label: 'AI Recommendations', icon: <Sparkles size={14} /> },
   { key: 'compare', label: 'Compare', icon: <GitCompare size={14} /> },
 ];
 
