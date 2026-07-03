@@ -32,6 +32,8 @@ import {
   TT_LONG_WIN_RATE, TT_SHORT_WIN_RATE,
   TT_MAX_DRAWDOWN_USD, TT_PEAK_CAPITAL, TT_RECOVERY_FACTOR,
   TT_LONGEST_DRAWDOWN, TT_LIQUIDATION_BUFFER,
+  TT_EQUITY_CURVE, TT_DRAWDOWN_CURVE, TT_UNDERWATER_DRAWDOWN, TT_CAPITAL_DRAWDOWN,
+  TT_RECENT_RUN_RETURN, TT_RECENT_RUN_WR, TT_RECENT_RUN_TRADES, TT_RECENT_RUN_DD,
 } from './MetricsPanelTooltips';
 
 // TT_ADDITIONAL_METRICS is the umbrella tooltip for the expandable section
@@ -646,9 +648,11 @@ function RecentRunsSection({
               </div>
               {/* Return % */}
               <div className="w-20 flex-shrink-0 text-right">
-                <span className="text-base font-bold tabular-nums leading-none" style={{ color: accent }}>
-                  {r.returnPercentage >= 0 ? '+' : ''}{r.returnPercentage.toFixed(2)}%
-                </span>
+                <RichTooltip content={TT_RECENT_RUN_RETURN}>
+                  <span className="text-base font-bold tabular-nums leading-none cursor-help" style={{ color: accent }}>
+                    {r.returnPercentage >= 0 ? '+' : ''}{r.returnPercentage.toFixed(2)}%
+                  </span>
+                </RichTooltip>
               </div>
               {/* Equity sparkline — flexes to fill the row without growing its height */}
               <div className="flex-1 min-w-0 h-10 flex items-center">
@@ -660,9 +664,15 @@ function RecentRunsSection({
               </div>
               {/* Stats — pinned to the top-right corner of the card */}
               <div className="self-start flex flex-col items-end leading-tight text-[10px] tabular-nums flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
-                <span>WR {(r.winRate * 100).toFixed(0)}%</span>
-                <span>{r.totalTrades} tr</span>
-                <span>DD {(r.maxDrawdown * 100).toFixed(1)}%</span>
+                <RichTooltip content={TT_RECENT_RUN_WR}>
+                  <span className="cursor-help">WR {(r.winRate * 100).toFixed(0)}%</span>
+                </RichTooltip>
+                <RichTooltip content={TT_RECENT_RUN_TRADES}>
+                  <span className="cursor-help">{r.totalTrades} tr</span>
+                </RichTooltip>
+                <RichTooltip content={TT_RECENT_RUN_DD}>
+                  <span className="cursor-help">DD {(r.maxDrawdown * 100).toFixed(1)}%</span>
+                </RichTooltip>
               </div>
               {/* Apply — inline so it never changes the row height */}
               {onApplyConfig && record.fullConfig && (
@@ -1204,7 +1214,9 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div className="rounded p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
               <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Equity Curve</p>
+                <RichTooltip content={TT_EQUITY_CURVE}>
+                  <p className="text-xs font-medium cursor-help" style={{ color: 'var(--text-muted)' }}>Equity Curve</p>
+                </RichTooltip>
                 <p className="text-xs font-semibold" style={{ color: result.finalCapital >= result.initialCapital ? 'var(--accent-green)' : 'var(--accent-red)', fontVariantNumeric: 'tabular-nums' }}>
                   ${result.finalCapital.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
@@ -1230,7 +1242,9 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
             </div>
             <div className="rounded p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
               <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Drawdown</p>
+                <RichTooltip content={TT_DRAWDOWN_CURVE}>
+                  <p className="text-xs font-medium cursor-help" style={{ color: 'var(--text-muted)' }}>Drawdown</p>
+                </RichTooltip>
                 <p className="text-xs font-semibold" style={{ color: 'var(--accent-orange)', fontVariantNumeric: 'tabular-nums' }}>
                   {drawdownPcts.length > 0 ? `${Math.min(...drawdownPcts).toFixed(2)}%` : '—'}
                 </p>
@@ -1248,7 +1262,9 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div className="rounded p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
               <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Underwater Drawdown %</p>
+                <RichTooltip content={TT_UNDERWATER_DRAWDOWN}>
+                  <p className="text-xs font-medium cursor-help" style={{ color: 'var(--text-muted)' }}>Underwater Drawdown %</p>
+                </RichTooltip>
                 <p className="text-xs font-semibold" style={{ color: 'var(--accent-orange)', fontVariantNumeric: 'tabular-nums' }}>
                   {maxDDpctVal.toFixed(2)}%
                 </p>
@@ -1258,7 +1274,9 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
             </div>
             <div className="rounded p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
               <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Capital Drawdown $</p>
+                <RichTooltip content={TT_CAPITAL_DRAWDOWN}>
+                  <p className="text-xs font-medium cursor-help" style={{ color: 'var(--text-muted)' }}>Capital Drawdown $</p>
+                </RichTooltip>
                 <p className="text-xs font-semibold" style={{ color: 'var(--accent-red)', fontVariantNumeric: 'tabular-nums' }}>
                   ${maxDDDollarVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>

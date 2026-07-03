@@ -1208,3 +1208,88 @@ export const TT_LIQUIDATION_BUFFER: TooltipContent = {
     { items: ['⚠️ Live wicks and funding can exceed backtest drawdown — treat a thin buffer as unsafe.'] },
   ],
 };
+
+// ── Performance & Draw-Down graphs (BTCAAAAA-38738) ───────────────────────────
+
+export const TT_EQUITY_CURVE: TooltipContent = {
+  title: 'Equity Curve',
+  body: 'Running account balance across the backtest, seeded at Initial Capital and stepped by each trade\'s realised P&L. The shape — not just the endpoint — reveals how the strategy earned its return.',
+  sections: [
+    {
+      header: 'How to read it:',
+      items: [
+        'Smooth, steady rise: consistent edge — the ideal profile',
+        'Steep jumps then flat: profit concentrated in a few trades — robustness risk',
+        'Deep dips before new highs: large drawdowns — cross-check the Drawdown graph',
+      ],
+    },
+    { items: ['⚠️ A rising in-sample curve is not proof of edge — confirm on out-of-sample data.'] },
+  ],
+};
+
+export const TT_DRAWDOWN_CURVE: TooltipContent = {
+  title: 'Drawdown (%)',
+  body: 'Percentage the equity sits below its running peak at each point in the run. Always ≤ 0; the lowest point is the Maximum Drawdown. Shows both the depth of losses and how long capital stayed underwater.',
+  sections: [
+    {
+      header: 'How to read it:',
+      items: [
+        'Shallow, brief dips: strategy recovers quickly — healthy',
+        'One deep trough: a single adverse regime — size positions to survive it',
+        'Long flat-bottom stretches: prolonged impairment — painful to hold live',
+      ],
+    },
+  ],
+};
+
+export const TT_UNDERWATER_DRAWDOWN: TooltipContent = {
+  title: 'Underwater Drawdown (%)',
+  body: 'Percent below the running equity peak at each point in the run. The "underwater" view flips the equity curve to focus purely on pain: every point below zero is unrecovered loss relative to the prior high-water mark.',
+  sections: [
+    {
+      header: 'How to read it:',
+      items: [
+        'Back to 0%: a new equity high was made — the drawdown fully recovered',
+        'Sustained below 0%: capital is still impaired — recovery pending',
+        'The minimum equals Maximum Drawdown % — the worst historical loss',
+      ],
+    },
+  ],
+};
+
+export const TT_CAPITAL_DRAWDOWN: TooltipContent = {
+  title: 'Capital Drawdown ($)',
+  body: 'Dollar capital lost from the running peak at each point — the raw damage to the account balance. Unlike the percentage view, this exposes the absolute dollars at risk, which drives real position-sizing and margin decisions.',
+  sections: [
+    {
+      header: 'How to read it:',
+      items: [
+        'The trough is the largest dollar drop the account endured',
+        'Compare to Initial Capital — a large dollar drawdown on small capital is severe',
+        'Use with Liquidation Buffer to gauge survival under leverage',
+      ],
+    },
+  ],
+};
+
+// ── Recent Runs card stats (BTCAAAAA-38738) ───────────────────────────────────
+
+export const TT_RECENT_RUN_RETURN: TooltipContent = {
+  title: 'Run Return (%)',
+  body: 'Total percentage return of this saved run over its full backtest period. Lets you compare the outcomes of recent configurations at a glance before re-applying one.',
+};
+
+export const TT_RECENT_RUN_WR: TooltipContent = {
+  title: 'Win Rate — this run',
+  body: 'Percentage of closed trades that ended in profit for this saved run. Interpret alongside the run\'s trade count and drawdown — a high win rate on very few trades is not yet statistically meaningful.',
+};
+
+export const TT_RECENT_RUN_TRADES: TooltipContent = {
+  title: 'Total Trades — this run',
+  body: 'Number of closed trades this saved run produced. Higher counts make the run\'s win rate and drawdown statistically more reliable; under ~30 trades the stats are noise.',
+};
+
+export const TT_RECENT_RUN_DD: TooltipContent = {
+  title: 'Max Drawdown — this run',
+  body: 'Largest peak-to-trough equity decline for this saved run, as a percent of the peak. Weigh each run\'s worst-case pain against its return before applying its configuration.',
+};
