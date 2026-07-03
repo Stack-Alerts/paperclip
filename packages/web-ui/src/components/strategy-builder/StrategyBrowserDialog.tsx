@@ -26,6 +26,18 @@ const STATUS_STYLES: Record<StrategyStatus, CSSProperties> = {
   active:     { color: 'var(--accent-teal)',  background: 'var(--accent-teal-dark)',   borderColor: 'var(--accent-teal-mid)' },
 };
 
+// BTCAAAAA-38723: the VALIDATION column pill must be keyed off the *validation*
+// result (Pass/Fail/Un-Validated), not the strategy's lifecycle `status`.
+// Keying the color off `status` made a strategy showing "Pass" render with a
+// blue/teal/muted pill whenever its lifecycle was backtested/active/draft — so
+// identical "Pass" labels appeared in different colors down the column.
+type ValidationStatus = 'Pass' | 'Fail' | 'Un-Validated';
+const VALIDATION_STATUS_STYLES: Record<ValidationStatus, CSSProperties> = {
+  Pass:           STATUS_STYLES.valid,
+  Fail:           STATUS_STYLES.invalid,
+  'Un-Validated': STATUS_STYLES.draft,
+};
+
 // Splitter persistence: 5-row default + localStorage restore (BTCAAAAA-29359).
 const SPLIT_STORAGE_KEY = 'strategyBrowser.splitPct.v1';
 const SPLIT_MIN_PCT = 25;
@@ -1109,7 +1121,7 @@ export function StrategyBrowserDialog({
                 filtered.map((strategy, idx) => {
                   const isSelected = strategy.id === selectedId;
                   const sType = strategy.strategyType ?? (strategy.settings as { strategyType?: string }).strategyType;
-                  const valStatus = strategy.validationStatus ??
+                  const valStatus: ValidationStatus = strategy.validationStatus ??
                     (strategy.status === StrategyStatus.VALID ? 'Pass' :
                      strategy.status === StrategyStatus.INVALID ? 'Fail' : 'Un-Validated');
                   return (
@@ -1163,7 +1175,7 @@ export function StrategyBrowserDialog({
                       </td>
                       <td className="px-3 py-2">
                         <span
-                          style={{ ...STATUS_PILL_BASE, ...(STATUS_STYLES[strategy.status] ?? { color: 'var(--text-muted)' }) }}
+                          style={{ ...STATUS_PILL_BASE, ...(VALIDATION_STATUS_STYLES[valStatus] ?? STATUS_STYLES.draft) }}
                         >
                           {valStatus}
                         </span>
