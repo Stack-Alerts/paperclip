@@ -1335,6 +1335,12 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
         </>
       )}
 
+      {/* Recent Runs: last 3 runs' equity curves, each with Apply. Sits directly
+          above the Risk Metrics / Trade Statistics grid per BTCAAAAA-38724. */}
+      <div className="mb-6">
+        <RecentRunsSection strategyId={strategyId} currentRunId={result.runId} onApplyConfig={onApplyConfig} />
+      </div>
+
       {/* Two side-by-side 3×2 sparkline-card panels (mockup middle rows) */}
       {/* mt-6: the inner SectionHeaders use first:mt-0, so the row spacer above
           the Risk Metrics heading has to live on this wrapper. */}
@@ -1396,12 +1402,6 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
           </div>
         </>
       )}
-
-      {/* Recent Runs: last 3 runs' equity curves, each with Apply. Sits just
-          above the additional-metrics expander per BTCAAAAA-38724. */}
-      <div className="mb-6">
-        <RecentRunsSection strategyId={strategyId} currentRunId={result.runId} onApplyConfig={onApplyConfig} />
-      </div>
 
       {/* Collapsed expander preserves every metric surfaced in v1 */}
       <div className="mt-5">
