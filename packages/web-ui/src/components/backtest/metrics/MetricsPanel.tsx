@@ -1336,8 +1336,10 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
       )}
 
       {/* Recent Runs: last 3 runs' equity curves, each with Apply. Sits directly
-          above the Risk Metrics / Trade Statistics grid per BTCAAAAA-38724. */}
-      <div className="mb-6">
+          above the Risk Metrics / Trade Statistics grid per BTCAAAAA-38724.
+          BTCAAAAA-38734: mt-6 adds a row of space above the heading so it is not
+          flush against the summary metrics rows above it. */}
+      <div className="mt-6 mb-6">
         <RecentRunsSection strategyId={strategyId} currentRunId={result.runId} onApplyConfig={onApplyConfig} />
       </div>
 
