@@ -1167,9 +1167,6 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig }:
         </>
       )}
 
-      {/* Recent Runs: last 3 runs' equity curves stacked, each with Apply */}
-      <RecentRunsSection strategyId={strategyId} currentRunId={result.runId} onApplyConfig={onApplyConfig} />
-
       {/* Two side-by-side 3×2 sparkline-card panels (mockup middle rows) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
@@ -1229,6 +1226,12 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig }:
           </div>
         </>
       )}
+
+      {/* Recent Runs: last 3 runs' equity curves, each with Apply. Sits just
+          above the additional-metrics expander per BTCAAAAA-38724. */}
+      <div className="mb-6">
+        <RecentRunsSection strategyId={strategyId} currentRunId={result.runId} onApplyConfig={onApplyConfig} />
+      </div>
 
       {/* Collapsed expander preserves every metric surfaced in v1 */}
       <div className="mt-5">
