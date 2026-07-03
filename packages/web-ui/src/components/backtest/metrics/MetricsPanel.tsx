@@ -543,7 +543,7 @@ function buildCumulativePnl(trades: Trade[]): number[] {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
-  const [showAdditional, setShowAdditional] = useState(false);
+  const [showAdditional, setShowAdditional] = useState(true);
 
   // All hooks must run unconditionally — compute series for the result we
   // were given (even if null) so the hook order stays stable across renders.
@@ -1137,7 +1137,7 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
           {showAdditional ? 'Hide additional metrics' : 'Show additional metrics'}
         </button>
         {showAdditional && (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 mt-3">
+          <div className="grid grid-cols-5 gap-3 md:grid-cols-5 mt-3">
             {additionalRows.map(r => <MetricCard key={r.label} {...r} />)}
           </div>
         )}
