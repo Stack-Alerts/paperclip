@@ -44,6 +44,10 @@ export interface MetricsPanelProps {
   strategyId?: string;
   /** Apply a past run's configuration back into the Config form. */
   onApplyConfig?: (record: BacktestRunRecord) => void;
+  /** Max leverage used for the run — powers the liquidation-buffer estimate. */
+  leverage?: number;
+  /** Risk per trade (% of capital) — contextualises drawdown vs sizing. */
+  riskPerTradePct?: number;
 }
 
 type Accent = 'green' | 'red' | 'orange' | 'blue' | 'neutral';
@@ -545,6 +549,37 @@ function buildCumulativePnl(trades: Trade[]): number[] {
   return out;
 }
 
+// Reconstruct a running-capital equity curve from the trade ledger. The backend
+// result does not carry an `equityCurve`, so every consumer that reads
+// `result.equityCurve` was rendering blank ("No equity curve captured"). Trades
+// are always persisted with per-trade `pnl`, so we seed at initial capital and
+// accumulate — the first point is the starting balance, then one point per exit.
+function buildEquityCurveFromTrades(
+  trades: Trade[],
+  initialCapital: number,
+): Array<{ timestamp: string; value: number }> {
+  if (!trades.length) return [];
+  const pts: Array<{ timestamp: string; value: number }> = [
+    { timestamp: trades[0].entryTime || trades[0].exitTime || '', value: initialCapital },
+  ];
+  let cap = initialCapital;
+  for (const t of trades) {
+    cap += t.pnl;
+    pts.push({ timestamp: t.exitTime || t.entryTime || '', value: cap });
+  }
+  return pts;
+}
+
+// Prefer the backend curve when present; otherwise reconstruct from trades.
+function resolveEquityCurve(
+  result: { equityCurve?: Array<{ timestamp: string; value: number }>; initialCapital: number },
+  trades: Trade[],
+): Array<{ timestamp: string; value: number }> {
+  const provided = result.equityCurve ?? [];
+  if (provided.length >= 2) return provided;
+  return buildEquityCurveFromTrades(trades, result.initialCapital);
+}
+
 // ── Recent Runs ──────────────────────────────────────────────────────────────
 // Stacks the last three saved runs' equity curves vertically, each with an
 // Apply button that loads that run's configuration back into the Config form.
@@ -582,7 +617,7 @@ function RecentRunsSection({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {records.map(record => {
           const r = record.result;
-          const equityVals = (r.equityCurve ?? []).map(p => p.value);
+          const equityVals = resolveEquityCurve(r, r.trades ?? []).map(p => p.value);
           const profit = r.finalCapital - r.initialCapital;
           const up = profit >= 0;
           const accent = up ? 'var(--accent-green)' : 'var(--accent-red)';
@@ -645,7 +680,7 @@ function RecentRunsSection({
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig }: MetricsPanelProps) {
+export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, leverage, riskPerTradePct }: MetricsPanelProps) {
   const [showAdditional, setShowAdditional] = useState(true);
 
   // All hooks must run unconditionally — compute series for the result we
@@ -692,7 +727,8 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig }:
     : null;
 
   // Equity curve + drawdown series for the Performance sparklines.
-  const equityValues = (result.equityCurve ?? []).map(p => p.value);
+  const equityCurve = resolveEquityCurve(result, allTrades);
+  const equityValues = equityCurve.map(p => p.value);
   let drawdownPcts: number[] = [];
   if (equityValues.length > 0) {
     let peak = equityValues[0];
@@ -704,6 +740,37 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig }:
   const recoveryFactor = (result.maxDrawdown * result.initialCapital) !== 0
     ? (netProfit / Math.abs(result.maxDrawdown * result.initialCapital)).toFixed(2)
     : '—';
+
+  // ── Draw Down analytics ───────────────────────────────────────────────────
+  // Underwater dollar series (value below the running peak) and the run of
+  // consecutive underwater points give the operator a read on both damage
+  // depth and how long capital stayed impaired. Liquidation buffer estimates
+  // how much headroom remains before a leveraged position would be wiped:
+  // a 1/leverage adverse move is a full liquidation, so the buffer is the gap
+  // between that threshold and the worst realised drawdown.
+  const ddDollarSeries: number[] = [];
+  if (equityValues.length > 0) {
+    let peak = equityValues[0];
+    for (const v of equityValues) {
+      if (v > peak) peak = v;
+      ddDollarSeries.push(v - peak);
+    }
+  }
+  const maxDDpctVal = drawdownPcts.length > 0 ? Math.min(...drawdownPcts) : 0;
+  const maxDDDollarVal = ddDollarSeries.length > 0 ? Math.min(...ddDollarSeries) : 0;
+  const peakCapital = equityValues.length > 0 ? Math.max(...equityValues) : result.initialCapital;
+  let longestDDRun = 0;
+  {
+    let run = 0;
+    for (const d of drawdownPcts) {
+      if (d < 0) { run += 1; longestDDRun = Math.max(longestDDRun, run); }
+      else run = 0;
+    }
+  }
+  const liquidationThresholdPct = leverage && leverage > 0 ? 100 / leverage : null;
+  const liquidationBufferPct = liquidationThresholdPct != null
+    ? liquidationThresholdPct - Math.abs(maxDDpctVal)
+    : null;
   const sharpeStr = allTrades.length >= 2 ? result.sharpeRatio.toFixed(2) : '—';
   const sortinoStr = allTrades.length >= 2 && result.losingTrades > 0
     ? result.sortino_ratio.toFixed(2)
@@ -1163,6 +1230,82 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig }:
               </div>
               <Sparkline values={drawdownPcts} color="var(--accent-orange)" fillBelow height={64} />
             </div>
+          </div>
+        </>
+      )}
+
+      {/* Draw Down Metrics: capital-movement graphs + liquidation-risk cards */}
+      {equityValues.length >= 2 && (
+        <>
+          <SectionHeader title="Draw Down Metrics" subtitle="Capital movements, drawdown damage, and leverage-based liquidation risk" />
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="rounded p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Underwater Drawdown %</p>
+                <p className="text-xs font-semibold" style={{ color: 'var(--accent-orange)', fontVariantNumeric: 'tabular-nums' }}>
+                  {maxDDpctVal.toFixed(2)}%
+                </p>
+              </div>
+              <Sparkline values={drawdownPcts} color="var(--accent-orange)" fillBelow height={64} />
+              <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-faint)' }}>Percent below the running equity peak at each point in the run.</p>
+            </div>
+            <div className="rounded p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Capital Drawdown $</p>
+                <p className="text-xs font-semibold" style={{ color: 'var(--accent-red)', fontVariantNumeric: 'tabular-nums' }}>
+                  ${maxDDDollarVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+              </div>
+              <Sparkline values={ddDollarSeries} color="var(--accent-red)" fillBelow height={64} />
+              <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-faint)' }}>Dollar capital lost from the running peak — raw damage to the account.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 mt-3">
+            <InfoCard
+              label="Max Drawdown"
+              value={`${maxDDpctVal.toFixed(2)}%`}
+              icon={TrendingDown}
+              accent="orange"
+              tooltip={TT_MAX_DRAWDOWN}
+            />
+            <InfoCard
+              label="Max Drawdown $"
+              value={`$${maxDDDollarVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+              icon={Coins}
+              accent="red"
+              tooltip={{ title: 'Max Drawdown ($)', body: 'Largest peak-to-trough drop in account capital, measured in dollars.' }}
+            />
+            <InfoCard
+              label="Peak Capital"
+              value={`$${peakCapital.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+              icon={TrendingUp}
+              accent="green"
+              tooltip={{ title: 'Peak Capital', body: 'Highest account balance reached during the run — the high-water mark drawdowns are measured against.' }}
+            />
+            <InfoCard
+              label="Recovery Factor"
+              value={recoveryFactor}
+              icon={RotateCcw}
+              accent="blue"
+              tooltip={{ title: 'Recovery Factor', body: 'Net profit divided by max drawdown in dollars. Higher means the strategy earned more per unit of capital damage.' }}
+            />
+            <InfoCard
+              label="Longest Drawdown"
+              value={longestDDRun > 0 ? `${longestDDRun} tr` : '—'}
+              icon={Clock}
+              accent="orange"
+              tooltip={{ title: 'Longest Drawdown', body: 'Most consecutive trades spent below a prior equity peak — how long capital stayed impaired before recovering.' }}
+            />
+            <InfoCard
+              label="Liquidation Buffer"
+              value={liquidationBufferPct != null ? `${liquidationBufferPct.toFixed(1)}%` : '—'}
+              icon={AlertOctagon}
+              accent={liquidationBufferPct != null && liquidationBufferPct < 0 ? 'red' : 'neutral'}
+              subValue={liquidationThresholdPct != null
+                ? `${leverage}× → liq at −${liquidationThresholdPct.toFixed(1)}%`
+                : (riskPerTradePct != null ? `risk/trade ${riskPerTradePct}%` : undefined)}
+              tooltip={{ title: 'Liquidation Buffer', body: 'Headroom between the worst realised drawdown and the ~1/leverage adverse move that would liquidate a leveraged position. Negative means the drawdown would have breached liquidation at this leverage.' }}
+            />
           </div>
         </>
       )}
