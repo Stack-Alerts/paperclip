@@ -102,12 +102,27 @@ const FONT_SCALES: Record<FontScale, BacktestFontSizes> = {
 };
 
 const FONT_SCALE_STORAGE_KEY = 'backtestConfigDialog.fontScale';
-const ALWAYS_CONFIG_TAB_KEY = 'backtestConfigDialog.alwaysOpenConfigTab';
+// BTCAAAAA-38735: "Remember Last" tab preference. When enabled the dialog
+// reopens on the tab the user last viewed; when disabled it always opens on
+// Config. REMEMBER_LAST_TAB_KEY holds the boolean toggle, LAST_TAB_KEY holds
+// the most-recently active TabKey.
+const REMEMBER_LAST_TAB_KEY = 'backtestConfigDialog.rememberLastTab';
+const LAST_TAB_KEY = 'backtestConfigDialog.lastTab';
+const TAB_KEYS: readonly TabKey[] = TABS.map((t) => t.key);
 
-function readStoredAlwaysConfigTab(): boolean {
+function readStoredRememberLastTab(): boolean {
   if (typeof window === 'undefined') return false;
-  try { return window.localStorage.getItem(ALWAYS_CONFIG_TAB_KEY) === 'true'; }
+  try { return window.localStorage.getItem(REMEMBER_LAST_TAB_KEY) === 'true'; }
   catch { return false; }
+}
+
+function readStoredLastTab(): TabKey {
+  if (typeof window === 'undefined') return 'config';
+  try {
+    const raw = window.localStorage.getItem(LAST_TAB_KEY);
+    if (raw && (TAB_KEYS as readonly string[]).includes(raw)) return raw as TabKey;
+  } catch { /* ignore */ }
+  return 'config';
 }
 
 function readStoredFontScale(): FontScale {
@@ -1665,19 +1680,28 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
     if (open) setFontScale(readStoredFontScale());
   }, [open]);
 
-  // BTCAAAAA-38676: "Always open Config Tab" utility checkbox.
-  // When enabled, every dialog open resets the active tab to 'config'
-  // so the user always lands on the config form regardless of which tab
-  // was active when the dialog was last dismissed.
-  // Lazy initializer reads localStorage once on mount to avoid setState-in-effect.
-  const [alwaysOpenConfig, setAlwaysOpenConfig] = useState<boolean>(() => readStoredAlwaysConfigTab());
+  // BTCAAAAA-38735: "Remember Last" tab checkbox (renamed from "Always Config
+  // Tab"). Enabled → the dialog reopens on the tab the user last viewed;
+  // disabled → it always lands on Config. Lazy initializer reads localStorage
+  // once on mount to avoid setState-in-effect.
+  const [rememberLastTab, setRememberLastTab] = useState<boolean>(() => readStoredRememberLastTab());
+  // Restore the correct tab whenever the dialog opens. Declared BEFORE the
+  // persist effect below so that, on the open transition, the restore runs
+  // first and the persist effect then re-writes the same value (idempotent).
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting tab on dialog open is intentional UX
-    if (open && alwaysOpenConfig) setActiveTab('config');
-  }, [open, alwaysOpenConfig]);
-  const updateAlwaysOpenConfig = useCallback((checked: boolean) => {
-    setAlwaysOpenConfig(checked);
-    try { window.localStorage.setItem(ALWAYS_CONFIG_TAB_KEY, String(checked)); } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- setting tab on dialog open is intentional UX
+    if (open) setActiveTab(rememberLastTab ? readStoredLastTab() : 'config');
+  }, [open, rememberLastTab]);
+  // Persist the active tab while the dialog is open so "Remember Last" has a
+  // value to restore next time. Gated on `open` so the mounted-but-closed
+  // default ('config') never clobbers the stored last tab.
+  useEffect(() => {
+    if (!open) return;
+    try { window.localStorage.setItem(LAST_TAB_KEY, activeTab); } catch { /* ignore */ }
+  }, [open, activeTab]);
+  const updateRememberLastTab = useCallback((checked: boolean) => {
+    setRememberLastTab(checked);
+    try { window.localStorage.setItem(REMEMBER_LAST_TAB_KEY, String(checked)); } catch { /* ignore */ }
   }, []);
   const updateFontScale = useCallback((next: FontScale) => {
     setFontScale(next);
@@ -2381,15 +2405,16 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
             <ThemeSelector />
             {/* Tooltip delay — shared singleton with BacktestWindow / strategy builder */}
             <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-faint)' }}>
-              {/* BTCAAAAA-38676: utility checkbox — always land on Config tab on open */}
-              <label className="flex items-center gap-1 cursor-pointer select-none" title="When enabled, opening this dialog always navigates to the Config tab">
+              {/* BTCAAAAA-38735: when enabled, reopen on the last-viewed tab;
+                  when disabled, always open on Config. */}
+              <label className="flex items-center gap-1 cursor-pointer select-none" title="When enabled, the dialog reopens on the tab you last used; when disabled it always opens on the Config tab">
                 <input
                   type="checkbox"
-                  checked={alwaysOpenConfig}
-                  onChange={e => updateAlwaysOpenConfig(e.target.checked)}
+                  checked={rememberLastTab}
+                  onChange={e => updateRememberLastTab(e.target.checked)}
                   style={{ accentColor: 'var(--toolbar-accent)', width: 11, height: 11 }}
                 />
-                Always Config Tab
+                Remember Last
               </label>
               <div className="w-px h-3" style={{ background: 'var(--border)' }} />
               <label className="flex items-center gap-1 cursor-pointer select-none" title="Toggle institutional-grade tooltips on all configuration fields">

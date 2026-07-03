@@ -44,6 +44,36 @@ const STORAGE_KEY = 'strategy_builder_strategies';
 // truth when the live result is no longer available.
 const SESSIONS_STORAGE_KEY = 'strategy_builder_backtest_sessions';
 
+// BTCAAAAA-38735: remember the exact strategy the user last had open so the
+// builder reopens on it after a reload — including `strategy_<hex>` backend
+// strategies that are opened via the Strategy Browser and never enter the
+// local drafts list (STORAGE_KEY). We persist the full snapshot, not just the
+// id, because an id alone is unresolvable on hydrate when the strategy is not
+// in STORAGE_KEY. Its per-strategy backtest session, compare history, and AI
+// recommendations are all keyed by strategyId, so restoring the right current
+// strategy is what makes them reload with it.
+const LAST_OPEN_STRATEGY_KEY = 'strategy_builder_last_open';
+
+function saveLastOpenStrategy(strategy: Strategy | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (strategy) localStorage.setItem(LAST_OPEN_STRATEGY_KEY, JSON.stringify(strategy));
+    else localStorage.removeItem(LAST_OPEN_STRATEGY_KEY);
+  } catch {
+    // localStorage full/disabled — lose only cross-reload durability.
+  }
+}
+
+function loadLastOpenStrategy(): Strategy | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(LAST_OPEN_STRATEGY_KEY);
+    return raw ? (JSON.parse(raw) as Strategy) : null;
+  } catch {
+    return null;
+  }
+}
+
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -169,6 +199,17 @@ function makeDefaultStrategy(name: string, description = ''): Strategy {
 function initCurrentStrategy(): { current: Strategy | null; list: Strategy[] } {
   if (typeof window === 'undefined') return { current: null, list: [] };
   const saved = loadFromStorage();
+  // BTCAAAAA-38735: prefer the explicitly last-open strategy so the builder
+  // reopens exactly where the user left off, rather than falling back to the
+  // most-recently-*modified* draft (which loses a strategy that was only
+  // opened/viewed). When the last-open id also exists as a local draft we use
+  // the list copy (possibly fresher); otherwise the persisted snapshot covers
+  // backend strategies that are not in STORAGE_KEY.
+  const lastOpen = loadLastOpenStrategy();
+  if (lastOpen) {
+    const fromList = saved.find((s) => s.id === lastOpen.id);
+    return { current: fromList ?? lastOpen, list: saved };
+  }
   if (saved.length > 0) {
     const mostRecent = [...saved].sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
@@ -313,6 +354,9 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     const restoredSession = migratedCurrent
       ? sessions[migratedCurrent.id] ?? null
       : null;
+    // BTCAAAAA-38735: keep the last-open snapshot in sync with the strategy
+    // hydration chose (also captures the "New_Strategy" → "" migration).
+    saveLastOpenStrategy(migratedCurrent);
     set({
       currentStrategy: normalizeDefinitionIds(migratedCurrent),
       strategyList: migrated,
@@ -341,6 +385,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     // by its own id, so switching back later restores it.
     const sessions = loadSessionsFromStorage();
     const session = sessions[id] ?? null;
+    saveLastOpenStrategy(strategy); // BTCAAAAA-38735
     set({
       currentStrategy: strategy,
       isLoadingStrategy: false,
@@ -357,6 +402,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     const strategies = loadFromStorage();
     strategies.push(strategy);
     saveToStorage(strategies);
+    saveLastOpenStrategy(strategy); // BTCAAAAA-38735
     set({
       currentStrategy: strategy,
       strategyList: strategies,
@@ -492,6 +538,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
       strategies.push(updated);
     }
     saveToStorage(strategies);
+    saveLastOpenStrategy(updated); // BTCAAAAA-38735: id changes local→backend on first save
     set({ currentStrategy: updated, strategyList: strategies });
     return updated;
   },
@@ -547,6 +594,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
     const strategies = loadFromStorage();
     strategies.push(merged);
     saveToStorage(strategies);
+    saveLastOpenStrategy(merged); // BTCAAAAA-38735
     set({ currentStrategy: merged, strategyList: strategies });
     return merged;
   },
@@ -1128,6 +1176,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => ({
           undoSnapshot: strategy,
         }));
     }
+    saveLastOpenStrategy(strategy); // BTCAAAAA-38735: primary Strategy Browser open path
     set({
       currentStrategy: strategy,
       fixedIssuesInSession,
