@@ -2594,7 +2594,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
             <TradesPanel trades={backTestResult?.trades ?? []} />
           )}
           {activeTab === 'metrics' && (
-            <MetricsPanel result={backTestResult} />
+            <MetricsPanel result={backTestResult} strategyId={currentStrategy?.id} onApplyConfig={applyRunConfig} />
           )}
           {activeTab === 'ai' && (
             <AiRecommendationsPanel

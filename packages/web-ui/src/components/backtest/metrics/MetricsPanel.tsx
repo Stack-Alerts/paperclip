@@ -1,14 +1,15 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { BacktestResult, Trade } from '@/lib/strategy-builder/types';
+import { useEffect, useMemo, useState } from 'react';
+import { BacktestResult, Trade, type BacktestRunRecord } from '@/lib/strategy-builder/types';
+import { loadRunRecordsForStrategy, loadAllRunRecords } from '@/lib/backtest-history';
 import { RichTooltip, type TooltipContent } from '@/components/strategy-builder/RichTooltip';
 import {
   TrendingUp, TrendingDown, DollarSign, Activity, BarChart3, BarChart2, LineChart,
   RotateCcw, AlertTriangle, AlertOctagon, Clock, Hash, Target,
   ArrowUp, ArrowDown, Sparkles, ArrowUpCircle, ArrowDownCircle, Scale,
   Percent, Trophy, Skull, Coins, ChevronDown, ChevronUp,
-  Calendar, Layers, ArrowRight, Percent as PercentIcon,
+  Calendar, Layers, ArrowRight, Percent as PercentIcon, Download,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -39,6 +40,10 @@ void TT_ADDITIONAL_METRICS;
 export interface MetricsPanelProps {
   result?: BacktestResult | null;
   trades?: Trade[];
+  /** Strategy id used to scope the "Recent Runs" history graphs. */
+  strategyId?: string;
+  /** Apply a past run's configuration back into the Config form. */
+  onApplyConfig?: (record: BacktestRunRecord) => void;
 }
 
 type Accent = 'green' | 'red' | 'orange' | 'blue' | 'neutral';
@@ -540,9 +545,107 @@ function buildCumulativePnl(trades: Trade[]): number[] {
   return out;
 }
 
+// ── Recent Runs ──────────────────────────────────────────────────────────────
+// Stacks the last three saved runs' equity curves vertically, each with an
+// Apply button that loads that run's configuration back into the Config form.
+// Run history lives in localStorage, so it is read in an effect to avoid an
+// SSR/client hydration mismatch.
+function RecentRunsSection({
+  strategyId,
+  currentRunId,
+  onApplyConfig,
+}: {
+  strategyId?: string;
+  currentRunId?: string;
+  onApplyConfig?: (record: BacktestRunRecord) => void;
+}) {
+  const [records, setRecords] = useState<BacktestRunRecord[]>([]);
+
+  useEffect(() => {
+    const all = strategyId ? loadRunRecordsForStrategy(strategyId) : loadAllRunRecords();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads persisted run records from localStorage after mount to avoid an SSR/client hydration mismatch
+    setRecords(all.slice(0, 3));
+  }, [strategyId, currentRunId]);
+
+  if (records.length === 0) return null;
+
+  const fmtDateTime = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } catch { return iso; }
+  };
+
+  return (
+    <>
+      <SectionHeader title="Recent Runs" subtitle="Equity curves from the last 3 runs — apply any run's configuration" />
+      <div className="flex flex-col gap-3">
+        {records.map(record => {
+          const r = record.result;
+          const equityVals = (r.equityCurve ?? []).map(p => p.value);
+          const profit = r.finalCapital - r.initialCapital;
+          const up = profit >= 0;
+          const accent = up ? 'var(--accent-green)' : 'var(--accent-red)';
+          const isCurrent = currentRunId != null && record.runId === currentRunId;
+          return (
+            <div
+              key={record.runId}
+              className="rounded p-3 flex items-center gap-4"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+            >
+              <div className="min-w-0 flex-shrink-0" style={{ width: 150 }}>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
+                    {fmtDateTime(record.savedAt)}
+                  </p>
+                  {isCurrent && (
+                    <span className="text-[9px] px-1 py-0.5 rounded flex-shrink-0" style={{ background: 'color-mix(in srgb, var(--accent-blue) 16%, transparent)', color: 'var(--accent-blue)' }}>
+                      current
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-faint)' }}>{record.strategyName}</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-sm font-bold tabular-nums" style={{ color: accent }}>
+                    {r.returnPercentage >= 0 ? '+' : ''}{r.returnPercentage.toFixed(2)}%
+                  </span>
+                </div>
+                <div className="flex gap-2 mt-0.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  <span>WR {(r.winRate * 100).toFixed(0)}%</span>
+                  <span>{r.totalTrades} tr</span>
+                  <span>DD {(r.maxDrawdown * 100).toFixed(1)}%</span>
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                {equityVals.length >= 2 ? (
+                  <Sparkline values={equityVals} color={accent} fillBelow height={56} />
+                ) : (
+                  <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>No equity curve captured</p>
+                )}
+              </div>
+              {onApplyConfig && record.fullConfig && (
+                <button
+                  onClick={() => onApplyConfig(record)}
+                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded flex-shrink-0"
+                  title="Apply this run's configuration to the Config tab"
+                  style={{ color: 'var(--accent-blue)', border: '1px solid rgba(46,140,255,0.35)', background: 'rgba(46,140,255,0.08)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(46,140,255,0.18)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(46,140,255,0.08)')}
+                >
+                  <Download size={12} />Apply
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
+export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig }: MetricsPanelProps) {
   const [showAdditional, setShowAdditional] = useState(true);
 
   // All hooks must run unconditionally — compute series for the result we
@@ -1063,6 +1166,9 @@ export function MetricsPanel({ result, trades = [] }: MetricsPanelProps) {
           </div>
         </>
       )}
+
+      {/* Recent Runs: last 3 runs' equity curves stacked, each with Apply */}
+      <RecentRunsSection strategyId={strategyId} currentRunId={result.runId} onApplyConfig={onApplyConfig} />
 
       {/* Two side-by-side 3×2 sparkline-card panels (mockup middle rows) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
