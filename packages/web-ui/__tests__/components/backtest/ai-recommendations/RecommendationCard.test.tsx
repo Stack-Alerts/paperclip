@@ -15,20 +15,18 @@ function makeProps(overrides: Partial<RecommendationCardData> = {}): Recommendat
     codeLines: ['side = long', 'risk = 0.25'],
     applied: false,
     onToggleApplied: jest.fn(),
-    onApplyOnChart: jest.fn(),
     analysisId: SAMPLE_ANALYSIS_ID,
     ...overrides,
   };
 }
 
 describe('RecommendationCard', () => {
-  it('renders the card anatomy: category chip, delta, title, code, apply on chart, toggle', () => {
+  it('renders the card anatomy: category chip, delta, title, code, toggle', () => {
     render(<RecommendationCard {...makeProps()} />);
     expect(screen.getByTestId('rec-card-r1-category')).toHaveTextContent(/risk/i);
     expect(screen.getByTestId('rec-card-r1-delta')).toHaveTextContent('+2.3%');
     expect(screen.getByText('Widen the stop')).toBeInTheDocument();
     expect(screen.getByTestId('rec-card-r1-code')).toHaveTextContent('side = long');
-    expect(screen.getByTestId('rec-card-r1-apply-on-chart')).toHaveTextContent(/apply on chart/i);
     expect(screen.getByTestId('rec-card-r1-toggle')).toBeInTheDocument();
   });
 
@@ -47,13 +45,6 @@ describe('RecommendationCard', () => {
     render(<RecommendationCard {...makeProps({ onToggleApplied })} />);
     fireEvent.click(screen.getByTestId('rec-card-r1-toggle'));
     expect(onToggleApplied).toHaveBeenCalledWith(true);
-  });
-
-  it('invokes onApplyOnChart from the footer link', () => {
-    const onApplyOnChart = jest.fn();
-    render(<RecommendationCard {...makeProps({ onApplyOnChart })} />);
-    fireEvent.click(screen.getByTestId('rec-card-r1-apply-on-chart'));
-    expect(onApplyOnChart).toHaveBeenCalledTimes(1);
   });
 });
 

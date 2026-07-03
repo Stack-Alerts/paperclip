@@ -1,7 +1,11 @@
 'use client';
 
 import { Strategy } from '@/lib/strategy-builder/types';
-import type { RecommendationCardData } from './RecommendationCard';
+import type {
+  RecommendationCardData,
+  RecommendationChange,
+  RecommendationFooterMetrics,
+} from './RecommendationCard';
 import type { RecommendationCategoryId } from './recommendationCategoryPalette';
 import type { RecommendationDiffParam } from './RecommendationDiff';
 import { ProjectedDelta } from './strategyImpactKpi';
@@ -26,6 +30,18 @@ export interface ParsedRec {
   signal?: string;
   parameter?: string;
   suggestedValue?: string;
+  // Presentational overrides (mockup-verbatim demo path). When present these
+  // take precedence over the derived defaults in toCardData so the card face
+  // matches the approved Current Analysis mockup exactly.
+  categoryIdOverride?: RecommendationCategoryId;
+  categoryLabel?: string;
+  deltaLabelOverride?: string;
+  deltaNegativeOverride?: boolean;
+  change?: RecommendationChange;
+  affectsLine?: string;
+  footerMetrics?: RecommendationFooterMetrics;
+  insight?: boolean;
+  insightBox?: string;
 }
 
 /**
@@ -242,12 +258,18 @@ export function toCardData(rec: ParsedRec, ctx: {
 
   return {
     id: rec.id,
-    categoryId: categoryIdFromRecType(rec.type),
-    deltaLabel,
-    deltaNegative,
+    categoryId: rec.categoryIdOverride ?? categoryIdFromRecType(rec.type),
+    categoryLabel: rec.categoryLabel,
+    deltaLabel: rec.deltaLabelOverride ?? deltaLabel,
+    deltaNegative: rec.deltaNegativeOverride ?? deltaNegative,
     title: rec.title,
     description: rec.rationale ?? rec.summary,
     codeLines,
+    change: rec.change,
+    affectsLine: rec.affectsLine,
+    footerMetrics: rec.footerMetrics,
+    insight: rec.insight,
+    insightBox: rec.insightBox,
     applied: ctx.applied,
     onToggleApplied: ctx.onToggleApplied,
     disabled: ctx.isApplyingThis || !ctx.isAutoApplicable,

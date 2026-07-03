@@ -229,8 +229,9 @@ describe('formatters', () => {
     expect(formatPercent(NaN)).toBe('–');
   });
 
-  it('formatCurrency formats thousands', () => {
-    expect(formatCurrency(1500)).toBe('$1.50k');
+  it('formatCurrency formats thousands with comma grouping', () => {
+    expect(formatCurrency(1500)).toBe('$1,500');
+    expect(formatCurrency(8824)).toBe('$8,824');
   });
 
   it('formatRatio rounds to 2dp by default', () => {

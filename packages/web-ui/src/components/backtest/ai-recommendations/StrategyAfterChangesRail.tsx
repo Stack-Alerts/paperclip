@@ -3,11 +3,25 @@
 import { useCallback } from 'react';
 import type { AfterChangesItem, AfterChangesStatus } from './strategyAfterChangesMerge';
 
+/** A single staged strategy leg for the mockup-verbatim demo rail. Each leg
+ * carries an explicit role pill (REQUIRED / EXIT / SIGNAL / 100% EXIT) with its
+ * own colors so the rail can mirror the approved Current Analysis mockup. */
+export interface DemoLeg {
+  title: string;
+  pillLabel: string;
+  pillBg: string;
+  pillFg: string;
+  pillBorder: string;
+}
+
 export interface StrategyAfterChangesRailProps {
   items: AfterChangesItem[];
   toggleOn: ReadonlySet<string>;
   onToggleCurrent: (recId: string) => void;
   onJumpToOriginEntry?: (historyEntryId: string) => void;
+  /** When provided, the rail renders these fixed strategy legs (mockup demo)
+   * instead of the recommendation-derived rows. */
+  demoLegs?: ReadonlyArray<DemoLeg>;
 }
 
 const STATUS_PILL: Record<
@@ -63,6 +77,7 @@ export function StrategyAfterChangesRail({
   toggleOn,
   onToggleCurrent,
   onJumpToOriginEntry,
+  demoLegs,
 }: StrategyAfterChangesRailProps) {
   const handleRowClick = useCallback((item: AfterChangesItem) => {
     if (item.carriedOver) return;
@@ -89,7 +104,38 @@ export function StrategyAfterChangesRail({
         Strategy after changes
       </p>
 
-      {items.length === 0 ? (
+      {demoLegs ? (
+        <ul className="flex flex-col gap-1.5">
+          {demoLegs.map((leg, i) => (
+            <li
+              key={`demo-leg-${i}`}
+              data-testid="after-changes-demo-leg"
+              className="rounded p-2 flex items-center justify-between gap-2"
+              style={{
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <span
+                className="text-[11px] font-semibold text-left truncate flex-1"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                {leg.title}
+              </span>
+              <span
+                className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded whitespace-nowrap"
+                style={{
+                  background: leg.pillBg,
+                  color: leg.pillFg,
+                  border: `1px solid ${leg.pillBorder}`,
+                }}
+              >
+                {leg.pillLabel}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : items.length === 0 ? (
         <p
           className="text-[11px]"
           style={{ color: 'var(--text-faint)' }}

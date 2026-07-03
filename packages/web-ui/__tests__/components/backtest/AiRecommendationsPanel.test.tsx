@@ -810,19 +810,20 @@ describe('AiRecommendationsPanel — empty-state preview + demo (BTCAAAAA-36917 
     expect(window.sessionStorage.getItem('ai_recs_v3_cache_v1')).toBeNull();
   });
 
-  it('v4: "Load demo data" seeds 3 sample recommendations without writing to the cache', async () => {
+  it('v4: "Load demo data" seeds the mockup sample recommendations without writing to the cache', async () => {
     renderEmptyPanel();
 
     fireEvent.click(screen.getByTestId('ai-recs-demo-btn'));
 
-    // The v3 toggle grid hydrates with 3 hardcoded sample recs. We assert
-    // count only (not identity) so the sample payload can evolve without
-    // breaking this contract test.
+    // The v3 toggle grid hydrates with the hardcoded BTCAAAAA-37748 mockup
+    // demo payload (5 recommendation cards + the reverse-view insight card).
+    // We assert count only (not identity) so the sample payload can evolve
+    // without breaking this contract test.
     await waitFor(() => {
       expect(screen.getAllByTestId('ai-recs-toggle-card').length).toBeGreaterThanOrEqual(2);
     });
     const cards = screen.getAllByTestId('ai-recs-toggle-card');
-    expect(cards.length).toBe(3);
+    expect(cards.length).toBe(6);
 
     // Exit-demo affordance is the only way back to the empty state; it must
     // be visible whenever demoMode is true.
@@ -839,7 +840,7 @@ describe('AiRecommendationsPanel — empty-state preview + demo (BTCAAAAA-36917 
 
     fireEvent.click(screen.getByTestId('ai-recs-demo-btn'));
     await waitFor(() => {
-      expect(screen.getAllByTestId('ai-recs-toggle-card')).toHaveLength(3);
+      expect(screen.getAllByTestId('ai-recs-toggle-card')).toHaveLength(6);
     });
 
     fireEvent.click(screen.getByTestId('ai-recs-exit-demo-btn'));

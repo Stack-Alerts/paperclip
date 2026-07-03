@@ -145,8 +145,10 @@ export function StrategyImpactKpiBar({
   const previewAfter = useMemo(
     () => (mode === 'snapshot' && snapshotAfter
       ? snapshotAfter
-      : applyDelta(baseline, combinedDelta)),
-    [mode, snapshotAfter, baseline, combinedDelta],
+      : deltas.length === 0
+        ? baseline
+        : applyDelta(baseline, combinedDelta)),
+    [mode, snapshotAfter, baseline, combinedDelta, deltas.length],
   );
 
   // Tag the confirmed-after value with the applied-set key it was computed

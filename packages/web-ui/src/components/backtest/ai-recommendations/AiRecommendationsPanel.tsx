@@ -56,10 +56,12 @@ import {
   AppliedRecImpact,
   deriveBaselineKpis,
   reProjectFromServer,
+  type KpiSet,
 } from './strategyImpactKpi';
 import { computeReanalyzeHash } from './dirtyHash';
 import { buildAiRecsSystemPrompt } from './prompts/systemPrompt';
 import { StrategyAfterChangesRail } from './StrategyAfterChangesRail';
+import type { DemoLeg } from './StrategyAfterChangesRail';
 import { mergeStrategyAfterChanges } from './strategyAfterChangesMerge';
 import { RecommendationsRow } from './RecommendationsRow';
 import { OptimizationGoalModal } from './OptimizationGoalModal';
@@ -136,6 +138,174 @@ const SAMPLE_RECOMMENDATIONS =
   + "high-volatility leg.\n"
   + "   Confidence: high\n"
   + "   - **stop_atr_multiple**: 1.5\n";
+
+// BTCAAAAA-38721 — verbatim Current Analysis mockup demo data. These are the
+// five recommendations + the reverse-view insight card from the approved
+// BTCAAAAA-37748 mockup, injected when demoMode is true so the live panel
+// renders the exact mockup face the board is screenshot-gating against.
+const DEMO_PARSED_RECS: ParsedRec[] = [
+  {
+    id: 'demo-rec-1',
+    title: 'Widen the stop past the −0.70% cluster',
+    summary: '',
+    raw: 'demo-rec-1',
+    type: 'risk',
+    confidence: 'high',
+    suggestedParams: [],
+    categoryIdOverride: 'risk',
+    categoryLabel: 'STOP LOSS',
+    deltaLabelOverride: '+8% WR',
+    change: {
+      contextLine: 'At 1hod exit · ABSOLUTE',
+      oldLine: 'stop = 0.70%',
+      newLine: 'stop = 1.05%',
+    },
+    affectsLine: 'Asia 50% → At 1hod',
+    footerMetrics: { wr: '+8 WR', dd: '+34 DD', pl: '+$1,640 P/L' },
+  },
+  {
+    id: 'demo-rec-2',
+    title: 'Gate entries against the EMA-55 vector',
+    summary: '',
+    raw: 'demo-rec-2',
+    type: 'entry',
+    confidence: 'high',
+    suggestedParams: [],
+    categoryIdOverride: 'entry',
+    categoryLabel: 'ENTRY FILTER',
+    deltaLabelOverride: '+5% WR',
+    change: {
+      contextLine: 'Ema 55 vector · entry gate',
+      oldLine: 'gate = off',
+      newLine: 'gate = require alignment',
+    },
+    affectsLine: 'Ema 55 vector → gate',
+    footerMetrics: { wr: '+5 WR', dd: '-46 DD', pl: '-$320 P/L' },
+  },
+  {
+    id: 'demo-rec-3',
+    title: 'Tighten the Below Asia 50 window to 8 candles',
+    summary: '',
+    raw: 'demo-rec-3',
+    type: 'regime',
+    confidence: 'high',
+    suggestedParams: [],
+    categoryIdOverride: 'regime',
+    categoryLabel: 'TIMING',
+    deltaLabelOverride: '+2.5% WR',
+    change: {
+      contextLine: 'Time constraint · Below Asia 50',
+      oldLine: 'within 12 candles',
+      newLine: 'within 8 candles',
+    },
+    affectsLine: 'Asia 50% → Below Asia 50',
+    footerMetrics: { wr: '+2.5 WR', dd: '-12 DD', pl: '-$110 P/L' },
+  },
+  {
+    id: 'demo-rec-4',
+    title: 'Deepen recheck on the 100% TP-aware exit',
+    summary: '',
+    raw: 'demo-rec-4',
+    type: 'exit',
+    confidence: 'high',
+    suggestedParams: [],
+    categoryIdOverride: 'exit',
+    categoryLabel: 'EXIT',
+    deltaLabelOverride: '+1.5% WR',
+    change: {
+      contextLine: 'Above Asia 50 exit · RCHECK',
+      oldLine: 'recheck = 2 bars',
+      newLine: 'recheck = 4 bars',
+    },
+    affectsLine: 'Asia 50% → Above Asia 50',
+    footerMetrics: { wr: '+1.5 WR', dd: '-8 DD', pl: '+$240 P/L' },
+  },
+  {
+    id: 'demo-rec-5',
+    title: 'Shorten Bearish Climax recheck to 3 bars',
+    summary: '',
+    raw: 'demo-rec-5',
+    type: 'signal',
+    confidence: 'high',
+    suggestedParams: [],
+    categoryIdOverride: 'signal',
+    categoryLabel: 'SIGNAL',
+    deltaLabelOverride: '+1% WR',
+    change: {
+      contextLine: 'Bearish Climax · RCHECK',
+      oldLine: 'within 5 bars',
+      newLine: 'within 3 bars',
+    },
+    affectsLine: 'Ema 55 vector → Bearish Climax',
+    footerMetrics: { wr: '+1 WR', dd: '-5 DD', pl: '+$90 P/L' },
+  },
+  {
+    id: 'demo-rec-6',
+    title: 'Reverse view — what the winners share',
+    summary: '',
+    raw: 'demo-rec-6',
+    type: 'pattern',
+    confidence: 'high',
+    suggestedParams: [],
+    categoryIdOverride: 'signal',
+    categoryLabel: 'PATTERN',
+    deltaLabelOverride: 'Insight',
+    insight: true,
+    insightBox:
+      'No parameter to toggle — use as a manual confluence check when placing trades.',
+    affectsLine: '—',
+    footerMetrics: { wr: '— WR', dd: '— DD', pl: '— P/L' },
+  },
+];
+
+// BTCAAAAA-38721 — verbatim STRATEGY IMPACT baseline from the mockup. With no
+// recommendations applied ("0 on"), PROJECTED equals BASELINE, so this single
+// KpiSet drives both columns of the bar.
+const DEMO_BASELINE_KPIS: KpiSet = {
+  winRate: 0.524,
+  netLiquidity: 8824,
+  maxDrawdown: 2.088,
+  profitFactor: 0,
+  entries: 21,
+};
+
+const DEMO_RAIL_LEGS: ReadonlyArray<DemoLeg> = [
+  {
+    title: 'Asia session 50 percent',
+    pillLabel: 'REQUIRED',
+    pillBg: 'var(--accent-green-soft)',
+    pillFg: 'var(--accent-green-on)',
+    pillBorder: 'var(--accent-green-on)',
+  },
+  {
+    title: 'Above Asia 50 exit',
+    pillLabel: '100% EXIT',
+    pillBg: 'var(--accent-blue-soft)',
+    pillFg: 'var(--accent-blue)',
+    pillBorder: 'var(--accent-blue)',
+  },
+  {
+    title: 'Ema 55 vector',
+    pillLabel: 'REQUIRED',
+    pillBg: 'var(--accent-green-soft)',
+    pillFg: 'var(--accent-green-on)',
+    pillBorder: 'var(--accent-green-on)',
+  },
+  {
+    title: 'Bearish Climax',
+    pillLabel: 'SIGNAL',
+    pillBg: 'rgba(192, 139, 255, 0.16)',
+    pillFg: '#c08bff',
+    pillBorder: '#c08bff',
+  },
+  {
+    title: 'Supply Demand Zones',
+    pillLabel: 'EXIT',
+    pillBg: 'rgba(255, 154, 82, 0.16)',
+    pillFg: '#ff9a52',
+    pillBorder: '#ff9a52',
+  },
+];
 
 const ACTIVE_PHASES: ReadonlySet<SendPhase> = new Set([
   'building-request',
@@ -553,9 +723,10 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   // makes both the source and inferred deps equal.
   const analysisRecommendations = aiAnalysis?.recommendations;
   const parsedRecs = useMemo(() => {
+    if (demoMode) return DEMO_PARSED_RECS;
     if (!analysisRecommendations) return [];
     return parseRecommendations(analysisRecommendations);
-  }, [analysisRecommendations]);
+  }, [analysisRecommendations, demoMode]);
 
   // BTCAAAAA-37780 / Sprint A6 — Diagnose tab data.
   const diagnoseRows = useMemo(
@@ -603,7 +774,10 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   );
 
   // BTCAAAAA-37774 Sprint A2 — baseline + applied impacts feed the KPI bar.
-  const baselineKpis = useMemo(() => deriveBaselineKpis(result ?? null), [result]);
+  const baselineKpis = useMemo(
+    () => (demoMode ? DEMO_BASELINE_KPIS : deriveBaselineKpis(result ?? null)),
+    [result, demoMode],
+  );
 
   // BTCAAAAA-37772 Sprint B/B4 — real re-projection function passed to the
   // KPI bar. When a strategy ID is available, fires /api/backtest/re-project
@@ -1975,11 +2149,11 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           Q7: when viewing a history snapshot use the stored KPIs; otherwise
           fall back to the live backtest result.
           BTCAAAAA-37772 Sprint B/B4 — reProjectFn wires in the real endpoint. */}
-      {(result || viewingHistoryEntry?.snapshotKpis) && (
+      {(result || viewingHistoryEntry?.snapshotKpis || demoMode) && (
         <StrategyImpactKpiBar
           baseline={viewingHistoryEntry?.snapshotKpis ?? baselineKpis}
           appliedImpacts={viewingHistoryEntry ? [] : appliedImpacts}
-          reProjectFn={viewingHistoryEntry ? undefined : reProjectFn}
+          reProjectFn={viewingHistoryEntry || demoMode ? undefined : reProjectFn}
         />
       )}
 
@@ -1996,8 +2170,11 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
                 className="ml-1.5 text-[10px] font-normal"
                 style={{ color: 'var(--text-faint)' }}
               >
-                ({visibleRecs.length} · {appliedRecIds.length} applied
-                {hiddenRecCount > 0 ? ` · ${hiddenRecCount} hidden` : ''})
+                {demoMode
+                  ? `· ${appliedRecIds.length} on`
+                  : `(${visibleRecs.length} · ${appliedRecIds.length} applied${
+                      hiddenRecCount > 0 ? ` · ${hiddenRecCount} hidden` : ''
+                    })`}
               </span>
             )}
             {/* BTCAAAAA-38464 (Stream 3, L2): low-confidence disclosure toggle.
@@ -2351,7 +2528,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           sticky "Apply all" footer — apply is per-card. */}
       </div>)}
 
-      {parsedRecs.length > 0 && (
+      {!demoMode && parsedRecs.length > 0 && (
         <ReverseViewBanner pattern={extractReverseViewPattern(reverseViewInputs)} />
       )}
 
@@ -2517,6 +2694,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
               toggleOn={appliedRecIdSet}
               onToggleCurrent={handleRailToggleCurrent}
               onJumpToOriginEntry={handleRailJumpToOriginEntry}
+              demoLegs={demoMode ? DEMO_RAIL_LEGS : undefined}
             />
           </div>
         </div>

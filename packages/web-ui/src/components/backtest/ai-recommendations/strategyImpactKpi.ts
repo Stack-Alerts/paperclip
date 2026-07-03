@@ -133,11 +133,12 @@ export function formatPercent(value: number, digits = 1): string {
 
 export function formatCurrency(value: number): string {
   if (!Number.isFinite(value)) return '–';
-  const abs = Math.abs(value);
-  const sign = value < 0 ? '-' : '';
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
-  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(2)}k`;
-  return `${sign}$${abs.toFixed(2)}`;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
+  }).format(value);
 }
 
 export function formatRatio(value: number, digits = 2): string {

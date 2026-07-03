@@ -22,7 +22,6 @@ function makeRec(
     codeLines: SAMPLE_CODE,
     applied: false,
     onToggleApplied: () => undefined,
-    onApplyOnChart: () => undefined,
     analysisId: SAMPLE_ANALYSIS_ID,
   };
 }
