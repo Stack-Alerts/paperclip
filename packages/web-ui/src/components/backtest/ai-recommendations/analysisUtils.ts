@@ -148,11 +148,28 @@ export function parseAnalysisResponse(text: string): {
   const normalized = text
     .replace(/\*{1,2}\s*(DIAGNOSIS)\s*\*{1,2}/gi, '$1:')
     .replace(/\*{1,2}\s*(RECOMMENDATIONS)\s*\*{1,2}/gi, '$1:')
+    // BTCAAAAA-37771: models often bold a synonym heading instead of the exact
+    // word RECOMMENDATIONS (e.g. `**Recommended Changes:**`). Without this the
+    // section was never split out and the box rendered blank after a completed
+    // re-analyze.
+    .replace(
+      /\*{1,2}\s*(?:Recommended|Suggested)\s+(?:Changes|Improvements)\s*\*{0,2}\s*:?/gi,
+      'RECOMMENDATIONS:',
+    )
     .replace(/^#{1,6}\s+(DIAGNOSIS)\s*[:\-]?\s*$/gim, 'DIAGNOSIS:')
     // BTCAAAAA-37067: DeepSeek emits `## Actionable Recommendations`; the prior
     // regex required the heading to start exactly with RECOMMENDATIONS, so the
     // RECOMMENDATIONS section was never split out and zero cards rendered.
-    .replace(/^#{1,6}\s+(?:Actionable\s+)?RECOMMENDATIONS\s*[:\-]?\s*$/gim, 'RECOMMENDATIONS:');
+    .replace(
+      /^#{1,6}\s+(?:Actionable\s+|Optimization\s+)?RECOMMENDATIONS?\s*[:\-]?\s*$/gim,
+      'RECOMMENDATIONS:',
+    )
+    // BTCAAAAA-37771: also accept `## Recommended Changes` /
+    // `## Suggested Improvements` heading variants.
+    .replace(
+      /^#{1,6}\s+(?:Recommended|Suggested)\s+(?:Changes|Improvements)\s*[:\-]?\s*$/gim,
+      'RECOMMENDATIONS:',
+    );
 
   const diagnosisMatch = normalized.match(
     /DIAGNOSIS\s*:\s*([\s\S]*?)(?=\n\s*RECOMMENDATIONS\s*:|$)/i,
@@ -182,6 +199,22 @@ export function parseAnalysisResponse(text: string): {
     if (idx > 0) {
       recommendations = diagnosis.slice(idx).trim();
       diagnosis = diagnosis.slice(0, idx).trim();
+    } else {
+      // BTCAAAAA-37771: no numbered list — the model may have bulleted its
+      // recommendations (- / * / •) directly under the diagnosis with no
+      // RECOMMENDATIONS header, which previously left the box blank. Promote a
+      // trailing bulleted list to the recommendations section, but only when
+      // there are at least two bullet lines so an incidental dash in prose is
+      // not mistaken for a rec list.
+      const bulletIdx = diagnosis.search(/\n\s*[-*•]\s+/);
+      if (bulletIdx > 0) {
+        const tail = diagnosis.slice(bulletIdx);
+        const bulletCount = (tail.match(/\n\s*[-*•]\s+/g) ?? []).length;
+        if (bulletCount >= 2) {
+          recommendations = tail.trim();
+          diagnosis = diagnosis.slice(0, bulletIdx).trim();
+        }
+      }
     }
   }
 

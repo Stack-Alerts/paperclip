@@ -2245,11 +2245,17 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
             {/* When there IS recommendations text but parsing didn't split it
                 into individual cards, show the raw text rather than an empty
                 placeholder. The user gets readable content; the toggle-card
-                feature message explains why cards aren't showing. */}
-            {aiAnalysis?.recommendations ? (
+                feature message explains why cards aren't showing.
+                BTCAAAAA-37771: if the parser extracted no recommendations at
+                all but the model DID return a response (`raw`), fall back to
+                the raw response so a completed re-analyze is never a silent
+                blank box — the user can always see what the model said. */}
+            {aiAnalysis?.recommendations || aiAnalysis?.raw ? (
               <div className="flex flex-col gap-2">
                 <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
-                  Could not split into individual toggle-cards. Showing the raw recommendations below.
+                  {aiAnalysis?.recommendations
+                    ? 'Could not split into individual toggle-cards. Showing the raw recommendations below.'
+                    : 'Could not parse a recommendations section from this analysis. Showing the raw model response below.'}
                 </p>
                 <pre
                   className="text-xs rounded p-2 overflow-auto max-h-64 whitespace-pre-wrap break-words"
@@ -2259,8 +2265,9 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
                     border: '1px solid var(--border)',
                     fontFamily: 'var(--font-mono, monospace)',
                   }}
+                  data-testid="ai-recs-raw-fallback"
                 >
-                  {aiAnalysis.recommendations}
+                  {aiAnalysis?.recommendations || aiAnalysis?.raw}
                 </pre>
               </div>
             ) : (
