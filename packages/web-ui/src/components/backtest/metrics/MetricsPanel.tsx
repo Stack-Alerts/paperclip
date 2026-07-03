@@ -579,7 +579,7 @@ function RecentRunsSection({
   return (
     <>
       <SectionHeader title="Recent Runs" subtitle="Equity curves from the last 3 runs — apply any run's configuration" />
-      <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {records.map(record => {
           const r = record.result;
           const equityVals = (r.equityCurve ?? []).map(p => p.value);
@@ -590,10 +590,10 @@ function RecentRunsSection({
           return (
             <div
               key={record.runId}
-              className="rounded p-3 flex items-center gap-4"
+              className="rounded p-3 flex flex-col gap-2"
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
             >
-              <div className="min-w-0 flex-shrink-0" style={{ width: 150 }}>
+              <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
                     {fmtDateTime(record.savedAt)}
@@ -616,7 +616,7 @@ function RecentRunsSection({
                   <span>DD {(r.maxDrawdown * 100).toFixed(1)}%</span>
                 </div>
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0">
                 {equityVals.length >= 2 ? (
                   <Sparkline values={equityVals} color={accent} fillBelow height={56} />
                 ) : (
@@ -626,7 +626,7 @@ function RecentRunsSection({
               {onApplyConfig && record.fullConfig && (
                 <button
                   onClick={() => onApplyConfig(record)}
-                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded flex-shrink-0"
+                  className="flex items-center justify-center gap-1 text-[11px] px-2 py-1 rounded w-full"
                   title="Apply this run's configuration to the Config tab"
                   style={{ color: 'var(--accent-blue)', border: '1px solid rgba(46,140,255,0.35)', background: 'rgba(46,140,255,0.08)' }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(46,140,255,0.18)')}
