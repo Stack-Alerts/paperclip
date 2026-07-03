@@ -21,7 +21,7 @@ export function WindowBreadcrumb({ page, item, itemDirty = false }: WindowBreadc
   const hasItem = item != null && item !== '';
   return (
     <span
-      className="ml-auto text-xs truncate max-w-xs pr-2"
+      className="ml-auto text-xs whitespace-nowrap pr-2"
       style={{ color: 'var(--text-secondary)' }}
     >
       BTC Trade Engine — {page}
