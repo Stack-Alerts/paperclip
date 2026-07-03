@@ -94,7 +94,19 @@ FIX_SHA_PATTERN = re.compile(r"^Fix-SHA: ([0-9a-f]{40})$", re.MULTILINE)
 # Line-anchored "no code commit" exemption marker for operational/non-code closures
 # (rclone reauth, routine pause/resume, manual rollback, etc.). Closure-gate
 # treats issues carrying this marker as verified and skips Fix-SHA requests.
-FIX_SHA_NONE_PATTERN = re.compile(r"^Fix-SHA: NONE\b", re.MULTILINE)
+#
+# Tolerances (BTCAAAAA-38727): the marker is authored by humans/agents in
+# Markdown, so it frequently arrives bolded (`**Fix-SHA: NONE**`) or with the
+# reason lowercased. A strict `^Fix-SHA: NONE` anchor missed those and the
+# coordination issue was re-requested a Fix-SHA and reopened every scan. We now
+# allow an optional leading emphasis wrapper (`*`, `**`, `_`, `__`, backtick),
+# optional leading whitespace, flexible spacing after the colon, and match
+# case-insensitively — while the `^` anchor still rejects mid-line prose
+# mentions like "we could not provide Fix-SHA: NONE here".
+FIX_SHA_NONE_PATTERN = re.compile(
+    r"^\s*(?:[*_~`]{1,2}\s*)?Fix-SHA:\s*NONE\b",
+    re.MULTILINE | re.IGNORECASE,
+)
 
 # v2 Step 2 (BTCAAAAA-38590): line-anchored [no-sha: reason] tag for board-action
 # closures that have no git artifact but have verifiable action evidence.
@@ -1420,6 +1432,7 @@ def process_issue(
     # Exempt non-code work from Fix-SHA requirement. Routine-generated tasks,
     # escalations, and coordination issues don't have code commits (BTCAAAAA-30677).
     exempt_origin_kinds = {
+        "routine",
         "routine_execution",
         "escalation",
         "notification",

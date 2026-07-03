@@ -337,6 +337,34 @@ class TestProcessIssue:
         mock_request.assert_not_called()
         assert state == {}
 
+    @patch("closure_gate_routine.fetch_issue_comments")
+    @patch("closure_gate_routine.request_fix_sha_tag")
+    def test_process_issue_bolded_fix_sha_none_exempt(self, mock_request, mock_fetch_comments):
+        """BTCAAAAA-38727: a Markdown-bolded `**Fix-SHA: NONE**` marker on a
+        coordination done-issue must be honored and never re-request a Fix-SHA.
+
+        This is the exact shape that reopened BTCAAAAA-30147/30148/32545/30148:
+        the marker was authored bolded, so the old `^Fix-SHA:` anchor missed it.
+        """
+        mock_fetch_comments.return_value = [
+            {"body": "unrelated chatter"},
+            {"body": "**Fix-SHA: NONE** — comment-only escalation; no commit exists."},
+        ]
+
+        issue = {
+            "id": "issue-bold-none",
+            "identifier": "BTCAAAAA-30148",
+            "status": "done",
+            "originKind": "manual",
+        }
+        state: dict = {}
+
+        action_type, success = process_issue(issue, state)
+        assert action_type == "verified"
+        assert success is True
+        mock_request.assert_not_called()
+        assert state == {}
+
 
 class TestFixShaNoneExemption:
     """Cover the `Fix-SHA: NONE` exemption helper."""
@@ -365,13 +393,32 @@ class TestFixShaNoneExemption:
         ]
         assert has_fix_sha_none_exemption(comments) is False
 
-    def test_lowercase_none_does_not_match(self):
+    def test_lowercase_none_matches(self):
         from closure_gate_routine import has_fix_sha_none_exemption
 
-        # Marker is case-sensitive: lowercase `none` should not match - keeps
-        # the exemption deliberate.
+        # BTCAAAAA-38727: the marker is now case-insensitive so a lowercased
+        # reason (`Fix-SHA: none`) is still honored as a valid closure.
         comments = [{"body": "Fix-SHA: none"}]
-        assert has_fix_sha_none_exemption(comments) is False
+        assert has_fix_sha_none_exemption(comments) is True
+
+    def test_bolded_marker_matches(self):
+        from closure_gate_routine import has_fix_sha_none_exemption
+
+        # BTCAAAAA-38727 root cause: coordination closures authored the marker
+        # in Markdown bold (`**Fix-SHA: NONE**`). The old `^Fix-SHA:` anchor
+        # missed the leading `**` and reopened the issue every scan.
+        comments = [
+            {"body": "**Fix-SHA: NONE** — comment-only escalation."},
+            {"body": "prose"},
+        ]
+        assert has_fix_sha_none_exemption(comments) is True
+
+    def test_bolded_lowercase_marker_matches(self):
+        from closure_gate_routine import has_fix_sha_none_exemption
+
+        # Combined tolerances: bold wrapper + lowercase reason.
+        comments = [{"body": "**Fix-SHA: none** operational only"}]
+        assert has_fix_sha_none_exemption(comments) is True
 
 
 class TestSplitParagraphs:
