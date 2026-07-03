@@ -2167,8 +2167,10 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
         />
       )}
 
-      {/* AC15: RECOMMENDATIONS header + card grid (ComparePanel layout). */}
-      <div className="flex flex-col gap-2">
+      {/* AC15: RECOMMENDATIONS header + card grid (ComparePanel layout).
+          BTCAAAAA-38733: mt-3 adds a row of space between the KPI frame and
+          the RECOMMENDATIONS header (board request). */}
+      <div className="mt-3 flex flex-col gap-2">
         <div className="flex items-baseline justify-between">
           <p
             className="text-xs font-semibold uppercase tracking-wide"
