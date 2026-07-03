@@ -1486,6 +1486,105 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
     [setRightTab],
   );
 
+  // BTCAAAAA-37771 review — the progress indicator is shared by the AI Request
+  // (leftPane) and Current Analysis (rightPane) views. Re-analyze can be
+  // triggered from the Current Analysis header, so its live status must render
+  // there too — otherwise the button just greys out silently and looks frozen.
+  const progressIndicator = showProgress ? (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      data-testid="ai-recs-progress"
+      className="rounded p-2 flex flex-col gap-1"
+      style={{
+        background: 'var(--bg-elevated)',
+        border: '1px solid var(--border)',
+      }}
+    >
+      <div className="flex items-center justify-between text-xs">
+        <span
+          data-testid="ai-recs-progress-label"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          {progressLabel}
+        </span>
+        <span className="flex items-center gap-2">
+          {phase === 'awaiting-provider' && awaitingEta !== null && (
+            <span
+              data-testid="ai-recs-progress-eta"
+              aria-live="off"
+              style={{
+                color: 'var(--text-muted)',
+                fontFamily: 'var(--font-mono, monospace)',
+              }}
+            >
+              ~{awaitingEta}s
+            </span>
+          )}
+          <span
+            data-testid="ai-recs-progress-percent"
+            style={{
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--font-mono, monospace)',
+            }}
+          >
+            {progressPercent}%
+          </span>
+        </span>
+      </div>
+      <div
+        role="progressbar"
+        aria-valuenow={progressPercent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="AI recommendation request progress"
+        className="w-full h-1.5 rounded overflow-hidden"
+        style={{ background: 'var(--bg-card)' }}
+      >
+        <div
+          data-testid="ai-recs-progress-bar"
+          className="h-full rounded"
+          style={{
+            width: `${progressPercent}%`,
+            background:
+              phase === 'done'
+                ? 'var(--accent-green)'
+                : 'var(--accent-blue)',
+            transition: 'width 200ms ease-out',
+          }}
+        />
+      </div>
+    </div>
+  ) : null;
+
+  // BTCAAAAA-37771 review — Test Connection result banner is shared so the
+  // button works from both the AI Request and Current Analysis views.
+  const testResultBanner = testResult ? (
+    <div
+      role="status"
+      data-testid="ai-test-result"
+      className="rounded p-2 text-xs"
+      style={{
+        background: testResult.ok
+          ? 'var(--accent-green-tint)'
+          : 'var(--accent-red-tint)',
+        color: testResult.ok ? 'var(--accent-green)' : 'var(--accent-red)',
+        border: `1px solid ${
+          testResult.ok ? 'var(--accent-green)' : 'var(--accent-red)'
+        }`,
+      }}
+    >
+      <span className="font-semibold">{testResult.ok ? '✓ ' : '✗ '}</span>
+      {testResult.message}
+      {testResult.detail && (
+        <span className="block mt-1" style={{ color: 'var(--text-muted)' }}>
+          {testResult.detail}
+        </span>
+      )}
+    </div>
+  ) : null;
+
   // ── LEFT pane: config + active-form + Approve flow ──
   const leftPane = (
     <div className="flex flex-col gap-3">
@@ -1687,74 +1786,8 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
         </div>
       )}
 
-      {/* Progress indicator */}
-      {showProgress && (
-        <div
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          data-testid="ai-recs-progress"
-          className="rounded p-2 flex flex-col gap-1"
-          style={{
-            background: 'var(--bg-elevated)',
-            border: '1px solid var(--border)',
-          }}
-        >
-          <div className="flex items-center justify-between text-xs">
-            <span
-              data-testid="ai-recs-progress-label"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              {progressLabel}
-            </span>
-            <span className="flex items-center gap-2">
-              {phase === 'awaiting-provider' && awaitingEta !== null && (
-                <span
-                  data-testid="ai-recs-progress-eta"
-                  aria-live="off"
-                  style={{
-                    color: 'var(--text-muted)',
-                    fontFamily: 'var(--font-mono, monospace)',
-                  }}
-                >
-                  ~{awaitingEta}s
-                </span>
-              )}
-              <span
-                data-testid="ai-recs-progress-percent"
-                style={{
-                  color: 'var(--text-muted)',
-                  fontFamily: 'var(--font-mono, monospace)',
-                }}
-              >
-                {progressPercent}%
-              </span>
-            </span>
-          </div>
-          <div
-            role="progressbar"
-            aria-valuenow={progressPercent}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="AI recommendation request progress"
-            className="w-full h-1.5 rounded overflow-hidden"
-            style={{ background: 'var(--bg-card)' }}
-          >
-            <div
-              data-testid="ai-recs-progress-bar"
-              className="h-full rounded"
-              style={{
-                width: `${progressPercent}%`,
-                background:
-                  phase === 'done'
-                    ? 'var(--accent-green)'
-                    : 'var(--accent-blue)',
-                transition: 'width 200ms ease-out',
-              }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Progress indicator (shared with Current Analysis view) */}
+      {progressIndicator}
 
       {/* BTCAAAAA-38466 (Stream 5, B2) — preflight validation banners. The
           classifier is the single source of truth for which banner to
@@ -1982,39 +2015,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
                 : 'Approve & Send to AI'}
         </button>
       </div>
-      {testResult && (
-        <div
-          role="status"
-          data-testid="ai-test-result"
-          className="rounded p-2 text-xs"
-          style={{
-            background: testResult.ok
-              ? 'var(--accent-green-tint)'
-              : 'var(--accent-red-tint)',
-            color: testResult.ok
-              ? 'var(--accent-green)'
-              : 'var(--accent-red)',
-            border: `1px solid ${
-              testResult.ok
-                ? 'var(--accent-green)'
-                : 'var(--accent-red)'
-            }`,
-          }}
-        >
-          <span className="font-semibold">
-            {testResult.ok ? '✓ ' : '✗ '}
-          </span>
-          {testResult.message}
-          {testResult.detail && (
-            <span
-              className="block mt-1"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              {testResult.detail}
-            </span>
-          )}
-        </div>
-      )}
+      {testResultBanner}
     </div>
   );
 
@@ -2601,16 +2602,49 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
             title={reanalyzeTooltip}
             data-testid="ai-recs-reanalyze"
             data-dirty={isDirty ? 'true' : 'false'}
-            className="px-2 py-1 rounded text-[11px] font-medium"
+            data-analyzing={analyzing ? 'true' : 'false'}
+            aria-busy={analyzing}
+            className="px-2 py-1 rounded text-[11px] font-medium inline-flex items-center gap-1"
             style={{
-              background: !reanalyzeDisabled ? 'var(--accent-blue)' : 'var(--bg-card)',
-              color: !reanalyzeDisabled ? 'var(--text-on-accent)' : 'var(--text-faint)',
+              background: analyzing || !reanalyzeDisabled ? 'var(--accent-blue)' : 'var(--bg-card)',
+              color: analyzing || !reanalyzeDisabled ? 'var(--text-on-accent)' : 'var(--text-faint)',
               border: '1px solid var(--border)',
-              opacity: reanalyzeDisabled ? 0.5 : 1,
+              opacity: analyzing ? 0.9 : reanalyzeDisabled ? 0.5 : 1,
               cursor: reanalyzeDisabled ? 'not-allowed' : 'pointer',
             }}
           >
-            Re-analyze
+            {analyzing ? (
+              <>
+                <span
+                  aria-hidden="true"
+                  className="inline-block w-3 h-3 rounded-full animate-spin"
+                  style={{
+                    border: '2px solid var(--text-on-accent)',
+                    borderTopColor: 'transparent',
+                  }}
+                />
+                <span>{progressLabel || 'Analyzing'}{progressPercent ? ` ${progressPercent}%` : '…'}</span>
+              </>
+            ) : (
+              'Re-analyze'
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={handleTestConnection}
+            disabled={!aiSettingsHydrated || testing}
+            title="Verifies the saved AI provider/model respond to a minimal live request."
+            data-testid="ai-recs-test-connection-header"
+            className="px-2 py-1 rounded text-[11px] font-medium"
+            style={{
+              background: 'var(--bg-card)',
+              color: aiSettingsHydrated && !testing ? 'var(--text-secondary)' : 'var(--text-faint)',
+              border: '1px solid var(--border)',
+              opacity: aiSettingsHydrated && !testing ? 1 : 0.5,
+              cursor: aiSettingsHydrated && !testing ? 'pointer' : 'not-allowed',
+            }}
+          >
+            {testing ? 'Testing…' : 'Test Connection'}
           </button>
           <button
             type="button"
@@ -2630,6 +2664,12 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           </button>
         </div>
       </div>
+
+      {/* BTCAAAAA-37771 review — live status for Re-analyze / Test Connection
+          triggered from this header. Only the AI Request tab renders these
+          inline in leftPane, so guard against double-rendering there. */}
+      {currentView !== 'request' && progressIndicator}
+      {currentView !== 'request' && testResultBanner}
 
       {/* Tabs */}
       <div
