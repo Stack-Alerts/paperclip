@@ -30,6 +30,8 @@ import {
   TT_ANNUALIZED_RETURN, TT_MARGIN_OF_SAFETY, TT_AVG_TRADE_DURATION,
   TT_KELLY_CRITERION, TT_GROSS_PROFIT, TT_GROSS_LOSS,
   TT_LONG_WIN_RATE, TT_SHORT_WIN_RATE,
+  TT_MAX_DRAWDOWN_USD, TT_PEAK_CAPITAL, TT_RECOVERY_FACTOR,
+  TT_LONGEST_DRAWDOWN, TT_LIQUIDATION_BUFFER,
 } from './MetricsPanelTooltips';
 
 // TT_ADDITIONAL_METRICS is the umbrella tooltip for the expandable section
@@ -656,8 +658,8 @@ function RecentRunsSection({
                   <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>No equity curve captured</p>
                 )}
               </div>
-              {/* Stats */}
-              <div className="flex flex-col items-end leading-tight text-[10px] tabular-nums flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+              {/* Stats — pinned to the top-right corner of the card */}
+              <div className="self-start flex flex-col items-end leading-tight text-[10px] tabular-nums flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
                 <span>WR {(r.winRate * 100).toFixed(0)}%</span>
                 <span>{r.totalTrades} tr</span>
                 <span>DD {(r.maxDrawdown * 100).toFixed(1)}%</span>
@@ -1278,28 +1280,28 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
               value={`$${maxDDDollarVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
               icon={Coins}
               accent="red"
-              tooltip={{ title: 'Max Drawdown ($)', body: 'Largest peak-to-trough drop in account capital, measured in dollars.' }}
+              tooltip={TT_MAX_DRAWDOWN_USD}
             />
             <InfoCard
               label="Peak Capital"
               value={`$${peakCapital.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
               icon={TrendingUp}
               accent="green"
-              tooltip={{ title: 'Peak Capital', body: 'Highest account balance reached during the run — the high-water mark drawdowns are measured against.' }}
+              tooltip={TT_PEAK_CAPITAL}
             />
             <InfoCard
               label="Recovery Factor"
               value={recoveryFactor}
               icon={RotateCcw}
               accent="blue"
-              tooltip={{ title: 'Recovery Factor', body: 'Net profit divided by max drawdown in dollars. Higher means the strategy earned more per unit of capital damage.' }}
+              tooltip={TT_RECOVERY_FACTOR}
             />
             <InfoCard
               label="Longest Drawdown"
               value={longestDDRun > 0 ? `${longestDDRun} tr` : '—'}
               icon={Clock}
               accent="orange"
-              tooltip={{ title: 'Longest Drawdown', body: 'Most consecutive trades spent below a prior equity peak — how long capital stayed impaired before recovering.' }}
+              tooltip={TT_LONGEST_DRAWDOWN}
             />
             <InfoCard
               label="Liquidation Buffer"
@@ -1309,14 +1311,16 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
               subValue={liquidationThresholdPct != null
                 ? `${leverage}× → liq at −${liquidationThresholdPct.toFixed(1)}%`
                 : (riskPerTradePct != null ? `risk/trade ${riskPerTradePct}%` : undefined)}
-              tooltip={{ title: 'Liquidation Buffer', body: 'Headroom between the worst realised drawdown and the ~1/leverage adverse move that would liquidate a leveraged position. Negative means the drawdown would have breached liquidation at this leverage.' }}
+              tooltip={TT_LIQUIDATION_BUFFER}
             />
           </div>
         </>
       )}
 
       {/* Two side-by-side 3×2 sparkline-card panels (mockup middle rows) */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* mt-6: the inner SectionHeaders use first:mt-0, so the row spacer above
+          the Risk Metrics heading has to live on this wrapper. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 mt-6">
         <div>
           <SectionHeader title="Risk Metrics" subtitle="Volatility, drawdown, and downside risk measures" />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

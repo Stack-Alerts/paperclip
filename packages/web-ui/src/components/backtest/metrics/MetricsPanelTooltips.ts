@@ -1109,3 +1109,102 @@ export const TT_SHORT_WIN_RATE: TooltipContent = {
     },
   ],
 };
+
+// ── Draw Down Metrics (BTCAAAAA-38724) ─────────────────────────────────────────
+
+export const TT_MAX_DRAWDOWN_USD: TooltipContent = {
+  title: 'Max Drawdown ($)',
+  body: 'The largest peak-to-trough decline in account capital measured in dollars, not percent. It is the single worst run of realised losses the equity curve endured before making a new high-water mark.',
+  sections: [
+    {
+      header: 'Formula:',
+      items: ['Max DD $ = Peak Capital − Lowest Trough Capital (in dollars)'],
+    },
+    {
+      header: 'Critical for:',
+      items: [
+        'Absolute risk budgeting — the dollar figure an account must survive',
+        'Margin sizing — dollar drawdown vs. free collateral drives liquidation risk',
+        'Recovery Factor denominator — net profit per dollar of capital damage',
+      ],
+    },
+    { items: ['⚠️ Percentage drawdown hides scale; a 10% drop on $1M is far more capital than on $10k.'] },
+  ],
+};
+
+export const TT_PEAK_CAPITAL: TooltipContent = {
+  title: 'Peak Capital',
+  body: 'The highest account balance reached at any point during the run — the high-water mark that every subsequent drawdown is measured against.',
+  sections: [
+    {
+      header: 'Interpretation:',
+      items: [
+        'Rising peak across the run: equity curve is making new highs — healthy',
+        'Peak reached early then flat: strategy front-loaded gains, later stagnated',
+        'Peak ≈ final capital: the run ended near its best — minimal give-back',
+      ],
+    },
+    { items: ['⚠️ Peak is a high-water mark, not a target — chasing it invites over-leverage.'] },
+  ],
+};
+
+export const TT_RECOVERY_FACTOR: TooltipContent = {
+  title: 'Recovery Factor',
+  body: 'Net profit divided by maximum dollar drawdown. It answers: for every dollar of worst-case capital damage, how many dollars did the strategy ultimately earn? Higher is better.',
+  sections: [
+    {
+      header: 'Formula:',
+      items: ['Recovery Factor = Net Profit / Max Drawdown ($)'],
+    },
+    {
+      header: 'Benchmarks:',
+      items: [
+        '< 1: Profit smaller than worst drawdown — fragile, hard to trade live',
+        '1–3: Acceptable — recovers its damage with a modest margin',
+        '3–5: Strong — earns several times its worst drawdown',
+        '> 5: Excellent — verify the drawdown sample is not understated',
+      ],
+    },
+    { items: ['⚠️ A short backtest can inflate this ratio by never sampling a true tail drawdown.'] },
+  ],
+};
+
+export const TT_LONGEST_DRAWDOWN: TooltipContent = {
+  title: 'Longest Drawdown',
+  body: 'The most consecutive trades spent below a prior equity peak — how long capital stayed underwater before the strategy clawed back to a new high. Measures pain duration, not depth.',
+  sections: [
+    {
+      header: 'Interpretation:',
+      items: [
+        'Short underwater runs: quick recovery — easier to hold through psychologically',
+        'Long underwater runs: extended stagnation even if depth is shallow',
+        'Pair with Max Drawdown $: depth × duration defines the full drawdown shape',
+      ],
+    },
+    { items: ['⚠️ Long underwater periods are the top reason traders abandon a profitable system.'] },
+  ],
+};
+
+export const TT_LIQUIDATION_BUFFER: TooltipContent = {
+  title: 'Liquidation Buffer',
+  body: 'Headroom between the worst realised drawdown and the ~1/leverage adverse move that would liquidate a leveraged position. A negative buffer means the drawdown would have breached the liquidation price at this leverage.',
+  sections: [
+    {
+      header: 'Formula:',
+      items: [
+        'Liquidation move ≈ 1 / leverage (e.g. 10× → ~10% adverse move liquidates)',
+        'Buffer = Liquidation move % − Worst drawdown %',
+      ],
+    },
+    {
+      header: 'Benchmarks:',
+      items: [
+        '< 0%: Drawdown would have liquidated — reduce leverage or risk/trade',
+        '0–5%: Razor-thin — a single worse-than-backtest move wipes the account',
+        '5–15%: Workable — retains margin for live slippage and gaps',
+        '> 15%: Comfortable — leverage is conservative relative to observed risk',
+      ],
+    },
+    { items: ['⚠️ Live wicks and funding can exceed backtest drawdown — treat a thin buffer as unsafe.'] },
+  ],
+};

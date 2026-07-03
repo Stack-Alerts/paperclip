@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useContext, useEffect, useRef, createContext, startTransition } from 'react';
-import { X, Play, Square, Pause, Settings, Terminal, TrendingUp, BarChart3, BarChart2, Sparkles, GitCompare, ChevronUp, ChevronDown } from 'lucide-react';
+import { X, Play, Square, Pause, Settings, Terminal, TrendingUp, BarChart3, BarChart2, Sparkles, GitCompare, ChevronUp, ChevronDown, Loader2, CheckCircle2 } from 'lucide-react';
 import { AppBrand } from '@/components/shared/AppBrand';
 import { ThemeSelector } from './ThemeSelector';
 import { useTooltipSettings } from './TooltipSettingsContext';
@@ -1725,6 +1725,11 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
   });
   const [outputLogs, setOutputLogs] = useState<BacktestStatusMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // BTCAAAAA-38724: transient banner shown while a saved run is loaded back
+  // into every tab (metrics / trades / AI / live output / compare) via Apply.
+  const [applyStatus, setApplyStatus] = useState<{ phase: 'loading' | 'success'; message: string } | null>(null);
+  const applyStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (applyStatusTimerRef.current) clearTimeout(applyStatusTimerRef.current); }, []);
 
   // BTCAAAAA-34942: tail in-flight logs from the store so the Live Output /
   // STATUS panels update during the run instead of waiting for the 30 min
@@ -2041,7 +2046,33 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
     if (fc.testingDays != null) setTestingDays(fc.testingDays);
     if (fc.maxLeverage != null) setLeverage(fc.maxLeverage);
     if (fc.confluenceThreshold != null) setConfluence(fc.confluenceThreshold);
+
+    // BTCAAAAA-38724: Apply must also load the run's *results* — not just the
+    // config — so Metrics / Trades / AI Recommendations / Live Output / Compare
+    // all repopulate for the selected run. The store's backTestResult drives
+    // every one of those tabs, so push the saved snapshot straight in.
+    const runLabel = new Date(record.savedAt).toLocaleString();
+    if (applyStatusTimerRef.current) clearTimeout(applyStatusTimerRef.current);
+    setApplyStatus({ phase: 'loading', message: `Loading configuration, metrics, trades, AI recommendations, live outputs and compare for run ${runLabel}…` });
+
+    if (record.result) {
+      // Suppress the auto-save effect from re-persisting this loaded run as a
+      // brand-new history entry (it keys on backTestResult.runId).
+      savedRunIdRef.current = record.result.runId;
+      useStrategyStore.setState({ backTestResult: record.result, backTestLogs: [] });
+      // Saved runs don't retain their live-output log stream, so synthesize a
+      // summary line so the Live Output tab isn't blank after Apply.
+      setOutputLogs([{
+        message: `Loaded saved run from ${runLabel} — ${record.result.totalTrades} trades, ${record.result.returnPercentage >= 0 ? '+' : ''}${record.result.returnPercentage.toFixed(2)}% return. (Original live-output log not retained in history.)`,
+        level: 'SYSTEM',
+        timestamp: new Date().toISOString(),
+      }]);
+    }
     setActiveTab('config');
+    applyStatusTimerRef.current = setTimeout(() => {
+      setApplyStatus({ phase: 'success', message: `Loaded configuration, metrics, AI recommendations, trades, live outputs and compare for run ${runLabel}.` });
+      applyStatusTimerRef.current = setTimeout(() => setApplyStatus(null), 4000);
+    }, 450);
   }, []);
 
   // Persist each completed run to the compare-panel history.
@@ -2050,6 +2081,10 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
     if (!backTestResult || !currentStrategy) return;
     if (backTestResult.status !== 'completed') return;
     if (savedRunIdRef.current === backTestResult.runId) return;
+    // Run-once-per-runId dedup guard. applyRunConfig also writes this ref to
+    // suppress re-persisting a just-loaded run, which makes the React Compiler
+    // treat the ref as hook-captured; the mutation here is safe and intended.
+    // eslint-disable-next-line react-hooks/immutability
     savedRunIdRef.current = backTestResult.runId;
     const fc: import('@/lib/strategy-builder/types').BacktestConfigFull = {
       strategyId: currentStrategy.id,
@@ -2541,6 +2576,30 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
             <FontScalePicker scale={fontScale} onChange={updateFontScale} />
           </div>
         </div>
+
+        {/* BTCAAAAA-38724: Apply-from-history status banner. Shows a loading
+            state while a saved run is pushed into every result tab, then a
+            success confirmation, then auto-dismisses. */}
+        {applyStatus && (
+          <div
+            data-testid="apply-run-status"
+            className="flex flex-shrink-0 items-center gap-2 px-4 py-1.5 text-[11px]"
+            style={{
+              borderBottom: '1px solid var(--border)',
+              background: applyStatus.phase === 'success'
+                ? 'color-mix(in srgb, var(--accent-green) 12%, transparent)'
+                : 'color-mix(in srgb, var(--accent-blue) 12%, transparent)',
+              color: applyStatus.phase === 'success' ? 'var(--accent-green)' : 'var(--accent-blue)',
+            }}
+            role="status"
+            aria-live="polite"
+          >
+            {applyStatus.phase === 'loading'
+              ? <Loader2 size={13} className="animate-spin flex-shrink-0" />
+              : <CheckCircle2 size={13} className="flex-shrink-0" />}
+            <span className="truncate">{applyStatus.message}</span>
+          </div>
+        )}
 
         {/* ── Tab content ── */}
         {/* Vertical padding tightened from `py-4` → `py-2` (board revision
