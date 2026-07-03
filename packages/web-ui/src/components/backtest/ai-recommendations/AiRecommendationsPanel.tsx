@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, ExternalLink } from 'lucide-react';
+import { X } from 'lucide-react';
 import { BacktestResult, Strategy } from '@/lib/strategy-builder/types';
 import { useAiSettings } from '@/hooks/useAiSettings';
 import { useAiProviderAvailability } from '@/hooks/useAiProviderAvailability';
@@ -325,6 +325,12 @@ export interface AiRecommendationsPanelProps {
    * read-only / preview contexts.
    */
   onStrategyUpdated?: (strategy: Strategy) => void;
+  /**
+   * Called whenever the applied-recommendation count changes. Lets the parent
+   * (BacktestConfigDialog) render the `Realtime · N changes applied` indicator
+   * in the outer tab bar instead of the panel header (board mockup 7aff6a2e).
+   */
+  onAppliedCountChange?: (count: number) => void;
 }
 
 interface ActiveRec {
@@ -396,6 +402,7 @@ export function AiRecommendationsPanel({
   strategy,
   backtestConfig,
   onStrategyUpdated,
+  onAppliedCountChange,
 }: AiRecommendationsPanelProps = {}) {
   const hasTrades = (result?.trades?.length ?? 0) > 0;
   const { settings, hydrated: aiSettingsHydrated } = useAiSettings();
@@ -557,6 +564,13 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   const [appliedRecIds, setAppliedRecIds] = useState<string[]>(
     () => readInitialCache()?.appliedRecIds ?? [],
   );
+
+  // Surface the applied-count to the parent so it can render the
+  // `Realtime · N changes applied` indicator in the outer tab bar
+  // (board mockup 7aff6a2e — moved out of this panel's header).
+  useEffect(() => {
+    onAppliedCountChange?.(appliedRecIds.length);
+  }, [appliedRecIds.length, onAppliedCountChange]);
   const [preApplySnapshots, setPreApplySnapshots] = useState<
     Array<[string, Strategy]>
   >(() => readInitialCache()?.preApplySnapshots ?? []);
@@ -1374,11 +1388,6 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
     },
     [canSend, isDirty, lastAnalysisHash],
   );
-
-  const handlePopOut = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    window.open(window.location.href, '_blank', 'noopener,width=1200,height=800');
-  }, []);
 
   const showProgress = phase !== 'idle' && phase !== 'error';
   const progressPercent = phase === 'idle' || phase === 'error' ? 0 : PHASE_INFO[phase as Exclude<SendPhase, 'idle' | 'error'>].percent;
@@ -2559,33 +2568,13 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
 
   return (
     <div className="flex flex-col gap-3">
-      {/* BTCAAAAA-37773 / Sprint A1 — persistent header row.
-          Left: realtime applied-changes indicator.
-          Right: entries · PF · WR · Re-analyze · Pop Out ↗ */}
+      {/* BTCAAAAA-37771 — panel header row (board mockup 7aff6a2e).
+          Realtime indicator lifted to the outer tab bar; Pop Out removed.
+          Left: entries · PF · WR   Right: Re-analyze */}
       <div
         data-testid="ai-recs-header"
         className="flex items-center justify-between gap-3 flex-wrap"
       >
-        <div
-          data-testid="ai-recs-realtime"
-          className="flex items-center gap-1.5 text-[11px]"
-          style={{
-            color: 'var(--text-muted)',
-            fontFamily: 'var(--font-mono, monospace)',
-          }}
-          title="Number of recommendations currently applied to the strategy."
-        >
-          <span
-            aria-hidden="true"
-            className="inline-block w-1.5 h-1.5 rounded-full"
-            style={{ background: 'var(--accent-green)' }}
-          />
-          <span>Realtime</span>
-          <span style={{ color: 'var(--text-faint)' }} aria-hidden="true">·</span>
-          <span data-testid="ai-recs-realtime-count">
-            {appliedRecIds.length} {appliedRecIds.length === 1 ? 'change' : 'changes'} applied
-          </span>
-        </div>
         <div
           data-testid="ai-recs-header-chips"
           className="flex items-center gap-2 text-[11px]"
@@ -2601,7 +2590,28 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           <span data-testid="ai-recs-chip-pf" title="Profit factor">PF {pfChip}</span>
           <span style={{ color: 'var(--text-faint)' }} aria-hidden="true">·</span>
           <span data-testid="ai-recs-chip-wr" title="Win rate">WR {wrChip}</span>
-          <span style={{ color: 'var(--text-faint)' }} aria-hidden="true">·</span>
+        </div>
+        <div
+          data-testid="ai-recs-header-actions"
+          className="flex items-center gap-2"
+        >
+          <button
+            type="button"
+            onClick={handleTestConnection}
+            disabled={!aiSettingsHydrated || testing}
+            title="Verifies the saved AI provider/model respond to a minimal live request."
+            data-testid="ai-recs-test-connection-header"
+            className="px-2 py-1 rounded text-[11px] font-medium"
+            style={{
+              background: 'var(--bg-card)',
+              color: aiSettingsHydrated && !testing ? 'var(--text-secondary)' : 'var(--text-faint)',
+              border: '1px solid var(--border)',
+              opacity: aiSettingsHydrated && !testing ? 1 : 0.5,
+              cursor: aiSettingsHydrated && !testing ? 'pointer' : 'not-allowed',
+            }}
+          >
+            {testing ? 'Testing…' : 'Test Connection'}
+          </button>
           <button
             type="button"
             onClick={handleReanalyzeClick}
@@ -2635,39 +2645,6 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
             ) : (
               'Re-analyze'
             )}
-          </button>
-          <button
-            type="button"
-            onClick={handleTestConnection}
-            disabled={!aiSettingsHydrated || testing}
-            title="Verifies the saved AI provider/model respond to a minimal live request."
-            data-testid="ai-recs-test-connection-header"
-            className="px-2 py-1 rounded text-[11px] font-medium"
-            style={{
-              background: 'var(--bg-card)',
-              color: aiSettingsHydrated && !testing ? 'var(--text-secondary)' : 'var(--text-faint)',
-              border: '1px solid var(--border)',
-              opacity: aiSettingsHydrated && !testing ? 1 : 0.5,
-              cursor: aiSettingsHydrated && !testing ? 'pointer' : 'not-allowed',
-            }}
-          >
-            {testing ? 'Testing…' : 'Test Connection'}
-          </button>
-          <button
-            type="button"
-            onClick={handlePopOut}
-            title="Open this panel in a detached window"
-            data-testid="ai-recs-popout"
-            className="px-2 py-1 rounded text-[11px] font-medium flex items-center gap-1"
-            style={{
-              background: 'var(--bg-card)',
-              color: 'var(--text-secondary)',
-              border: '1px solid var(--border)',
-              cursor: 'pointer',
-            }}
-          >
-            Pop Out
-            <ExternalLink size={11} aria-hidden="true" />
           </button>
         </div>
       </div>

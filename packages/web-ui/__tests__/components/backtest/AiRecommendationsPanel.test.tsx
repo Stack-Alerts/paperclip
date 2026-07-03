@@ -1459,7 +1459,9 @@ describe('AiRecommendationsPanel — KPI re-projection (Sprint B6)', () => {
     '   Parameter: maxAllocation\n' +
     '   Suggested Value: 15';
 
-  async function renderWithAnalysis() {
+  async function renderWithAnalysis(
+    extraProps: Partial<React.ComponentProps<typeof AiRecommendationsPanel>> = {},
+  ) {
     const fetchMock = jest.fn().mockImplementation((url: string) => {
       const u = String(url);
       if (u.includes('/api/ai/analyze')) {
@@ -1487,6 +1489,7 @@ describe('AiRecommendationsPanel — KPI re-projection (Sprint B6)', () => {
         result={makeResult()}
         strategy={makeStrategy()}
         backtestConfig={{}}
+        {...extraProps}
       />,
     );
 
@@ -1524,17 +1527,23 @@ describe('AiRecommendationsPanel — KPI re-projection (Sprint B6)', () => {
     expect(screen.getByTestId('strategy-impact-applied-chip')).toHaveTextContent('1 applied');
   });
 
-  it('realtime header count updates to "1 change applied" after toggling a rec on', async () => {
-    await renderWithAnalysis();
+  it('reports applied count via onAppliedCountChange after toggling a rec on', async () => {
+    // BTCAAAAA-37771: the `Realtime · N changes applied` indicator moved out of
+    // this panel to the outer tab bar (board mockup 7aff6a2e). The panel now
+    // surfaces the count through the onAppliedCountChange callback instead of
+    // rendering it inline, so the realtime element no longer lives here.
+    const onAppliedCountChange = jest.fn();
+    await renderWithAnalysis({ onAppliedCountChange });
 
-    expect(screen.getByTestId('ai-recs-realtime-count')).toHaveTextContent('0 changes applied');
+    expect(screen.queryByTestId('ai-recs-realtime-count')).toBeNull();
+    expect(onAppliedCountChange).toHaveBeenLastCalledWith(0);
 
     const cards = screen.getAllByTestId('ai-recs-toggle-card');
     const toggle = within(cards[0]).getByRole('checkbox');
     fireEvent.click(toggle);
 
     await waitFor(() => {
-      expect(screen.getByTestId('ai-recs-realtime-count')).toHaveTextContent('1 change applied');
+      expect(onAppliedCountChange).toHaveBeenLastCalledWith(1);
     });
   });
 

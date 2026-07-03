@@ -1662,6 +1662,10 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
   const { settings: tooltipSettings, update: updateTooltipSettings } = useTooltipSettings();
 
   const [activeTab, setActiveTab] = useState<TabKey>('config');
+  // Applied-recommendation count surfaced from AiRecommendationsPanel so the
+  // `Realtime · N changes applied` indicator can live in the tab bar row on
+  // the AI tab (board mockup 7aff6a2e).
+  const [aiAppliedCount, setAiAppliedCount] = useState(0);
   // Font scale picked from header Aa−/Aa+ control. Defaults to `Normal` per
   // BTCAAAAA-34264 acceptance #1; reads the persisted choice on mount so each
   // dialog open respects the user's last selection.
@@ -2492,6 +2496,30 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
               </button>
             );
           })}
+          {/* BTCAAAAA-37771 — Realtime applied-changes indicator lives on the
+              tab bar row (board mockup 7aff6a2e), shown only on the AI tab. */}
+          {activeTab === 'ai' && (
+            <div
+              data-testid="ai-recs-realtime"
+              className="flex items-center gap-1.5 ml-auto pr-2 text-[11px] whitespace-nowrap self-center"
+              style={{
+                color: 'var(--text-muted)',
+                fontFamily: 'var(--font-mono, monospace)',
+              }}
+              title="Number of recommendations currently applied to the strategy."
+            >
+              <span
+                aria-hidden="true"
+                className="inline-block w-1.5 h-1.5 rounded-full"
+                style={{ background: 'var(--accent-green)' }}
+              />
+              <span>Realtime</span>
+              <span style={{ color: 'var(--text-faint)' }} aria-hidden="true">·</span>
+              <span data-testid="ai-recs-realtime-count">
+                {aiAppliedCount} {aiAppliedCount === 1 ? 'change' : 'changes'} applied
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ── Tab content ── */}
@@ -2572,6 +2600,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
             <AiRecommendationsPanel
               result={backTestResult}
               strategy={currentStrategy}
+              onAppliedCountChange={setAiAppliedCount}
               backtestConfig={{
                 startDate: config.startDate,
                 endDate: config.endDate,
