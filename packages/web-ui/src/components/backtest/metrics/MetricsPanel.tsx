@@ -605,15 +605,15 @@ function RecentRunsSection({
                   )}
                 </div>
                 <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-faint)' }}>{record.strategyName}</p>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-sm font-bold tabular-nums" style={{ color: accent }}>
+                <div className="flex items-center justify-between gap-2 mt-1">
+                  <span className="text-lg font-bold tabular-nums leading-none" style={{ color: accent }}>
                     {r.returnPercentage >= 0 ? '+' : ''}{r.returnPercentage.toFixed(2)}%
                   </span>
-                </div>
-                <div className="flex gap-2 mt-0.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                  <span>WR {(r.winRate * 100).toFixed(0)}%</span>
-                  <span>{r.totalTrades} tr</span>
-                  <span>DD {(r.maxDrawdown * 100).toFixed(1)}%</span>
+                  <div className="flex flex-col items-end leading-tight text-[10px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                    <span>WR {(r.winRate * 100).toFixed(0)}%</span>
+                    <span>{r.totalTrades} tr</span>
+                    <span>DD {(r.maxDrawdown * 100).toFixed(1)}%</span>
+                  </div>
                 </div>
               </div>
               <div className="min-w-0">
