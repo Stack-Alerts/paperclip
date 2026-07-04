@@ -2085,41 +2085,10 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
       </div>
 
       {rightTab === 'recs' && (<div id="ai-recs-right-panel-recs" role="tabpanel" aria-labelledby="ai-recs-right-tab-recs">
-      {/* Diagnosis card: compact summary at the top so the grid below has
-          room. The detailed prose is still rendered in full; we just do
-          not crowd it next to the per-rec cards. */}
-      <div
-        className="rounded p-3"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-      >
-        <p
-          className="text-xs font-semibold uppercase tracking-wide mb-2"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          STRATEGY DIAGNOSIS
-        </p>
-        {aiAnalysis?.diagnosis ? (
-          <p
-            className="text-xs whitespace-pre-wrap"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            {aiAnalysis.diagnosis}
-          </p>
-        ) : aiAnalysis?.raw ? (
-          <p
-            className="text-xs whitespace-pre-wrap"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            {aiAnalysis.raw}
-          </p>
-        ) : (
-          <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
-            {result
-              ? 'Awaiting AI analysis. Use “Approve & Send to AI” below once the request preview is verified.'
-              : 'Run a backtest first, then use “Approve & Send to AI” to receive a strategy diagnosis.'}
-          </p>
-        )}
-      </div>
+      {/* BTCAAAAA-37748 — the mockup's Current Analysis face has no inline
+          "Strategy Diagnosis" prose block; the full diagnosis lives in the
+          Diagnose sub-tab (DiagnosePane). Keeping it here diverged the live
+          view from the board-approved mockup, so it is intentionally omitted. */}
 
       {/* Q7 (BTCAAAAA-38564): when viewing a past analysis, show a read-only
           banner above the KPI bar so the user knows they're in snapshot mode. */}
