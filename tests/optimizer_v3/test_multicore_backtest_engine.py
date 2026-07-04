@@ -477,5 +477,131 @@ class TestBacktestModes(unittest.TestCase):
         self.assertFalse(ids1 & ids3, "Segment 1 and 3 overlap")
 
 
+class TestMinRiskRewardEntryFilter(unittest.TestCase):
+    """BTCAAAAA-38762: Min R:R must act as an entry filter, so raising it
+    monotonically reduces (or holds) the trade count on a fixed dataset."""
+
+    def setUp(self):
+        get_trade_registry().clear()
+
+    def _make_bars(self, count: int) -> List[Bar]:
+        bars = []
+        base_time = int(datetime(2025, 1, 1).timestamp() * 1e9)
+        instrument_id = InstrumentId(Symbol("BTC"), Venue("BINANCE"))
+        bar_type = BarType(
+            instrument_id,
+            BarSpecification(15, BarAggregation.MINUTE, PriceType.LAST),
+            AggregationSource.EXTERNAL,
+        )
+        for i in range(count):
+            ts = base_time + i * 15 * 60 * int(1e9)
+            bars.append(Bar(
+                bar_type=bar_type,
+                open=Price(50000.0 + i, 2),
+                high=Price(50100.0 + i, 2),
+                low=Price(49900.0 + i, 2),
+                close=Price(50050.0 + i, 2),
+                volume=Quantity(10.0, 8),
+                ts_event=ts,
+                ts_init=ts,
+            ))
+        return bars
+
+    def _run_chunk_with_min_rr(self, bars, min_rr):
+        """Run a single in-process chunk with a stub evaluator that fires an
+        entry whenever flat and a signal-exit on the next bar, so every
+        accepted entry closes deterministically. Returns (num_trades,
+        rr_rejections)."""
+        import src.optimizer_v3.core.institutional_signal_evaluator as ev_mod
+        from src.optimizer_v3.core.institutional_signal_evaluator import (
+            SignalEvaluationResult, TradeState,
+        )
+        from src.optimizer_v3.core.multicore_backtest_engine import (
+            evaluate_chunk, ChunkData,
+        )
+
+        class _StubEvaluator:
+            def __init__(self, config):
+                self.current_trade = None
+
+            def evaluate_bar(self, current_bar, i, lookback_bars, total_bars):
+                in_trade = self.current_trade is not None
+                return SignalEvaluationResult(
+                    confluence_score=100,
+                    signals_fired=['test_block::test_signal'],
+                    recheck_confirmations=[],
+                    should_enter=not in_trade,
+                    should_exit=in_trade,  # close the bar after entry
+                    exit_percentage=1.0,
+                    exit_reason='Signal Exit',
+                    timing_violations=[],
+                    bar_index=i,
+                    timestamp=datetime(2025, 1, 1),
+                )
+
+            def enter_trade(self, current_bar, i, side, signals_fired):
+                self.current_trade = TradeState(
+                    entry_bar=i,
+                    entry_price=current_bar.close,
+                    entry_side=side,
+                    entry_signals=list(signals_fired),
+                )
+
+            def exit_trade(self, percentage):
+                if self.current_trade:
+                    self.current_trade.remaining_position -= percentage
+                    if self.current_trade.remaining_position <= 0.01:
+                        self.current_trade = None
+
+        original = ev_mod.InstitutionalSignalEvaluator
+        ev_mod.InstitutionalSignalEvaluator = _StubEvaluator
+        try:
+            chunk = ChunkData(
+                chunk_id=0,
+                bars=bars,
+                global_start_idx=0,
+                global_end_idx=len(bars),
+                overlap_bars=0,
+            )
+            backtest_config = {
+                'timeframe': '15m',
+                'starting_capital': 10000,
+                'risk_per_trade_pct': 10,
+                'min_risk_reward': min_rr,
+                'max_leverage': 10,
+                'max_bars_held': 200,
+                'tpsl_mode': 'Fibonacci',
+                'adaptive_sl': {'enabled': False},
+            }
+            result = evaluate_chunk(chunk, {'strategy_type': 'Bullish'}, backtest_config, 'LONG')
+        finally:
+            ev_mod.InstitutionalSignalEvaluator = original
+
+        self.assertEqual(result.errors, [], f"chunk errored: {result.errors}")
+        return len(result.trades), result.rr_rejections
+
+    def test_trade_count_monotonic_in_min_rr(self):
+        bars = self._make_bars(400)
+        counts = []
+        rejections = []
+        for min_rr in (0.0, 1.2, 1.8, 3.5):
+            n, rej = self._run_chunk_with_min_rr(bars, min_rr)
+            counts.append(n)
+            rejections.append(rej)
+
+        # Non-increasing as the minimum rises.
+        for earlier, later in zip(counts, counts[1:]):
+            self.assertGreaterEqual(earlier, later, f"counts not monotonic: {counts}")
+
+        # No filtering at min_rr=0; a high minimum rejects every candidate.
+        self.assertEqual(rejections[0], 0)
+        self.assertGreater(counts[0], 0, "stub evaluator should produce trades")
+        self.assertEqual(counts[-1], 0, "min_rr=3.5 must reject all ramp candidates")
+        self.assertGreater(rejections[-1], 0)
+
+        # 1.2 vs 3.5 must differ: ramp candidates have natural R:R in between.
+        self.assertGreater(counts[1], counts[3])
+
+
 if __name__ == '__main__':
     unittest.main()

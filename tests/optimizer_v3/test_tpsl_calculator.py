@@ -91,6 +91,40 @@ class TestTPSLCalculator:
         calc1 = get_tpsl_calculator()
         calc2 = get_tpsl_calculator()
         assert calc1 is calc2
+
+    def test_natural_rr_populated_fixed(self):
+        """BTCAAAAA-38762: Fixed mode populates natural R:R (no clamp -> equals rr)."""
+        calc = TPSLCalculator()
+        levels = calc.calculate_levels(
+            entry_price=50000.0,
+            mode='Fixed',
+            lookback_bars=[],
+            config={'fixed_sl_percent': 1.0, 'fixed_tp_percent': 2.0},
+            entry_side='LONG',
+        )
+        assert levels.natural_risk_reward_ratio == pytest.approx(2.0, rel=1e-6)
+        assert levels.risk_reward_ratio == pytest.approx(2.0, rel=1e-6)
+
+    def test_natural_rr_is_pre_clamp_fibonacci(self):
+        """BTCAAAAA-38762: natural R:R is captured BEFORE the min_rr TP-clamp.
+
+        With a high min_risk_reward the clamp moves TP1 up so risk_reward_ratio
+        equals the minimum, while natural_risk_reward_ratio retains the true
+        (lower) geometry that the entry filter must gate on.
+        """
+        calc = TPSLCalculator()
+        bars = create_bars_with_swing(swing_low=49500.0, swing_high=50000.0, num_bars=20)
+        levels = calc.calculate_levels(
+            entry_price=50000.0,
+            mode='Fibonacci',
+            lookback_bars=bars,
+            config={'min_risk_reward': 5.0},
+            entry_side='LONG',
+        )
+        # Post-clamp rr is raised to the configured minimum...
+        assert levels.risk_reward_ratio == pytest.approx(5.0, rel=1e-6)
+        # ...but the natural (pre-clamp) rr is strictly below it.
+        assert 0.0 < levels.natural_risk_reward_ratio < 5.0
     
     def test_fibonacci_calculation_long(self):
         """Test Fibonacci TP/SL calculation for LONG"""

@@ -31,6 +31,11 @@ class TPSLLevels:
     swing_high: Optional[float] = None
     swing_low: Optional[float] = None
     risk_reward_ratio: float = 0.0
+    # Pre-clamp R:R of the natural TP1/SL geometry, captured BEFORE the
+    # min_risk_reward TP-clamp moves TP1. The engine uses this as the entry
+    # filter gate (BTCAAAAA-38762); risk_reward_ratio above is the post-clamp
+    # value used for reporting/TP placement.
+    natural_risk_reward_ratio: float = 0.0
 
 
 class TPSLCalculator:
@@ -193,7 +198,9 @@ class TPSLCalculator:
         risk = abs(entry_price - stop_loss)
         reward = abs(take_profit_1 - entry_price)
         risk_reward_ratio = reward / risk if risk > 0 else 0
-        
+        # Capture the natural (pre-clamp) R:R for the entry filter gate.
+        natural_risk_reward_ratio = risk_reward_ratio
+
         # WIRING FIX: Validate min R:R ratio from config (if provided)
         if config:
             min_rr = config.get('min_risk_reward', 1.5)
@@ -216,7 +223,8 @@ class TPSLCalculator:
             calculation_mode='Fibonacci',
             swing_high=swing_high,
             swing_low=swing_low,
-            risk_reward_ratio=risk_reward_ratio
+            risk_reward_ratio=risk_reward_ratio,
+            natural_risk_reward_ratio=natural_risk_reward_ratio
         )
     
     def _calculate_hybrid_levels(
@@ -275,7 +283,9 @@ class TPSLCalculator:
         risk = abs(entry_price - fib_levels.stop_loss)
         reward = abs(fib_levels.take_profit_1 - entry_price)
         fib_levels.risk_reward_ratio = reward / risk if risk > 0 else 0
-        
+        # Capture the natural (pre-clamp) R:R for the entry filter gate.
+        fib_levels.natural_risk_reward_ratio = fib_levels.risk_reward_ratio
+
         # WIRING FIX: Validate min R:R ratio from config!
         min_rr = config.get('min_risk_reward', 1.5)
         if fib_levels.risk_reward_ratio < min_rr and risk > 0:
@@ -329,7 +339,8 @@ class TPSLCalculator:
             take_profit_2=take_profit_2,
             take_profit_3=take_profit_3,
             calculation_mode='Fixed',
-            risk_reward_ratio=risk_reward_ratio
+            risk_reward_ratio=risk_reward_ratio,
+            natural_risk_reward_ratio=risk_reward_ratio
         )
     
     def _calculate_atr(self, bars: List[Bar], period: int = 14) -> float:

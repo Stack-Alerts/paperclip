@@ -141,6 +141,7 @@ class ChunkResult:
     errors: List[str]
     messages: List[Dict[str, str]]  # NEW: Collected live messages for Live Output
     sl_adjustments: int = 0  # CRITICAL FIX: Track Adaptive SL updates
+    rr_rejections: int = 0  # BTCAAAAA-38762: entries skipped by Min R:R filter
     # {block_name: {signal_name: [iso_date_str, ...]}} — one entry per signal fire per date
     signal_dates_by_block: Dict[str, Dict[str, List[str]]] = field(default_factory=dict)
 
@@ -285,6 +286,7 @@ def evaluate_chunk(
         total_bars = len(bars)
         
         trade_count = 0  # Track trade count for messages
+        rr_rejections = 0  # BTCAAAAA-38762: entries skipped by Min R:R filter
         
         # Calculate actual processing range (exclude overlap)
         # We need overlap for lookback, but only process core chunk
@@ -319,6 +321,31 @@ def evaluate_chunk(
 
             # ENTRY DECISION
             if result.should_enter and not evaluator.current_trade:
+                # Compute prospective TP/SL BEFORE opening the trade so Min R:R
+                # can act as an entry filter (BTCAAAAA-38762). entry_price here
+                # mirrors the value used post-entry (current bar close).
+                from src.optimizer_v3.core.tpsl_calculator import get_tpsl_calculator
+                tpsl_calc = get_tpsl_calculator()
+
+                entry_price = round(float(current_bar.close), 2)
+                tpsl_mode = backtest_config.get('tpsl_mode', 'Fibonacci')
+
+                tpsl_levels = tpsl_calc.calculate_levels(
+                    entry_price=entry_price,
+                    mode=tpsl_mode,
+                    lookback_bars=lookback_bars,
+                    config=backtest_config,
+                    entry_side=side
+                )
+
+                # ENTRY FILTER: reject trades whose natural (pre-clamp) R:R is
+                # below the configured minimum. min_risk_reward <= 0 (or absent)
+                # disables the gate, preserving legacy no-filter behavior.
+                min_rr = float(backtest_config.get('min_risk_reward', 0) or 0)
+                if min_rr > 0 and tpsl_levels.natural_risk_reward_ratio < min_rr:
+                    rr_rejections += 1
+                    continue
+
                 trade_count += 1
 
                 # Enter trade with signals that fired
@@ -359,22 +386,8 @@ def evaluate_chunk(
                         _ep, _bar_low, _bar_high, i, _ts_utc, _bar_close,
                     )
 
-                # Calculate TP/SL levels
-                from src.optimizer_v3.core.tpsl_calculator import get_tpsl_calculator
-                tpsl_calc = get_tpsl_calculator()
-
-                entry_price = round(float(current_bar.close), 2)
-                tpsl_mode = backtest_config.get('tpsl_mode', 'Fibonacci')
-                
-                tpsl_levels = tpsl_calc.calculate_levels(
-                    entry_price=entry_price,
-                    mode=tpsl_mode,
-                    lookback_bars=lookback_bars,
-                    config=backtest_config,
-                    entry_side=side
-                )
-                
-                # Store in trade state
+                # TP/SL levels were computed above (pre-entry) for the R:R
+                # filter; store the accepted trade's levels in trade state.
                 evaluator.current_trade.tpsl_levels = tpsl_levels
                 evaluator.current_trade.initial_sl = tpsl_levels.stop_loss
                 
@@ -790,6 +803,7 @@ def evaluate_chunk(
             errors=errors,
             messages=messages,
             sl_adjustments=sl_adjustment_count,
+            rr_rejections=rr_rejections,
             signal_dates_by_block=plain_signal_dates,
         )
 
@@ -842,6 +856,7 @@ def merge_chunk_results(
     all_errors = []
     all_messages = []
     total_sl_adjustments = 0  # CRITICAL FIX: Accumulate SL adjustments
+    total_rr_rejections = 0  # BTCAAAAA-38762: Accumulate Min R:R filter rejections
     merged_signal_dates: Dict[str, Dict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
 
     # Sort by chunk_id
@@ -859,6 +874,7 @@ def merge_chunk_results(
         all_errors.extend(result.errors)
         all_messages.extend(result.messages)
         total_sl_adjustments += result.sl_adjustments  # CRITICAL FIX: Sum SL counts
+        total_rr_rejections += result.rr_rejections  # BTCAAAAA-38762: Sum R:R rejections
 
         # Merge per-block signal date lists across chunks
         for blk, sigs in result.signal_dates_by_block.items():
@@ -899,6 +915,7 @@ def merge_chunk_results(
         'duplicates_rejected': duplicates_rejected,
         'tp_adjustments': {'TP1': tp1_count, 'TP2': tp2_count, 'TP3': tp3_count, 'SL': sl_exit_count},
         'sl_adjustments': total_sl_adjustments,
+        'rr_rejections': total_rr_rejections,
         # {block_name: {signal_name: [iso_date, ...]}} — all signal fires across the run
         'signal_dates_by_block': {blk: dict(sigs) for blk, sigs in merged_signal_dates.items()},
     }
