@@ -706,8 +706,8 @@ function RecentRunsSection({
             <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>No equity curve captured</p>
           )}
         </div>
-        {/* Stats — pinned to the top-right corner of the card */}
-        <div className="self-start flex flex-col items-end leading-tight text-[10px] tabular-nums flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+        {/* Stats — one row of three columns, pinned to the top-right corner */}
+        <div className="self-start flex flex-row items-center gap-3 leading-tight text-[10px] tabular-nums flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
           <RichTooltip content={TT_RECENT_RUN_WR}><span className="cursor-help">WR {(r.winRate * 100).toFixed(0)}%</span></RichTooltip>
           <RichTooltip content={TT_RECENT_RUN_TRADES}><span className="cursor-help">{r.totalTrades} tr</span></RichTooltip>
           <RichTooltip content={TT_RECENT_RUN_DD}><span className="cursor-help">DD {(r.maxDrawdown * 100).toFixed(1)}%</span></RichTooltip>
