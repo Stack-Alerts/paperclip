@@ -1,0 +1,9 @@
+[Unit]
+Description=BTC Test Env Autosync (rebuild+restart on origin/main change, BTCAAAAA-38802)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.config/systemd/user/test-env-autosync.sh
+StandardOutput=journal
+StandardError=journal

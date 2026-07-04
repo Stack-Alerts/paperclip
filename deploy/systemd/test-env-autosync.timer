@@ -1,0 +1,10 @@
+[Unit]
+Description=BTC Test Env Autosync Timer (every 5 min, BTCAAAAA-38802)
+
+[Timer]
+OnBootSec=120
+OnUnitActiveSec=300
+AccuracySec=30
+
+[Install]
+WantedBy=timers.target
