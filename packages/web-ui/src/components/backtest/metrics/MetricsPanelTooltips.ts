@@ -1209,6 +1209,37 @@ export const TT_LIQUIDATION_BUFFER: TooltipContent = {
   ],
 };
 
+export const TT_LIQUIDATION_RISK_METER: TooltipContent = {
+  title: 'Liquidation Risk Meter',
+  body: 'Risk-over-time view of how close the account came to a leveraged liquidation at each point in the run. At every equity point it plots the share of the ~1/leverage liquidation budget already consumed by the drawdown from the running peak.',
+  sections: [
+    {
+      header: 'Formula:',
+      items: [
+        'Liquidation move % ≈ 100 / leverage (e.g. 10× → ~10% adverse move liquidates)',
+        'Risk % at each point = |Drawdown from peak %| / Liquidation move % × 100 (capped at 100%)',
+      ],
+    },
+    {
+      header: 'How to read it:',
+      items: [
+        '0%: sitting at an equity peak — no liquidation pressure',
+        '100%: drawdown reached the liquidation threshold — the position would have been wiped',
+        'Peak marker shows the run\'s closest brush with liquidation',
+      ],
+    },
+    {
+      header: 'Zones:',
+      items: [
+        'Safe (< 33%): comfortable margin against the leverage in use',
+        'Caution (33–66%): a worse-than-backtest move could threaten the account',
+        'Danger (≥ 66%): the run flirted with liquidation — reduce leverage or risk/trade',
+      ],
+    },
+    { items: ['⚠️ A webui approximation from equity + leverage; live wicks and funding can push real risk higher.'] },
+  ],
+};
+
 // ── Performance & Draw-Down graphs (BTCAAAAA-38738) ───────────────────────────
 
 export const TT_EQUITY_CURVE: TooltipContent = {

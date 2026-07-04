@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { BacktestResult, Trade, type BacktestRunRecord } from '@/lib/strategy-builder/types';
 import { loadRunRecordsForStrategy, loadAllRunRecords } from '@/lib/backtest-history';
 import { RichTooltip, type TooltipContent } from '@/components/strategy-builder/RichTooltip';
+import { LiquidationRiskMeter } from './LiquidationRiskMeter';
 import {
   TrendingUp, TrendingDown, DollarSign, Activity, BarChart3, BarChart2, LineChart,
   RotateCcw, AlertTriangle, AlertOctagon, Clock, Hash, Target,
@@ -1331,6 +1332,12 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
                 : (riskPerTradePct != null ? `risk/trade ${riskPerTradePct}%` : undefined)}
               tooltip={TT_LIQUIDATION_BUFFER}
             />
+          </div>
+          {/* Liquidation Risk Meter (BTCAAAAA-38748): risk-over-time companion to
+              the single-scalar Liquidation Buffer above. Renders only when a
+              leverage is known (primary Metrics tab); otherwise self-hides. */}
+          <div className="mt-3">
+            <LiquidationRiskMeter equityValues={equityValues} leverage={leverage} />
           </div>
         </>
       )}
