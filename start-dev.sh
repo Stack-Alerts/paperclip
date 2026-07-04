@@ -2,11 +2,15 @@
 # start-dev.sh — canonical launcher for supervised development server on :3010
 #
 # Behavior:
-#   1. Ensures btc-dev-server.service is active
-#   2. If inactive/failed, restarts it via systemctl --user
-#   3. Waits for HTTP 200 on http://localhost:3010/
-#   4. Prints the canonical URL
-#   5. By default exits after readiness; --watch to tail journalctl
+#   1. Code-safety gate: refuses to start unless every local change is
+#      committed AND pushed to GitHub (protects un-submitted work before
+#      we sync/switch to origin/main).
+#   2. Syncs the working tree to the latest origin/main.
+#   3. Always restarts btc-dev-server.service so `next dev` recompiles the
+#      newest origin/main (an already-running server is restarted too).
+#   4. Waits for HTTP 200 on http://localhost:3010/
+#   5. Prints the canonical URL
+#   6. By default exits after readiness; --watch to tail journalctl
 #
 # Usage:
 #   ./start-dev.sh                  # Start/verify, then exit
@@ -19,6 +23,50 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
+
+# ─── Code-safety gate (BTCAAAAA-38724) ───────────────────────────────────
+# The dev server always compiles the latest origin/main. To avoid losing
+# un-submitted local work when we sync/switch to main, refuse to start until
+# everything is committed AND pushed to GitHub.
+echo "[start-dev] verifying all local work is submitted to GitHub..."
+if ! git fetch --quiet origin 2>/dev/null; then
+  echo "ERROR: git fetch origin failed — check network/remote before starting." >&2
+  exit 1
+fi
+
+DIRTY_COUNT=$(git status --porcelain 2>/dev/null | grep -c '^.' || true)
+if [[ "$DIRTY_COUNT" -gt 0 ]]; then
+  echo "" >&2
+  echo "✗ Refusing to start: $DIRTY_COUNT uncommitted change(s) present." >&2
+  echo "  Commit and push them before starting the dev server (code safety)." >&2
+  echo "  Uncommitted paths:" >&2
+  git status --porcelain 2>/dev/null | sed 's/^/    /' >&2
+  exit 1
+fi
+
+# Committed-but-unpushed work on the current branch.
+GATE_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+GATE_UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || echo "")
+if [[ -n "$GATE_UPSTREAM" ]]; then
+  UNPUSHED=$(git rev-list "$GATE_UPSTREAM"..HEAD --count 2>/dev/null || echo "0")
+  if [[ "$UNPUSHED" -gt 0 ]]; then
+    echo "" >&2
+    echo "✗ Refusing to start: $UNPUSHED commit(s) on '$GATE_BRANCH' are not pushed to $GATE_UPSTREAM." >&2
+    echo "  Push them before starting the dev server (code safety):" >&2
+    echo "    git push" >&2
+    exit 1
+  fi
+elif [[ "$GATE_BRANCH" != "main" && "$GATE_BRANCH" != "master" ]]; then
+  # No upstream tracking branch — verify HEAD is at least contained in origin/main.
+  if ! git merge-base --is-ancestor HEAD origin/main 2>/dev/null; then
+    echo "" >&2
+    echo "✗ Refusing to start: branch '$GATE_BRANCH' has no upstream and its commits are not on origin/main." >&2
+    echo "  Push your branch to GitHub before starting (code safety):" >&2
+    echo "    git push -u origin $GATE_BRANCH" >&2
+    exit 1
+  fi
+fi
+echo "[start-dev] ✓ all local work is committed and pushed"
 
 # Early branch gate: detect non-main branch and offer to switch before touching systemd.
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
@@ -67,6 +115,18 @@ if [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
       exit 1
       ;;
   esac
+fi
+
+# ─── Always compile the latest origin/main (BTCAAAAA-38724) ───────────────
+# Fast-forward the working tree to origin/main so `next dev` recompiles the
+# newest merged code. Safe: the code-safety gate above guaranteed a clean,
+# fully-pushed tree, so a fast-forward can never clobber local work.
+if [[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" == "master" ]]; then
+  echo "[start-dev] syncing $CURRENT_BRANCH to latest origin/main..."
+  if ! git pull --ff-only origin main 2>&1; then
+    echo "ERROR: git pull --ff-only origin main failed." >&2
+    exit 1
+  fi
 fi
 
 WATCH=0
@@ -212,15 +272,17 @@ if [[ -n "$PID_ON_PORT" ]] && [[ "$PID_ON_PORT" != "$SERVICE_PID" ]]; then
   handle_port_conflict "$TARGET_PORT" "$PID_ON_PORT"
 fi
 
-if [[ "$SERVICE_STATE" != "active" ]]; then
-  echo "[start-dev] btc-dev-server.service is $SERVICE_STATE — restarting..."
-  if ! systemctl --user restart btc-dev-server.service 2>/dev/null; then
-    echo "ERROR: failed to restart btc-dev-server.service" >&2
-    systemctl --user status btc-dev-server.service 2>&1 | head -20 >&2
-    exit 1
-  fi
-  sleep 1
+# Always restart (BTCAAAAA-38724): restarting re-runs the service's
+# ExecStartPre (which fast-forwards HEAD to origin/main) and bounces
+# `next dev` so it recompiles the newest code. Restarting an already-active
+# server is exactly what guarantees "always compile the latest main".
+echo "[start-dev] restarting btc-dev-server.service to compile latest origin/main (was: $SERVICE_STATE)..."
+if ! systemctl --user restart btc-dev-server.service 2>/dev/null; then
+  echo "ERROR: failed to restart btc-dev-server.service" >&2
+  systemctl --user status btc-dev-server.service 2>&1 | head -20 >&2
+  exit 1
 fi
+sleep 1
 
 # Wait for HTTP 200 on :3010
 echo "[start-dev] waiting for http://localhost:3010/ to be ready..."
