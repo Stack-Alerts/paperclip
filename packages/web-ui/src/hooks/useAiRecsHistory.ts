@@ -94,13 +94,55 @@ function loadStored(): AiRecsHistoryEntry[] {
   }
 }
 
-function persist(entries: AiRecsHistoryEntry[]): void {
+const HISTORY_ENDPOINT = '/api/ai-recs/history';
+
+function persistLocal(entries: AiRecsHistoryEntry[]): void {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   } catch {
     // Quota exceeded or storage disabled — best effort. In-memory state
     // remains authoritative for the current session.
+  }
+}
+
+// Push the full record set to the durable server-side store (BTCAAAAA-38756).
+// localStorage stays as an offline cache; the server copy survives browser
+// sessions. Best-effort — a failed sync leaves the local cache authoritative.
+function syncServer(entries: AiRecsHistoryEntry[]): void {
+  if (typeof fetch === 'undefined') return;
+  void fetch(HISTORY_ENDPOINT, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ records: entries }),
+  }).catch(() => {
+    // Offline or server unavailable — cache remains authoritative.
+  });
+}
+
+function persist(entries: AiRecsHistoryEntry[]): void {
+  persistLocal(entries);
+  syncServer(entries);
+}
+
+// Hydrate from the durable server store, falling back to the localStorage
+// cache when the server is unreachable or returns nothing.
+async function loadRemote(): Promise<AiRecsHistoryEntry[]> {
+  if (typeof fetch === 'undefined') return loadStored();
+  try {
+    const res = await fetch(HISTORY_ENDPOINT, { method: 'GET' });
+    if (!res.ok) return loadStored();
+    const data = (await res.json()) as { records?: unknown };
+    if (!Array.isArray(data.records)) return loadStored();
+    const records = data.records
+      .map(coerceEntry)
+      .filter((e): e is AiRecsHistoryEntry => e !== null)
+      .slice(0, MAX_ENTRIES);
+    if (records.length === 0) return loadStored();
+    persistLocal(records);
+    return records;
+  } catch {
+    return loadStored();
   }
 }
 
@@ -146,9 +188,20 @@ export function useAiRecsHistory(): UseAiRecsHistoryResult {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    // Seed synchronously from the localStorage cache so the UI paints
+    // immediately and `hydrated` flips true without a network round-trip.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setEntries(loadStored());
     setHydrated(true);
+    // Reconcile with the durable server store in the background; the cache
+    // stays authoritative if the server is unreachable or empty.
+    void loadRemote().then((remote) => {
+      if (!cancelled) setEntries(remote);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const add = useCallback<UseAiRecsHistoryResult['add']>(
