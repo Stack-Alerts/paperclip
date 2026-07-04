@@ -1,4 +1,5 @@
 import { BlockType, type Block, type Strategy } from '@/lib/strategy-builder/types';
+import { ALL_BLOCK_TYPES } from '@/lib/strategy-builder/blockTypeVocabulary';
 
 // BTC/crypto context line — anchored so snapshot tests and history entries
 // can detect "did the prompt include domain context?" without parsing prose.
@@ -10,20 +11,14 @@ const BTC_CRYPTO_CONTEXT =
 // actionable items so the Approve & Apply flow stays reviewable.
 const MAX_RECOMMENDATIONS = 3;
 
-// The full BlockType enum (canonical source of truth at
-// `@/lib/strategy-builder/types.ts`). We list every supported type so the AI
-// knows the universe of building blocks it can recommend. The runtime
-// strategy may only use a subset — those get surfaced as the
-// "actually-used" list further down.
-const ALL_SUPPORTED_BLOCK_TYPES: BlockType[] = [
-  BlockType.ENTRY_CONDITION,
-  BlockType.EXIT_CONDITION,
-  BlockType.RISK_MANAGEMENT,
-  BlockType.TIME_CONSTRAINT,
-  BlockType.FILTER,
-  BlockType.INDICATOR,
-  BlockType.POSITION_SIZING,
-];
+// The canonical block-type vocabulary lives in
+// `@/lib/strategy-builder/blockTypeVocabulary` (sourced from the BlockType
+// enum). Both this dynamic prompt and the static analyze SYSTEM_PROMPT draw
+// from that one list so ADD_BLOCK suggestions always name a matchable type
+// (BTCAAAAA-38730). We list every supported type so the AI knows the universe
+// of building blocks it can recommend; the runtime strategy may only use a
+// subset — those get surfaced as the "actually-used" list further down.
+const ALL_SUPPORTED_BLOCK_TYPES: readonly BlockType[] = ALL_BLOCK_TYPES;
 
 // BlockLibrary entries come back from `/api/strategy-builder/block-library` as
 // `unknown[]` in the panel (deliberately loosely typed); we only need the

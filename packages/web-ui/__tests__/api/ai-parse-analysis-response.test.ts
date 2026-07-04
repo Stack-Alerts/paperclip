@@ -1,4 +1,32 @@
-import { parseAnalysisResponse } from '../../app/api/ai/analyze/analyzer';
+import { parseAnalysisResponse, SYSTEM_PROMPT } from '../../app/api/ai/analyze/analyzer';
+import {
+  ALL_BLOCK_TYPES,
+  BLOCK_TYPE_VOCABULARY,
+} from '@/lib/strategy-builder/blockTypeVocabulary';
+
+describe('SYSTEM_PROMPT block vocabulary (BTCAAAAA-38730)', () => {
+  it('uses the canonical BlockType vocabulary, not the old category names', () => {
+    // The static analyze prompt and the dynamic buildAiRecsSystemPrompt reach
+    // the model in the same call; both must name the same block vocabulary so
+    // an ADD_BLOCK suggestion is always matchable by the auto-apply path.
+    expect(SYSTEM_PROMPT).toContain(BLOCK_TYPE_VOCABULARY);
+    for (const type of ALL_BLOCK_TYPES) {
+      expect(SYSTEM_PROMPT).toContain(type);
+    }
+  });
+
+  it('no longer references the conflicting category taxonomy', () => {
+    for (const category of [
+      'PATTERNS',
+      'OSCILLATORS',
+      'MOVING_AVERAGES',
+      'SMC_ICT',
+      'WYCKOFF',
+    ]) {
+      expect(SYSTEM_PROMPT).not.toContain(category);
+    }
+  });
+});
 
 describe('parseAnalysisResponse (BTCAAAAA-37067)', () => {
   it('parses plain "RECOMMENDATIONS:" header', () => {

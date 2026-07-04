@@ -7,6 +7,8 @@
  * route.ts, which runs on the Node.js runtime).
  */
 
+import { BLOCK_TYPE_VOCABULARY } from '@/lib/strategy-builder/blockTypeVocabulary';
+
 export type AnalyzeProvider =
   | 'claude-code'
   | 'anthropic'
@@ -75,10 +77,10 @@ export const SYSTEM_PROMPT = `You are an expert quantitative analyst specialisin
 
 Platform context:
 - This is a BTC/USDT perpetual futures strategy builder running on historical OHLCV data.
-- Strategies are composed of building blocks drawn from these categories:
-  PATTERNS, TREND, OSCILLATORS, MOVING_AVERAGES, PRICE_ACTION, PRICE_LEVELS,
-  MARKET_STRUCTURE, SUPPLY_DEMAND, VOLATILITY, RISK_MANAGEMENT, FIBONACCI,
-  ELLIOTT_WAVE, SESSIONS, SMC_ICT, WYCKOFF, INSTITUTIONAL, SIGNALS.
+- Strategies are composed of building blocks, each of exactly one block type
+  drawn from this supported vocabulary (use these exact type names — do not
+  invent categories):
+  ${BLOCK_TYPE_VOCABULARY}.
 - Strategy config keys you may reference (use exact names — do not invent keys):
   timeframe, initialCapital, commissionPercentage, slippagePercentage,
   maxConcurrentPositions, riskPerTradePct, minRiskRewardRatio, maxBarsHeld,
@@ -116,7 +118,7 @@ RECOMMENDATIONS:
 === TEMPLATE B (use only to add an entirely new building block) ===
 2. <One-sentence action title>
    Type: ADD_BLOCK
-   Block: <block category name, e.g. VOLATILITY>
+   Block: <one supported block-type name from the vocabulary above, e.g. indicator>
    Rationale: <one sentence explaining why>
 
 Hard rules — breaking any of these makes your output unparseable:

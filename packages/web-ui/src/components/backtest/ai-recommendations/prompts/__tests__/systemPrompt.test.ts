@@ -4,6 +4,7 @@ import {
   type Block,
   type Strategy,
 } from '@/lib/strategy-builder/types';
+import { ALL_BLOCK_TYPES } from '@/lib/strategy-builder/blockTypeVocabulary';
 import { buildAiRecsSystemPrompt } from '../systemPrompt';
 
 function makeStrategy(): Strategy {
@@ -137,6 +138,20 @@ describe('buildAiRecsSystemPrompt', () => {
     ]) {
       expect(prompt).toContain(type);
     }
+  });
+
+  it('sources the supported vocabulary from the shared canonical block-type list (BTCAAAAA-38730)', () => {
+    // The dynamic prompt and the static analyze SYSTEM_PROMPT must draw from
+    // ONE canonical vocabulary so ADD_BLOCK suggestions always name a type the
+    // auto-apply path can match. Pin the supported line to ALL_BLOCK_TYPES so
+    // any drift between the two prompts is caught here.
+    const prompt = buildAiRecsSystemPrompt({ strategy: null, blockCatalog: null });
+    const supportedLine = prompt.match(
+      /Recommend only building blocks from this supported vocabulary:\s*\n\s*([^\n]+)/,
+    )?.[1];
+    expect(supportedLine).toBeDefined();
+    const supported = (supportedLine ?? '').split(',').map((s) => s.trim());
+    expect(supported).toEqual([...ALL_BLOCK_TYPES]);
   });
 
   it('merges any catalog-only block types into the supported vocabulary', () => {
