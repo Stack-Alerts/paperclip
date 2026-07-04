@@ -1,0 +1,9 @@
+[Unit]
+Description=BTC Dev Server Autosync (keep worktree on origin/main, BTCAAAAA-38800)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.config/systemd/user/btc-devserver-autosync.sh
+StandardOutput=journal
+StandardError=journal

@@ -18,6 +18,11 @@
 #
 # All branch gating, main-branch enforcement, and health surveillance
 # are inherited from btc-dev-server.service (see AGENTS.md).
+#
+# NOTE (BTCAAAAA-38800): btc-devserver-autosync.timer keeps the served
+# worktree on origin/main automatically (checks every 60s after any merge),
+# so running this script after each merge is no longer required — it remains
+# the manual/recovery entry point.
 
 set -euo pipefail
 
