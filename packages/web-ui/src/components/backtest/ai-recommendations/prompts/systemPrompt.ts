@@ -135,6 +135,11 @@ export function buildAiRecsSystemPrompt({
     `    ${paramList}`,
     '- Building blocks actually used by this strategy:',
     `    ${usedList}`,
+    '- When the payload includes a performance_attribution object, base your',
+    '  diagnosis and recommendations on it: cite metric_divergence when the',
+    '  reported and per-entry numbers disagree, and target the entry signal,',
+    '  block, or exit reason that gated the most trades or drove the most PnL',
+    '  rather than defaulting to generic "widen SL / reduce hold" advice.',
     `- Return at most ${MAX_RECOMMENDATIONS} recommendations.`,
   ].join('\n');
 }

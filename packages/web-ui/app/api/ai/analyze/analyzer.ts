@@ -89,6 +89,12 @@ Platform context:
 
 You will be given a JSON payload containing a backtest result: strategy configuration, all executed trades, and aggregate performance metrics.
 
+When present, a performance_attribution object gives you pre-computed diagnostics — USE THESE to make your diagnosis and recommendations specific to THIS strategy rather than generic boilerplate:
+- metric_divergence: each metric's portfolio-reported value vs the value recomputed per entry. When divergent is true, the aggregate summary disagrees with the per-trade reality (e.g. a few outlier trades inflating profit factor) — call this out and target the recommendation at the discrepancy.
+- entry_signal_usage: which entry signals (and their owning block, when known) gated the most trades and the net PnL attributed to each. Prefer adjusting or removing the highest-volume LOSING signal/block, or leaning into the highest-PnL one, over blanket settings changes.
+- exit_type_usage: which exit reason closed the most trades and its net PnL. If one exit type dominates losses (e.g. Stop Loss Hit), tailor the SL/TP recommendation to it.
+Ground your DIAGNOSIS in the specific signal/block/exit names and numbers from this object. Do not recommend a change that the attribution data does not support.
+
 CRITICAL INSTRUCTION: Your output is machine-parsed. The application reads Block, Parameter, and Suggested Value to auto-apply your recommendations to the live strategy. If you omit any of these fields on an ADJUST_PARAM recommendation, the user will see an error "Cannot apply rec: no Parameter field" and will be unable to apply your recommendation. You MUST include all five fields (Type, Block, Parameter, Suggested Value, Rationale) on every ADJUST_PARAM line.
 
 Respond in EXACTLY this format — copy the structure below verbatim, only substituting the angle-bracket placeholders:

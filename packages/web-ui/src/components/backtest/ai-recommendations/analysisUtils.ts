@@ -1,5 +1,6 @@
 import { Strategy, Trade } from '@/lib/strategy-builder/types';
 import { BacktestResult } from '@/lib/strategy-builder/types';
+import { buildAttribution } from './attribution';
 
 export function formatStrategyConfig(strategy: Strategy | null | undefined): string {
   if (!strategy) return 'No strategy loaded.';
@@ -82,6 +83,11 @@ export function buildRequestPayload(
       ? allTrades
       : [...allTrades.slice(0, 10), ...allTrades.slice(-10)];
 
+  // BTCAAAAA-38731: attribution is computed over the FULL trade set (not the
+  // 20-trade sample) so the divergence/usage stats stay accurate even when the
+  // raw trade log is truncated for token budget.
+  const attribution = buildAttribution(result, strategy);
+
   return JSON.stringify(
     {
       strategy_config: strategy
@@ -125,6 +131,7 @@ export function buildRequestPayload(
       ...(optimizationGoal
         ? { optimization_goal: optimizationGoal }
         : {}),
+      ...(attribution ? { performance_attribution: attribution } : {}),
     },
     null,
     2,
