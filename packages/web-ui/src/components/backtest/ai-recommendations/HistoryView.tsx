@@ -324,105 +324,122 @@ export function HistoryView({
           Clear all
         </button>
       </div>
-      {entries.map((entry) => {
-        const isOpen = expandedId === entry.id;
-        const recCount = countRecommendations(entry.recommendations);
-        const appliedCount = entry.status === 'applied' ? recCount : 0;
-        return (
-          <div
-            key={entry.id}
-            data-testid={`history-row-${entry.id}`}
-            className="flex flex-col gap-1"
-          >
-            {/* Q7 (BTCAAAAA-38564) — compact history row matching mockup 6:
-                status badge · date/time + provider · prompt (truncated) ·
-                "N recs · K applied" · View (→ Current Analysis) · ⋯ Details. */}
+      {/* BTCAAAAA-36899 — history entries render as a responsive card grid
+          (1 col narrow, 2 cols at xl) instead of full-width horizontal rows.
+          The old row layout let the prompt push the View/⋯ buttons off-screen
+          on narrow panels; cards stack their content so buttons stay reachable. */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
+        {entries.map((entry) => {
+          const isOpen = expandedId === entry.id;
+          const recCount = countRecommendations(entry.recommendations);
+          const appliedCount = entry.status === 'applied' ? recCount : 0;
+          return (
             <div
-              className="flex items-center gap-2 rounded px-2 py-1.5"
+              key={entry.id}
+              data-testid={`history-row-${entry.id}`}
+              className="flex flex-col gap-2 rounded px-3 py-2.5"
               style={{
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border)',
                 minWidth: 0,
-                overflow: 'hidden',
               }}
             >
-              <StatusBadge status={entry.status} />
-              <div className="flex flex-col" style={{ minWidth: 130 }}>
+              {/* Header: status badge + timestamp/provider on the left,
+                  "N recs · K applied" on the right. */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2" style={{ minWidth: 0 }}>
+                  <StatusBadge status={entry.status} />
+                  <div className="flex flex-col" style={{ minWidth: 0 }}>
+                    <span
+                      className="text-[11px]"
+                      style={{
+                        color: 'var(--text-secondary)',
+                        fontFamily: 'var(--font-mono, monospace)',
+                      }}
+                    >
+                      {formatTimestamp(entry.createdAt)}
+                    </span>
+                    <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                      {providerLabel(entry)}
+                    </span>
+                  </div>
+                </div>
                 <span
-                  className="text-[11px]"
+                  data-testid={`history-counts-${entry.id}`}
+                  className="text-[11px] shrink-0"
                   style={{
-                    color: 'var(--text-secondary)',
+                    color: entry.status === 'applied' ? 'var(--accent-green-on)' : 'var(--text-faint)',
                     fontFamily: 'var(--font-mono, monospace)',
                   }}
                 >
-                  {formatTimestamp(entry.createdAt)}
-                </span>
-                <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
-                  {providerLabel(entry)}
+                  {recCount} rec{recCount === 1 ? '' : 's'} · {appliedCount} applied
                 </span>
               </div>
-              <span
-                className="text-xs flex-1 truncate"
-                style={{ color: 'var(--text-muted)' }}
+              {/* Prompt wraps to at most two lines so it never overflows. */}
+              <p
+                className="text-xs"
+                style={{
+                  color: 'var(--text-muted)',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  wordBreak: 'break-word',
+                  margin: 0,
+                }}
                 title={entry.prompt}
               >
                 {entry.prompt}
-              </span>
-              <span
-                data-testid={`history-counts-${entry.id}`}
-                className="text-[11px] shrink-0"
-                style={{
-                  color: entry.status === 'applied' ? 'var(--accent-green-on)' : 'var(--text-faint)',
-                  fontFamily: 'var(--font-mono, monospace)',
-                }}
-              >
-                {recCount} rec{recCount === 1 ? '' : 's'} · {appliedCount} applied
-              </span>
-              {/* Q7: View navigates to Current Analysis with the snapshot KPIs. */}
-              <button
-                type="button"
-                onClick={() => onLoadIntoCurrent(entry)}
-                data-testid={`history-view-${entry.id}`}
-                className="px-2 py-1 rounded text-[10px] font-medium shrink-0"
-                style={{
-                  background: 'var(--accent-blue)',
-                  color: 'var(--text-on-accent)',
-                  border: '1px solid var(--accent-blue)',
-                  cursor: 'pointer',
-                }}
-                title="Load this snapshot into Current Analysis tab"
-              >
-                View
-              </button>
-              {/* Details (⋯) toggle for notes / status controls / delete. */}
-              <button
-                type="button"
-                onClick={() => setExpandedId(isOpen ? null : entry.id)}
-                data-testid={`history-details-${entry.id}`}
-                className="px-2 py-1 rounded text-[10px] font-medium shrink-0"
-                style={{
-                  background: isOpen ? 'var(--bg-elevated)' : 'transparent',
-                  color: 'var(--text-faint)',
-                  border: `1px solid ${isOpen ? 'var(--border)' : 'transparent'}`,
-                  cursor: 'pointer',
-                }}
-                title="Show notes, status controls, and delete"
-              >
-                {isOpen ? '−' : '⋯'}
-              </button>
+              </p>
+              {/* Actions row — right-aligned, wraps if the card is very narrow
+                  so the buttons always stay reachable. */}
+              <div className="flex items-center gap-2 justify-end flex-wrap">
+                {/* Q7: View navigates to Current Analysis with the snapshot KPIs. */}
+                <button
+                  type="button"
+                  onClick={() => onLoadIntoCurrent(entry)}
+                  data-testid={`history-view-${entry.id}`}
+                  className="px-2 py-1 rounded text-[10px] font-medium shrink-0"
+                  style={{
+                    background: 'var(--accent-blue)',
+                    color: 'var(--text-on-accent)',
+                    border: '1px solid var(--accent-blue)',
+                    cursor: 'pointer',
+                  }}
+                  title="Load this snapshot into Current Analysis tab"
+                >
+                  View
+                </button>
+                {/* Details toggle for notes / status controls / delete. */}
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(isOpen ? null : entry.id)}
+                  data-testid={`history-details-${entry.id}`}
+                  className="px-2 py-1 rounded text-[10px] font-medium shrink-0"
+                  style={{
+                    background: isOpen ? 'var(--bg-elevated)' : 'transparent',
+                    color: 'var(--text-faint)',
+                    border: `1px solid ${isOpen ? 'var(--border)' : 'transparent'}`,
+                    cursor: 'pointer',
+                  }}
+                  title="Show notes, status controls, and delete"
+                >
+                  {isOpen ? '− Details' : '⋯ Details'}
+                </button>
+              </div>
+              {isOpen && (
+                <HistoryCard
+                  entry={entry}
+                  onUpdateStatus={onUpdateStatus}
+                  onUpdateNotes={onUpdateNotes}
+                  onRequestDelete={onRequestDelete}
+                  onLoadIntoCurrent={onLoadIntoCurrent}
+                />
+              )}
             </div>
-            {isOpen && (
-              <HistoryCard
-                entry={entry}
-                onUpdateStatus={onUpdateStatus}
-                onUpdateNotes={onUpdateNotes}
-                onRequestDelete={onRequestDelete}
-                onLoadIntoCurrent={onLoadIntoCurrent}
-              />
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

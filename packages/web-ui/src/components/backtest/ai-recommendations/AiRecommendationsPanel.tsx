@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { X } from 'lucide-react';
+import { X, Zap } from 'lucide-react';
 import { BacktestResult, Strategy } from '@/lib/strategy-builder/types';
 import { useAiSettings } from '@/hooks/useAiSettings';
 import { useAiProviderAvailability } from '@/hooks/useAiProviderAvailability';
@@ -2623,11 +2623,12 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
             data-dirty={isDirty ? 'true' : 'false'}
             data-analyzing={analyzing ? 'true' : 'false'}
             aria-busy={analyzing}
-            className="px-2 py-1 rounded text-[11px] font-medium inline-flex items-center gap-1"
+            className="px-2 py-1 rounded text-[11px] font-medium inline-flex items-center gap-1.5 transition-all"
             style={{
-              background: analyzing || !reanalyzeDisabled ? 'var(--accent-blue)' : 'var(--bg-card)',
-              color: analyzing || !reanalyzeDisabled ? 'var(--text-on-accent)' : 'var(--text-faint)',
-              border: '1px solid var(--border)',
+              background: 'rgba(46, 140, 255, 0.12)',
+              color: 'var(--accent-blue)',
+              border: '1px solid rgba(46, 140, 255, 0.6)',
+              boxShadow: '0 0 12px rgba(46, 140, 255, 0.25), inset 0 0 8px rgba(46, 140, 255, 0.08)',
               opacity: analyzing ? 0.9 : reanalyzeDisabled ? 0.5 : 1,
               cursor: reanalyzeDisabled ? 'not-allowed' : 'pointer',
             }}
@@ -2638,14 +2639,18 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
                   aria-hidden="true"
                   className="inline-block w-3 h-3 rounded-full animate-spin"
                   style={{
-                    border: '2px solid var(--text-on-accent)',
+                    border: '2px solid var(--accent-blue)',
                     borderTopColor: 'transparent',
                   }}
                 />
                 <span>{progressLabel || 'Analyzing'}{progressPercent ? ` ${progressPercent}%` : '…'}</span>
               </>
             ) : (
-              'Re-analyze'
+              <>
+                <Zap size={14} strokeWidth={1.5} aria-hidden="true" />
+                {/* BTCAAAAA-36899: "Analyze" until recommendations exist, then "Re-analyze". */}
+                {aiAnalysis ? 'Re-analyze' : 'Analyze'}
+              </>
             )}
           </button>
         </div>
