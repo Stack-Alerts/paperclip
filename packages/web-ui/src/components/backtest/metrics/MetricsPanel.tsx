@@ -5,6 +5,7 @@ import { BacktestResult, Trade, type BacktestRunRecord } from '@/lib/strategy-bu
 import { loadRunRecordsForStrategy, loadAllRunRecords } from '@/lib/backtest-history';
 import { RichTooltip, type TooltipContent } from '@/components/strategy-builder/RichTooltip';
 import { LiquidationRiskMeter } from './LiquidationRiskMeter';
+import { DrawdownChart } from './DrawdownChart';
 import {
   TrendingUp, TrendingDown, DollarSign, Activity, BarChart3, BarChart2, LineChart,
   RotateCcw, AlertTriangle, AlertOctagon, Clock, Hash, Target,
@@ -33,7 +34,7 @@ import {
   TT_LONG_WIN_RATE, TT_SHORT_WIN_RATE,
   TT_MAX_DRAWDOWN_USD, TT_PEAK_CAPITAL, TT_RECOVERY_FACTOR,
   TT_LONGEST_DRAWDOWN, TT_LIQUIDATION_BUFFER,
-  TT_EQUITY_CURVE, TT_DRAWDOWN_CURVE, TT_UNDERWATER_DRAWDOWN, TT_CAPITAL_DRAWDOWN,
+  TT_EQUITY_CURVE, TT_DRAWDOWN_CURVE, TT_CAPITAL_DRAWDOWN,
   TT_RECENT_RUN_RETURN, TT_RECENT_RUN_WR, TT_RECENT_RUN_TRADES, TT_RECENT_RUN_DD,
 } from './MetricsPanelTooltips';
 
@@ -809,6 +810,7 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
   // Equity curve + drawdown series for the Performance sparklines.
   const equityCurve = resolveEquityCurve(result, allTrades);
   const equityValues = equityCurve.map(p => p.value);
+  const equityTimestamps = equityCurve.map(p => p.timestamp);
   let drawdownPcts: number[] = [];
   if (equityValues.length > 0) {
     let peak = equityValues[0];
@@ -1323,18 +1325,12 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
         <>
           <SectionHeader title="Draw Down Metrics" subtitle="Capital movements, drawdown damage, and leverage-based liquidation risk" />
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="rounded p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-              <div className="flex items-center justify-between mb-1.5">
-                <RichTooltip content={TT_UNDERWATER_DRAWDOWN}>
-                  <p className="text-xs font-medium cursor-help" style={{ color: 'var(--text-muted)' }}>Underwater Drawdown %</p>
-                </RichTooltip>
-                <p className="text-xs font-semibold" style={{ color: 'var(--accent-orange)', fontVariantNumeric: 'tabular-nums' }}>
-                  {maxDDpctVal.toFixed(2)}%
-                </p>
-              </div>
-              <Sparkline values={drawdownPcts} color="var(--accent-orange)" fillBelow height={64} />
-              <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-faint)' }}>Percent below the running equity peak at each point in the run.</p>
-            </div>
+            <DrawdownChart
+              drawdownPcts={drawdownPcts}
+              drawdownDollars={ddDollarSeries}
+              timestamps={equityTimestamps}
+              leverage={leverage}
+            />
             <div className="rounded p-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
               <div className="flex items-center justify-between mb-1.5">
                 <RichTooltip content={TT_CAPITAL_DRAWDOWN}>
