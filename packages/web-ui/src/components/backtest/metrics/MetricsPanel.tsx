@@ -672,51 +672,51 @@ function RecentRunsSection({
   const discoveryStale =
     best != null && current != null && new Date(current.savedAt).getTime() > newestDiscoveryAt;
 
-  const runRow = (record: BacktestRunRecord, slot: RunSlot) => {
+  const runCard = (record: BacktestRunRecord, slot: RunSlot) => {
     const r = record.result;
     const equityVals = resolveEquityCurve(r, r.trades ?? []).map(p => p.value);
     const up = r.finalCapital - r.initialCapital >= 0;
     const accent = up ? 'var(--accent-green)' : 'var(--accent-red)';
     return (
       <div
-        className="rounded px-3 flex items-center gap-3 h-16"
+        className="rounded p-3 flex flex-col gap-2 h-full"
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
       >
-        <SlotBadge slot={slot} />
-        {/* Run identity — date + strategy name */}
-        <div className="min-w-0 w-40 flex-shrink-0">
-          <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
-            {fmtDateTime(record.savedAt)}
-          </p>
-          <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-faint)' }}>{record.strategyName}</p>
-        </div>
-        {/* Return % */}
-        <div className="w-20 flex-shrink-0 text-right">
+        {/* Header — slot badge + return % */}
+        <div className="flex items-center justify-between gap-2">
+          <SlotBadge slot={slot} />
           <RichTooltip content={TT_RECENT_RUN_RETURN}>
             <span className="text-base font-bold tabular-nums leading-none cursor-help" style={{ color: accent }}>
               {r.returnPercentage >= 0 ? '+' : ''}{r.returnPercentage.toFixed(2)}%
             </span>
           </RichTooltip>
         </div>
-        {/* Equity sparkline — flexes to fill the row without growing its height */}
-        <div className="flex-1 min-w-0 h-10 flex items-center">
+        {/* Run identity — date + strategy name */}
+        <div className="min-w-0">
+          <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
+            {fmtDateTime(record.savedAt)}
+          </p>
+          <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-faint)' }}>{record.strategyName}</p>
+        </div>
+        {/* Equity sparkline */}
+        <div className="h-10 flex items-center">
           {equityVals.length >= 2 ? (
             <Sparkline values={equityVals} color={accent} fillBelow height={40} />
           ) : (
             <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>No equity curve captured</p>
           )}
         </div>
-        {/* Stats — one row of three columns, pinned to the top-right corner */}
-        <div className="self-start flex flex-row items-center gap-3 leading-tight text-[10px] tabular-nums flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+        {/* Stats — WR / trades / drawdown spread across the card width */}
+        <div className="flex flex-row items-center justify-between leading-tight text-[10px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
           <RichTooltip content={TT_RECENT_RUN_WR}><span className="cursor-help">WR {(r.winRate * 100).toFixed(0)}%</span></RichTooltip>
           <RichTooltip content={TT_RECENT_RUN_TRADES}><span className="cursor-help">{r.totalTrades} tr</span></RichTooltip>
           <RichTooltip content={TT_RECENT_RUN_DD}><span className="cursor-help">DD {(r.maxDrawdown * 100).toFixed(1)}%</span></RichTooltip>
         </div>
-        {/* Apply — inline so it never changes the row height */}
+        {/* Apply — full-width, pinned to the bottom so cards align */}
         {onApplyConfig && record.fullConfig && (
           <button
             onClick={() => onApplyConfig(record)}
-            className="flex items-center justify-center gap-1 text-[11px] px-2.5 py-1 rounded flex-shrink-0"
+            className="mt-auto w-full flex items-center justify-center gap-1 text-[11px] px-2.5 py-1 rounded"
             title="Apply this run's configuration to the Config tab"
             style={{ color: 'var(--accent-blue)', border: '1px solid rgba(46,140,255,0.35)', background: 'rgba(46,140,255,0.08)' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(46,140,255,0.18)')}
@@ -729,31 +729,31 @@ function RecentRunsSection({
     );
   };
 
-  // Muted, dashed-border placeholder — keeps the row's fixed height so the
-  // three-slot layout never shifts when a slot has no data yet.
-  const placeholderRow = (slot: RunSlot, message: string) => (
+  // Muted, dashed-border placeholder — fills the column height so the
+  // three-column layout never shifts when a slot has no data yet.
+  const placeholderCard = (slot: RunSlot, message: string) => (
     <div
-      className="rounded px-3 flex items-center gap-3 h-16"
+      className="rounded p-3 flex flex-col gap-2 h-full"
       style={{ background: 'var(--bg-card)', border: '1px dashed var(--border)', opacity: 0.6 }}
     >
       <SlotBadge slot={slot} />
-      <p className="text-[11px] flex-1 min-w-0" style={{ color: 'var(--text-faint)' }}>{message}</p>
+      <p className="text-[11px] min-w-0" style={{ color: 'var(--text-faint)' }}>{message}</p>
     </div>
   );
 
   return (
     <>
       <SectionHeader title="Recent Runs" subtitle="Current & previous backtests plus the best Config Discovery result — apply any run's configuration" />
-      <div className="flex flex-col gap-2">
-        {current ? runRow(current, 'current') : placeholderRow('current', 'No backtest run yet')}
-        {previous ? runRow(previous, 'previous') : placeholderRow('previous', 'No previous run')}
-        {best ? runRow(best, 'best') : placeholderRow('best', 'Config Discovery not run yet')}
-        {best && discoveryStale && (
-          <p className="text-[10px] pl-1" style={{ color: 'var(--text-faint)' }}>
-            Config Discovery may be stale — a newer backtest has run since the last sweep.
-          </p>
-        )}
+      <div className="grid grid-cols-3 gap-3 items-stretch">
+        {current ? runCard(current, 'current') : placeholderCard('current', 'No backtest run yet')}
+        {previous ? runCard(previous, 'previous') : placeholderCard('previous', 'No previous run')}
+        {best ? runCard(best, 'best') : placeholderCard('best', 'Config Discovery not run yet')}
       </div>
+      {best && discoveryStale && (
+        <p className="text-[10px] pl-1 mt-2" style={{ color: 'var(--text-faint)' }}>
+          Config Discovery may be stale — a newer backtest has run since the last sweep.
+        </p>
+      )}
     </>
   );
 }
