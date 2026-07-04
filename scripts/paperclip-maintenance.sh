@@ -3,7 +3,10 @@
 # verify the local BTCAAAAA paperclip instance after a restart or upgrade.
 #
 # What it does (idempotent, safe to re-run):
-#   1. Verifies postgres + server are reachable; restarts paperclip cleanly.
+#   0. Preflight: resolves npx cache (auto-detects latest installed version).
+#   1. (--upgrade only) Upgrades paperclipai to the latest stable release
+#      via `npm install -g paperclipai@latest`, then `npx -y paperclipai@latest`
+#      to populate the local npx cache the server runs from.
 #   2. Patches the npx-cached paperclipai server with two fixes that aren't
 #      yet upstream (cross-company-blocker recovery loop + agent-as-board
 #      comment misattribution). Skips lines that are already patched.
@@ -15,19 +18,60 @@
 #   6. Reports status (plugin list, recovery-flow health, backup listing).
 #
 # Usage:
-#   ./paperclip-maintenance.sh                # full cycle
+#   ./paperclip-maintenance.sh                # full cycle (patch + restart + verify)
+#   ./paperclip-maintenance.sh --upgrade      # upgrade to latest + patch + restart + verify
 #   ./paperclip-maintenance.sh --patch-only   # just patch the server, don't restart
 #   ./paperclip-maintenance.sh --no-restart   # patch + verify, leave server running
-#   ./paperclip-maintenance.sh --reinstall-plugin <path>  # point at a specific source checkout
+#   ./paperclip-maintenance.sh --reinstall-plugin <path>
+#   ./paperclip-maintenance.sh --canary       # upgrade to latest canary instead of stable
 #
-# Requirements: psql in PATH, paperclip running on 127.0.0.1:3100.
+# Requirements: psql + npm + npx on PATH, paperclip running on 127.0.0.1:3100.
 
 set -euo pipefail
 
 PAPERCLIP_HOME="${PAPERCLIP_HOME:-/home/sirrus/.paperclip}"
-NPX_CACHE="/home/sirrus/.npm/_npx/43414d9b790239bb/node_modules/@paperclipai/server"
-RECOVERY_FILE="$NPX_CACHE/dist/services/recovery/service.js"
-ROUTES_FILE="$NPX_CACHE/dist/routes/issues.js"
+PAPERCLIP_URL="${PAPERCLIP_URL:-http://127.0.0.1:3100}"
+NPM="${NPM:-npm}"
+NPX="${NPX:-npx}"
+PG="${PG:-/home/sirrus/.pg0/installation/18.1.0/bin/psql}"
+PG_HOST="127.0.0.1"
+PG_PORT="54329"
+PG_USER="paperclip"
+PG_DB="paperclip"
+PLUGIN_SOURCE_DEFAULT="/home/sirrus/paperclip-btcaaaaa-main/packages/plugins/paperclip-backup"
+PLUGIN_INSTALL_DIR="$PAPERCLIP_HOME/plugins/paperclip-backup"
+
+# Resolve the active npx cache dir for paperclipai. Falls back to the
+# newest "paperclipai" install in ~/.npm/_npx if the env var isn't set.
+NPX_CACHE_DIR="${NPX_CACHE_DIR:-}"
+resolve_npx_cache() {
+    if [[ -n "$NPX_CACHE_DIR" && -d "$NPX_CACHE_DIR/node_modules/@paperclipai/server" ]]; then
+        echo "$NPX_CACHE_DIR"; return 0
+    fi
+    # find -path with globs doesn't behave well across all shells here; iterate
+    # the candidate dirs and pick the most recently modified one that has the
+    # @paperclipai/server subpath.
+    local best="" best_mtime=0 d mtime
+    for d in ~/.npm/_npx/*/; do
+        [[ -d "$d/node_modules/@paperclipai/server" ]] || continue
+        mtime=$(stat -c %Y "$d" 2>/dev/null || echo 0)
+        if (( mtime > best_mtime )); then
+            best_mtime=$mtime
+            best=$d
+        fi
+    done
+    if [[ -z "$best" ]]; then
+        echo "ERROR: could not locate any npx cache with paperclipai server" >&2
+        return 1
+    fi
+    # Strip trailing slash
+    echo "${best%/}"
+}
+
+NPX_CACHE="$(resolve_npx_cache)"
+RECOVERY_FILE="$NPX_CACHE/node_modules/@paperclipai/server/dist/services/recovery/service.js"
+ROUTES_FILE="$NPX_CACHE/node_modules/@paperclipai/server/dist/routes/issues.js"
+PLUGIN_SOURCE="$PLUGIN_SOURCE_DEFAULT"
 PLUGIN_SOURCE_DEFAULT="/home/sirrus/paperclip-btcaaaaa-main/packages/plugins/paperclip-backup"
 PLUGIN_INSTALL_DIR="$PAPERCLIP_HOME/plugins/paperclip-backup"
 PAPERCLIP_URL="${PAPERCLIP_URL:-http://127.0.0.1:3100}"
@@ -39,15 +83,19 @@ PG_DB="paperclip"
 
 PATCH_ONLY=0
 NO_RESTART=0
+DO_UPGRADE=0
+USE_CANARY=0
 PLUGIN_SOURCE="$PLUGIN_SOURCE_DEFAULT"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --patch-only) PATCH_ONLY=1; shift ;;
     --no-restart) NO_RESTART=1; shift ;;
+    --upgrade) DO_UPGRADE=1; shift ;;
+    --canary) USE_CANARY=1; DO_UPGRADE=1; shift ;;
     --reinstall-plugin) PLUGIN_SOURCE="$2"; shift 2 ;;
     -h|--help)
-      sed -n '2,20p' "$0"; exit 0 ;;
+      sed -n '2,28p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -67,6 +115,10 @@ command -v jq   >/dev/null || warn "jq missing (will use python for JSON)"
 
 if curl -sf -m 3 "$PAPERCLIP_URL/api/health" >/dev/null; then
   ok "paperclip server reachable at $PAPERCLIP_URL"
+  if [[ -x "$(command -v "$NPM" 2>/dev/null || echo /nonexistent)" ]]; then
+    CUR_VER=$(curl -sS "$PAPERCLIP_URL/api/health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','?'))" 2>/dev/null)
+    ok "running paperclip version: $CUR_VER"
+  fi
 else
   warn "paperclip not reachable — will start it after patching"
 fi
@@ -77,8 +129,38 @@ else
   warn "psql not at $PG; postgres ops will be skipped"
 fi
 
+ok "resolved npx cache: $NPX_CACHE"
+
 # ────────────────────────────────────────────────────────────────────────────
-step "1  patch server: recovery-loop cross-company-blocker fix"
+if [[ "$DO_UPGRADE" == "1" ]]; then
+  step "1  upgrade paperclipai"
+
+  DIST_TAG="latest"
+  [[ "$USE_CANARY" == "1" ]] && DIST_TAG="canary"
+
+  LATEST=$("$NPM" view paperclipai@$DIST_TAG version 2>/dev/null || echo "?")
+  CUR_VER=$(curl -sS "$PAPERCLIP_URL/api/health" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','?'))" 2>/dev/null)
+  ok "latest paperclipai@$DIST_TAG = $LATEST  |  running = $CUR_VER"
+
+  # Pull into npx cache. npx -y forces a fetch even if a matching cache exists.
+  # We then re-resolve NPX_CACHE so subsequent patch steps target the new install.
+  "$NPX" -y "paperclipai@$DIST_TAG" --version >/dev/null 2>&1 \
+    || warn "npx paperclipai@$DIST_TAG --version failed (continuing)"
+  NEW_NPX_CACHE="$(resolve_npx_cache)"
+  if [[ "$NEW_NPX_CACHE" != "$NPX_CACHE" ]]; then
+    ok "npx cache moved: $NPX_CACHE  →  $NEW_NPX_CACHE"
+    NPX_CACHE="$NEW_NPX_CACHE"
+    RECOVERY_FILE="$NPX_CACHE/node_modules/@paperclipai/server/dist/services/recovery/service.js"
+    ROUTES_FILE="$NPX_CACHE/node_modules/@paperclipai/server/dist/routes/issues.js"
+    # New binary path the restart step needs to use
+    PAPERCLIP_BIN="$NPX_CACHE/node_modules/.bin/paperclipai"
+  else
+    ok "npx cache unchanged ($NPX_CACHE) — version was already pinned or up-to-date"
+  fi
+fi
+
+# ────────────────────────────────────────────────────────────────────────────
+step "$([[ "$DO_UPGRADE" == "1" ]] && echo "2" || echo "1")  patch server: recovery-loop cross-company-blocker fix"
 
 if [[ ! -f "$RECOVERY_FILE" ]]; then
   warn "recovery file not at $RECOVERY_FILE — skipping patch (probably upgraded)"
@@ -154,7 +236,7 @@ PY
 fi
 
 # ────────────────────────────────────────────────────────────────────────────
-step "2  patch server: agent-as-board comment misattribution fix"
+step "$([[ "$DO_UPGRADE" == "1" ]] && echo "3" || echo "2")  patch server: agent-as-board comment misattribution fix"
 
 if [[ ! -f "$ROUTES_FILE" ]]; then
   warn "routes/issues.js not at $ROUTES_FILE — skipping patch"
@@ -240,7 +322,7 @@ fi
 [[ "$PATCH_ONLY" == "1" ]] && { ok "patch-only mode — stopping here"; exit 0; }
 
 # ────────────────────────────────────────────────────────────────────────────
-step "3  ensure paperclip-backup plugin is installed"
+step "$([[ "$DO_UPGRADE" == "1" ]] && echo "4" || echo "3")  ensure paperclip-backup plugin is installed"
 
 BACKUP_PID=$(curl -sS "$PAPERCLIP_URL/api/plugins" 2>/dev/null | python3 -c "
 import sys, json
@@ -268,7 +350,7 @@ else
 fi
 
 # ────────────────────────────────────────────────────────────────────────────
-step "4  clear stuck plugin_state running markers"
+step "$([[ "$DO_UPGRADE" == "1" ]] && echo "5" || echo "4")  clear stuck plugin_state running markers"
 
 if [[ -x "$PG" ]]; then
   STUCK=$(PGPASSWORD=paperclip "$PG" -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tA -c \
@@ -285,7 +367,7 @@ else
 fi
 
 # ────────────────────────────────────────────────────────────────────────────
-step "5  restart paperclip server"
+step "$([[ "$DO_UPGRADE" == "1" ]] && echo "6" || echo "5")  restart paperclip server"
 
 if [[ "$NO_RESTART" == "1" ]]; then
   ok "no-restart mode — leaving server running"
@@ -307,11 +389,12 @@ else
   fi
 
   cd /home/sirrus/projects/BTC-Trade-Engine-PaperClip
-  nohup /home/sirrus/.npm/_npx/43414d9b790239bb/node_modules/.bin/paperclipai run --instance default \
-    > /tmp/paperclip-restart.log 2>&1 &
-  ok "started new paperclip server (PID $!)"
+  PAPERCLIP_BIN="${PAPERCLIP_BIN:-$NPX_CACHE/node_modules/.bin/paperclipai}"
+  [[ -x "$PAPERCLIP_BIN" ]] || die "paperclipai binary not found at $PAPERCLIP_BIN"
+  nohup "$PAPERCLIP_BIN" run --instance default > /tmp/paperclip-restart.log 2>&1 &
+  ok "started new paperclip server (PID $!) using $(basename "$PAPERCLIP_BIN")"
 
-  step "6  waiting for server health"
+  step "$([[ "$DO_UPGRADE" == "1" ]] && echo "7" || echo "6")  waiting for server health"
   for i in $(seq 1 30); do
     if curl -sf -m 2 "$PAPERCLIP_URL/api/health" >/dev/null; then
       ok "paperclip healthy after ${i}s"
@@ -323,7 +406,10 @@ else
 fi
 
 # ────────────────────────────────────────────────────────────────────────────
-step "7  final verification"
+step "$([[ "$DO_UPGRADE" == "1" ]] && echo "8" || echo "7")  final verification"
+
+RUN_VER=$(curl -sS "$PAPERCLIP_URL/api/health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','?'))" 2>/dev/null)
+ok "paperclip version after maintenance: $RUN_VER"
 
 PLUGIN_COUNT=$(curl -sS "$PAPERCLIP_URL/api/plugins" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
 ok "$PLUGIN_COUNT plugins registered"
