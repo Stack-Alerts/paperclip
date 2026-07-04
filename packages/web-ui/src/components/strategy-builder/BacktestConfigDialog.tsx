@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useContext, useEffect, useRef, createContext, startTransition } from 'react';
+import { useState, useCallback, useEffect, useRef, startTransition } from 'react';
 import { X, Play, Square, Pause, Settings, Terminal, TrendingUp, BarChart3, BarChart2, Sparkles, GitCompare, ChevronUp, ChevronDown, Loader2, CheckCircle2 } from 'lucide-react';
 import { AppBrand } from '@/components/shared/AppBrand';
 import { ThemeSelector } from './ThemeSelector';
@@ -25,6 +25,15 @@ import { LiveOutputPanel } from '@/components/backtest/live-output/LiveOutputPan
 import { BacktestCountersRow } from '@/components/backtest/live-output/BacktestCountersRow';
 import { TradesPanel } from '@/components/backtest/trades/TradesPanel';
 import { MetricsPanel } from '@/components/backtest/metrics/MetricsPanel';
+import {
+  type FontScale,
+  FONT_SCALES,
+  FONT_SCALE_ORDER,
+  FONT_SCALE_STORAGE_KEY,
+  readStoredFontScale,
+  FontSizesContext,
+  useFontSizes,
+} from '@/components/backtest/backtestFontScale';
 import { AiRecommendationsPanel } from '@/components/backtest/ai-recommendations/AiRecommendationsPanel';
 import { ComparePanel } from '@/components/backtest/compare/ComparePanel';
 import { PresetsPanel } from '@/components/backtest/compare/PresetsPanel';
@@ -58,50 +67,12 @@ const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
 ];
 
 
-// ─── STATUS section font scaling (BTCAAAAA-34264 → scoped down by BTCAAAAA-34312) ─
+// ─── STATUS section font scaling (BTCAAAAA-34264 → 34312 → 38790) ─────────────
 //
-// The board's original cycle-20 ask was narrow: STATUS-section readability only
-// (their screenshot was a closeup of the STATUS checklist). Cycle-19 over-applied
-// the bump across the entire dialog (section headers, chip text, spinbox values,
-// row labels, sub-section labels). BTCAAAAA-34312 scopes the scale back to
-// STATUS only — every other surface returns to its pre-cycle-19 (pre-`a11b1ebdd`)
-// hard-coded size, while STATUS retains the three-step Compact / Normal / Large
-// scale driven by the dialog-header Aa−/Aa+ control. localStorage key is
-// preserved so a user's prior choice still applies (now to STATUS only).
-type FontScale = 'Compact' | 'Normal' | 'Large';
-
-type BacktestFontSizes = {
-  /** Status section monospace lines (the idle checklist / live event stream). */
-  statusText: string;
-  /** Status section "Status" header label. */
-  statusLabel: string;
-};
-
-// BTCAAAAA-34924: cycle-21's per-scale `statusMaxHeight` (115/135/155) clamped
-// the Status block and forced an internal scroll bar even when the dialog had
-// room left. STATUS now flexes to fill whatever vertical space the dialog body
-// leaves over; the font-scale picker only adjusts text sizes here.
-const FONT_SCALES: Record<FontScale, BacktestFontSizes> = {
-  // Compact ≈ pre-cycle-19 statusText sizing. Kept for power-users who want
-  // maximum density across the whole dialog.
-  Compact: {
-    statusText: '11px',
-    statusLabel: '10px',
-  },
-  // Normal = the bumped STATUS size the board actually asked for in cycle-19.
-  // The rest of the dialog stays at the pre-cycle-19 sizes hard-coded inline.
-  Normal: {
-    statusText: '13px',
-    statusLabel: '11px',
-  },
-  // Large = one step bigger for accessibility / large monitors.
-  Large: {
-    statusText: '14px',
-    statusLabel: '12px',
-  },
-};
-
-const FONT_SCALE_STORAGE_KEY = 'backtestConfigDialog.fontScale';
+// The three-step Compact / Normal / Large scale + its context/storage helpers now
+// live in the shared `backtestFontScale` module so tab panels outside this file
+// (e.g. the Metrics tab's Recent Runs cards, BTCAAAAA-38790) can consume the same
+// header-driven scale without prop drilling or a circular import.
 // BTCAAAAA-38735: "Remember Last" tab preference. When enabled the dialog
 // reopens on the tab the user last viewed; when disabled it always opens on
 // Config. REMEMBER_LAST_TAB_KEY holds the boolean toggle, LAST_TAB_KEY holds
@@ -125,22 +96,6 @@ function readStoredLastTab(): TabKey {
   return 'config';
 }
 
-function readStoredFontScale(): FontScale {
-  if (typeof window === 'undefined') return 'Normal';
-  try {
-    const raw = window.localStorage.getItem(FONT_SCALE_STORAGE_KEY);
-    if (raw === 'Compact' || raw === 'Normal' || raw === 'Large') return raw;
-  } catch {
-    // localStorage may be unavailable (private mode, SSR hydration); fall back silently.
-  }
-  return 'Normal';
-}
-
-// Threaded via context so StatusColumn can read the active scale without prop
-// drilling from the dialog root. Only StatusColumn consumes this — the rest of
-// the dialog uses inline hard-coded pre-cycle-19 sizes (BTCAAAAA-34312).
-const FontSizesContext = createContext<BacktestFontSizes>(FONT_SCALES.Normal);
-const useFontSizes = () => useContext(FontSizesContext);
 
 // ─── Adaptive SL V2.0 — canonical preset values ──────────────────────────────
 //
@@ -1578,7 +1533,6 @@ function ConfigTab({
 // through them; the active step is rendered between the buttons so the user
 // always knows the current value. Sits in the dialog header next to the close
 // button. The choice is persisted to localStorage by the parent.
-const FONT_SCALE_ORDER: FontScale[] = ['Compact', 'Normal', 'Large'];
 const FontScalePicker = ({
   scale,
   onChange,

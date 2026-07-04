@@ -6,6 +6,7 @@ import { loadRunRecordsForStrategy, loadAllRunRecords } from '@/lib/backtest-his
 import { RichTooltip, type TooltipContent } from '@/components/strategy-builder/RichTooltip';
 import { LiquidationRiskMeter } from './LiquidationRiskMeter';
 import { DrawdownChart } from './DrawdownChart';
+import { useFontSizes } from '@/components/backtest/backtestFontScale';
 import {
   TrendingUp, TrendingDown, DollarSign, Activity, BarChart3, BarChart2, LineChart,
   RotateCcw, AlertTriangle, AlertOctagon, Clock, Hash, Target,
@@ -638,6 +639,10 @@ function RecentRunsSection({
   onApplyConfig?: (record: BacktestRunRecord) => void;
 }) {
   const [records, setRecords] = useState<BacktestRunRecord[]>([]);
+  // BTCAAAAA-38790: the header Aa−/Aa+ control scales the small text inside the
+  // Recent Runs cards (run name, WR/tr/DD stats, stale note) — but NOT the
+  // "Recent Runs" section header, which stays fixed like other titles.
+  const fontSizes = useFontSizes();
 
   useEffect(() => {
     const all = strategyId ? loadRunRecordsForStrategy(strategyId) : loadAllRunRecords();
@@ -745,16 +750,19 @@ function RecentRunsSection({
   return (
     <>
       <SectionHeader title="Recent Runs" subtitle="Current & previous backtests plus the best Config Discovery result — apply any run's configuration" />
-      <div className="grid grid-cols-3 gap-3 items-stretch">
-        {current ? runCard(current, 'current') : placeholderCard('current', 'No backtest run yet')}
-        {previous ? runCard(previous, 'previous') : placeholderCard('previous', 'No previous run')}
-        {best ? runCard(best, 'best') : placeholderCard('best', 'Config Discovery not run yet')}
+      {/* zoom scales only the small card text with the header font control (BTCAAAAA-38790) */}
+      <div style={{ zoom: fontSizes.smallScale }}>
+        <div className="grid grid-cols-3 gap-3 items-stretch">
+          {current ? runCard(current, 'current') : placeholderCard('current', 'No backtest run yet')}
+          {previous ? runCard(previous, 'previous') : placeholderCard('previous', 'No previous run')}
+          {best ? runCard(best, 'best') : placeholderCard('best', 'Config Discovery not run yet')}
+        </div>
+        {best && discoveryStale && (
+          <p className="text-[10px] pl-1 mt-2" style={{ color: 'var(--text-faint)' }}>
+            Config Discovery may be stale — a newer backtest has run since the last sweep.
+          </p>
+        )}
       </div>
-      {best && discoveryStale && (
-        <p className="text-[10px] pl-1 mt-2" style={{ color: 'var(--text-faint)' }}>
-          Config Discovery may be stale — a newer backtest has run since the last sweep.
-        </p>
-      )}
     </>
   );
 }
