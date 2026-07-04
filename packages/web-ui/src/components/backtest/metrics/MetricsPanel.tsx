@@ -586,10 +586,47 @@ function resolveEquityCurve(
 }
 
 // ── Recent Runs ──────────────────────────────────────────────────────────────
-// Stacks the last three saved runs' equity curves vertically, each with an
-// Apply button that loads that run's configuration back into the Config form.
+// Three fixed semantic slots (BTCAAAAA-38676):
+//   • Current  — the run being viewed (newest manual backtest).
+//   • Previous — the prior manual backtest, or a muted placeholder when none.
+//   • Best     — the best-returning Config Discovery run, or a subtle note when
+//                discovery has not been run (or looks stale after newer runs).
+// Every slot keeps the same fixed row height so Apply never reflows the layout.
 // Run history lives in localStorage, so it is read in an effect to avoid an
 // SSR/client hydration mismatch.
+
+type RunSlot = 'current' | 'previous' | 'best';
+
+const SLOT_LABEL: Record<RunSlot, string> = {
+  current: 'Current',
+  previous: 'Previous',
+  best: 'Best',
+};
+
+const SLOT_COLOR: Record<RunSlot, string> = {
+  current: 'var(--accent-blue)',
+  previous: 'var(--text-muted)',
+  best: 'var(--accent-amber)',
+};
+
+// Config Discovery persists each swept run through recordCompareCard with a
+// strategyName of `"<name> · <label>"`; the " · " separator is the marker that
+// tells discovery runs apart from plain manual backtests in the shared history.
+function isDiscoveryRun(record: BacktestRunRecord): boolean {
+  return record.strategyName.includes(' · ');
+}
+
+function SlotBadge({ slot }: { slot: RunSlot }) {
+  return (
+    <div className="w-[68px] flex-shrink-0 flex items-center gap-1">
+      {slot === 'best' && <Trophy size={11} style={{ color: SLOT_COLOR.best }} />}
+      <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: SLOT_COLOR[slot] }}>
+        {SLOT_LABEL[slot]}
+      </span>
+    </div>
+  );
+}
+
 function RecentRunsSection({
   strategyId,
   currentRunId,
@@ -604,10 +641,8 @@ function RecentRunsSection({
   useEffect(() => {
     const all = strategyId ? loadRunRecordsForStrategy(strategyId) : loadAllRunRecords();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads persisted run records from localStorage after mount to avoid an SSR/client hydration mismatch
-    setRecords(all.slice(0, 3));
+    setRecords(all);
   }, [strategyId, currentRunId]);
-
-  if (records.length === 0) return null;
 
   const fmtDateTime = (iso: string) => {
     try {
@@ -616,81 +651,108 @@ function RecentRunsSection({
     } catch { return iso; }
   };
 
+  // History is newest-first. Split it into plain manual backtests and the runs
+  // produced by Config Discovery so each slot draws from the right pool.
+  const manual = records.filter(r => !isDiscoveryRun(r));
+  const discovery = records.filter(isDiscoveryRun);
+
+  // Current = the run on screen, falling back to the newest manual run.
+  const current =
+    (currentRunId ? manual.find(r => r.runId === currentRunId) : undefined) ?? manual[0] ?? null;
+  // Previous = the newest manual run that is not the current one.
+  const previous = manual.find(r => r.runId !== current?.runId) ?? null;
+  // Best = the highest-returning discovery run.
+  const best = discovery.length
+    ? discovery.reduce((a, b) => (b.result.returnPercentage > a.result.returnPercentage ? b : a))
+    : null;
+  // Discovery looks stale once a manual run is saved after the latest sweep —
+  // the config it explored no longer matches what the user is now testing.
+  const newestDiscoveryAt = discovery.reduce(
+    (max, r) => Math.max(max, new Date(r.savedAt).getTime()), 0);
+  const discoveryStale =
+    best != null && current != null && new Date(current.savedAt).getTime() > newestDiscoveryAt;
+
+  const runRow = (record: BacktestRunRecord, slot: RunSlot) => {
+    const r = record.result;
+    const equityVals = resolveEquityCurve(r, r.trades ?? []).map(p => p.value);
+    const up = r.finalCapital - r.initialCapital >= 0;
+    const accent = up ? 'var(--accent-green)' : 'var(--accent-red)';
+    return (
+      <div
+        className="rounded px-3 flex items-center gap-3 h-16"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+      >
+        <SlotBadge slot={slot} />
+        {/* Run identity — date + strategy name */}
+        <div className="min-w-0 w-40 flex-shrink-0">
+          <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
+            {fmtDateTime(record.savedAt)}
+          </p>
+          <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-faint)' }}>{record.strategyName}</p>
+        </div>
+        {/* Return % */}
+        <div className="w-20 flex-shrink-0 text-right">
+          <RichTooltip content={TT_RECENT_RUN_RETURN}>
+            <span className="text-base font-bold tabular-nums leading-none cursor-help" style={{ color: accent }}>
+              {r.returnPercentage >= 0 ? '+' : ''}{r.returnPercentage.toFixed(2)}%
+            </span>
+          </RichTooltip>
+        </div>
+        {/* Equity sparkline — flexes to fill the row without growing its height */}
+        <div className="flex-1 min-w-0 h-10 flex items-center">
+          {equityVals.length >= 2 ? (
+            <Sparkline values={equityVals} color={accent} fillBelow height={40} />
+          ) : (
+            <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>No equity curve captured</p>
+          )}
+        </div>
+        {/* Stats — pinned to the top-right corner of the card */}
+        <div className="self-start flex flex-col items-end leading-tight text-[10px] tabular-nums flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+          <RichTooltip content={TT_RECENT_RUN_WR}><span className="cursor-help">WR {(r.winRate * 100).toFixed(0)}%</span></RichTooltip>
+          <RichTooltip content={TT_RECENT_RUN_TRADES}><span className="cursor-help">{r.totalTrades} tr</span></RichTooltip>
+          <RichTooltip content={TT_RECENT_RUN_DD}><span className="cursor-help">DD {(r.maxDrawdown * 100).toFixed(1)}%</span></RichTooltip>
+        </div>
+        {/* Apply — inline so it never changes the row height */}
+        {onApplyConfig && record.fullConfig && (
+          <button
+            onClick={() => onApplyConfig(record)}
+            className="flex items-center justify-center gap-1 text-[11px] px-2.5 py-1 rounded flex-shrink-0"
+            title="Apply this run's configuration to the Config tab"
+            style={{ color: 'var(--accent-blue)', border: '1px solid rgba(46,140,255,0.35)', background: 'rgba(46,140,255,0.08)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(46,140,255,0.18)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(46,140,255,0.08)')}
+          >
+            <Download size={12} />Apply
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  // Muted, dashed-border placeholder — keeps the row's fixed height so the
+  // three-slot layout never shifts when a slot has no data yet.
+  const placeholderRow = (slot: RunSlot, message: string) => (
+    <div
+      className="rounded px-3 flex items-center gap-3 h-16"
+      style={{ background: 'var(--bg-card)', border: '1px dashed var(--border)', opacity: 0.6 }}
+    >
+      <SlotBadge slot={slot} />
+      <p className="text-[11px] flex-1 min-w-0" style={{ color: 'var(--text-faint)' }}>{message}</p>
+    </div>
+  );
+
   return (
     <>
-      <SectionHeader title="Recent Runs" subtitle="Equity curves from the last 3 runs — apply any run's configuration" />
+      <SectionHeader title="Recent Runs" subtitle="Current & previous backtests plus the best Config Discovery result — apply any run's configuration" />
       <div className="flex flex-col gap-2">
-        {records.map(record => {
-          const r = record.result;
-          const equityVals = resolveEquityCurve(r, r.trades ?? []).map(p => p.value);
-          const profit = r.finalCapital - r.initialCapital;
-          const up = profit >= 0;
-          const accent = up ? 'var(--accent-green)' : 'var(--accent-red)';
-          const isCurrent = currentRunId != null && record.runId === currentRunId;
-          return (
-            <div
-              key={record.runId}
-              className="rounded px-3 flex items-center gap-3 h-16"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-            >
-              {/* Run identity — date + strategy name */}
-              <div className="min-w-0 w-40 flex-shrink-0">
-                <div className="flex items-center gap-1.5">
-                  <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>
-                    {fmtDateTime(record.savedAt)}
-                  </p>
-                  {isCurrent && (
-                    <span className="text-[9px] px-1 py-0.5 rounded flex-shrink-0" style={{ background: 'color-mix(in srgb, var(--accent-blue) 16%, transparent)', color: 'var(--accent-blue)' }}>
-                      current
-                    </span>
-                  )}
-                </div>
-                <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-faint)' }}>{record.strategyName}</p>
-              </div>
-              {/* Return % */}
-              <div className="w-20 flex-shrink-0 text-right">
-                <RichTooltip content={TT_RECENT_RUN_RETURN}>
-                  <span className="text-base font-bold tabular-nums leading-none cursor-help" style={{ color: accent }}>
-                    {r.returnPercentage >= 0 ? '+' : ''}{r.returnPercentage.toFixed(2)}%
-                  </span>
-                </RichTooltip>
-              </div>
-              {/* Equity sparkline — flexes to fill the row without growing its height */}
-              <div className="flex-1 min-w-0 h-10 flex items-center">
-                {equityVals.length >= 2 ? (
-                  <Sparkline values={equityVals} color={accent} fillBelow height={40} />
-                ) : (
-                  <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>No equity curve captured</p>
-                )}
-              </div>
-              {/* Stats — pinned to the top-right corner of the card */}
-              <div className="self-start flex flex-col items-end leading-tight text-[10px] tabular-nums flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
-                <RichTooltip content={TT_RECENT_RUN_WR}>
-                  <span className="cursor-help">WR {(r.winRate * 100).toFixed(0)}%</span>
-                </RichTooltip>
-                <RichTooltip content={TT_RECENT_RUN_TRADES}>
-                  <span className="cursor-help">{r.totalTrades} tr</span>
-                </RichTooltip>
-                <RichTooltip content={TT_RECENT_RUN_DD}>
-                  <span className="cursor-help">DD {(r.maxDrawdown * 100).toFixed(1)}%</span>
-                </RichTooltip>
-              </div>
-              {/* Apply — inline so it never changes the row height */}
-              {onApplyConfig && record.fullConfig && (
-                <button
-                  onClick={() => onApplyConfig(record)}
-                  className="flex items-center justify-center gap-1 text-[11px] px-2.5 py-1 rounded flex-shrink-0"
-                  title="Apply this run's configuration to the Config tab"
-                  style={{ color: 'var(--accent-blue)', border: '1px solid rgba(46,140,255,0.35)', background: 'rgba(46,140,255,0.08)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(46,140,255,0.18)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(46,140,255,0.08)')}
-                >
-                  <Download size={12} />Apply
-                </button>
-              )}
-            </div>
-          );
-        })}
+        {current ? runRow(current, 'current') : placeholderRow('current', 'No backtest run yet')}
+        {previous ? runRow(previous, 'previous') : placeholderRow('previous', 'No previous run')}
+        {best ? runRow(best, 'best') : placeholderRow('best', 'Config Discovery not run yet')}
+        {best && discoveryStale && (
+          <p className="text-[10px] pl-1" style={{ color: 'var(--text-faint)' }}>
+            Config Discovery may be stale — a newer backtest has run since the last sweep.
+          </p>
+        )}
       </div>
     </>
   );
