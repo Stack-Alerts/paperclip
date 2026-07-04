@@ -46,7 +46,7 @@ export function AppSidebar() {
 
   return (
     <aside
-      className={`flex-shrink-0 flex flex-col transition-all duration-300 ${collapsed ? 'w-16' : 'w-56'}`}
+      className={`flex-shrink-0 flex flex-col transition-all duration-300 ${collapsed ? 'w-16' : 'w-[124px]'}`}
       style={{
         background: 'var(--sidebar-bg)',
         borderRight: '1px solid var(--border)',
