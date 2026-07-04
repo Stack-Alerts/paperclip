@@ -1399,7 +1399,7 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
               the single-scalar Liquidation Buffer above. Renders only when a
               leverage is known (primary Metrics tab); otherwise self-hides. */}
           <div className="mt-3">
-            <LiquidationRiskMeter equityValues={equityValues} leverage={leverage} />
+            <LiquidationRiskMeter equityCurve={equityCurve} leverage={leverage} />
           </div>
         </>
       )}
