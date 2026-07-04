@@ -97,13 +97,9 @@ export function StrategyAfterChangesRail({
         alignSelf: 'flex-start',
       }}
     >
-      <p
-        className="text-xs font-semibold uppercase tracking-wide"
-        style={{ color: 'var(--text-muted)' }}
-      >
-        Strategy after changes
-      </p>
-
+      {/* BTCAAAAA-37748 — heading removed: the parent now renders a
+          "Strategy after changes / Diagnosis" segmented toggle above the
+          rail (per mockup), which serves as this panel's header. */}
       {demoLegs ? (
         <ul className="flex flex-col gap-1.5">
           {demoLegs.map((leg, i) => (

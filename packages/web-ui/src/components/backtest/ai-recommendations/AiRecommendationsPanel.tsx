@@ -2040,55 +2040,14 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
   // rollback is a follow-up backend ticket; see AC18 inline notes).
   const rightPane = (
     <div className="flex flex-col gap-3">
-      {/* BTCAAAAA-37780 / Sprint A6 — right-rail sub-tabs. The recs tab
-          keeps the existing diagnosis-summary card + per-rec toggle grid;
-          the diagnose tab renders the orchestrator markdown plus a
-          reported-vs-per-entry metrics table and the pinned-impact
-          sentence. */}
-      <div
-        role="tablist"
-        aria-label="Right-rail views"
-        data-testid="ai-recs-right-tabs"
-        className="flex items-center gap-1 border-b"
-        style={{ borderColor: 'var(--border)' }}
-      >
-        {(['recs', 'diagnose'] as const).map((t) => {
-          const isActive = rightTab === t;
-          const label = t === 'recs' ? 'Recommendations' : 'Diagnose';
-          return (
-            <button
-              key={t}
-              id={`ai-recs-right-tab-${t}`}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              aria-controls={`ai-recs-right-panel-${t}`}
-              tabIndex={isActive ? 0 : -1}
-              onClick={() => setRightTab(t)}
-              onKeyDown={(e) => handleRightTabKeyDown(e, t)}
-              ref={(el) => { if (el) rightTabRefs.current.set(t, el); else rightTabRefs.current.delete(t); }}
-              data-testid={`ai-recs-right-tab-${t}`}
-              className="px-3 py-1.5 text-xs font-medium rounded-t"
-              style={{
-                background: isActive ? 'var(--bg-card)' : 'transparent',
-                color: isActive ? 'var(--text-secondary)' : 'var(--text-faint)',
-                border: '1px solid var(--border)',
-                borderBottom: isActive ? '1px solid var(--bg-card)' : '1px solid var(--border)',
-                marginBottom: isActive ? '-1px' : '0',
-                cursor: 'pointer',
-              }}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      {rightTab === 'recs' && (<div id="ai-recs-right-panel-recs" role="tabpanel" aria-labelledby="ai-recs-right-tab-recs">
-      {/* BTCAAAAA-37748 — the mockup's Current Analysis face has no inline
-          "Strategy Diagnosis" prose block; the full diagnosis lives in the
-          Diagnose sub-tab (DiagnosePane). Keeping it here diverged the live
-          view from the board-approved mockup, so it is intentionally omitted. */}
+      {/* BTCAAAAA-37748 — the mockup's Current Analysis face has no left
+          "Recommendations / Diagnose" sub-tab row: the left column always
+          shows the KPI bar + recommendation grid, and the Diagnosis view
+          moves to the right-rail "Strategy after changes / Diagnosis"
+          toggle (see rail block below). The inline "Strategy Diagnosis"
+          prose block is likewise omitted — the full diagnosis lives in the
+          rail's Diagnosis panel. */}
+      <div id="ai-recs-recs-panel">
 
       {/* Q7 (BTCAAAAA-38564): when viewing a past analysis, show a read-only
           banner above the KPI bar so the user knows they're in snapshot mode. */}
@@ -2514,21 +2473,10 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
 
       {/* Per-tile saves are now the action surface (AC20). No more
           sticky "Apply all" footer — apply is per-card. */}
-      </div>)}
+      </div>
 
       {!demoMode && parsedRecs.length > 0 && (
         <ReverseViewBanner pattern={extractReverseViewPattern(reverseViewInputs)} />
-      )}
-
-      {rightTab === 'diagnose' && (
-        <div id="ai-recs-right-panel-diagnose" role="tabpanel" aria-labelledby="ai-recs-right-tab-diagnose">
-          <DiagnosePane
-            diagnosis={aiAnalysis?.diagnosis ?? aiAnalysis?.raw ?? ''}
-            rows={diagnoseRows}
-            stagedSentence={stagedSentence}
-            hasResult={!!result}
-          />
-        </div>
       )}
     </div>
   );
@@ -2686,16 +2634,68 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
           <div style={{ flex: '1 1 0', minWidth: 0 }}>
             {rightPane}
           </div>
-          {/* marginTop offsets the sub-tab bar (py-1.5 + text-xs + border-b ≈ 29px) plus gap-3 (12px)
-              so the rail top-edge aligns with the Strategy Diagnosis card below the tabs. */}
-          <div style={{ marginTop: '41px' }}>
-            <StrategyAfterChangesRail
-              items={afterChangesItems}
-              toggleOn={appliedRecIdSet}
-              onToggleCurrent={handleRailToggleCurrent}
-              onJumpToOriginEntry={handleRailJumpToOriginEntry}
-              demoLegs={demoMode ? DEMO_RAIL_LEGS : undefined}
-            />
+          {/* BTCAAAAA-37748 — right rail with the mockup's segmented toggle:
+              "Strategy after changes" (staged legs) | "Diagnosis" (the
+              DiagnosePane that used to be a left sub-tab). Both columns start
+              at the top now that the left sub-tab row is gone. */}
+          <div style={{ width: 300, flex: '0 0 300px' }}>
+            <div
+              role="tablist"
+              aria-label="Right-rail views"
+              data-testid="ai-recs-right-tabs"
+              className="flex items-center gap-1 mb-2 p-0.5 rounded"
+              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
+            >
+              {(['recs', 'diagnose'] as const).map((t) => {
+                const isActive = rightTab === t;
+                const label = t === 'recs' ? 'Strategy after changes' : 'Diagnosis';
+                return (
+                  <button
+                    key={t}
+                    id={`ai-recs-right-tab-${t}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    aria-controls={`ai-recs-right-panel-${t}`}
+                    tabIndex={isActive ? 0 : -1}
+                    onClick={() => setRightTab(t)}
+                    onKeyDown={(e) => handleRightTabKeyDown(e, t)}
+                    ref={(el) => { if (el) rightTabRefs.current.set(t, el); else rightTabRefs.current.delete(t); }}
+                    data-testid={`ai-recs-right-tab-${t}`}
+                    className="flex-1 px-2 py-1 text-[11px] font-medium rounded text-center"
+                    style={{
+                      background: isActive ? 'var(--bg-card)' : 'transparent',
+                      color: isActive ? 'var(--text-secondary)' : 'var(--text-faint)',
+                      border: isActive ? '1px solid var(--border)' : '1px solid transparent',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {rightTab === 'recs' ? (
+              <div id="ai-recs-right-panel-recs" role="tabpanel" aria-labelledby="ai-recs-right-tab-recs">
+                <StrategyAfterChangesRail
+                  items={afterChangesItems}
+                  toggleOn={appliedRecIdSet}
+                  onToggleCurrent={handleRailToggleCurrent}
+                  onJumpToOriginEntry={handleRailJumpToOriginEntry}
+                  demoLegs={demoMode ? DEMO_RAIL_LEGS : undefined}
+                />
+              </div>
+            ) : (
+              <div id="ai-recs-right-panel-diagnose" role="tabpanel" aria-labelledby="ai-recs-right-tab-diagnose">
+                <DiagnosePane
+                  diagnosis={aiAnalysis?.diagnosis ?? aiAnalysis?.raw ?? ''}
+                  rows={diagnoseRows}
+                  stagedSentence={stagedSentence}
+                  hasResult={!!result}
+                />
+              </div>
+            )}
           </div>
         </div>
       ) : currentView === 'request' ? (
