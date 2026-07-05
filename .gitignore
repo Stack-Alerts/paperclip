@@ -223,3 +223,9 @@ docs/screenshots/BTCAAAAA-*.png
 .freeze-blocker-BTCAAAAA-*.md
 .e2e-test
 .claude/worktrees/
+
+# Agent cruft (do not commit)
+.playwright-mcp/
+PaperClip_Mods/
+worktrees/
+38790-*.png
