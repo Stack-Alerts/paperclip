@@ -68,7 +68,7 @@ const defaultConfig: BacktestConfigFull = {
   },
   riskPerTradePct: 10,
   minRiskRewardRatio: 1.2,
-  maxBarsHeld: 50,
+  maxBarsHeld: 200,
   lookbackDays: 180,
   trainingDays: 90,
   testingDays: 30,
