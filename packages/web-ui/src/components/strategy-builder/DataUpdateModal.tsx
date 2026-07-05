@@ -63,6 +63,55 @@ export interface DataGapCheckResult {
   lakeapi_end?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Gap-check normalization (BTCAAAAA-38869)
+//
+// Two backend quirks made the modal disagree with the sidebar/Market Data page:
+//  1. `/data/gap-check` omits `ohlcv_*` entries entirely when they have no gap,
+//     so the OHLCV rows appeared only when "gapped" and vanished after an
+//     update — users expect them listed always.
+//  2. It measures OHLCV gaps up to *now*, so the in-flight (not yet closed)
+//     candle is reported as a tiny trailing gap (e.g. 0.01 days for 15m) even
+//     though no closed bar is missing. The authoritative /data/verify reports
+//     no gaps for the same state. Reclassify those trailing-edge gaps as
+//     complete; anything larger than two intervals is a real gap.
+// ---------------------------------------------------------------------------
+
+const OHLCV_INTERVAL_SECONDS: Record<string, number> = {
+  ohlcv_15m: 900,
+  ohlcv_1h: 3600,
+  ohlcv_1d: 86400,
+};
+
+export function normalizeGapCheckResult(raw: DataGapCheckResult): DataGapCheckResult {
+  const all: Record<string, DataTypeStatus> = { ...raw.all_status };
+
+  for (const [key, interval] of Object.entries(OHLCV_INTERVAL_SECONDS)) {
+    const info = all[key];
+    if (!info) {
+      all[key] = { status: 'complete' };
+      continue;
+    }
+    if (info.status === 'gap') {
+      const gapSeconds =
+        info.gap_days != null ? info.gap_days * 86400 : (info.gap_minutes ?? 0) * 60;
+      if (gapSeconds <= interval * 2) {
+        all[key] = { ...info, status: 'complete' };
+      }
+    }
+  }
+
+  const anyGaps = Object.values(all).some(
+    (s) => s.status === 'gap' || s.status === 'missing',
+  );
+  const gapDays = Object.values(all)
+    .filter((s) => s.status === 'gap')
+    .map((s) => s.gap_days ?? 0);
+  const maxGap = anyGaps && gapDays.length > 0 ? Math.max(...gapDays) : 0;
+
+  return { ...raw, all_status: all, any_gaps: anyGaps, max_gap: maxGap };
+}
+
 export interface DataUpdateModalProps {
   open: boolean;
   /** ISO date string for start of gap */
@@ -237,7 +286,9 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
 
   // Gap check state - use prop if provided, otherwise use internal state
   const [internalGapCheckResult, setInternalGapCheckResult] = useState<DataGapCheckResult | null>(null);
-  const gapCheckResult = propGapCheckResult ?? internalGapCheckResult;
+  const gapCheckResult = propGapCheckResult
+    ? normalizeGapCheckResult(propGapCheckResult)
+    : internalGapCheckResult;
   const [gapCheckLoading, setGapCheckLoading] = useState(false);
   const [buttonEnabled, setButtonEnabled] = useState(false);
 
@@ -260,19 +311,20 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
 
     // If gap check result is provided as prop, use it directly
     if (propGapCheckResult) {
+      const normalized = normalizeGapCheckResult(propGapCheckResult);
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setInternalGapCheckResult(propGapCheckResult);
+      setInternalGapCheckResult(normalized);
       setButtonEnabled(true);
-      onGapCheckComplete?.(propGapCheckResult);
+      onGapCheckComplete?.(normalized);
 
       // If in auto mode and gaps exist, auto-start after 1 second
-      if (autoMode && propGapCheckResult.any_gaps && !isRunning) {
+      if (autoMode && normalized.any_gaps && !isRunning) {
         setTimeout(() => {
           handleUpdate();
         }, 1000);
       }
       // If in auto mode and no gaps, auto-close after 3 seconds
-      if (autoMode && !propGapCheckResult.any_gaps) {
+      if (autoMode && !normalized.any_gaps) {
         setAutoCloseSeconds(3);
       }
       return;
@@ -290,7 +342,7 @@ export const DataUpdateModal: React.FC<DataUpdateModalProps> = ({
 
     const checkGaps = async () => {
       try {
-        const result = await onCheckGaps();
+        const result = normalizeGapCheckResult(await onCheckGaps());
         setInternalGapCheckResult(result);
         onGapCheckComplete?.(result);
 
