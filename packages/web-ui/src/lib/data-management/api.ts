@@ -116,6 +116,36 @@ export function parseApiTimestamp(ts: string | null | undefined): Date | null {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Interval-aware staleness (BTCAAAAA-38869)
+//
+// The backend uses fixed age thresholds (e.g. 25 h for 1d) which flag the
+// last *closed* candle as stale even when no bar is actually missing. The
+// Market Data page already corrected for this locally; the sidebar widget
+// consumed the raw backend ``anyStale`` flag, so the two disagreed. Both now
+// share this computation: a timeframe is stale only when its last bar's
+// open-time predates the expected open of the last fully-closed candle.
+// ---------------------------------------------------------------------------
+
+export function computeActualStale(tf: string, f: TimeframeFreshness): boolean {
+  if (!f.lastBarTs || f.ageSeconds === null) return true;
+  const intervalSeconds: Record<string, number> = { '15m': 900, '1h': 3600, '1d': 86400 };
+  const interval = intervalSeconds[tf];
+  if (interval === undefined) return f.stale;
+  const nowSec = Date.now() / 1000;
+  const expectedLastClosedOpen = Math.floor(nowSec / interval) * interval - interval;
+  const d = parseApiTimestamp(f.lastBarTs);
+  if (!d) return true;
+  return d.getTime() / 1000 < expectedLastClosedOpen;
+}
+
+export function anyTimeframeActuallyStale(
+  freshness: Record<string, TimeframeFreshness> | null | undefined,
+): boolean {
+  if (!freshness) return false;
+  return Object.entries(freshness).some(([tf, f]) => computeActualStale(tf, f));
+}
+
 export function formatLocalShort(ts: string | null | undefined): string {
   const d = parseApiTimestamp(ts);
   if (!d) return '—';

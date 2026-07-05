@@ -12,28 +12,10 @@ import {
   runBulkBackfill,
   formatLocalShort,
   parseApiTimestamp,
+  computeActualStale,
 } from '@/lib/data-management/api';
 import type { DataStatusResponse, TimeframeVerifyResult, TimeframeFreshness } from '@/lib/data-management/api';
 import { WindowBreadcrumb } from '@/components/shared/WindowBreadcrumb';
-
-// The backend uses a fixed 90 000 s (25 h) threshold for the 1d timeframe,
-// which flags the last *closed* daily candle as stale once it's past 01:00 UTC
-// even though there is no gap (today's in-flight candle hasn't closed yet).
-// This function replaces the backend flag with an interval-aware computation:
-// a bar is stale only when its open-time predates the expected last closed candle.
-function computeActualStale(tf: string, f: TimeframeFreshness): boolean {
-  if (!f.lastBarTs || f.ageSeconds === null) return true;
-  const intervalSeconds: Record<string, number> = { '15m': 900, '1h': 3600, '1d': 86400 };
-  const interval = intervalSeconds[tf];
-  if (interval === undefined) return f.stale;
-  const nowSec = Date.now() / 1000;
-  // Expected open-time of the last fully-closed candle:
-  // floor(now / interval) * interval - interval
-  const expectedLastClosedOpen = Math.floor(nowSec / interval) * interval - interval;
-  const d = parseApiTimestamp(f.lastBarTs);
-  if (!d) return true;
-  return d.getTime() / 1000 < expectedLastClosedOpen;
-}
 
 // Detect the "data source archive lag" pattern: the freshness card is stale AND
 // the last bar timestamp is exactly the prior-day 00:00:00Z (i.e. the daily

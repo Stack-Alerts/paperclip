@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchDataStatus, triggerDataUpdate } from '@/lib/data-management/api';
+import { fetchDataStatus, triggerDataUpdate, anyTimeframeActuallyStale } from '@/lib/data-management/api';
 import type { DataStatusResponse } from '@/lib/data-management/api';
 
 export type AutoUpdateStatus = 'idle' | 'updating' | 'ok' | 'error';
@@ -81,8 +81,11 @@ export function useAutoDataUpdate(): AutoDataUpdateState {
       const ts15m = s?.timeframeFreshness['15m']?.lastBarTs ?? null;
       if (ts15m) setLastCandleTs(ts15m);
       setLastUpdateTime(new Date());
-      setStatus('ok');
-      setStatusMessage('Data up-to-date');
+      // Use the same interval-aware staleness as the Market Data page so the
+      // sidebar and the page can never disagree (BTCAAAAA-38869).
+      const stillStale = anyTimeframeActuallyStale(s?.timeframeFreshness);
+      setStatus(stillStale ? 'error' : 'ok');
+      setStatusMessage(stillStale ? 'Data may be stale' : 'Data up-to-date');
       inQuickRetryRef.current = false;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -114,8 +117,11 @@ export function useAutoDataUpdate(): AutoDataUpdateState {
       if (s) {
         const ts15m = s.timeframeFreshness['15m']?.lastBarTs ?? null;
         setLastCandleTs(ts15m);
-        setStatus(s.anyStale ? 'error' : 'ok');
-        setStatusMessage(s.anyStale ? 'Data may be stale' : 'Data up-to-date');
+        // Interval-aware staleness shared with the Market Data page — the raw
+        // backend anyStale flag false-positives on closed candles (BTCAAAAA-38869).
+        const isStale = anyTimeframeActuallyStale(s.timeframeFreshness);
+        setStatus(isStale ? 'error' : 'ok');
+        setStatusMessage(isStale ? 'Data may be stale' : 'Data up-to-date');
       }
       // Arm first timer
       const check = () => runUpdate(scheduleNextCheck);
