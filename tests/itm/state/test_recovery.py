@@ -31,6 +31,7 @@ from src.itm.state.recovery import (
     RecoveryError,
     ExchangePosition,
     MockBinancePositionFetcher,
+    MockLakeAPIFetcher,
     RecoveryConfig,
 )
 from src.itm.state.manager import StateManager, StateManagerConfig
@@ -392,3 +393,141 @@ class TestRecoveryTiming:
         assert result.recovery_duration_ms < 120_000, (
             f"Recovery took {result.recovery_duration_ms:.0f}ms, expected < 120000ms"
         )
+
+
+# ---------------------------------------------------------------------------
+# BTE-TC-FDR-003-A: LakeAPI fetch + signal replay (ITM Spec §22.3)
+# ---------------------------------------------------------------------------
+
+
+def _make_bar(ts: datetime, close: str = "50000") -> dict:
+    """Build a minimal bar dict for testing."""
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return {
+        "timestamp": ts,
+        "open": Decimal(close),
+        "high": Decimal(close),
+        "low": Decimal(close),
+        "close": Decimal(close),
+        "volume": Decimal("1.0"),
+    }
+
+
+class TestFdrTC003A:
+    """BTE-TC-FDR-003-A: State recovery completes in <2min for ≤24h outage.
+
+    Covers ITM Spec §22.3 steps 3 (LakeAPI fetch) and 4 (signal replay).
+    """
+
+    def _checkpoint_from_past(self, mgr, redis, pg, hours_ago: float = 0.5) -> StateManager:
+        """Create a checkpoint timestamped hours_ago and return a fresh manager."""
+        from src.itm.state.schema import StateCheckpoint
+        cp = StateCheckpoint(
+            sequence=1,
+            state=ITMSystemState(),
+            source="bar_close",
+            checkpointed_at=datetime.now(timezone.utc) - timedelta(hours=hours_ago),
+        )
+        redis.write(cp)
+        pg.write(cp)
+        mgr2 = StateManager(redis_store=redis, pg_store=pg)
+        mgr2.connect()
+        return mgr2
+
+    def test_lakeapi_bars_fetched_during_recovery(self):
+        """RecoveryResult reports bars fetched from LakeAPI for the outage window."""
+        mgr, redis, pg = make_manager_with_state()
+        # Checkpoint 30 min ago so bars in the last 5 min fall inside the window
+        mgr2 = self._checkpoint_from_past(mgr, redis, pg, hours_ago=0.5)
+
+        now = datetime.now(timezone.utc)
+        bars = [_make_bar(now - timedelta(minutes=i)) for i in range(5, 0, -1)]
+        lake_fetcher = MockLakeAPIFetcher(bars)
+
+        protocol = RecoveryProtocol(lakeapi_fetcher=lake_fetcher)
+        result = protocol.run(mgr2)
+
+        assert not result.is_clean_start
+        assert result.lakeapi_bars_fetched == 5
+        assert result.outage_seconds >= 0.0
+
+    def test_signal_replayer_called_for_each_bar(self):
+        """signal_replayer is invoked once per fetched bar."""
+        mgr, redis, pg = make_manager_with_state()
+        mgr2 = self._checkpoint_from_past(mgr, redis, pg, hours_ago=0.5)
+
+        now = datetime.now(timezone.utc)
+        bars = [_make_bar(now - timedelta(minutes=i)) for i in range(3, 0, -1)]
+        lake_fetcher = MockLakeAPIFetcher(bars)
+
+        replayed_bars = []
+
+        def replayer(bar, state):
+            replayed_bars.append(bar)
+
+        protocol = RecoveryProtocol(lakeapi_fetcher=lake_fetcher, signal_replayer=replayer)
+        result = protocol.run(mgr2)
+
+        assert result.signals_replayed == 3
+        assert len(replayed_bars) == 3
+
+    def test_recovery_without_lakeapi_fetcher_skips_steps_3_4(self):
+        """Without lakeapi_fetcher, bars_fetched and signals_replayed stay 0."""
+        mgr, redis, pg = make_manager_with_state()
+        mgr.checkpoint(ITMSystemState())
+
+        mgr2 = StateManager(redis_store=redis, pg_store=pg)
+        mgr2.connect()
+
+        protocol = RecoveryProtocol()
+        result = protocol.run(mgr2)
+
+        assert result.lakeapi_bars_fetched == 0
+        assert result.signals_replayed == 0
+
+    def test_recovery_sla_under_2min_with_lakeapi_and_replay(self):
+        """BTE-TC-FDR-003-A SLA: full recovery (incl. LakeAPI + replay) < 2min."""
+        mgr, redis, pg = make_manager_with_state()
+        # Simulate ≤24h outage: checkpoint 23h55m ago (safely under the 24h stale threshold)
+        mgr2 = self._checkpoint_from_past(mgr, redis, pg, hours_ago=23.9)
+
+        # 1435 one-minute bars covering the ~23h55m outage window
+        now = datetime.now(timezone.utc)
+        bars = [_make_bar(now - timedelta(minutes=i)) for i in range(1435, 0, -1)]
+        lake_fetcher = MockLakeAPIFetcher(bars)
+
+        replayed: list = []
+
+        def replayer(bar, state):
+            replayed.append(bar)
+
+        protocol = RecoveryProtocol(lakeapi_fetcher=lake_fetcher, signal_replayer=replayer)
+        result = protocol.run(mgr2)
+
+        # Allow ±2 bars for timing jitter around the outage boundary
+        assert result.lakeapi_bars_fetched >= 1430
+        assert result.signals_replayed >= 1430
+        assert result.recovery_duration_ms < 120_000, (
+            f"Full recovery (LakeAPI+replay) took {result.recovery_duration_ms:.0f}ms, "
+            f"expected <120000ms (2min SLA per BTE-TC-FDR-003-A)"
+        )
+
+    def test_lakeapi_fetch_failure_is_non_fatal(self):
+        """LakeAPI fetch failure does not abort recovery — state is still returned."""
+        class FailingLakeAPIFetcher:
+            def get_bars(self, symbol, interval, start, end):
+                raise ConnectionError("LakeAPI unavailable")
+
+        mgr, redis, pg = make_manager_with_state()
+        mgr.checkpoint(ITMSystemState())
+
+        mgr2 = StateManager(redis_store=redis, pg_store=pg)
+        mgr2.connect()
+
+        protocol = RecoveryProtocol(lakeapi_fetcher=FailingLakeAPIFetcher())
+        result = protocol.run(mgr2)
+
+        assert not result.is_clean_start
+        assert result.lakeapi_bars_fetched == 0
+        assert result.signals_replayed == 0

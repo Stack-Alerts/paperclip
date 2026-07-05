@@ -28,8 +28,10 @@ from .manager import (
 from .recovery import (
     RecoveryProtocol,
     RecoveryResult,
+    RecoveryConfig,
     DivergenceAlert,
     RecoveryError,
+    MockLakeAPIFetcher,
 )
 from .shutdown import GracefulShutdownHandler
 
@@ -47,8 +49,10 @@ __all__ = [
     # recovery
     "RecoveryProtocol",
     "RecoveryResult",
+    "RecoveryConfig",
     "DivergenceAlert",
     "RecoveryError",
+    "MockLakeAPIFetcher",
     # shutdown
     "GracefulShutdownHandler",
 ]

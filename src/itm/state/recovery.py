@@ -16,24 +16,41 @@ API (from integration spec)
     result = protocol.run(manager)
     # result.is_clean_start, result.has_divergence, result.orders_blocked
     # result.recovery_duration_ms, result.state
+    # result.lakeapi_bars_fetched, result.signals_replayed, result.outage_seconds
 
-Recovery sequence
------------------
+Recovery sequence (ITM Spec §22.3)
+------------------------------------
 1. Call ``manager.load_latest()`` to get the most recent checkpoint.
 2. If no checkpoint found → ``is_clean_start = True``.
 3. If checkpoint is too stale (older than ``max_recovery_age_hours``) →
    treat as clean start.
-4. Call ``fetcher.get_positions()`` to get live exchange positions.
-5. Diff ITM positions vs exchange positions.
-6. If divergence detected → ``has_divergence = True``, log CRITICAL, set
+4. Fetch missing data from LakeAPI for the outage window (checkpoint → now).
+5. Replay signals for the offline period via the optional ``signal_replayer``.
+6. Call ``fetcher.get_positions()`` to reconcile with current exchange state.
+7. Diff ITM positions vs exchange positions.
+8. If divergence detected → ``has_divergence = True``, log CRITICAL, set
    ``orders_blocked = True``.
-7. Return ``RecoveryResult``.
+9. Validate capital consistency (divergence check covers this).
+10. Return ``RecoveryResult``.
 
 Binance reconciliation types
 -----------------------------
 * ``itm_open_exchange_closed`` — ITM has open position, exchange disagrees.
 * ``exchange_open_itm_missing`` — Exchange has position ITM has no record of.
 * ``quantity_mismatch`` — Both know about it but quantities differ.
+
+LakeAPI / signal replay
+-----------------------
+Pass a ``lakeapi_fetcher`` with::
+
+    get_bars(symbol, interval, start, end) -> List[dict]
+
+where each dict has keys: ``timestamp`` (datetime), ``open``, ``high``,
+``low``, ``close``, ``volume`` (Decimal-compatible values).
+
+Pass a ``signal_replayer`` callable ``(bar: dict, state: ITMSystemState) -> None``
+to apply each fetched bar against the recovered state.  Both are optional;
+omitting them skips LakeAPI fetch and signal replay silently.
 """
 
 from __future__ import annotations
@@ -43,7 +60,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, Callable
 
 from .schema import ITMSystemState
 
@@ -162,9 +179,17 @@ class RecoveryConfig:
     max_recovery_age_hours:
         Maximum age (in hours) of a recovered checkpoint before it is considered
         too stale.  Defaults to 24.
+    lakeapi_symbol:
+        Binance symbol to pass when fetching missing bars from LakeAPI.
+        Defaults to 'BTCUSDT'.
+    lakeapi_interval:
+        Bar interval label (e.g. '1m', '5m') to pass to LakeAPI.
+        Defaults to '1m'.
     """
 
     max_recovery_age_hours: float = 24.0
+    lakeapi_symbol: str = "BTCUSDT"
+    lakeapi_interval: str = "1m"
 
     @property
     def max_age_seconds(self) -> float:
@@ -190,6 +215,9 @@ class RecoveryResult:
     divergences:          List of ``DivergenceAlert`` objects
     loaded_from:          'redis', 'postgres', or 'clean'
     error_message:        Set on failure (non-fatal)
+    outage_seconds:       Detected outage window in seconds (0 on clean start)
+    lakeapi_bars_fetched: Number of bars fetched from LakeAPI for the outage
+    signals_replayed:     Number of signals replayed against the recovered state
     """
 
     is_clean_start: bool = True
@@ -200,6 +228,45 @@ class RecoveryResult:
     divergences: List[DivergenceAlert] = field(default_factory=list)
     loaded_from: str = "clean"
     error_message: Optional[str] = None
+    outage_seconds: float = 0.0
+    lakeapi_bars_fetched: int = 0
+    signals_replayed: int = 0
+
+
+# ---------------------------------------------------------------------------
+# MockLakeAPIFetcher
+# ---------------------------------------------------------------------------
+
+
+class MockLakeAPIFetcher:
+    """In-memory LakeAPI fetcher for testing and paper-trading.
+
+    Returns bars from a pre-configured list, filtered by the requested
+    time window.  Each bar is a dict with keys: ``timestamp``, ``open``,
+    ``high``, ``low``, ``close``, ``volume``.
+    """
+
+    def __init__(self, bars: Optional[List[dict]] = None) -> None:
+        self._bars: List[dict] = list(bars or [])
+
+    def get_bars(
+        self,
+        symbol: str,
+        interval: str,
+        start: datetime,
+        end: datetime,
+    ) -> List[dict]:
+        """Return bars whose ``timestamp`` falls within [start, end]."""
+        result = []
+        for bar in self._bars:
+            ts = bar.get("timestamp")
+            if ts is None:
+                continue
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if start <= ts <= end:
+                result.append(bar)
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -218,15 +285,28 @@ class RecoveryProtocol:
         for testing or ``None`` to skip reconciliation.
     config:
         ``RecoveryConfig`` controlling stale-state thresholds.
+    lakeapi_fetcher:
+        Optional object with a ``get_bars(symbol, interval, start, end)``
+        method.  When provided, missing bars for the outage window are
+        fetched from LakeAPI (step 4 of ITM Spec §22.3).
+    signal_replayer:
+        Optional callable ``(bar: dict, state: ITMSystemState) -> None``.
+        Called once per fetched bar during signal replay (step 5 of
+        ITM Spec §22.3).  Skipped when ``None`` or when no bars were
+        fetched.
     """
 
     def __init__(
         self,
         fetcher=None,
         config: Optional[RecoveryConfig] = None,
+        lakeapi_fetcher=None,
+        signal_replayer: Optional[Callable] = None,
     ) -> None:
         self._fetcher = fetcher
         self._config = config or RecoveryConfig()
+        self._lakeapi_fetcher = lakeapi_fetcher
+        self._signal_replayer = signal_replayer
 
     def run(self, manager) -> RecoveryResult:
         """Execute recovery using *manager*.load_latest() + reconciliation.
@@ -293,8 +373,65 @@ class RecoveryProtocol:
         divergences: list[DivergenceAlert] = []
         has_divergence = False
         orders_blocked = False
+        outage_seconds = age_seconds
+        lakeapi_bars_fetched = 0
+        signals_replayed = 0
 
-        # Reconcile with exchange
+        # Step 4 — Fetch missing data from LakeAPI for outage window (§22.3)
+        if self._lakeapi_fetcher is not None:
+            outage_start = cp.checkpointed_at
+            if outage_start.tzinfo is None:
+                outage_start = outage_start.replace(tzinfo=timezone.utc)
+            outage_end = datetime.now(timezone.utc)
+            logger.info(
+                "Recovery: fetching LakeAPI bars for outage window %s → %s "
+                "(symbol=%s interval=%s)",
+                outage_start.isoformat(),
+                outage_end.isoformat(),
+                self._config.lakeapi_symbol,
+                self._config.lakeapi_interval,
+            )
+            try:
+                lakeapi_bars = self._lakeapi_fetcher.get_bars(
+                    symbol=self._config.lakeapi_symbol,
+                    interval=self._config.lakeapi_interval,
+                    start=outage_start,
+                    end=outage_end,
+                )
+                lakeapi_bars_fetched = len(lakeapi_bars)
+                logger.info(
+                    "Recovery: LakeAPI returned %d bars for %.0f-second outage",
+                    lakeapi_bars_fetched,
+                    outage_seconds,
+                )
+
+                # Step 5 — Replay signals for the offline period (§22.3)
+                if self._signal_replayer is not None and lakeapi_bars:
+                    logger.info(
+                        "Recovery: replaying %d signals against recovered state",
+                        lakeapi_bars_fetched,
+                    )
+                    for bar in lakeapi_bars:
+                        try:
+                            self._signal_replayer(bar, state)
+                            signals_replayed += 1
+                        except Exception as replay_exc:  # noqa: BLE001
+                            logger.warning(
+                                "Recovery: signal_replayer raised on bar %s: %s",
+                                bar.get("timestamp"),
+                                replay_exc,
+                            )
+                    logger.info(
+                        "Recovery: signal replay complete (%d/%d bars replayed)",
+                        signals_replayed,
+                        lakeapi_bars_fetched,
+                    )
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "Recovery: LakeAPI fetch failed (outage data unavailable): %s", exc
+                )
+
+        # Step 6 — Reconcile with current exchange state (§22.3)
         if self._fetcher is not None:
             try:
                 exchange_positions = self._fetcher.get_positions()
@@ -329,7 +466,14 @@ class RecoveryProtocol:
             state=state,
             divergences=divergences,
             loaded_from=loaded_from,
+            outage_seconds=outage_seconds,
+            lakeapi_bars_fetched=lakeapi_bars_fetched,
+            signals_replayed=signals_replayed,
         )
+
+    # ------------------------------------------------------------------
+    # Private helpers (internal to RecoveryProtocol)
+    # ------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
