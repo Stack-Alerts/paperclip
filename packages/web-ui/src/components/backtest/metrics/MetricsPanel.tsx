@@ -771,6 +771,11 @@ function RecentRunsSection({
 
 export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, leverage, riskPerTradePct }: MetricsPanelProps) {
   const [showAdditional, setShowAdditional] = useState(true);
+  // BTCAAAAA-38790 (reopen): the header Aa−/Aa+ control must reach every
+  // small-text card grid on this tab — not just Recent Runs. Section headers
+  // and the large hero KPIs stay fixed; each card grid below zooms.
+  const fontSizes = useFontSizes();
+  const smallZoom = { zoom: fontSizes.smallScale } as const;
 
   // All hooks must run unconditionally — compute series for the result we
   // were given (even if null) so the hook order stays stable across renders.
@@ -1352,7 +1357,7 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
               <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-faint)' }}>Dollar capital lost from the running peak — raw damage to the account.</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 mt-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 mt-3" style={smallZoom}>
             <InfoCard
               label="Max Drawdown"
               value={`${maxDDpctVal.toFixed(2)}%`}
@@ -1422,7 +1427,7 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 mt-6">
         <div>
           <SectionHeader title="Risk Metrics" subtitle="Volatility, drawdown, and downside risk measures" />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" style={smallZoom}>
             {riskSparklineCards.map(c => (
               <SparklineCard
                 key={c.label}
@@ -1440,7 +1445,7 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
         </div>
         <div>
           <SectionHeader title="Trade Statistics" subtitle="Win/loss distribution and execution rates" />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" style={smallZoom}>
             {tradeSparklineCards.map(c => (
               <SparklineCard
                 key={c.label}
@@ -1462,7 +1467,7 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
       {periodCards.length > 0 && (
         <>
           <SectionHeader title="Backtest Period" subtitle="Run window, sample size, and reporting currency" />
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5" style={smallZoom}>
             {periodCards.map(c => (
               <InfoCard
                 key={c.label}
@@ -1491,7 +1496,7 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
           {showAdditional ? 'Hide additional metrics' : 'Show additional metrics'}
         </button>
         {showAdditional && (
-          <div className="grid grid-cols-5 gap-3 md:grid-cols-5 mt-3">
+          <div className="grid grid-cols-5 gap-3 md:grid-cols-5 mt-3" style={smallZoom}>
             {additionalRows.map(r => <MetricCard key={r.label} {...r} />)}
           </div>
         )}

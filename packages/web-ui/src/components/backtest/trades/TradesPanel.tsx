@@ -2,6 +2,7 @@
 
 import { useMemo, useState, Fragment } from 'react';
 import { Trade } from '@/lib/strategy-builder/types';
+import { useFontSizes } from '@/components/backtest/backtestFontScale';
 
 export interface TradesPanelProps {
   trades?: Trade[];
@@ -187,6 +188,10 @@ function sortGroupValue(g: TradeGroup, key: ColumnKey): number | string {
 export function TradesPanel({ trades = [] }: TradesPanelProps) {
   const [sortKey, setSortKey] = useState<ColumnKey>('id');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  // BTCAAAAA-38790: header Aa−/Aa+ control scales the small-text data here too
+  // (summary strip + trade table); the TRADE HISTORY section title stays fixed.
+  const fontSizes = useFontSizes();
+  const smallZoom = { zoom: fontSizes.smallScale } as const;
 
   // Show individual partial-exit rows (no aggregation) — mirrors thick-client display.
   const summary = useMemo(() => {
@@ -227,7 +232,9 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
   if (trades.length === 0) {
     return (
       <div className="flex flex-col min-w-0">
-        <PerformanceSummary summary={summary} hasTrades={false} />
+        <div style={smallZoom}>
+          <PerformanceSummary summary={summary} hasTrades={false} />
+        </div>
         <SectionShell title="Trade History">
           <div
             className="flex flex-col items-center justify-center py-12"
@@ -245,10 +252,12 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
 
   return (
     <div className="flex flex-col min-w-0">
-      <PerformanceSummary summary={summary} hasTrades />
+      <div style={smallZoom}>
+        <PerformanceSummary summary={summary} hasTrades />
+      </div>
 
       <SectionShell title="Trade History">
-        <div style={{ overflowX: 'auto', minWidth: 0 }}>
+        <div style={{ overflowX: 'auto', minWidth: 0, ...smallZoom }}>
           <table
             style={{
               minWidth: totalWidth,
@@ -328,6 +337,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
             borderTop: '1px solid var(--border)',
             color: 'var(--text-muted)',
             fontSize: 12,
+            ...smallZoom,
           }}
         >
           Showing: <b style={{ color: 'var(--text-secondary)' }}>All Trades ({trades.length})</b>
