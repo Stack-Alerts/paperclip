@@ -1320,6 +1320,11 @@ export const TT_RECENT_RUN_TRADES: TooltipContent = {
   body: 'Number of closed trades this saved run produced. Higher counts make the run\'s win rate and drawdown statistically more reliable; under ~30 trades the stats are noise.',
 };
 
+export const TT_RECENT_RUN_DURATION: TooltipContent = {
+  title: 'Test Duration — this run',
+  body: 'Length of the backtest window (start to end date) this run was tested over. Runs with different durations are not directly comparable on return % — a longer window has more time to compound gains or losses.',
+};
+
 export const TT_RECENT_RUN_DD: TooltipContent = {
   title: 'Max Drawdown — this run',
   body: 'Largest peak-to-trough equity decline for this saved run, as a percent of the peak. Weigh each run\'s worst-case pain against its return before applying its configuration.',

@@ -12,7 +12,7 @@ import {
   RotateCcw, AlertTriangle, AlertOctagon, Clock, Hash, Target,
   ArrowUp, ArrowDown, Sparkles, ArrowUpCircle, ArrowDownCircle, Scale,
   Percent, Trophy, Skull, Coins, ChevronDown, ChevronUp,
-  Calendar, Layers, ArrowRight, Percent as PercentIcon, Download,
+  Calendar, Layers, ArrowRight, Percent as PercentIcon, Download, Undo2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -37,6 +37,7 @@ import {
   TT_LONGEST_DRAWDOWN, TT_LIQUIDATION_BUFFER,
   TT_EQUITY_CURVE, TT_DRAWDOWN_CURVE, TT_CAPITAL_DRAWDOWN,
   TT_RECENT_RUN_RETURN, TT_RECENT_RUN_WR, TT_RECENT_RUN_TRADES, TT_RECENT_RUN_DD,
+  TT_RECENT_RUN_DURATION,
 } from './MetricsPanelTooltips';
 
 // TT_ADDITIONAL_METRICS is the umbrella tooltip for the expandable section
@@ -51,6 +52,10 @@ export interface MetricsPanelProps {
   strategyId?: string;
   /** Apply a past run's configuration back into the Config form. */
   onApplyConfig?: (record: BacktestRunRecord) => void;
+  /** runId of the history record currently applied via Apply, if any. */
+  appliedRunId?: string | null;
+  /** Restore the run that was on screen before the last Apply. */
+  onRollbackApply?: () => void;
   /** Max leverage used for the run — powers the liquidation-buffer estimate. */
   leverage?: number;
   /** Risk per trade (% of capital) — contextualises drawdown vs sizing. */
@@ -618,25 +623,45 @@ function isDiscoveryRun(record: BacktestRunRecord): boolean {
   return record.strategyName.includes(' · ');
 }
 
-function SlotBadge({ slot }: { slot: RunSlot }) {
+function SlotBadge({ slot, applied }: { slot: RunSlot; applied?: boolean }) {
+  // BTCAAAAA-38883: when the run on screen came from Apply (not a fresh
+  // backtest), the Current slot is relabelled "Applied" in amber so the user
+  // knows the metrics no longer describe their latest manual run.
+  const label = slot === 'current' && applied ? 'Applied' : SLOT_LABEL[slot];
+  const color = slot === 'current' && applied ? SLOT_COLOR.best : SLOT_COLOR[slot];
   return (
     <div className="w-[68px] flex-shrink-0 flex items-center gap-1">
       {slot === 'best' && <Trophy size={11} style={{ color: SLOT_COLOR.best }} />}
-      <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: SLOT_COLOR[slot] }}>
-        {SLOT_LABEL[slot]}
+      <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color }}>
+        {label}
       </span>
     </div>
   );
+}
+
+// Length of the backtest window — different windows make return % incomparable,
+// so each card surfaces its own duration (BTCAAAAA-38883).
+function fmtTestDuration(start?: string, end?: string): string {
+  if (!start || !end) return '—';
+  const ms = new Date(end).getTime() - new Date(start).getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return '—';
+  const days = ms / 86_400_000;
+  if (days >= 1) return `${Math.round(days)}d`;
+  return `${Math.max(1, Math.round(ms / 3_600_000))}h`;
 }
 
 function RecentRunsSection({
   strategyId,
   currentRunId,
   onApplyConfig,
+  appliedRunId,
+  onRollbackApply,
 }: {
   strategyId?: string;
   currentRunId?: string;
   onApplyConfig?: (record: BacktestRunRecord) => void;
+  appliedRunId?: string | null;
+  onRollbackApply?: () => void;
 }) {
   const [records, setRecords] = useState<BacktestRunRecord[]>([]);
   // BTCAAAAA-38790: the header Aa−/Aa+ control scales the small text inside the
@@ -662,9 +687,11 @@ function RecentRunsSection({
   const manual = records.filter(r => !isDiscoveryRun(r));
   const discovery = records.filter(isDiscoveryRun);
 
-  // Current = the run on screen, falling back to the newest manual run.
+  // Current = the run actually on screen — including a discovery run loaded
+  // via Apply (BTCAAAAA-38883: the slot must replace, not lag behind, the
+  // applied run) — falling back to the newest manual run.
   const current =
-    (currentRunId ? manual.find(r => r.runId === currentRunId) : undefined) ?? manual[0] ?? null;
+    (currentRunId ? records.find(r => r.runId === currentRunId) : undefined) ?? manual[0] ?? null;
   // Previous = the newest manual run that is not the current one.
   const previous = manual.find(r => r.runId !== current?.runId) ?? null;
   // Best = the highest-returning discovery run.
@@ -683,14 +710,18 @@ function RecentRunsSection({
     const equityVals = resolveEquityCurve(r, r.trades ?? []).map(p => p.value);
     const up = r.finalCapital - r.initialCapital >= 0;
     const accent = up ? 'var(--accent-green)' : 'var(--accent-red)';
+    const isApplied = appliedRunId != null && record.runId === appliedRunId;
     return (
       <div
         className="rounded p-3 flex flex-col gap-2 h-full"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+        style={{
+          background: 'var(--bg-card)',
+          border: isApplied ? '1px solid rgba(245,158,11,0.45)' : '1px solid var(--border)',
+        }}
       >
         {/* Header — slot badge + return % */}
         <div className="flex items-center justify-between gap-2">
-          <SlotBadge slot={slot} />
+          <SlotBadge slot={slot} applied={isApplied} />
           <RichTooltip content={TT_RECENT_RUN_RETURN}>
             <span className="text-base font-bold tabular-nums leading-none cursor-help" style={{ color: accent }}>
               {r.returnPercentage >= 0 ? '+' : ''}{r.returnPercentage.toFixed(2)}%
@@ -717,9 +748,23 @@ function RecentRunsSection({
           <RichTooltip content={TT_RECENT_RUN_WR}><span className="cursor-help">WR {(r.winRate * 100).toFixed(0)}%</span></RichTooltip>
           <RichTooltip content={TT_RECENT_RUN_TRADES}><span className="cursor-help">{r.totalTrades} tr</span></RichTooltip>
           <RichTooltip content={TT_RECENT_RUN_DD}><span className="cursor-help">DD {(r.maxDrawdown * 100).toFixed(1)}%</span></RichTooltip>
+          <RichTooltip content={TT_RECENT_RUN_DURATION}><span className="cursor-help">{fmtTestDuration(r.startDate, r.endDate)}</span></RichTooltip>
         </div>
-        {/* Apply — full-width, pinned to the bottom so cards align */}
-        {onApplyConfig && record.fullConfig && (
+        {/* Apply / Roll Back — full-width, pinned to the bottom so cards align.
+            The card whose config is currently applied flips to an amber Roll
+            Back that restores the pre-Apply run (BTCAAAAA-38883). */}
+        {isApplied && onRollbackApply ? (
+          <button
+            onClick={onRollbackApply}
+            className="mt-auto w-full flex items-center justify-center gap-1 text-[11px] px-2.5 py-1 rounded"
+            title="Restore the run you were viewing before Apply"
+            style={{ color: 'var(--accent-amber)', border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.10)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(245,158,11,0.2)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(245,158,11,0.10)')}
+          >
+            <Undo2 size={12} />Roll Back
+          </button>
+        ) : onApplyConfig && record.fullConfig ? (
           <button
             onClick={() => onApplyConfig(record)}
             className="mt-auto w-full flex items-center justify-center gap-1 text-[11px] px-2.5 py-1 rounded"
@@ -730,7 +775,7 @@ function RecentRunsSection({
           >
             <Download size={12} />Apply
           </button>
-        )}
+        ) : null}
       </div>
     );
   };
@@ -769,7 +814,7 @@ function RecentRunsSection({
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, leverage, riskPerTradePct }: MetricsPanelProps) {
+export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, appliedRunId, onRollbackApply, leverage, riskPerTradePct }: MetricsPanelProps) {
   const [showAdditional, setShowAdditional] = useState(true);
   // BTCAAAAA-38790 (reopen): the header Aa−/Aa+ control must reach every
   // small-text card grid on this tab — not just Recent Runs. Section headers
@@ -1418,7 +1463,7 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, l
           BTCAAAAA-38734: mt-6 adds a row of space above the heading so it is not
           flush against the summary metrics rows above it. */}
       <div className="mt-6 mb-6">
-        <RecentRunsSection strategyId={strategyId} currentRunId={result.runId} onApplyConfig={onApplyConfig} />
+        <RecentRunsSection strategyId={strategyId} currentRunId={result.runId} onApplyConfig={onApplyConfig} appliedRunId={appliedRunId} onRollbackApply={onRollbackApply} />
       </div>
 
       {/* Two side-by-side 3×2 sparkline-card panels (mockup middle rows) */}

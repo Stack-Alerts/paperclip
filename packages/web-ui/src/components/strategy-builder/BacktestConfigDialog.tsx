@@ -38,7 +38,7 @@ import { AiRecommendationsPanel } from '@/components/backtest/ai-recommendations
 import { ComparePanel } from '@/components/backtest/compare/ComparePanel';
 import { PresetsPanel } from '@/components/backtest/compare/PresetsPanel';
 import { BacktestProgressMeter } from '@/components/backtest/progress-meter';
-import { addRunRecord } from '@/lib/backtest-history';
+import { addRunRecord, loadAllRunRecords } from '@/lib/backtest-history';
 import { ConfigDiscoveryResultsDialog, type DiscoveryScenario } from './ConfigDiscoveryResultsDialog';
 import { runDiscovery } from '@/components/backtest/config-discovery/runDiscovery';
 import { generateSingleAxisScenarios, DEFAULT_PARAMETER_RANGES } from '@/lib/strategy-builder/config-discovery';
@@ -1684,6 +1684,10 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
   const [applyStatus, setApplyStatus] = useState<{ phase: 'loading' | 'success'; message: string } | null>(null);
   const applyStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (applyStatusTimerRef.current) clearTimeout(applyStatusTimerRef.current); }, []);
+  // BTCAAAAA-38883: which history record is currently applied, and which run
+  // was on screen before it — powers the Current→Applied relabel and the amber
+  // Roll Back button in the Metrics tab's Recent Runs cards.
+  const [appliedApply, setAppliedApply] = useState<{ appliedRunId: string; prevRunId: string | null } | null>(null);
 
   // BTCAAAAA-34942: tail in-flight logs from the store so the Live Output /
   // STATUS panels update during the run instead of waiting for the 30 min
@@ -1965,7 +1969,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
 
   // Apply a saved run's configuration back into the live form (Compare tab → Config).
   // Reverses the fullConfig mapping built in the persist effect below.
-  const applyRunConfig = useCallback((record: import('@/lib/strategy-builder/types').BacktestRunRecord) => {
+  const applyRunConfigCore = useCallback((record: import('@/lib/strategy-builder/types').BacktestRunRecord) => {
     const fc = record.fullConfig;
     if (!fc) return;
     setConfig(prev => ({
@@ -2028,6 +2032,31 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
       applyStatusTimerRef.current = setTimeout(() => setApplyStatus(null), 4000);
     }, 450);
   }, []);
+
+  // BTCAAAAA-38883: public Apply — records which run got applied (and what it
+  // replaced) so Recent Runs can flip that card's Apply into an amber Roll Back.
+  const applyRunConfig = useCallback((record: import('@/lib/strategy-builder/types').BacktestRunRecord) => {
+    const prevRunId = useStrategyStore.getState().backTestResult?.runId ?? null;
+    applyRunConfigCore(record);
+    const appliedRunId = record.result?.runId ?? record.runId;
+    setAppliedApply({ appliedRunId, prevRunId: prevRunId !== appliedRunId ? prevRunId : null });
+  }, [applyRunConfigCore]);
+
+  // Restore the run that was on screen before the last Apply (if it was saved
+  // to history), then drop the applied marker either way.
+  const rollbackApply = useCallback(() => {
+    if (appliedApply?.prevRunId) {
+      const prev = loadAllRunRecords().find(r => r.runId === appliedApply.prevRunId);
+      if (prev) applyRunConfigCore(prev);
+    }
+    setAppliedApply(null);
+  }, [appliedApply, applyRunConfigCore]);
+
+  // A fresh backtest supersedes any applied run: the marker only counts while
+  // the applied run is still the one on screen, so derive validity instead of
+  // clearing state in an effect.
+  const effectiveAppliedRunId =
+    appliedApply && backTestResult?.runId === appliedApply.appliedRunId ? appliedApply.appliedRunId : null;
 
   // Persist each completed run to the compare-panel history.
   const savedRunIdRef = useRef<string | null>(null);
@@ -2625,7 +2654,7 @@ export function BacktestConfigDialog({ open, onClose, standalone = false }: Back
             <TradesPanel trades={backTestResult?.trades ?? []} />
           )}
           {activeTab === 'metrics' && (
-            <MetricsPanel result={backTestResult} strategyId={currentStrategy?.id} onApplyConfig={applyRunConfig} leverage={Number(leverage)} riskPerTradePct={Number(maxRisk)} />
+            <MetricsPanel result={backTestResult} strategyId={currentStrategy?.id} onApplyConfig={applyRunConfig} appliedRunId={effectiveAppliedRunId} onRollbackApply={rollbackApply} leverage={Number(leverage)} riskPerTradePct={Number(maxRisk)} />
           )}
           {activeTab === 'ai' && (
             <AiRecommendationsPanel
