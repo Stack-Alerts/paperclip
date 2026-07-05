@@ -58,7 +58,13 @@ interface TileSpec {
   delta: (d: ProjectedDelta) => number;
   formatDelta: (d: number) => string;
   higherIsBetter: boolean;
+  /** BTCAAAAA-37748 mockup parity — gradient of the tile's progress strip. */
+  stripGradient: string;
+  /** 0..1 fill fraction of the strip for the projected value. */
+  stripFill: (projected: number, baseline: number) => number;
 }
+
+const clamp01 = (v: number) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
 
 const TILES: TileSpec[] = [
   {
@@ -69,6 +75,8 @@ const TILES: TileSpec[] = [
     delta: (d) => d.winRate ?? 0,
     formatDelta: (d) => `${d >= 0 ? '+' : ''}${(d * 100).toFixed(1)}pp`,
     higherIsBetter: true,
+    stripGradient: 'linear-gradient(90deg, var(--accent-green-on, #22c55e), var(--accent-blue, #3b82f6))',
+    stripFill: (projected) => clamp01(projected),
   },
   {
     id: 'max-drawdown',
@@ -78,6 +86,9 @@ const TILES: TileSpec[] = [
     delta: (d) => d.maxDrawdown ?? 0,
     formatDelta: (d) => `${d >= 0 ? '+' : ''}${(d * 100).toFixed(1)}pp`,
     higherIsBetter: false,
+    stripGradient: 'linear-gradient(90deg, var(--accent-red-on, #ef4444), var(--accent-amber-on, #f59e0b))',
+    // Drawdown is a fraction that can exceed 1 (leveraged); 3x = full strip.
+    stripFill: (projected) => clamp01(projected / 3),
   },
   {
     id: 'net-pnl',
@@ -87,6 +98,10 @@ const TILES: TileSpec[] = [
     delta: (d) => d.netLiquidity ?? 0,
     formatDelta: (d) => `${d >= 0 ? '+' : ''}${formatCurrency(d)}`,
     higherIsBetter: true,
+    stripGradient: 'linear-gradient(90deg, var(--accent-green-on, #22c55e), var(--accent-teal, #2dd4bf))',
+    // Centered at half strip for the baseline; doubling the baseline fills it.
+    stripFill: (projected, baseline) =>
+      clamp01(0.5 + (projected - baseline) / (2 * Math.max(Math.abs(baseline), 1))),
   },
   {
     id: 'trades',
@@ -96,6 +111,9 @@ const TILES: TileSpec[] = [
     delta: (d) => d.entries ?? 0,
     formatDelta: (d) => `${d >= 0 ? '+' : ''}${Math.trunc(d)}`,
     higherIsBetter: true,
+    stripGradient: 'linear-gradient(90deg, var(--accent-teal, #2dd4bf), var(--accent-blue, #3b82f6))',
+    // 200 trades = full strip; keeps small sample counts visibly short.
+    stripFill: (projected) => clamp01(projected / 200),
   },
 ];
 
@@ -318,31 +336,72 @@ export function StrategyImpactKpiBar({
                 {tile.label}
               </p>
 
-              <div className="flex items-baseline gap-1 flex-wrap">
+              {/* BTCAAAAA-37748 mockup parity: BASELINE → PROJECTED value pair
+                  with micro-labels, then the tile's gradient progress strip. */}
+              <div className="flex items-end gap-2 flex-wrap">
+                <div className="flex flex-col">
+                  <span
+                    className="text-[8px] font-semibold uppercase tracking-wider"
+                    style={{ color: 'var(--text-faint)' }}
+                  >
+                    Baseline
+                  </span>
+                  <span
+                    className="text-[11px] font-mono"
+                    style={{ color: 'var(--text-muted)' }}
+                    data-testid={`strategy-impact-${tile.id}-before`}
+                  >
+                    {tile.format(before1)}
+                  </span>
+                </div>
                 <span
-                  className="text-[11px] font-mono"
-                  style={{ color: 'var(--text-muted)' }}
-                  data-testid={`strategy-impact-${tile.id}-before`}
+                  className="text-[10px] pb-0.5"
+                  style={{ color: 'var(--text-faint)' }}
                 >
-                  {tile.format(before1)}
-                </span>
-                <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
                   →
                 </span>
-                <span
-                  className="text-sm font-mono font-semibold"
-                  style={{ color: 'var(--text-secondary)' }}
-                  data-testid={`strategy-impact-${tile.id}-after`}
-                >
-                  {tile.format(after1)}
-                </span>
+                <div className="flex flex-col">
+                  <span
+                    className="text-[8px] font-semibold uppercase tracking-wider"
+                    style={{ color: 'var(--text-faint)' }}
+                  >
+                    Projected
+                  </span>
+                  <span
+                    className="text-sm font-mono font-semibold"
+                    style={{ color: 'var(--text-secondary)' }}
+                    data-testid={`strategy-impact-${tile.id}-after`}
+                  >
+                    {tile.format(after1)}
+                  </span>
+                </div>
+                <DeltaChip
+                  direction={dir1}
+                  label={tile.formatDelta(delta1)}
+                  testId={`strategy-impact-${tile.id}-delta`}
+                />
               </div>
 
-              <DeltaChip
-                direction={dir1}
-                label={tile.formatDelta(delta1)}
-                testId={`strategy-impact-${tile.id}-delta`}
-              />
+              <div
+                aria-hidden="true"
+                data-testid={`strategy-impact-${tile.id}-strip`}
+                style={{
+                  height: 4,
+                  borderRadius: 999,
+                  background: 'var(--bg-card)',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    width: `${tile.stripFill(after1, before1) * 100}%`,
+                    height: '100%',
+                    borderRadius: 999,
+                    background: tile.stripGradient,
+                    transition: 'width 200ms ease',
+                  }}
+                />
+              </div>
             </div>
           );
         })}

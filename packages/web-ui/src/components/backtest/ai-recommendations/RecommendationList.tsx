@@ -182,8 +182,25 @@ export function categoryIdFromRecType(type: string | undefined): RecommendationC
   if (t.includes('ADD_SIGNAL') || t.includes('REMOVE_SIGNAL') || t.includes('SIGNAL')) return 'signal';
   if (t.includes('ADD_BLOCK') || t.includes('REMOVE_BLOCK') || t.includes('REGIME')) return 'regime';
   if (t.includes('EXIT')) return 'exit';
-  if (t.includes('ENTRY')) return 'entry';
+  if (t.includes('ENTRY') || t.includes('FILTER')) return 'entry';
+  if (t.includes('TIME')) return 'regime';
+  if (t.includes('STOP') || t.includes('RISK')) return 'risk';
   return 'signal';
+}
+
+// BTCAAAAA-37748 live parity: map the AI-supplied "Category:" label (mockup
+// vocabulary — STOP LOSS / ENTRY FILTER / TIMING / EXIT / SIGNAL / RISK) onto
+// the locked palette id so live cards get the same chip tones as the mockup.
+export function categoryIdFromCategoryLabel(
+  label: string,
+): RecommendationCategoryId | undefined {
+  const l = label.toUpperCase();
+  if (l.includes('STOP') || l.includes('RISK')) return 'risk';
+  if (l.includes('ENTRY')) return 'entry';
+  if (l.includes('TIMING') || l.includes('REGIME')) return 'regime';
+  if (l.includes('EXIT')) return 'exit';
+  if (l.includes('SIGNAL') || l.includes('PATTERN')) return 'signal';
+  return undefined;
 }
 
 // BTCAAAAA-38438: format a projected-impact delta as a short label
@@ -295,6 +312,17 @@ export function simpleHash(input: string): string {
 
 export function parseSingleRec(block: string, index: number): ParsedRec {
   const rawSignal = tryExtractField(block, 'Signal');
+  // BTCAAAAA-37748 live parity: structured presentation fields emitted by the
+  // analyze prompt so live cards render the exact mockup face (category chip,
+  // red/green change diff, Affects chip, WR/DD/P/L footer). All optional —
+  // older responses simply fall back to the plain code-line face.
+  const categoryLabelRaw = tryExtractField(block, 'Category');
+  const changeOld = tryExtractField(block, 'Change Old');
+  const changeNew = tryExtractField(block, 'Change New');
+  const changeContext = tryExtractField(block, 'Change Context');
+  const projWr = tryExtractField(block, 'Projected WR');
+  const projDd = tryExtractField(block, 'Projected DD');
+  const projPl = tryExtractField(block, 'Projected PnL');
   return {
     id: `rec-${index}-${simpleHash(block)}`,
     title: deriveTitle(block, index),
@@ -308,6 +336,29 @@ export function parseSingleRec(block: string, index: number): ParsedRec {
     signal: rawSignal && !/^n\/a$/i.test(rawSignal) ? rawSignal : undefined,
     parameter: tryExtractField(block, 'Parameter'),
     suggestedValue: tryExtractField(block, 'Suggested Value'),
+    categoryLabel: categoryLabelRaw ? categoryLabelRaw.toUpperCase() : undefined,
+    categoryIdOverride: categoryLabelRaw
+      ? categoryIdFromCategoryLabel(categoryLabelRaw)
+      : undefined,
+    deltaLabelOverride: projWr ? `${projWr} WR` : undefined,
+    deltaNegativeOverride: projWr ? projWr.trim().startsWith('-') : undefined,
+    change:
+      changeOld && changeNew
+        ? {
+            contextLine: changeContext ?? '',
+            oldLine: changeOld,
+            newLine: changeNew,
+          }
+        : undefined,
+    affectsLine: tryExtractField(block, 'Affects'),
+    footerMetrics:
+      projWr || projDd || projPl
+        ? {
+            wr: projWr ? `${projWr} WR` : '— WR',
+            dd: projDd ? `${projDd} DD` : '— DD',
+            pl: projPl ? `${projPl} P/L` : '— P/L',
+          }
+        : undefined,
   };
 }
 

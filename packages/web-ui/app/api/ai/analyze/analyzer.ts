@@ -114,15 +114,29 @@ RECOMMENDATIONS:
    Parameter: <exact key from that block's data object or from strategy settings — do NOT invent a name>
    Suggested Value: <new value only, e.g. 1.5 or true — no units, no ranges>
    Rationale: <one sentence explaining why>
+   Category: <exactly one of STOP LOSS, ENTRY FILTER, TIMING, EXIT, SIGNAL, RISK>
+   Change Context: <where the change lives, e.g. At 1hod exit · ABSOLUTE>
+   Change Old: <the current setting as one short code line, e.g. stop = 0.70%>
+   Change New: <the suggested setting as one short code line, e.g. stop = 1.05%>
+   Affects: <block/signal lineage, e.g. Asia 50% -> At 1hod>
+   Projected WR: <estimated win-rate delta in percent, e.g. +8%>
+   Projected DD: <estimated max-drawdown delta in percent, e.g. -12%>
+   Projected PnL: <estimated net PnL delta in dollars, e.g. +$1,640>
 
 === TEMPLATE B (use only to add an entirely new building block) ===
 2. <One-sentence action title>
    Type: ADD_BLOCK
    Block: <one supported block-type name from the vocabulary above, e.g. indicator>
    Rationale: <one sentence explaining why>
+   Category: <exactly one of STOP LOSS, ENTRY FILTER, TIMING, EXIT, SIGNAL, RISK>
+   Affects: <block/signal lineage the new block gates, e.g. EMA 55 vector -> entries>
+   Projected WR: <estimated win-rate delta in percent, e.g. +2%>
+   Projected DD: <estimated max-drawdown delta in percent, e.g. -5%>
+   Projected PnL: <estimated net PnL delta in dollars, e.g. +$240>
 
 Hard rules — breaking any of these makes your output unparseable:
-- Type, Block, Parameter, Suggested Value, Rationale: no asterisks, no markdown, no colons in values.
+- Type, Block, Parameter, Suggested Value, Rationale, Category, Change Context, Change Old, Change New, Affects, Projected WR, Projected DD, Projected PnL: no asterisks, no markdown, no colons in values.
+- The Category, Change, Affects, and Projected lines drive the card face the user sees (colored category chip, before/after diff, impact footer). Include ALL of them on every recommendation; estimate the Projected deltas from the attribution data and trade list.
 - Block in Template A must match a name from the strategy_config payload exactly, or be the literal word settings.
 - Parameter must be a key that actually exists in that block.data or in strategy settings — never invent a key.
 - Suggested Value is a single scalar: a number or string, nothing else.
@@ -143,12 +157,28 @@ RECOMMENDATIONS:
    Parameter: adaptiveSL.enabled
    Suggested Value: true
    Rationale: Switching from a fixed stop to an adaptive volatility-based stop should reduce whipsaw losses in ranging markets.
+   Category: STOP LOSS
+   Change Context: settings · adaptiveSL
+   Change Old: adaptiveSL.enabled = false
+   Change New: adaptiveSL.enabled = true
+   Affects: settings -> stop loss
+   Projected WR: +4%
+   Projected DD: -9%
+   Projected PnL: +$820
 2. Reduce fixed hold to allow winners to breathe
    Type: ADJUST_PARAM
    Block: settings
    Parameter: maxBarsHeld
    Suggested Value: 8
-   Rationale: Extending the hold by 3 bars gives winning setups room to reach their mean-reversion target before time exit.`;
+   Rationale: Extending the hold by 3 bars gives winning setups room to reach their mean-reversion target before time exit.
+   Category: TIMING
+   Change Context: settings · time exit
+   Change Old: maxBarsHeld = 5
+   Change New: maxBarsHeld = 8
+   Affects: settings -> time exit
+   Projected WR: +2%
+   Projected DD: +1%
+   Projected PnL: +$310`;
 
 /** Format the user message by appending the payload as a JSON code block. */
 function buildUserMessage(prompt: string, payload: unknown): string {

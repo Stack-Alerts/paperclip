@@ -37,7 +37,6 @@ import {
   DEFAULT_SETTINGS_HREF,
   type PreflightError,
 } from './preflightValidation';
-import { ReverseViewBanner } from './ReverseViewBanner';
 import {
   DEFAULT_CONFIDENCE_FLOOR,
   meetsConfidenceFloor,
@@ -52,6 +51,7 @@ import {
   ReverseViewInput,
 } from './reverseViewPattern';
 import { StrategyImpactKpiBar, type ReProjectFn } from './StrategyImpactKpiBar';
+import type { RecommendationCardData } from './RecommendationCard';
 import {
   AppliedRecImpact,
   deriveBaselineKpis,
@@ -2432,7 +2432,7 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
               analysisId={lastAnalysisHash ?? strategy?.id ?? ''}
               recommendations={(() => {
                 const conflictMap = detectConflicts(parsedRecs);
-                return parsedRecs.map((rec) => {
+                const cards: RecommendationCardData[] = parsedRecs.map((rec) => {
                   const isApplied = appliedRecIds.includes(rec.id);
                   const isApplyingThis = perTileApplying.includes(rec.id);
                   const isStructural = STRUCTURAL_TYPES.has((rec.type ?? '').toUpperCase());
@@ -2465,6 +2465,48 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
                     },
                   };
                 });
+                // BTCAAAAA-37748 live parity: the mockup renders the reverse
+                // view as the last card in the recommendation grid (insight
+                // face, no toggle), not as a full-width banner below it.
+                if (parsedRecs.length > 0) {
+                  const pattern = extractReverseViewPattern(reverseViewInputs);
+                  const upliftLabel =
+                    pattern.sampleSize > 0
+                      ? `${pattern.avgUplift >= 0 ? '+' : ''}${pattern.avgUplift.toFixed(1)}%`
+                      : 'Insight';
+                  const sharedLine =
+                    pattern.sampleSize > 0
+                      ? [
+                          pattern.topCategories.length > 0
+                            ? `Categories: ${pattern.topCategories.join(' · ')}`
+                            : null,
+                          pattern.topParamKeys.length > 0
+                            ? `Params: ${pattern.topParamKeys.join(' · ')}`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' — ')
+                      : '';
+                  cards.push({
+                    id: 'reverse-view',
+                    categoryId: 'signal',
+                    categoryLabel: 'PATTERN',
+                    deltaLabel: upliftLabel,
+                    title: 'Reverse view — what the winners share',
+                    description: pattern.headline,
+                    insight: true,
+                    insightBox: sharedLine
+                      ? `${sharedLine}. No parameter to toggle — use as a manual confluence check when placing trades.`
+                      : 'No parameter to toggle — use as a manual confluence check when placing trades.',
+                    affectsLine: '—',
+                    footerMetrics: { wr: '— WR', dd: '— DD', pl: '— P/L' },
+                    applied: false,
+                    onToggleApplied: () => {},
+                    analysisId: lastAnalysisHash ?? strategy?.id ?? '',
+                    dataAttributes: { 'data-testid': 'reverse-view-card' },
+                  });
+                }
+                return cards;
               })()}
             />
           </div>
@@ -2474,10 +2516,6 @@ const [blockCatalog, setBlockCatalog] = useState<unknown[] | null>(null);
       {/* Per-tile saves are now the action surface (AC20). No more
           sticky "Apply all" footer — apply is per-card. */}
       </div>
-
-      {!demoMode && parsedRecs.length > 0 && (
-        <ReverseViewBanner pattern={extractReverseViewPattern(reverseViewInputs)} />
-      )}
     </div>
   );
 
