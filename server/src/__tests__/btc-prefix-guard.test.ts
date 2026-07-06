@@ -130,7 +130,7 @@ describe("enforceBtcPrefixTokens", () => {
     expect(result.ok).toBe(true);
   });
 
-  it("passes when the candidate resolves in the actor's company", async () => {
+  it("rejects even when the candidate resolves (truncated real identifier is the primary bug case)", async () => {
     const seen: string[] = [];
     const result = await enforceBtcPrefixTokens({
       text: "see BTC-9999",
@@ -141,7 +141,12 @@ describe("enforceBtcPrefixTokens", () => {
         return { exists: true };
       },
     });
-    expect(result).toEqual({ ok: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.offendingToken).toBe("BTC-9999");
+      expect(result.suggestedFull).toBe("BTCAAAAA-9999");
+      expect(result.resolvable).toBe(true);
+    }
     expect(seen).toEqual(["BTCAAAAA-9999"]);
   });
 
@@ -220,20 +225,21 @@ describe("enforceBtcPrefixTokens", () => {
         return { exists: true };
       },
     });
-    expect(result).toEqual({ ok: true });
+    expect(result.ok).toBe(false);
     expect(seen[0].cid).toBe("explicit-company");
   });
 
-  it("uses explicit companyId without actor (multi-company board user scenario)", async () => {
+  it("rejects with resolvable:true when the token resolves in the explicit company", async () => {
     const result = await enforceBtcPrefixTokens({
       text: "see BTC-9999",
       companyId: "target-company",
       lookup: async (_candidate, cid) => ({ exists: cid === "target-company" }),
     });
-    expect(result).toEqual({ ok: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.resolvable).toBe(true);
   });
 
-  it("allows token when it resolves in a non-primary actor company (multi-company board user)", async () => {
+  it("marks resolvable:true when the token resolves in a non-primary actor company", async () => {
     // Board actor has two companies; token only exists in the second one.
     const boardActor = { type: "board", companyIds: ["c-primary", "c-secondary"] };
     const result = await enforceBtcPrefixTokens({
@@ -241,7 +247,8 @@ describe("enforceBtcPrefixTokens", () => {
       actor: boardActor,
       lookup: async (_candidate, cid) => ({ exists: cid === "c-secondary" }),
     });
-    expect(result).toEqual({ ok: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.resolvable).toBe(true);
   });
 
   it("rejects token when it resolves in NONE of the actor companies", async () => {
@@ -286,11 +293,11 @@ describe("enforceBtcPrefixTokens", () => {
         return { exists: true };
       },
     });
-    expect(result).toEqual({ ok: true });
+    expect(result.ok).toBe(false);
     expect(calls).toBe(1);
   });
 
-  it("returns the first failing token when multiple are present", async () => {
+  it("returns the first bare token when multiple are present", async () => {
     const result = await enforceBtcPrefixTokens({
       text: "BTC-1111 ok BTC-2222 bad",
       actor,
@@ -301,8 +308,9 @@ describe("enforceBtcPrefixTokens", () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.offendingToken).toBe("BTC-2222");
-      expect(result.suggestedFull).toBe("BTCAAAAA-2222");
+      expect(result.offendingToken).toBe("BTC-1111");
+      expect(result.suggestedFull).toBe("BTCAAAAA-1111");
+      expect(result.resolvable).toBe(true);
     }
   });
 });
@@ -356,13 +364,13 @@ describe("enforceBtcPrefixTokens via express middleware mount", () => {
     expect(res.body.details.companyId).toBe("company-1");
   });
 
-  it("returns 201 for a comment containing a resolving short form", async () => {
+  it("returns 422 for a comment containing a resolving short form (must use full prefix)", async () => {
     const app = mountGuard(async (candidate) => ({
       exists: candidate === "BTCAAAAA-9999",
     }));
     const res = await request(app).post("/comments").send({ body: "see BTC-9999" });
-    expect(res.status).toBe(201);
-    expect(res.body).toEqual({ ok: true });
+    expect(res.status).toBe(422);
+    expect(res.body.details.offendingToken).toBe("BTC-9999");
   });
 
   it("returns 201 for a control comment with the full prefix", async () => {
@@ -484,7 +492,7 @@ describe("btc-prefix-guard wired into route handlers", () => {
     expect(res.body.details.companyId).toBe("company-A");
   });
 
-  it("(b) POST /issues/:id/comments returns 201 when BTC-9999 resolves in the actor's company", async () => {
+  it("(b) POST /issues/:id/comments returns 422 when BTC-9999 resolves in the actor's company (truncated real identifier)", async () => {
     const app = buildRouteApp({
       actor: { type: "agent", companyId: "company-A" },
       issue: { id: "issue-1", companyId: "company-A" },
@@ -493,8 +501,10 @@ describe("btc-prefix-guard wired into route handlers", () => {
     const res = await request(app)
       .post("/issues/issue-1/comments")
       .send({ body: "see BTC-9999 for context" });
-    expect(res.status).toBe(201);
-    expect(res.body).toEqual({ ok: true, issueId: "issue-1" });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe("Truncated prefix");
+    expect(res.body.details.offendingToken).toBe("BTC-9999");
+    expect(res.body.details.resolvable).toBe(true);
   });
 
   it("(c) POST /issues/:id/comments returns 201 for system actor (type:'none') — bypasses BTC-EUR crypto context (and any BTC-N)", async () => {

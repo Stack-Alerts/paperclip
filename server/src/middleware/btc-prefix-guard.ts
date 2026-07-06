@@ -22,6 +22,8 @@ export type BtcPrefixGuardResult =
       offendingToken: string;
       suggestedFull: string;
       actorCompanyId: string;
+      /** True when the full-prefix form resolves to a real issue (truncated real identifier). */
+      resolvable: boolean;
     };
 
 /** Strip fenced and inline code blocks to avoid false positives on code examples. */
@@ -116,35 +118,38 @@ export async function enforceBtcPrefixTokens(params: {
   }
   if (candidates.length === 0) return { ok: true };
 
-  // A token is valid if it resolves in ANY of the actor's companies.
-  for (const c of candidates) {
-    const lookupResults = await Promise.all(
-      companyIds.map((cid) => lookup(c.candidate, cid)),
-    );
-    const resolvesInAny = lookupResults.some((r) => r?.exists);
-    if (!resolvesInAny) {
-      return {
-        ok: false,
-        offendingToken: c.token,
-        suggestedFull: c.candidate,
-        actorCompanyId: primaryCompanyId,
-      };
-    }
-  }
-  return { ok: true };
+  // Every bare BTC-N token is rejected: truncated real identifiers are the
+  // primary bug case (post_hook_emissions scan must reach 0), and unresolvable
+  // ones are broken references. Lookup only shapes the error message.
+  const first = candidates[0];
+  const lookupResults = await Promise.all(
+    companyIds.map((cid) => lookup(first.candidate, cid)),
+  );
+  const resolvesInAny = lookupResults.some((r) => r?.exists);
+  return {
+    ok: false,
+    offendingToken: first.token,
+    suggestedFull: first.candidate,
+    actorCompanyId: primaryCompanyId,
+    resolvable: resolvesInAny,
+  };
 }
 
 export function respondBtcPrefixGuardFailure(
   res: Response,
   result: Extract<BtcPrefixGuardResult, { ok: false }>,
 ) {
+  const message = result.resolvable
+    ? `Comment contains truncated identifier '${result.offendingToken}'. Use the full '${result.suggestedFull}' form.`
+    : `Comment contains '${result.offendingToken}' which does not resolve to a real identifier in this company. Remove it or use a valid full '${BTC_FULL_PREFIX}-N' identifier.`;
   res.status(422).json({
     error: "Truncated prefix",
-    message: `Comment contains '${result.offendingToken}' which does not resolve to a real identifier in this company. Use the full '${result.suggestedFull}' form.`,
+    message,
     details: {
       offendingToken: result.offendingToken,
       suggestedFull: result.suggestedFull,
       companyId: result.actorCompanyId,
+      resolvable: result.resolvable,
     },
   });
 }
