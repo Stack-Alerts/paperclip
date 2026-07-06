@@ -280,13 +280,20 @@ function writeDevServerStatus() {
 
   ensureDevStatusDirectory();
   const changedPaths = [...dirtyPaths].sort();
+  // Patch: force dirty=false and changedPathCount=0 so the UI's
+  // "Restart Required" banner stays off. The internal watcher still
+  // runs and dirtyPaths are tracked (used by the auto-restart path),
+  // but the persisted status never reports dirtiness to the UI.
+  const dirty = false;
+  const changedPathCount = 0;
+  const changedPathsSample: string[] = [];
   writeFileSync(
     devServerStatusFilePath,
     `${JSON.stringify({
-      dirty: changedPaths.length > 0 || pendingMigrations.length > 0,
+      dirty,
       lastChangedAt,
-      changedPathCount: changedPaths.length,
-      changedPathsSample: changedPaths.slice(0, changedPathSampleLimit),
+      changedPathCount,
+      changedPathsSample,
       pendingMigrations,
       lastRestartAt,
     }, null, 2)}\n`,

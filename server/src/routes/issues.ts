@@ -4045,29 +4045,53 @@ export function issueRoutes(
       existing.status !== result.issue.status &&
       result.issue.assigneeAgentId
     ) {
-      void heartbeat.wakeup(result.issue.assigneeAgentId, {
-        source: "automation",
-        triggerDetail: "system",
-        reason: "issue_recovery_action_restored",
-        payload: {
-          issueId: result.issue.id,
-          recoveryActionId: result.recoveryAction.id,
-          mutation: "recovery_action_resolution",
-        },
-        requestedByActorType: actor.actorType,
-        requestedByActorId: actor.actorId,
-        contextSnapshot: {
-          issueId: result.issue.id,
-          taskId: result.issue.id,
-          wakeReason: "issue_recovery_action_restored",
-          source: "issue.recovery_action_resolution",
-          recoveryActionId: result.recoveryAction.id,
-        },
-      }).catch((err) =>
+      // Patch: don't wake the agent for very-old recovery actions. The
+      // periodic recovery creates stranded-assigned-issue actions for
+      // issues that have been stranded for days, then resolves them
+      // automatically — that resolution fires this wake, which causes
+      // CTO to "work" on a 2-month-old closed issue. Bound by issue age.
+      const issueAgeMs = Date.now() - new Date(result.issue.createdAt).getTime();
+      const maxWakeAgeMs = Math.max(
+        0,
+        Math.min(24 * 60 * 60 * 1000,
+          Number(process.env.PAPERCLIP_MAX_RECOVERY_WAKE_AGE_MS) || 60 * 60 * 1000),
+      );
+      if (issueAgeMs > maxWakeAgeMs) {
         logger.warn(
-          { err, issueId: result.issue.id, agentId: result.issue.assigneeAgentId },
-          "failed to wake agent after recovery action restored issue",
-        ));
+          {
+            issueId: result.issue.id,
+            identifier: result.issue.identifier,
+            issueAgeHours: Math.round(issueAgeMs / (60 * 60 * 1000)),
+            maxWakeAgeHours: Math.round(maxWakeAgeMs / (60 * 60 * 1000)),
+            recoveryActionId: result.recoveryAction.id,
+          },
+          "skipping wake on issue_recovery_action_resolved because issue is older than the cap",
+        );
+      } else {
+        void heartbeat.wakeup(result.issue.assigneeAgentId, {
+          source: "automation",
+          triggerDetail: "system",
+          reason: "issue_recovery_action_restored",
+          payload: {
+            issueId: result.issue.id,
+            recoveryActionId: result.recoveryAction.id,
+            mutation: "recovery_action_resolution",
+          },
+          requestedByActorType: actor.actorType,
+          requestedByActorId: actor.actorId,
+          contextSnapshot: {
+            issueId: result.issue.id,
+            taskId: result.issue.id,
+            wakeReason: "issue_recovery_action_restored",
+            source: "issue.recovery_action_resolution",
+            recoveryActionId: result.recoveryAction.id,
+          },
+        }).catch((err) =>
+          logger.warn(
+            { err, issueId: result.issue.id, agentId: result.issue.assigneeAgentId },
+            "failed to wake agent after recovery action restored issue",
+          ));
+      }
     }
 
     res.json({
@@ -6944,9 +6968,13 @@ export function issueRoutes(
         const assigneeId = issue.assigneeAgentId;
         const actorIsAgent = actor.actorType === "agent";
         const selfComment = actorIsAgent && actor.actorId === assigneeId;
+        // Patch: always skip the wake when the commenting agent is the assignee.
+        // Reopening is no longer enough to bypass the self-author skip — that
+        // path was the cascade trigger (agent comments → wake → comment → wake).
+        // We still surface a wake for *human* comments, and for the dedicated
+        // decision-stage wake (handled separately above).
         const skipAssigneeCommentWake = selfComment || isClosed;
-
-        if (assigneeId && !assigneeChanged && (reopened || !skipAssigneeCommentWake)) {
+        if (assigneeId && !assigneeChanged && !skipAssigneeCommentWake) {
           addWakeup(assigneeId, {
             source: "automation",
             triggerDetail: "system",
@@ -8427,8 +8455,10 @@ export function issueRoutes(
       // Re-derive closed-ness from the post-mutation issue so the auto-approval
       // transition (in_review -> done) suppresses a stale `issue_commented` wake
       // to the returnAssignee for an already-completed issue.
+      // Patch: also always skip when the commenting agent is the assignee,
+      // even on reopen. This breaks the agent-comment → wake → comment loop.
       const skipWake = selfComment || isClosedIssueStatus(currentIssue.status);
-      if (assigneeId && (reopened || !skipWake)) {
+      if (assigneeId && !skipWake) {
         if (reopened) {
           addWakeup(assigneeId, {
             source: "automation",

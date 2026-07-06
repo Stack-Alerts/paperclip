@@ -1,7 +1,14 @@
 import { useCallback, useState } from "react";
 import { getWorktreeUiBranding } from "../lib/worktree-branding";
 
-export function WorktreeBanner() {
+// WorktreeBanner is disabled. The worktree identity is still tracked server-side
+// via PAPERCLIP_WORKTREE_NAME for routing/logging, but the UI banner is hidden.
+// Per operator policy: no banner unless there is a real, actionable issue.
+export function WorktreeBanner(): null {
+  return null;
+
+  // The body below is intentionally unreachable; preserved for reference.
+  /* eslint-disable @typescript-eslint/no-unreachable */
   const branding = getWorktreeUiBranding();
   const [copied, setCopied] = useState(false);
 
@@ -40,4 +47,5 @@ export function WorktreeBanner() {
       </div>
     </div>
   );
+  /* eslint-enable @typescript-eslint/no-unreachable */
 }

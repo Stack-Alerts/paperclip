@@ -9709,7 +9709,8 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
     return { reaped: reaped.length, runIds: reaped };
   }
 
-  async function resumeQueuedRuns() {
+  async function resumeQueuedRuns(opts?: { maxDispatches?: number }) {
+    const maxDispatches = Math.max(0, opts?.maxDispatches ?? Number.MAX_SAFE_INTEGER);
     const queuedRuns = await db
       .select({ agentId: heartbeatRuns.agentId })
       .from(heartbeatRuns)
@@ -9720,13 +9721,22 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
       ));
 
     const agentIds = [...new Set(queuedRuns.map((r) => r.agentId))];
+    let dispatched = 0;
+    let skipped = 0;
     for (const agentId of agentIds) {
-      await startNextQueuedRunForAgent(agentId);
+      if (dispatched >= maxDispatches) {
+        skipped += 1;
+        continue;
+      }
+      const started = await startNextQueuedRunForAgent(agentId);
+      if (started) dispatched += 1;
+      else skipped += 1;
     }
+    return { dispatched, skipped, considered: agentIds.length };
   }
 
-  async function reconcileStrandedAssignedIssues() {
-    return recovery.reconcileStrandedAssignedIssues();
+  async function reconcileStrandedAssignedIssues(opts?: { maxDispatches?: number }) {
+    return recovery.reconcileStrandedAssignedIssues({ maxDispatches: opts?.maxDispatches });
   }
 
   async function sweepStaleIssueLocks() {

@@ -2844,7 +2844,8 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
     return updated;
   }
 
-  async function reconcileStrandedAssignedIssues() {
+  async function reconcileStrandedAssignedIssues(opts?: { maxDispatches?: number }) {
+    const maxDispatches = Math.max(0, opts?.maxDispatches ?? Number.MAX_SAFE_INTEGER);
     const candidates = await db
       .select()
       .from(issues)
@@ -2852,6 +2853,11 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
         and(
           isNull(issues.assigneeUserId),
           inArray(issues.status, ["todo", "in_progress", "in_review"]),
+          // Patch: skip issues older than 24h. The periodic recovery was
+          // repeatedly creating "stranded" actions for 2-month-old issues
+          // and waking CTO, who would then attempt to work on long-since-
+          // closed items. Old issues aren't stranded — they're historical.
+          sql`${issues.createdAt} > now() - interval '24 hours'`,
           or(
             sql`${issues.assigneeAgentId} is not null`,
             eq(issues.status, "in_review"),
@@ -2873,6 +2879,15 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
       recentProgressExempted: 0,
       skipped: 0,
       issueIds: [] as string[],
+    };
+
+    // Helper: tracks total startup dispatches (anything that creates a new run).
+    let startupDispatches = 0;
+    const isAtCap = () => startupDispatches >= maxDispatches;
+    const tryConsumeDispatchSlot = (): boolean => {
+      if (isAtCap()) return false;
+      startupDispatches += 1;
+      return true;
     };
 
     for (const issue of candidates) {
@@ -3015,6 +3030,11 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
           continue;
         }
 
+        if (!tryConsumeDispatchSlot()) {
+          result.skipped += 1;
+          continue;
+        }
+
         const queued = await enqueueStrandedIssueRecovery({
           issueId: issue.id,
           agentId: participantAgentId,
@@ -3046,6 +3066,11 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
           }
 
           if (await isInvocationBudgetBlocked(issue, agentId)) {
+            result.skipped += 1;
+            continue;
+          }
+
+          if (!tryConsumeDispatchSlot()) {
             result.skipped += 1;
             continue;
           }
@@ -3086,6 +3111,11 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
         }
 
         if (await isInvocationBudgetBlocked(issue, agentId)) {
+          result.skipped += 1;
+          continue;
+        }
+
+        if (!tryConsumeDispatchSlot()) {
           result.skipped += 1;
           continue;
         }
@@ -3174,6 +3204,11 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
         }
 
         if (await isInvocationBudgetBlocked(issue, agentId)) {
+          result.skipped += 1;
+          continue;
+        }
+
+        if (!tryConsumeDispatchSlot()) {
           result.skipped += 1;
           continue;
         }
@@ -3269,6 +3304,11 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
       }
 
       if (await isInvocationBudgetBlocked(issue, agentId)) {
+        result.skipped += 1;
+        continue;
+      }
+
+      if (!tryConsumeDispatchSlot()) {
         result.skipped += 1;
         continue;
       }

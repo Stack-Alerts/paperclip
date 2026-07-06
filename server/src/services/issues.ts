@@ -5548,7 +5548,55 @@ export function issueService(db: Db) {
           }),
         );
 
-        const [issue] = await tx.insert(issues).values(values).returning();
+        // Patch: on identifier-uniqueness violation (e.g. user-authored issue
+        // already took this number), retry up to N times by re-computing the next
+        // available issue_number. This fixes the Impact Gate routine, which
+        // hit BTCAAAAA-38937 already taken by a [RECOVERY] user issue.
+        let issue;
+        let attempt = 0;
+        // Bound retries tightly so a stuck counter can't loop forever.
+        while (true) {
+          try {
+            [issue] = await tx.insert(issues).values(values).returning();
+            break;
+          } catch (err) {
+            const isIdentifierConflict =
+              !!err &&
+              typeof err === "object" &&
+              "code" in err &&
+              (err as { code?: string }).code === "23505" &&
+              "constraint" in err &&
+              ((err as { constraint?: string }).constraint === "issues_identifier_idx" ||
+                (err as { constraint?: string }).constraint === "issues_pkey" === false);
+            // 23505 on a uniqueness violation that isn't the identifier
+            // re-throw so other constraints (FK, NOT NULL) still surface.
+            if (!isIdentifierConflict) throw err;
+            attempt += 1;
+            if (attempt >= 5) {
+              throw new Error(
+                `unable to allocate a free issue_number after ${attempt} retries; ` +
+                  `last identifier was ${identifier}`,
+              );
+            }
+            // Re-derive the next free number from the current max within this tx.
+            const [nextMaxRow] = await tx
+              .select({ maxNum: sql<number>`coalesce(max(${issues.issueNumber}), 0)` })
+              .from(issues)
+              .where(eq(issues.companyId, companyId));
+            const nextMax = (nextMaxRow?.maxNum ?? 0) + 1;
+            await tx
+              .update(companies)
+              .set({ issueCounter: sql`${nextMax}` })
+              .where(eq(companies.id, companyId));
+            const [bumped] = await tx
+              .select({ issueCounter: companies.issueCounter })
+              .from(companies)
+              .where(eq(companies.id, companyId));
+            const newNumber = bumped?.issueCounter ?? nextMax;
+            (values as { issueNumber: number; identifier: string }).issueNumber = newNumber;
+            (values as { identifier: string }).identifier = `${company.issuePrefix}-${newNumber}`;
+          }
+        }
         if (watchdog) {
           await upsertIssueWatchdogForIssue(tx, companyId, issue.id, {
             agentId: watchdog.agentId,

@@ -806,19 +806,35 @@ export async function startServer(): Promise<StartedServer> {
         }
       }
 
+      // Patch: cap startup-recovery dispatch volume. We still reconcile state
+      // (mark runs as lost, schedule retries) but only dispatch a bounded
+      // number of new runs at startup. The remaining ones sit in the queue
+      // and the regular tick-timer path drains them at a sane cadence.
+      const startupDispatchCap = Math.max(
+        0,
+        Math.min(50, Number(process.env.PAPERCLIP_STARTUP_DISPATCH_CAP) || 5),
+      );
       const promotion = await heartbeat.promoteDueScheduledRetries();
-      await heartbeat.resumeQueuedRuns();
-      const reconciled = await heartbeat.reconcileStrandedAssignedIssues();
+      const resumeResult = await heartbeat.resumeQueuedRuns({ maxDispatches: startupDispatchCap });
+      const reconciled = await heartbeat.reconcileStrandedAssignedIssues({ maxDispatches: startupDispatchCap });
       if (
         promotion.promoted > 0 ||
         reconciled.assignmentDispatched > 0 ||
         reconciled.dispatchRequeued > 0 ||
         reconciled.continuationRequeued > 0 ||
         reconciled.successfulRunHandoffEscalated > 0 ||
-        reconciled.escalated > 0
+        reconciled.escalated > 0 ||
+        (resumeResult as any).skipped > 0
       ) {
         logger.warn(
-          { promotedScheduledRetries: promotion.promoted, promotedScheduledRetryRunIds: promotion.runIds, ...reconciled },
+          {
+            promotedScheduledRetries: promotion.promoted,
+            promotedScheduledRetryRunIds: promotion.runIds,
+            startupDispatchCap,
+            resumeSkipped: (resumeResult as any).skipped,
+            resumeDispatched: (resumeResult as any).dispatched,
+            ...reconciled,
+          },
           "startup heartbeat recovery changed assigned issue state",
         );
       }
@@ -906,12 +922,20 @@ export async function startServer(): Promise<StartedServer> {
   
       // Periodically reap orphaned runs (5-min staleness threshold) and make sure
       // persisted queued work is still being driven forward.
+      // Patch: the periodic recovery must be capped, otherwise a crash-recovery
+      // backlog (50+ stranded assigned issues) re-dispatches every 30s and
+      // causes the OOM we just hit. Use a small cap (3) per periodic tick
+      // and let the natural cadence drain the queue without piling up.
+      const periodicDispatchCap = Math.max(
+        0,
+        Math.min(10, Number(process.env.PAPERCLIP_PERIODIC_DISPATCH_CAP) || 3),
+      );
       void heartbeat
         .reapOrphanedRuns({ staleThresholdMs: 5 * 60 * 1000 })
         .then(() => heartbeat.promoteDueScheduledRetries())
         .then(async (promotion) => {
-          await heartbeat.resumeQueuedRuns();
-          const reconciled = await heartbeat.reconcileStrandedAssignedIssues();
+          await heartbeat.resumeQueuedRuns({ maxDispatches: periodicDispatchCap });
+          const reconciled = await heartbeat.reconcileStrandedAssignedIssues({ maxDispatches: periodicDispatchCap });
           if (
             promotion.promoted > 0 ||
             reconciled.assignmentDispatched > 0 ||
