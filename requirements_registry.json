@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "$schema": "docs/architecture/requirements_registry.schema.md",
+  "description": "Canonical requirement registry. Maps functional/non-functional/business/architectural requirements to source modules, test files, and originating Paperclip issues. Consumed by scripts/lock_module_verify.py, scripts/validate_requirements_registry.py, and scripts/sync_trace_test_cases.py to enforce lock-gate, impact-gate, and gap-detection in CI.",
+  "generated_at": "2026-07-06T09:30:00Z",
+  "generated_by": "DevelopmentManager (270cc7ed-d6cd-4df6-ab50-abf7c0e8ea15)",
+  "parent_issue": "BTCAAAAA-38932",
+  "requirements": [
+    {
+      "id": "REQ-ITM-003",
+      "type": "FR",
+      "title": "RecoveryProtocol must fetch missing outage data via LakeAPI and replay signals (FDR-003)",
+      "description": "Implements ITM Spec §22.3 steps 3 and 4 inside RecoveryProtocol.run(). When state recovery encounters a checkpoint older than max_recovery_age_hours, RecoveryProtocol must (a) fetch missing bars for the outage window from LakeAPI via the optional lakeapi_fetcher callable and (b) replay signals for the offline period via the optional signal_replayer callable. End-to-end recovery for a <=24h outage must complete in under 2 minutes. BTE-TC-FDR-003-A covers these acceptance criteria in tests/itm/state/test_recovery.py::TestFdrTC003A.",
+      "source_issues": ["BTCAAAAA-27593", "BTCAAAAA-27578"],
+      "source_modules": ["src/itm/state/recovery.py"],
+      "test_files": ["tests/itm/state/test_recovery.py"],
+      "test_markers": ["@pytest.mark.fr(\"FDR-003\")"],
+      "status": "active",
+      "priority": "critical",
+      "tags": ["itm", "recovery", "lakeapi", "signal-replay", "fdr-003"],
+      "owner_agent": "DevelopmentManager",
+      "superseded_by": null
+    }
+  ]
+}

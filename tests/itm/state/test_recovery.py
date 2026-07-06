@@ -414,6 +414,7 @@ def _make_bar(ts: datetime, close: str = "50000") -> dict:
     }
 
 
+@pytest.mark.fr("FDR-003")
 class TestFdrTC003A:
     """BTE-TC-FDR-003-A: State recovery completes in <2min for ≤24h outage.
 
