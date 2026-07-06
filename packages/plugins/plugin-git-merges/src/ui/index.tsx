@@ -2529,9 +2529,11 @@ function AwaitingApprovalView({
   return (
     <div style={{ display: "grid", gap: "8px" }}>
       <div style={{ ...mutedTextStyle, fontSize: "11px" }}>
-        {approvals.length} pending request_confirmation interaction
-        {approvals.length === 1 ? "" : "s"}, ordered by unblocks-count DESC
-        then newest. Click an identifier to open the issue in a new tab.
+        {approvals.length} pending board-approval request
+        {approvals.length === 1 ? "" : "s"} (same data the Inbox uses),
+        ordered by unblocks-count DESC then newest. Open an approval to
+        review the payload and approve / reject it on its detail page;
+        the linked issue is shown for context.
       </div>
       {approvals.map((a) => (
         <ApprovalCard
@@ -2545,6 +2547,20 @@ function AwaitingApprovalView({
       ))}
     </div>
   );
+}
+
+/**
+ * Friendly label for the approval `kind` field. The plugin sources
+ * approvals from the `approvals` table (same as the operator Inbox),
+ * where the canonical kind is `request_board_approval`. We still
+ * tolerate the older `request_confirmation` kind for plugins/hosts that
+ * synthesize approvals from `issue_thread_interactions`.
+ */
+function approvalKindLabel(kind: string): string {
+  if (kind === "request_board_approval") return "Board approval";
+  if (kind === "request_confirmation") return "Confirmation request";
+  if (kind === "budget_override_required") return "Budget override";
+  return kind || "Approval";
 }
 
 function ApprovalCard({
@@ -2561,6 +2577,22 @@ function ApprovalCard({
   companyPrefix: string | null;
 }) {
   const isHighImpact = approval.unblocksCount > 0;
+  const hostNavigation = useHostNavigation();
+  // `interactionId` is the approval uuid (from the `approvals` table) —
+  // the approval detail page is where the Approve/Reject buttons live.
+  // The issue page only renders the approval card on the Activity tab,
+  // which most operators don't realize — linking straight to
+  // /approvals/:id is the actionable target.
+  const approvalHref = approval.interactionId
+    ? `/approvals/${encodeURIComponent(approval.interactionId)}`
+    : null;
+  const approvalLinkProps = approvalHref
+    ? hostNavigation.linkProps(approvalHref)
+    : null;
+  const handleApprovalClick: React.MouseEventHandler<HTMLAnchorElement> = (e) => {
+    onVisit(approval.issueId || approval.interactionId);
+    if (approvalLinkProps) approvalLinkProps.onClick(e);
+  };
   return (
     <div style={isHighImpact ? chainCardActionableStyle : chainCardStyle}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
@@ -2589,7 +2621,7 @@ function ApprovalCard({
         {approval.issuePriority ? (
           <span style={pillStyle}>{approval.issuePriority}</span>
         ) : null}
-        <span style={pillStyle}>request_confirmation</span>
+        <span style={pillStyle}>{approvalKindLabel(approval.kind)}</span>
         {chain ? (
           <span style={chainMetaPillStyle}>chain {chain.chainId}</span>
         ) : null}
@@ -2597,6 +2629,18 @@ function ApprovalCard({
           <span style={chainUnblocksPillStyle}>
             ⚡ unblocks {approval.unblocksCount}
           </span>
+        ) : null}
+        {approvalLinkProps ? (
+          <a
+            {...approvalLinkProps}
+            target="_blank"
+            rel="noreferrer"
+            onClick={handleApprovalClick}
+            style={primaryButtonStyle}
+            title="Open the approval detail page (where Approve/Reject buttons live)"
+          >
+            Open approval →
+          </a>
         ) : null}
       </div>
       <div style={{ ...mutedTextStyle, fontSize: "11px" }}>
