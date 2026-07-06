@@ -6,6 +6,7 @@ import {
   enforceBtcPrefixTokens,
   extractBtcPrefixTokens,
   pickActorCompanyId,
+  respondBtcPrefixGuardFailure,
   suggestedFullForm,
 } from "../middleware/btc-prefix-guard.js";
 
@@ -386,5 +387,167 @@ describe("enforceBtcPrefixTokens via express middleware mount", () => {
     });
     const res = await request(app).post("/comments").send({ body: "trading BTC-EUR" });
     expect(res.status).toBe(201);
+  });
+});
+
+/**
+ * Route-level integration tests that mirror the exact wire-up pattern in
+ * server/src/routes/issues.ts for POST /issues/:id/comments and PATCH
+ * /issues/:id. The lookup shape matches `svc.getByIdentifierForCompany`
+ * (returns truthy when the issue exists in the company, null when missing).
+ */
+describe("btc-prefix-guard wired into route handlers", () => {
+  type IssueRow = { id: string; identifier: string };
+  function buildLookup(issues: IssueRow[]) {
+    return async (fullIdentifier: string, companyId: string) => {
+      const found = issues.find(
+        (i) => i.identifier.toLowerCase() === fullIdentifier.toLowerCase(),
+      );
+      return found ? { exists: true, id: found.id, companyId } : null;
+    };
+  }
+
+  function buildRouteApp(opts: {
+    actor:
+      | { type: "agent"; companyId: string }
+      | { type: "board"; companyIds: string[] }
+      | { type: "none" };
+    issue: { id: string; companyId: string };
+    lookup: (fullIdentifier: string, companyId: string) => Promise<unknown>;
+  }) {
+    const app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+      (req as unknown as { actor: typeof opts.actor }).actor = opts.actor;
+      next();
+    });
+    // Mirrors the wire-up in routes/issues.ts POST /issues/:id/comments
+    app.post("/issues/:id/comments", async (req, res) => {
+      const actor = (req as unknown as { actor: typeof opts.actor }).actor;
+      if (actor.type === "agent" && typeof (req.body as { body?: unknown }).body === "string") {
+        const result = await enforceBtcPrefixTokens({
+          text: (req.body as { body: string }).body,
+          companyId: opts.issue.companyId,
+          actor,
+          lookup: opts.lookup as Parameters<typeof enforceBtcPrefixTokens>[0]["lookup"],
+        });
+        if (!result.ok) {
+          respondBtcPrefixGuardFailure(res, result);
+          return;
+        }
+      }
+      res.status(201).json({ ok: true, issueId: opts.issue.id });
+    });
+    // Mirrors the wire-up in routes/issues.ts PATCH /issues/:id
+    app.patch("/issues/:id", async (req, res) => {
+      const actor = (req as unknown as { actor: typeof opts.actor }).actor;
+      if (actor.type === "agent") {
+        const body = req.body as { description?: unknown; comment?: unknown };
+        const descriptionText = typeof body.description === "string" ? body.description : null;
+        const commentBodyText = typeof body.comment === "string" ? body.comment : null;
+        const textToGuard = descriptionText ?? commentBodyText;
+        if (textToGuard !== null) {
+          const result = await enforceBtcPrefixTokens({
+            text: textToGuard,
+            companyId: opts.issue.companyId,
+            actor,
+            lookup: opts.lookup as Parameters<typeof enforceBtcPrefixTokens>[0]["lookup"],
+          });
+          if (!result.ok) {
+            respondBtcPrefixGuardFailure(res, result);
+            return;
+          }
+        }
+      }
+      res.status(200).json({ ok: true, issueId: opts.issue.id });
+    });
+    return app;
+  }
+
+  const existingIssues: IssueRow[] = [
+    { id: "issue-1", identifier: "BTCAAAAA-9999" },
+  ];
+
+  it("(a) POST /issues/:id/comments returns 422 for agent actor when BTC-9999 does not resolve", async () => {
+    const app = buildRouteApp({
+      actor: { type: "agent", companyId: "company-A" },
+      issue: { id: "issue-1", companyId: "company-A" },
+      lookup: buildLookup([]),
+    });
+    const res = await request(app)
+      .post("/issues/issue-1/comments")
+      .send({ body: "see BTC-9999 for context" });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe("Truncated prefix");
+    expect(res.body.details.offendingToken).toBe("BTC-9999");
+    expect(res.body.details.suggestedFull).toBe("BTCAAAAA-9999");
+    expect(res.body.details.companyId).toBe("company-A");
+  });
+
+  it("(b) POST /issues/:id/comments returns 201 when BTC-9999 resolves in the actor's company", async () => {
+    const app = buildRouteApp({
+      actor: { type: "agent", companyId: "company-A" },
+      issue: { id: "issue-1", companyId: "company-A" },
+      lookup: buildLookup(existingIssues),
+    });
+    const res = await request(app)
+      .post("/issues/issue-1/comments")
+      .send({ body: "see BTC-9999 for context" });
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ ok: true, issueId: "issue-1" });
+  });
+
+  it("(c) POST /issues/:id/comments returns 201 for system actor (type:'none') — bypasses BTC-EUR crypto context (and any BTC-N)", async () => {
+    let lookupCalls = 0;
+    const app = buildRouteApp({
+      // system / internal actor: this codebase uses actor.type === "none" for
+      // unauthenticated/internal callers (see server/src/middleware/auth.ts:35).
+      // The route bypasses any actor that isn't "agent", so the guard never runs.
+      actor: { type: "none" },
+      issue: { id: "issue-1", companyId: "company-A" },
+      lookup: async () => {
+        lookupCalls += 1;
+        return null;
+      },
+    });
+    const res = await request(app)
+      .post("/issues/issue-1/comments")
+      .send({ body: "trading BTC-EUR pair against BTC-USD, see BTC-9999" });
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ ok: true, issueId: "issue-1" });
+    // Route-level bypass means the guard is never invoked; lookup is untouched.
+    expect(lookupCalls).toBe(0);
+  });
+
+  it("(c-board) POST /issues/:id/comments returns 201 for board actor (bypass) even when BTC-9999 would not resolve", async () => {
+    let lookupCalls = 0;
+    const app = buildRouteApp({
+      actor: { type: "board", companyIds: ["company-A", "company-B"] },
+      issue: { id: "issue-1", companyId: "company-A" },
+      lookup: async () => {
+        lookupCalls += 1;
+        return null;
+      },
+    });
+    const res = await request(app)
+      .post("/issues/issue-1/comments")
+      .send({ body: "trading BTC-EUR pair, see BTC-9999" });
+    expect(res.status).toBe(201);
+    expect(lookupCalls).toBe(0); // board bypass skips the guard entirely
+  });
+
+  it("(d) PATCH /issues/:id returns 422 for agent actor when description contains an unresolvable BTC-9999", async () => {
+    const app = buildRouteApp({
+      actor: { type: "agent", companyId: "company-A" },
+      issue: { id: "issue-1", companyId: "company-A" },
+      lookup: buildLookup([]),
+    });
+    const res = await request(app)
+      .patch("/issues/issue-1")
+      .send({ description: "follow-up on BTC-9999" });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe("Truncated prefix");
+    expect(res.body.details.offendingToken).toBe("BTC-9999");
+    expect(res.body.details.suggestedFull).toBe("BTCAAAAA-9999");
   });
 });

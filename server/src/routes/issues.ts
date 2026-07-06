@@ -5726,6 +5726,29 @@ export function issueRoutes(
     if (!(await assertAgentIssueMutationAllowed(req, res, existing))) return;
     if (!(await assertCheapRecoveryIssueAssigneeProfileAllowed(req, res, existing, req.body))) return;
 
+    if (req.actor.type === "agent") {
+      const descriptionText =
+        typeof req.body.description === "string" ? req.body.description : null;
+      const commentBodyText =
+        typeof req.body.comment === "string" ? req.body.comment : null;
+      const textToGuard = descriptionText ?? commentBodyText;
+      if (textToGuard !== null) {
+        const prefixGuard = await enforceBtcPrefixTokens({
+          text: textToGuard,
+          companyId: existing.companyId,
+          actor: req.actor,
+          lookup: async (fullIdentifier, companyId) => {
+            const found = await svc.getByIdentifierForCompany(fullIdentifier, companyId);
+            return found ? { exists: true } : null;
+          },
+        });
+        if (!prefixGuard.ok) {
+          respondBtcPrefixGuardFailure(res, prefixGuard);
+          return;
+        }
+      }
+    }
+
     const actor = getActorInfo(req);
     const isClosed = isClosedIssueStatus(existing.status);
     const isBlocked = existing.status === "blocked";
@@ -7616,6 +7639,24 @@ export function issueRoutes(
       presentation: req.body.presentation,
       metadata: req.body.metadata,
     })) return;
+    if (
+      req.actor.type === "agent" &&
+      typeof req.body.body === "string"
+    ) {
+      const prefixGuard = await enforceBtcPrefixTokens({
+        text: req.body.body,
+        companyId: issue.companyId,
+        actor: req.actor,
+        lookup: async (fullIdentifier, companyId) => {
+          const found = await svc.getByIdentifierForCompany(fullIdentifier, companyId);
+          return found ? { exists: true } : null;
+        },
+      });
+      if (!prefixGuard.ok) {
+        respondBtcPrefixGuardFailure(res, prefixGuard);
+        return;
+      }
+    }
     const closedExecutionWorkspace = await getClosedIssueExecutionWorkspace(issue);
     if (closedExecutionWorkspace) {
       respondClosedIssueExecutionWorkspace(res, closedExecutionWorkspace);
