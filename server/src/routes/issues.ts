@@ -107,6 +107,10 @@ import {
 } from "../services/task-watchdog-scope.js";
 import type { TaskWatchdogServiceDeps, taskWatchdogService } from "../services/task-watchdogs.js";
 import { logger } from "../middleware/logger.js";
+import {
+  enforceBtcPrefixTokens,
+  respondBtcPrefixGuardFailure,
+} from "../middleware/btc-prefix-guard.js";
 import { conflict, forbidden, HttpError, notFound, unauthorized, unprocessable } from "../errors.js";
 import { assertBoard, assertCompanyAccess, getActorInfo } from "./authz.js";
 import {
@@ -6044,6 +6048,29 @@ export function issueRoutes(
     if (!(await assertAgentIssueMutationAllowed(req, res, existing))) return;
     if (!(await assertCheapRecoveryIssueAssigneeProfileAllowed(req, res, existing, req.body))) return;
 
+    if (req.actor.type === "agent") {
+      const descriptionText =
+        typeof req.body.description === "string" ? req.body.description : null;
+      const commentBodyText =
+        typeof req.body.comment === "string" ? req.body.comment : null;
+      const textToGuard = descriptionText ?? commentBodyText;
+      if (textToGuard !== null) {
+        const prefixGuard = await enforceBtcPrefixTokens({
+          text: textToGuard,
+          companyId: existing.companyId,
+          actor: req.actor,
+          lookup: async (fullIdentifier, companyId) => {
+            const found = await svc.getByIdentifier(fullIdentifier);
+            return found && found.companyId === companyId ? { exists: true } : null;
+          },
+        });
+        if (!prefixGuard.ok) {
+          respondBtcPrefixGuardFailure(res, prefixGuard);
+          return;
+        }
+      }
+    }
+
     const actor = getActorInfo(req);
     const isClosed = isClosedIssueStatus(existing.status);
     const isBlocked = existing.status === "blocked";
@@ -6973,7 +7000,18 @@ export function issueRoutes(
         // path was the cascade trigger (agent comments → wake → comment → wake).
         // We still surface a wake for *human* comments, and for the dedicated
         // decision-stage wake (handled separately above).
-        const skipAssigneeCommentWake = selfComment || isClosed;
+        // Patch 2: also skip when the issue is > 24h old. When the user is
+        // reviewing old historical issues (e.g. 2-month-old done issues),
+        // their reopen comment should NOT auto-wake the assignee — they're
+        // not asking the agent to do work, just re-opening to read state.
+        const reopenAgeMs = Date.now() - new Date(issue.createdAt).getTime();
+        const maxCommentWakeAgeMs = Math.max(
+          0,
+          Math.min(7 * 24 * 60 * 60 * 1000,
+            Number(process.env.PAPERCLIP_MAX_COMMENT_WAKE_AGE_MS) || 24 * 60 * 60 * 1000),
+        );
+        const isOldIssue = reopenAgeMs > maxCommentWakeAgeMs;
+        const skipAssigneeCommentWake = selfComment || isClosed || isOldIssue;
         if (assigneeId && !assigneeChanged && !skipAssigneeCommentWake) {
           addWakeup(assigneeId, {
             source: "automation",
@@ -7988,6 +8026,24 @@ export function issueRoutes(
       presentation: req.body.presentation,
       metadata: req.body.metadata,
     })) return;
+    if (
+      req.actor.type === "agent" &&
+      typeof req.body.body === "string"
+    ) {
+      const prefixGuard = await enforceBtcPrefixTokens({
+        text: req.body.body,
+        companyId: issue.companyId,
+        actor: req.actor,
+        lookup: async (fullIdentifier, companyId) => {
+          const found = await svc.getByIdentifier(fullIdentifier);
+          return found && found.companyId === companyId ? { exists: true } : null;
+        },
+      });
+      if (!prefixGuard.ok) {
+        respondBtcPrefixGuardFailure(res, prefixGuard);
+        return;
+      }
+    }
     const closedExecutionWorkspace = await getClosedIssueExecutionWorkspace(issue);
     if (closedExecutionWorkspace) {
       respondClosedIssueExecutionWorkspace(res, closedExecutionWorkspace);
@@ -8457,7 +8513,17 @@ export function issueRoutes(
       // to the returnAssignee for an already-completed issue.
       // Patch: also always skip when the commenting agent is the assignee,
       // even on reopen. This breaks the agent-comment → wake → comment loop.
-      const skipWake = selfComment || isClosedIssueStatus(currentIssue.status);
+      // Patch 2: also skip when the issue is > 24h old. When the user is
+      // reviewing old historical issues, their reopen comment should NOT
+      // auto-wake the assignee — they're not asking the agent to do work.
+      const reopenAgeMs2 = Date.now() - new Date(currentIssue.createdAt).getTime();
+      const maxCommentWakeAgeMs2 = Math.max(
+        0,
+        Math.min(7 * 24 * 60 * 60 * 1000,
+          Number(process.env.PAPERCLIP_MAX_COMMENT_WAKE_AGE_MS) || 24 * 60 * 60 * 1000),
+      );
+      const isOldIssue2 = reopenAgeMs2 > maxCommentWakeAgeMs2;
+      const skipWake = selfComment || isClosedIssueStatus(currentIssue.status) || isOldIssue2;
       if (assigneeId && !skipWake) {
         if (reopened) {
           addWakeup(assigneeId, {
