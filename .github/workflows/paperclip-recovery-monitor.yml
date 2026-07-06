@@ -131,7 +131,10 @@ jobs:
           lines.append('## PaperClip Recovery Monitor — Matches (scheduled check)')
           lines.append('')
           for s in d:
-              lines.append(f'- **{s[\"scenario\"]}** ({s[\"name\"]}): {s[\"matched\"]} match(es)')
+              if 'error' in s:
+                  lines.append('- **ERROR:** ' + str(s['error'])[:200])
+              else:
+                  lines.append(f'- **{s.get(\"scenario\", \"?\")}** ({s.get(\"name\", \"?\")}): {s.get(\"matched\", \"?\")} match(es)')
           print('\n'.join(lines))
           " > $GITHUB_STEP_SUMMARY
           else
