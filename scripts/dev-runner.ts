@@ -537,13 +537,27 @@ async function waitForChildExit() {
   return await childExitPromise;
 }
 
+function killChildProcessGroup(target: NonNullable<typeof child>, signal: NodeJS.Signals) {
+  // The real server is a grandchild (pnpm -> sh -> tsx -> node); killing only
+  // the direct pnpm child orphans it and leaves the old server holding $PORT.
+  if (process.platform !== "win32" && typeof target.pid === "number") {
+    try {
+      process.kill(-target.pid, signal);
+      return;
+    } catch {
+      // group already gone or not a group leader; fall back to direct kill
+    }
+  }
+  target.kill(signal);
+}
+
 async function stopChildForRestart() {
   if (!child) return { code: 0, signal: null };
   childExitWasExpected = true;
-  child.kill("SIGTERM");
+  killChildProcessGroup(child, "SIGTERM");
   const killTimer = setTimeout(() => {
     if (child) {
-      child.kill("SIGKILL");
+      killChildProcessGroup(child, "SIGKILL");
     }
   }, gracefulShutdownTimeoutMs);
   try {
@@ -560,7 +574,13 @@ async function startServerChild() {
   child = spawn(
     pnpmBin,
     ["--filter", "@paperclipai/server", serverScript, ...forwardedArgs],
-    { stdio: "inherit", env, shell: process.platform === "win32" },
+    {
+      stdio: "inherit",
+      env,
+      shell: process.platform === "win32",
+      // Own process group so restarts can kill the full pnpm->tsx->node tree.
+      detached: process.platform !== "win32",
+    },
   );
 
   childExitPromise = new Promise((resolve, reject) => {
@@ -603,23 +623,36 @@ async function maybeAutoRestartChild() {
   let health: { devServer?: { enabled?: boolean; autoRestartEnabled?: boolean; activeRunCount?: number } } | null = null;
   try {
     health = await getDevHealthPayload();
-  } catch {
-    restartInFlight = false;
-    return;
+  } catch (error) {
+    if (!manualRestartRequested) {
+      restartInFlight = false;
+      return;
+    }
+    // Manual restart with a dead/unreachable health endpoint: the server is
+    // already down (or wedged), so restarting is safe — never swallow the
+    // consumed restart request into a permanent deadlock.
+    console.log(
+      `[paperclip] manual restart: health probe failed (${toError(error).message}); treating dead server as safe to restart`,
+    );
   }
 
-  const devServer = health?.devServer;
-  if (!devServer?.enabled) {
-    restartInFlight = false;
-    return;
-  }
-  if (!manualRestartRequested && devServer.autoRestartEnabled !== true) {
-    restartInFlight = false;
-    return;
-  }
-  if (!manualRestartRequested && (devServer.activeRunCount ?? 0) > 0) {
-    restartInFlight = false;
-    return;
+  if (health) {
+    const devServer = health.devServer;
+    if (!devServer?.enabled) {
+      if (manualRestartRequested) {
+        console.log("[paperclip] manual restart request dropped: health payload reports dev server disabled");
+      }
+      restartInFlight = false;
+      return;
+    }
+    if (!manualRestartRequested && devServer.autoRestartEnabled !== true) {
+      restartInFlight = false;
+      return;
+    }
+    if (!manualRestartRequested && (devServer.activeRunCount ?? 0) > 0) {
+      restartInFlight = false;
+      return;
+    }
   }
 
   try {
@@ -674,7 +707,7 @@ async function shutdown(signal: NodeJS.Signals) {
   }
 
   childExitWasExpected = true;
-  child.kill(signal);
+  killChildProcessGroup(child, signal);
   const exit = await waitForChildExit();
   if (exit.signal) {
     exitForSignal(exit.signal);
