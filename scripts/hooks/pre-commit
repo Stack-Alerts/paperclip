@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# .git/hooks/pre-commit — agent-ownership section guard (BTCAAAAA-38995)
+#
+# Blocks a commit that stages files outside the acting agent's owned sections
+# (see agent_ownership.json). Soft + reversible: relax an agent's globs in the
+# manifest, or bypass a single justified commit with AGENT_OWNERSHIP_BYPASS=1.
+#
+# To install on a fresh clone:
+#   cp scripts/hooks/pre-commit .git/hooks/pre-commit
+#   chmod +x .git/hooks/pre-commit
+#
+# To bypass a single intentional out-of-scope commit:
+#   AGENT_OWNERSHIP_BYPASS=1 git commit -m "..."
+
+set -u
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [ -z "$REPO_ROOT" ]; then
+  echo "[pre-commit] not a git repo — skipping ownership guard." >&2
+  exit 0
+fi
+
+GUARD="$REPO_ROOT/scripts/agent_ownership_guard.py"
+if [ ! -f "$GUARD" ]; then
+  echo "[pre-commit] $GUARD missing — skipping ownership guard." >&2
+  exit 0
+fi
+
+if ! python3 "$GUARD" --staged; then
+  cat >&2 <<'EOF'
+
+[pre-commit] Commit refused: agent-ownership guard blocked an out-of-scope edit.
+Escalate to the CTO (see the message above), relax the manifest, or set
+AGENT_OWNERSHIP_BYPASS=1 for a single justified commit.
+EOF
+  exit 1
+fi
+
+exit 0

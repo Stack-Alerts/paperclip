@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "description": "Agent section-ownership manifest (Workspace Confinement Phase 1, BTCAAAAA-38995). Maps each agent role to the repo path globs it owns. Enforced by scripts/agent_ownership_guard.py as a soft, reversible pre-edit guard. Relaxing an agent's scope is a one-line edit to its 'owns' list. This is complementary to .module_lock_registry.json: the lock registry is a board-approval deny-list for a few critical files; this manifest is a per-agent allow-list for whole sections.",
+  "paperclip_issue": "BTCAAAAA-38995",
+  "parent_plan": "BTCAAAAA-38991 (approved plan rev 6b53a14c, Phase 1)",
+  "created_at": "2026-07-07T00:00:00Z",
+  "created_by": "CTO",
+  "unlisted_agent_policy": "warn",
+  "escalation_message": "BLOCKED by agent-ownership guard. This write is outside the acting agent's owned sections (see agent_ownership.json). ONE-COMMAND ESCALATION (creates a CTO-assigned child issue and marks your work blocked-by it): python3 scripts/escalate_cross_section.py --issue $PAPERCLIP_TASK_ID --paths <files> [--summary \"why\"]  (add --dry-run to preview the payloads). The CTO then delegates the child to the owning agent, who implements+tests; the CTO verifies and marks the child done, which auto-releases the blocker on your issue and resumes your work. Full loop: docs/agent-ownership-escalation.md. Reversible unblock options: (1) the CTO adds the glob to this agent's 'owns' list in agent_ownership.json (one-line edit); (2) for a single intentional, justified out-of-scope operation set AGENT_OWNERSHIP_BYPASS=1 and note the reason in the commit/issue.",
+  "agents": {
+    "UIEngineer": {
+      "owns": [
+        "packages/web-ui/app/**",
+        "packages/web-ui/**"
+      ],
+      "note": "Owns all web-ui app panels (backtest, dashboard, data-management, market-data, reports, settings, signals, strategy-browser, strategy-builder, validation, ...)."
+    },
+    "PlatformEngineer": {
+      "owns": [
+        "src/api/**",
+        "src/impact_gate/**",
+        "src/blast_radius/**",
+        "src/touch_index/**",
+        "src/debugger_logger/**",
+        "scripts/**",
+        ".github/**"
+      ],
+      "note": "API surface plus shared platform/automation tooling (co-owned with AutomationEngineer). Holds the module-lock on scripts/lock_gate.py, .module_lock_registry.json, .github/workflows/lock-gate.yml (approval BTCAAAAA-1479)."
+    },
+    "DataEngineer": {
+      "owns": [
+        "src/data_manager/**"
+      ],
+      "note": "UnifiedDataManager. src/data_manager is also board-locked in .module_lock_registry.json (approval BTCAAAAA-1479)."
+    },
+    "StrategyResearcher": {
+      "owns": [
+        "src/strategies/**",
+        "src/optimizer_v3/**",
+        "src/detectors/**",
+        "src/indicators/**",
+        "src/strategy_builder/**"
+      ],
+      "note": "Strategy research / signal generation surface (co-owned with BacktestAnalyst). Some files within are board-locked (trade_registry, institutional_signal_evaluator, detectors registry, optimizer_v3/database)."
+    },
+    "BacktestAnalyst": {
+      "owns": [
+        "src/strategies/**",
+        "src/optimizer_v3/**",
+        "src/detectors/**",
+        "src/indicators/**",
+        "src/strategy_builder/**"
+      ],
+      "note": "Co-owner with StrategyResearcher of the strategy/backtest surface."
+    },
+    "NautilusEngineer": {
+      "owns": [
+        "src/itm/**"
+      ],
+      "note": "Institutional trade management (ITM). src/itm/state/manager.py is board-locked."
+    },
+    "AutomationEngineer": {
+      "owns": [
+        "src/impact_gate/**",
+        "src/blast_radius/**",
+        "src/touch_index/**",
+        "src/debugger_logger/**",
+        "scripts/**",
+        ".github/**"
+      ],
+      "note": "CI/automation tooling and guardrails (co-owned with PlatformEngineer)."
+    },
+    "DatabaseAdministrator": {
+      "owns": [
+        "alembic/**"
+      ],
+      "note": "Database migrations."
+    },
+    "DocWriter": {
+      "owns": [
+        "docs/**",
+        "*.md",
+        "**/*.md"
+      ],
+      "note": "Documentation and markdown across the repo."
+    },
+    "LinuxSpecialist": {
+      "owns": [
+        "deploy/**"
+      ],
+      "note": "Deployment / host configuration."
+    },
+    "RepoSteward": {
+      "owns": [
+        "scripts/hooks/**"
+      ],
+      "note": "PR / merge coordination only. No feature-code ownership; may maintain local git hooks. Section changes require CTO escalation, not direct edits."
+    },
+    "Architect": {
+      "owns": [
+        "**"
+      ],
+      "note": "Cross-cutting design authority (override). Owns strategy_builder/validation lock entries in .module_lock_registry.json."
+    },
+    "CTO": {
+      "owns": [
+        "**"
+      ],
+      "note": "Coordination / escalation authority (override). Can touch any section; this is the escalation target the guard names."
+    }
+  },
+  "agent_id_map": {
+    "41b5ede6-e209-40ba-b923-dc969c722e6d": "CTO",
+    "9113b321-771b-481d-8ae7-33765ed9b1f5": "UIEngineer",
+    "58cd0e89-a143-4102-98aa-45a412a70248": "PlatformEngineer",
+    "f680b3fd-945b-4e0b-ae42-1f9639a4cbd3": "DatabaseAdministrator",
+    "f2fb75fd-a40d-4ee9-a7d0-6920808d2c4c": "RepoSteward",
+    "a1d7dba5-6b71-4fff-86cb-8ee1734a35c5": "LinuxSpecialist",
+    "5ed47769-f44e-48f6-a6d6-630479b230bf": "DocWriter",
+    "a472d315-3e2e-4c3b-a1ba-a931295628cc": "NautilusEngineer",
+    "2b9152a6-07f6-4ae9-87fa-c824012c9ff6": "AutomationEngineer",
+    "e3fcab65-c9a3-45bd-97e8-5145d3d6db5e": "StrategyResearcher",
+    "79beb038-0309-4e15-95c8-d310455dfb0e": "BacktestAnalyst",
+    "73eaab54-0d5f-4a5c-a9f9-0019064ee418": "Architect",
+    "000f41e8-8514-4100-94f7-93ea4b9876af": "DataEngineer"
+  }
+}
