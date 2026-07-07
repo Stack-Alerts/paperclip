@@ -1,0 +1,45 @@
+name: Workspace CWD Guardrail
+
+# Phase 0 confinement guardrail (BTCAAAAA-38994): alarm if any git_repo
+# workspace cwd is ever pointed at a subdirectory of the repo root, which
+# would fail the heartbeat `missing_git_metadata` validator.
+
+on:
+  schedule:
+    # Every 6 hours — cheap read-only API audit
+    - cron: '0 */6 * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: workspace-cwd-guardrail
+  cancel-in-progress: false
+
+jobs:
+  guardrail:
+    name: Assert git_repo workspace cwds == repo root
+    runs-on: self-hosted
+
+    env:
+      PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
+      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+      PAPERCLIP_COMPANY_ID: ${{ secrets.PAPERCLIP_COMPANY_ID }}
+
+    steps:
+      - uses: actions/checkout@v4.3.1
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install requests python-dotenv
+
+      - name: Run workspace cwd guardrail
+        env:
+          PYTHONPATH: src
+        run: python scripts/audit/workspace_cwd_guardrail.py
+
+      - name: Log guardrail result
+        if: always()
+        run: |
+          echo "## Workspace CWD Guardrail" >> $GITHUB_STEP_SUMMARY
+          echo "- Job status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Timestamp: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
