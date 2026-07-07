@@ -13,6 +13,7 @@ import {
   issueComments,
   issueDocuments,
   issueExecutionDecisions,
+  issueRecoveryActions,
   issueRelations,
   issues as issueRows,
   issueWorkProducts,
@@ -24,6 +25,7 @@ import {
 } from "@paperclipai/db";
 import {
   addIssueCommentSchema,
+  addIssueRecoveryActionCommentSchema,
   acceptIssueThreadInteractionSchema,
   attachmentArtifactWorkProductMetadataSchema,
   cancelIssueThreadInteractionSchema,
@@ -107,6 +109,10 @@ import { logger } from "../middleware/logger.js";
 import { conflict, forbidden, HttpError, notFound, unauthorized, unprocessable } from "../errors.js";
 import { assertBoard, assertCompanyAccess, getActorInfo } from "./authz.js";
 import {
+  createClosureGate,
+  throwIfClosureGateRejected,
+} from "../services/closure-gate.js";
+import {
   assertNoAgentHostWorkspaceCommandMutation,
   collectIssueWorkspaceCommandPaths,
 } from "./workspace-command-authz.js";
@@ -126,6 +132,10 @@ import { readAcceptedPlanConfirmationTarget } from "../services/issues.js";
 import { environmentService } from "../services/environments.js";
 import { environmentRuntimeService } from "../services/environment-runtime.js";
 import { redactSensitiveText } from "../redaction.js";
+import {
+  enforceBtcPrefixTokens,
+  respondBtcPrefixGuardFailure,
+} from "../middleware/btc-prefix-guard.js";
 import {
   createCompanySearchRateLimiter,
   type CompanySearchRateLimiter,
@@ -1130,6 +1140,7 @@ export function issueRoutes(
     return searchSvc;
   };
   const searchRateLimiter = opts.searchRateLimiter ?? defaultCompanySearchRateLimiter;
+  const closureGateSvc = createClosureGate({ logger });
   const instanceSettings = instanceSettingsService(db);
   const agentsSvc = agentService(db);
   const projectsSvc = projectService(db);
@@ -3630,6 +3641,98 @@ export function issueRoutes(
     });
   });
 
+  router.post("/issues/:id/recovery-actions/comment", validate(addIssueRecoveryActionCommentSchema), async (req, res) => {
+    const id = req.params.id as string;
+    const issue = await svc.getById(id);
+    if (!issue) {
+      res.status(404).json({ error: "Issue not found" });
+      return;
+    }
+    assertCompanyAccess(req, issue.companyId);
+    const activeRecoveryAction = await recoveryActionsSvc.getActiveForIssue(issue.companyId, issue.id);
+    if (!activeRecoveryAction) {
+      res.status(404).json({ error: "Active recovery action not found" });
+      return;
+    }
+    if (req.actor.type === "agent") {
+      const actorAgentId = req.actor.agentId;
+      if (!actorAgentId) {
+        res.status(403).json({ error: "Agent authentication required" });
+        return;
+      }
+      if (activeRecoveryAction.ownerAgentId !== actorAgentId) {
+        res.status(403).json({
+          error: "Agent is not the owner of this recovery action",
+          details: {
+            issueId: issue.id,
+            recoveryActionId: activeRecoveryAction.id,
+            actorAgentId,
+            recoveryOwnerAgentId: activeRecoveryAction.ownerAgentId,
+            securityPrinciples: ["Least Privilege", "Complete Mediation"],
+          },
+        });
+        return;
+      }
+    } else if (activeRecoveryAction.ownerType === "agent") {
+      // User/board actors cannot post follow-up comments on agent-owned recovery actions.
+      res.status(403).json({
+        error: "Recovery action is owned by an agent; only the owner agent may post follow-up comments",
+        details: {
+          issueId: issue.id,
+          recoveryActionId: activeRecoveryAction.id,
+          recoveryOwnerAgentId: activeRecoveryAction.ownerAgentId,
+        },
+      });
+      return;
+    }
+
+    const actor = getActorInfo(req);
+    const result = await db.transaction(async (tx) => {
+      const comment = await svc.addComment(
+        issue.id,
+        req.body.body,
+        {
+          agentId: actor.agentId ?? undefined,
+          userId: actor.actorType === "user" ? actor.actorId : undefined,
+          runId: actor.runId,
+        },
+        undefined,
+        tx,
+      );
+      const updatedAction = await recoveryActionsSvc.bumpFollowupAttempt(
+        {
+          companyId: issue.companyId,
+          sourceIssueId: issue.id,
+          actionId: activeRecoveryAction.id,
+        },
+        tx,
+      );
+      return { comment, action: updatedAction };
+    });
+
+    await logActivity(db, {
+      companyId: issue.companyId,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      agentId: actor.agentId,
+      runId: actor.runId,
+      action: "issue.recovery_action_followup_comment",
+      entityType: "issue",
+      entityId: issue.id,
+      details: {
+        identifier: issue.identifier,
+        recoveryActionId: result.action?.id ?? activeRecoveryAction.id,
+        commentId: result.comment.id,
+      },
+    });
+
+    res.status(201).json({
+      issueId: issue.id,
+      recoveryActionId: result.action?.id ?? activeRecoveryAction.id,
+      comment: result.comment,
+    });
+  });
+
   router.post("/issues/:id/recovery-actions/resolve", validate(resolveIssueRecoveryActionSchema), async (req, res) => {
     const id = req.params.id as string;
     const existing = await svc.getById(id);
@@ -5717,6 +5820,29 @@ export function issueRoutes(
     if (!(await assertAgentIssueMutationAllowed(req, res, existing))) return;
     if (!(await assertCheapRecoveryIssueAssigneeProfileAllowed(req, res, existing, req.body))) return;
 
+    if (req.actor.type === "agent") {
+      const descriptionText =
+        typeof req.body.description === "string" ? req.body.description : null;
+      const commentBodyText =
+        typeof req.body.comment === "string" ? req.body.comment : null;
+      const textToGuard = descriptionText ?? commentBodyText;
+      if (textToGuard !== null) {
+        const prefixGuard = await enforceBtcPrefixTokens({
+          text: textToGuard,
+          companyId: existing.companyId,
+          actor: req.actor,
+          lookup: async (fullIdentifier, companyId) => {
+            const found = await svc.getByIdentifierForCompany(fullIdentifier, companyId);
+            return found ? { exists: true } : null;
+          },
+        });
+        if (!prefixGuard.ok) {
+          respondBtcPrefixGuardFailure(res, prefixGuard);
+          return;
+        }
+      }
+    }
+
     const actor = getActorInfo(req);
     const isClosed = isClosedIssueStatus(existing.status);
     const isBlocked = existing.status === "blocked";
@@ -5977,6 +6103,51 @@ export function issueRoutes(
       updateFields,
       actorType: req.actor.type,
     });
+
+    // CAR-214: Fix-SHA closure-gate routine. When this PATCH is closing
+    // the issue (status: "done") and the actor is an agent, require a
+    // Fix-SHA line in the closure comment and verify it is reachable on
+    // the issue's configured remote branch.
+    if (updateFields.status === "done" && existing.status !== "done") {
+      const gateCompany = await companiesSvc.getById(existing.companyId);
+      const companyMode = (gateCompany?.closureGateFixSha ?? "off") as
+        | "off"
+        | "advisory"
+        | "enforce";
+      let gateFallbackCommentBody: string | null = null;
+      if (typeof commentBody !== "string" || commentBody.length === 0) {
+        try {
+          const recent = await svc.listComments(existing.id, { order: "desc", limit: 1 });
+          gateFallbackCommentBody = recent[0]?.body ?? null;
+        } catch (err) {
+          logger.warn(
+            { err, issueId: existing.id },
+            "closure-gate: failed to load most recent comment for Fix-SHA fallback",
+          );
+        }
+      }
+      const resolveRepoUrl = async () => {
+        if (!existing.executionWorkspaceId) return null;
+        try {
+          const ws = await executionWorkspacesSvc.getById(existing.executionWorkspaceId);
+          return ws?.repoUrl ?? null;
+        } catch (err) {
+          logger.warn(
+            { err, issueId: existing.id, executionWorkspaceId: existing.executionWorkspaceId },
+            "closure-gate: failed to load execution workspace for repo URL",
+          );
+          return null;
+        }
+      };
+      const gateOutcome = await closureGateSvc.assertAllowed({
+        companyMode,
+        actor: { actorType: actor.actorType, agentId: actor.agentId ?? null },
+        commentBody: typeof commentBody === "string" ? commentBody : null,
+        fallbackCommentBody: gateFallbackCommentBody,
+        resolveRepoUrl,
+      });
+      throwIfClosureGateRejected(gateOutcome);
+    }
 
     const nextAssigneeAgentId =
       updateFields.assigneeAgentId === undefined ? existing.assigneeAgentId : (updateFields.assigneeAgentId as string | null);
@@ -7562,6 +7733,24 @@ export function issueRoutes(
       presentation: req.body.presentation,
       metadata: req.body.metadata,
     })) return;
+    if (
+      req.actor.type === "agent" &&
+      typeof req.body.body === "string"
+    ) {
+      const prefixGuard = await enforceBtcPrefixTokens({
+        text: req.body.body,
+        companyId: issue.companyId,
+        actor: req.actor,
+        lookup: async (fullIdentifier, companyId) => {
+          const found = await svc.getByIdentifierForCompany(fullIdentifier, companyId);
+          return found ? { exists: true } : null;
+        },
+      });
+      if (!prefixGuard.ok) {
+        respondBtcPrefixGuardFailure(res, prefixGuard);
+        return;
+      }
+    }
     const closedExecutionWorkspace = await getClosedIssueExecutionWorkspace(issue);
     if (closedExecutionWorkspace) {
       respondClosedIssueExecutionWorkspace(res, closedExecutionWorkspace);

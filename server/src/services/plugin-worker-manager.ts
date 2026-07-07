@@ -722,6 +722,9 @@ export function createPluginWorkerHandle(
       ...options.env,
       PATH: process.env.PATH ?? "",
       NODE_PATH: process.env.NODE_PATH ?? "",
+      // Forward the host's paperclip config path so plugins can self-discover
+      // the running server (host, port) without inheriting unrelated secrets.
+      PAPERCLIP_CONFIG: process.env.PAPERCLIP_CONFIG ?? "",
       PAPERCLIP_PLUGIN_ID: pluginId,
       NODE_ENV: process.env.NODE_ENV ?? "production",
       TZ: process.env.TZ ?? "UTC",

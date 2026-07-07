@@ -224,6 +224,7 @@ function launcherTriggerClassName(placementZone: PluginLauncherPlacementZone): s
       return "justify-start h-8 w-full";
     case "toolbarButton":
     case "globalToolbarButton":
+    case "inboxToolbarButton":
       return "h-8";
     default:
       return "h-8";
@@ -764,7 +765,7 @@ function DefaultLauncherTrigger({
   return (
     <Button
       type="button"
-      variant={placementZone === "toolbarButton" || placementZone === "globalToolbarButton" ? "outline" : "ghost"}
+      variant={placementZone === "toolbarButton" || placementZone === "globalToolbarButton" || placementZone === "inboxToolbarButton" ? "outline" : "ghost"}
       size="sm"
       className={launcherTriggerClassName(placementZone)}
       onClick={onClick}

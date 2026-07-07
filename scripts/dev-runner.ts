@@ -491,6 +491,13 @@ async function markChildAsCurrent() {
   lastChangedAt = null;
   lastRestartAt = new Date().toISOString();
   await refreshPendingMigrations();
+  // Persist the cleared state immediately so the UI's "Restart Required"
+  // banner clears on the next poll. Without this, ``writeDevServerStatus``
+  // only runs from the change-scan and migration-refresh paths, neither
+  // of which fires just because the child was restarted — so the status
+  // file would keep reporting ``dirty: true`` until the next backend
+  // file change, even though the server is now running fresh code.
+  writeDevServerStatus();
   await updateDevServiceRecord();
 }
 
@@ -596,7 +603,8 @@ async function maybeAutoRestartChild() {
   let health: { devServer?: { enabled?: boolean; autoRestartEnabled?: boolean; activeRunCount?: number } } | null = null;
   try {
     health = await getDevHealthPayload();
-  } catch {
+  } catch (err) {
+    process.stderr.write(`[dev-runner] health fetch failed: ${(err as Error).message}\n`);
     restartInFlight = false;
     return;
   }
