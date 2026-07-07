@@ -3055,7 +3055,7 @@ export async function buildPaperclipWakePayload(input: {
       })))
     : [];
 
-  return {
+  const payload = {
     reason: readNonEmptyString(input.contextSnapshot.wakeReason),
     issue: issueSummary
       ? {
@@ -3130,17 +3130,18 @@ export async function buildPaperclipWakePayload(input: {
     fallbackFetchNeeded: truncated || missingCommentCount > 0,
   };
 
-  if (initialContinuationSummary) {
+  if (safeContinuationSummary) {
     const compressThreshold = resolveWakePayloadCompressThresholdChars();
     const serialized = JSON.stringify(payload);
     if (serialized.length > compressThreshold) {
-      const compressed = buildCompressedContinuationSummaryHeadline(initialContinuationSummary.body);
+      const compressed = buildCompressedContinuationSummaryHeadline(safeContinuationSummary.body);
       payload.continuationSummary = {
-        key: initialContinuationSummary.key,
-        title: initialContinuationSummary.title,
+        key: safeContinuationSummary.key,
+        title: safeContinuationSummary.title,
         body: compressed.body,
-        bodyTruncated: compressed.truncated || initialContinuationSummary.bodyTruncated,
-        updatedAt: initialContinuationSummary.updatedAt,
+        bodyTruncated: compressed.truncated || safeContinuationSummary.body.length > 4_000,
+        sourceTrust: safeContinuationSummary.sourceTrust ?? null,
+        updatedAt: safeContinuationSummary.updatedAt.toISOString(),
       };
     }
   }
