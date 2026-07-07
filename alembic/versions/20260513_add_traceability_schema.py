@@ -17,6 +17,7 @@ This migration is additive — no existing tables are modified.
 """
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = "20260513_add_traceability_schema"
 down_revision = "20260512_add_bug_files_updated_at"
@@ -34,12 +35,12 @@ def upgrade() -> None:
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("status", sa.String(30), nullable=False),
         sa.Column("priority", sa.String(20), nullable=True),
-        sa.Column("labels", sa.JSONB(), nullable=True),
+        sa.Column("labels", postgresql.JSONB(), nullable=True),
         sa.Column("source", sa.String(30), nullable=False),
         sa.Column("paperclip_id", sa.UUID(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("metadata", sa.JSONB(), nullable=True),
+        sa.Column("metadata", postgresql.JSONB(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("identifier"),
     )
@@ -54,11 +55,11 @@ def upgrade() -> None:
         sa.Column("test_file", sa.String(500), nullable=False),
         sa.Column("test_function", sa.String(300), nullable=False),
         sa.Column("test_class", sa.String(300), nullable=True),
-        sa.Column("markers", sa.JSONB(), nullable=True),
+        sa.Column("markers", postgresql.JSONB(), nullable=True),
         sa.Column("source", sa.String(30), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("tags", sa.JSONB(), nullable=True),
+        sa.Column("tags", postgresql.JSONB(), nullable=True),
         sa.Column("language", sa.String(20), nullable=False, server_default=sa.text("'python'")),
         sa.Column("component", sa.String(200), nullable=True),
         sa.PrimaryKeyConstraint("id"),
@@ -76,7 +77,7 @@ def upgrade() -> None:
         sa.Column("issue_type", sa.String(30), nullable=False),
         sa.Column("status", sa.String(30), nullable=False),
         sa.Column("paperclip_id", sa.UUID(), nullable=True),
-        sa.Column("labels", sa.JSONB(), nullable=True),
+        sa.Column("labels", postgresql.JSONB(), nullable=True),
         sa.Column("parent_id", sa.UUID(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
@@ -104,7 +105,7 @@ def upgrade() -> None:
         sa.Column("link_type", sa.String(30), nullable=False),
         sa.Column("direction", sa.String(10), nullable=False),
         sa.Column("confidence", sa.Float(), nullable=False),
-        sa.Column("metadata", sa.JSONB(), nullable=True),
+        sa.Column("metadata", postgresql.JSONB(), nullable=True),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("created_by", sa.String(100), nullable=True),
