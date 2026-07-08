@@ -2702,6 +2702,12 @@ export function GitMergesSettingsPage(_props: PluginSettingsPageProps) {
     showJson,
     maxOutputChars: Math.max(1000, Math.min(5_000_000, maxOutputChars)),
     scanTimeoutSeconds: Math.max(10, Math.min(3600, scanTimeoutSeconds)),
+    // BTCAAAAA-39051: new fields. The settings UI doesn't yet expose
+    // controls for these (that lands in the follow-up commit); the
+    // DEFAULT_CONFIG values are sent on save.
+    stuckThresholdHours: DEFAULT_CONFIG.stuckThresholdHours,
+    etaHistorySize: DEFAULT_CONFIG.etaHistorySize,
+    runningRefreshIntervalSeconds: DEFAULT_CONFIG.runningRefreshIntervalSeconds,
   };
 
   async function onSubmit(event: FormEvent) {

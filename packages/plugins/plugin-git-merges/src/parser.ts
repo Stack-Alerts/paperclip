@@ -13,6 +13,7 @@ import type {
   ApprovalRequest,
   BlockedChain,
   ChainNode,
+  EtaByStatus,
   MergeBlock,
   MergeCheck,
   MergeStatus,
@@ -82,6 +83,58 @@ function parseStatusLine(label: string): {
   return { status, passed, total };
 }
 
+/**
+ * BTCAAAAA-39051: parse the script's "in review for X" string into a
+ * fractional hours number. The script uses Python's `humanize.naturaldelta`
+ * which produces strings like:
+ *   "5s" (seconds), "30m" (minutes), "2h 15m", "3d 4h", "44h 30m".
+ * We only need hours, so days are converted to hours (1d = 24h).
+ * Returns `null` for unparseable inputs.
+ */
+export function parseInReviewForHours(label: string): number | null {
+  if (!label) return null;
+  const trimmed = label.trim();
+  if (!trimmed) return null;
+  let totalHours = 0;
+  let matched = false;
+  const dayMatch = trimmed.match(/(\d+)\s*d/);
+  if (dayMatch && dayMatch[1]) {
+    totalHours += Number.parseInt(dayMatch[1], 10) * 24;
+    matched = true;
+  }
+  const hourMatch = trimmed.match(/(\d+)\s*h/);
+  if (hourMatch && hourMatch[1]) {
+    totalHours += Number.parseInt(hourMatch[1], 10);
+    matched = true;
+  }
+  const minMatch = trimmed.match(/(\d+)\s*m/);
+  if (minMatch && minMatch[1]) {
+    totalHours += Number.parseInt(minMatch[1], 10) / 60;
+    matched = true;
+  }
+  // Pure-second strings ("5s") round to 0 hours; treat as < 1h rather
+  // than unparseable so the stuck-threshold check has a defined value.
+  const secMatch = trimmed.match(/^(\d+)\s*s$/);
+  if (secMatch && secMatch[1]) {
+    return 0;
+  }
+  return matched ? totalHours : null;
+}
+
+/**
+ * BTCAAAAA-39051: pick an ETA bucket from a median-minutes number.
+ *   < 15 min          → "fast"    (green)
+ *   15 min - 2 h      → "medium"  (yellow)
+ *   > 2 h             → "slow"    (red)
+ *   null/unknown      → "unknown" (grey)
+ */
+export function etaBucketFromMinutes(minutes: number | null): "fast" | "medium" | "slow" | "unknown" {
+  if (minutes == null) return "unknown";
+  if (minutes < 15) return "fast";
+  if (minutes < 120) return "medium";
+  return "slow";
+}
+
 function isInsideBlock(lines: string[], idx: number): boolean {
   // A block begins at a `  #N` line and ends at the next `──...───` line.
   for (let i = idx - 1; i >= 0; i -= 1) {
@@ -126,6 +179,7 @@ export function parseMergeQueueOutput(stdout: string): ParseResult {
     waiting: 0,
     failing: 0,
     noPrOrSha: 0,
+    stuck: 0,
   };
 
   let headerTimestamp: string | null = null;
@@ -291,12 +345,14 @@ export function parseMergeQueueOutput(stdout: string): ParseResult {
 
 function finaliseBlock(partial: Partial<MergeBlock>): MergeBlock {
   const checks = (partial.checks ?? []) as MergeCheck[];
+  const inReviewFor = partial.inReviewFor ?? "";
   return {
     index: partial.index ?? 0,
     issueUuid: partial.issueUuid ?? "",
     issueIdentifier: partial.issueIdentifier ?? null,
     title: partial.title ?? "",
-    inReviewFor: partial.inReviewFor ?? "",
+    inReviewFor,
+    inReviewHours: parseInReviewForHours(inReviewFor),
     fixSha: partial.fixSha ?? null,
     fixShaMissing: partial.fixShaMissing ?? false,
     prNumber: partial.prNumber ?? null,
@@ -308,7 +364,138 @@ function finaliseBlock(partial: Partial<MergeBlock>): MergeBlock {
     progressTotal: partial.progressTotal ?? null,
     checks,
     diffKey: partial.diffKey ?? partial.issueUuid ?? "",
+    // BTCAAAAA-39051: stuck + ETA are computed in a separate pass
+    // (augmentBlocksWithStuckAndEta) that has the previous-blocks
+    // context and ETA history. Default to "not stuck / unknown ETA"
+    // here so the bare parser still produces a valid MergeBlock.
+    isStuck: false,
+    etaMinutes: null,
+    etaBucket: "unknown",
   };
+}
+
+/**
+ * BTCAAAAA-39051: signature of a block's "progress signal" — the union
+ * of fields that, if any change between two scans, means the PR has
+ * made progress. Used to determine `isStuck`.
+ *
+ * We intentionally exclude `title` and `checks[]` (per-check detail)
+ * because the script reorders check entries and re-formats details
+ * between runs even when the underlying state hasn't changed.
+ */
+type ProgressSignal = Pick<
+  MergeBlock,
+  | "status"
+  | "fixSha"
+  | "fixShaMissing"
+  | "prNumber"
+  | "prMergeable"
+  | "progressPassed"
+  | "progressTotal"
+>;
+
+function progressKey(block: MergeBlock): string {
+  const s: ProgressSignal = {
+    status: block.status,
+    fixSha: block.fixSha,
+    fixShaMissing: block.fixShaMissing,
+    prNumber: block.prNumber,
+    prMergeable: block.prMergeable,
+    progressPassed: block.progressPassed,
+    progressTotal: block.progressTotal,
+  };
+  return JSON.stringify(s);
+}
+
+/**
+ * BTCAAAAA-39051: post-process a parsed block list to add the stuck +
+ * ETA fields that depend on context (previous-blocks snapshot and
+ * ETA history). Returns a new array; does not mutate the input.
+ *
+ * Stuck definition (matches the ticket acceptance criterion):
+ *   `inReviewHours >= stuckThresholdHours` AND
+ *   `progressKey(current) === progressKey(prior block in previous scan)`
+ *
+ * ETA definition:
+ *   For each block, look up the median (in minutes) for its current
+ *   `status` from `etaByStatus`. If no samples yet for that bucket,
+ *   fall back to the next-wider bucket: failing→waiting→ready, no-pr→no-sha→unknown.
+ *   Returns `null` + "unknown" if no bucket has data.
+ */
+export function augmentBlocksWithStuckAndEta(
+  blocks: MergeBlock[],
+  previousBlocks: MergeBlock[] | null,
+  stuckThresholdHours: number,
+  etaByStatus: EtaByStatus | null,
+): MergeBlock[] {
+  const previousByKey = new Map<string, MergeBlock>();
+  if (previousBlocks) {
+    for (const prev of previousBlocks) {
+      previousByKey.set(prev.diffKey, prev);
+    }
+  }
+  let stuckCount = 0;
+  const augmented = blocks.map((block) => {
+    const prior = previousByKey.get(block.diffKey);
+    const hours = block.inReviewHours;
+    const stuckByAge = hours != null && hours >= stuckThresholdHours;
+    const noPrior = prior == null;
+    const noProgress = prior != null && progressKey(prior) === progressKey(block);
+    const isStuck = stuckByAge && (noPrior || noProgress);
+    if (isStuck) stuckCount += 1;
+
+    // ETA: pick the median for this block's status bucket, with a
+    // graceful fallback to the most-related bucket when the current
+    // bucket has no samples yet.
+    const etaMinutes = pickEtaForStatus(block.status, etaByStatus);
+    const etaBucket = etaBucketFromMinutes(etaMinutes);
+
+    return {
+      ...block,
+      isStuck,
+      etaMinutes,
+      etaBucket,
+    };
+  });
+  // We can't mutate `totals` here (it lives in the ParseResult), but
+  // augmentBlocksWithStuckAndEta returns a derived `stuckCount` via
+  // the companion helper below for the worker to fold back in.
+  return augmented;
+}
+
+/**
+ * BTCAAAAA-39051: count the number of stuck blocks in an augmented
+ * list. Worker calls this after `augmentBlocksWithStuckAndEta` and
+ * folds the result into `totals.stuck` before persisting.
+ */
+export function countStuck(blocks: MergeBlock[]): number {
+  let n = 0;
+  for (const b of blocks) if (b.isStuck) n += 1;
+  return n;
+}
+
+function pickEtaForStatus(
+  status: MergeStatus,
+  eta: EtaByStatus | null,
+): number | null {
+  if (!eta) return null;
+  // Direct hit.
+  const direct = eta[status];
+  if (direct && direct.medianMinutes != null) return direct.medianMinutes;
+  // Fallback chain: pick the most-related bucket with data.
+  const chain: Record<MergeStatus, MergeStatus[]> = {
+    ready: ["waiting", "failing", "unknown"],
+    waiting: ["ready", "failing", "unknown"],
+    failing: ["waiting", "ready", "unknown"],
+    "no-pr": ["no-sha", "unknown"],
+    "no-sha": ["no-pr", "unknown"],
+    unknown: ["ready", "waiting", "failing", "no-pr", "no-sha"],
+  };
+  for (const fallback of chain[status]) {
+    const v = eta[fallback];
+    if (v && v.medianMinutes != null) return v.medianMinutes;
+  }
+  return null;
 }
 
 export interface BlockDiff {
@@ -465,6 +652,7 @@ function tryParseJsonOutput(stdout: string): ParseResult | null {
         issueIdentifier: (it["display_key"] as string | null) ?? null,
         title: (it["title"] as string) ?? "(no title)",
         inReviewFor: "",
+        inReviewHours: null,
         fixSha: (it["fix_sha"] as string | null) ?? null,
         fixShaMissing: !it["fix_sha"],
         prNumber: typeof it["pr_number"] === "number" ? (it["pr_number"] as number) : null,
@@ -476,6 +664,9 @@ function tryParseJsonOutput(stdout: string): ParseResult | null {
         progressTotal: Number.isFinite(total) ? total : null,
         checks,
         diffKey: issueId,
+        isStuck: false,
+        etaMinutes: null,
+        etaBucket: "unknown",
       });
     }
   }
@@ -572,6 +763,7 @@ function tryParseJsonOutput(stdout: string): ParseResult | null {
     waiting: 0,
     failing: 0,
     noPrOrSha: 0,
+    stuck: 0,
   };
 
   return {
