@@ -358,6 +358,7 @@ class BugFreshnessReport:
     total_rows: int
     max_age_hours: float
     min_age_hours: float
+    last_write_age_hours: float
     stale_rows: int
     stale_threshold_days: int
 
@@ -472,7 +473,15 @@ def compute_bug_freshness(
     engine: Engine,
     stale_threshold_days: int = 30,
 ) -> BugFreshnessReport:
-    """Report age statistics for touch_index_bug_files entries using updated_at."""
+    """Report age statistics for touch_index_bug_files entries using updated_at.
+
+    ``last_write_age_hours`` measures worker activity: it is the age of the
+    newest row's ``updated_at``. The pass/fail gate in
+    ``run_bug_quality_checks`` uses this — not ``stale_rows`` — because once
+    the index reaches steady state (every eligible bug close is captured),
+    individual rows can legitimately go months without being re-written.
+    The signal we want is *worker inactivity*, not *data age*.
+    """
     with engine.connect() as conn:
         total = (
             conn.execute(text("SELECT COUNT(*) FROM touch_index_bug_files")).scalar()
@@ -508,6 +517,7 @@ def compute_bug_freshness(
         total_rows=total,
         max_age_hours=round(max_age, 1),
         min_age_hours=round(min_age, 1),
+        last_write_age_hours=round(min_age, 1),
         stale_rows=stale,
         stale_threshold_days=stale_threshold_days,
     )
@@ -642,19 +652,24 @@ def run_bug_quality_checks(
 
     try:
         freshness = compute_bug_freshness(engine, stale_threshold_days)
-        if freshness.stale_rows > 0:
+        stale_threshold_hours = stale_threshold_days * 24
+        if freshness.last_write_age_hours > stale_threshold_hours:
             logger.warning(
-                "BUG FRESHNESS: %d stale rows (>%d days), max age %.1f hours",
-                freshness.stale_rows,
+                "BUG FRESHNESS: worker last wrote %.1f hours ago "
+                "(threshold %d days = %d h), %d rows, %d stale",
+                freshness.last_write_age_hours,
                 freshness.stale_threshold_days,
-                freshness.max_age_hours,
+                stale_threshold_hours,
+                freshness.total_rows,
+                freshness.stale_rows,
             )
             failures += 1
         else:
             logger.info(
-                "BUG FRESHNESS: %d rows, max age %.1f hours",
+                "BUG FRESHNESS: %d rows, last write %.1f hours ago (%d stale)",
                 freshness.total_rows,
-                freshness.max_age_hours,
+                freshness.last_write_age_hours,
+                freshness.stale_rows,
             )
     except Exception:
         logger.exception("Bug freshness check failed")

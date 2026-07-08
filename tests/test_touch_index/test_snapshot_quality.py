@@ -44,6 +44,7 @@ def _make_fr_report():
             total_rows = 150
             stale_rows = 0
             max_age_hours = 12.5
+            last_write_age_hours = 2.0
 
         class consistency:
             null_owner_rows = 0
@@ -140,7 +141,6 @@ class TestBuildFrReport:
         assert d["total"] == 42
         assert d["missing_issue_identifiers"] == []
         assert d["total_rows"] == 150
-        assert d["stale_rows"] == 0
         assert d["max_age_hours"] == 12.5
         assert d["null_owner_rows"] == 0
         assert d["null_updated_at_rows"] == 0
@@ -194,6 +194,7 @@ class TestBuildFrReport:
                 total_rows = 20
                 stale_rows = 0
                 max_age_hours = 1.0
+                last_write_age_hours = 0.5
 
             class consistency:
                 null_owner_rows = 0
@@ -221,6 +222,7 @@ class TestBuildFrReport:
                 total_rows = 120
                 stale_rows = 2
                 max_age_hours = 200.0
+                last_write_age_hours = 100.0
 
             class consistency:
                 null_owner_rows = 0

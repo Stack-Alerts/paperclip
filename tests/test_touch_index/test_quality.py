@@ -956,6 +956,7 @@ class TestRunBugQualityChecks:
                     total_rows=5,
                     max_age_hours=2.0,
                     min_age_hours=0.1,
+                    last_write_age_hours=0.1,
                     stale_rows=0,
                     stale_threshold_days=30,
                 ),
@@ -1001,6 +1002,7 @@ class TestRunBugQualityChecks:
                     total_rows=5,
                     max_age_hours=2.0,
                     min_age_hours=0.1,
+                    last_write_age_hours=0.1,
                     stale_rows=0,
                     stale_threshold_days=30,
                 ),
@@ -1044,6 +1046,7 @@ class TestRunBugQualityChecks:
                     total_rows=5,
                     max_age_hours=1.0,
                     min_age_hours=0.1,
+                    last_write_age_hours=0.1,
                     stale_rows=0,
                     stale_threshold_days=30,
                 ),
@@ -1085,6 +1088,7 @@ class TestRunBugQualityChecks:
                     total_rows=5,
                     max_age_hours=800.0,
                     min_age_hours=2.0,
+                    last_write_age_hours=800.0,
                     stale_rows=3,
                     stale_threshold_days=30,
                 ),
@@ -1103,6 +1107,70 @@ class TestRunBugQualityChecks:
             report = run_bug_quality_checks(engine)
 
         assert report.passed is False
+        # 800h > 30d * 24h = 720h — true worker inactivity triggers the gate.
+        assert report.freshness.last_write_age_hours == 800.0
+
+    def test_false_positive_stale_rows_passes(self):
+        """Regression guard for BTCAAAAA-38818: stale_rows > 0 alone must not
+        fail the gate. The signal we want is worker inactivity, not data age.
+
+        Mirrors the production false-positive: 938 rows, 3707 stale_rows
+        (every row older than the 30-day threshold is "stale"), but the
+        worker wrote a fresh row 2 hours ago, so the index is healthy.
+        The pre-fix gate flipped systemd `touch-index-bug-worker.timer`
+        to `failed` on this exact signal.
+
+        Coverage and consistency are mocked at passing levels so this test
+        isolates the freshness regression — the production false-positive
+        also had low coverage (74%), but that was a *separate* warning
+        that legitimately fired; the BTC-38818 bug was the freshness gate
+        tripping on stale_rows alone.
+        """
+        engine = MagicMock()
+
+        with (
+            patch(
+                "touch_index.quality.compute_bug_coverage",
+                return_value=BugCoverageReport(
+                    total_bug_issues=438,
+                    indexed_bug_issues=438,
+                    coverage_pct=100.0,
+                    missing_issue_identifiers=[],
+                    eligible_bug_issues=438,
+                    eligible_coverage_pct=100.0,
+                    missing_eligible_identifiers=[],
+                ),
+            ),
+            patch(
+                "touch_index.quality.compute_bug_freshness",
+                return_value=BugFreshnessReport(
+                    total_rows=938,
+                    max_age_hours=2160.0,  # ~90 days, oldest row
+                    min_age_hours=2.0,     # worker wrote ~2h ago
+                    last_write_age_hours=2.0,
+                    stale_rows=3707,       # EVERY row is older than 30d
+                    stale_threshold_days=30,
+                ),
+            ),
+            patch(
+                "touch_index.quality.check_bug_consistency",
+                return_value=BugConsistencyReport(
+                    null_closed_at_rows=0,
+                    null_updated_at_rows=0,
+                    duplicate_pairs=0,
+                    orphan_bug_issue_ids=[],
+                    unknown_source_rows=0,
+                ),
+            ),
+        ):
+            report = run_bug_quality_checks(engine)
+
+        # Coverage and consistency pass; freshness must also pass because
+        # last_write_age_hours (2.0) is well under the 30-day threshold.
+        assert report.passed is True
+        assert report.freshness is not None
+        assert report.freshness.last_write_age_hours == 2.0
+        assert report.freshness.stale_rows == 3707
 
     def test_consistency_issues_fail(self):
         engine = MagicMock()
@@ -1126,6 +1194,7 @@ class TestRunBugQualityChecks:
                     total_rows=5,
                     max_age_hours=1.0,
                     min_age_hours=0.1,
+                    last_write_age_hours=0.1,
                     stale_rows=0,
                     stale_threshold_days=30,
                 ),
@@ -1160,6 +1229,7 @@ class TestRunBugQualityChecks:
                     total_rows=5,
                     max_age_hours=1.0,
                     min_age_hours=0.1,
+                    last_write_age_hours=0.1,
                     stale_rows=0,
                     stale_threshold_days=30,
                 ),
@@ -1475,6 +1545,7 @@ class TestRunBugQualityChecksExtended:
                     total_rows=5,
                     max_age_hours=2.0,
                     min_age_hours=0.1,
+                    last_write_age_hours=0.1,
                     stale_rows=0,
                     stale_threshold_days=30,
                 ),
@@ -1509,6 +1580,7 @@ class TestRunBugQualityChecksExtended:
                     total_rows=5,
                     max_age_hours=2.0,
                     min_age_hours=0.1,
+                    last_write_age_hours=0.1,
                     stale_rows=0,
                     stale_threshold_days=30,
                 ),
@@ -1546,6 +1618,7 @@ class TestRunBugQualityChecksExtended:
                     total_rows=5,
                     max_age_hours=2.0,
                     min_age_hours=0.1,
+                    last_write_age_hours=0.1,
                     stale_rows=0,
                     stale_threshold_days=30,
                 ),
@@ -1583,6 +1656,7 @@ class TestRunBugQualityChecksExtended:
                     total_rows=5,
                     max_age_hours=2.0,
                     min_age_hours=0.1,
+                    last_write_age_hours=0.1,
                     stale_rows=0,
                     stale_threshold_days=30,
                 ),
@@ -1677,6 +1751,7 @@ class TestReportToDict:
             total_rows=10,
             max_age_hours=48.0,
             min_age_hours=2.0,
+            last_write_age_hours=2.0,
             stale_rows=1,
             stale_threshold_days=30,
         )
@@ -1707,6 +1782,7 @@ class TestReportToDict:
             total_rows=5,
             max_age_hours=12.0,
             min_age_hours=1.0,
+            last_write_age_hours=1.0,
             stale_rows=0,
             stale_threshold_days=30,
         )
@@ -1782,6 +1858,7 @@ class TestReportToDictExtended:
             total_rows=5,
             max_age_hours=12.0,
             min_age_hours=1.0,
+            last_write_age_hours=1.0,
             stale_rows=0,
             stale_threshold_days=30,
         )
