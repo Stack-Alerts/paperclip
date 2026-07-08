@@ -73,31 +73,154 @@ elif [[ "$GATE_BRANCH" != "main" && "$GATE_BRANCH" != "master" ]]; then
 fi
 echo "[start-dev] ✓ all local work is committed and pushed"
 
-# Early branch gate: detect non-main branch and offer to switch before touching systemd.
+# Early branch gate: detect non-main branch and offer branch-aware recovery.
+# BTCAAAAA-39034: probe which options are actually viable (main held elsewhere?
+# backend already alive? dirty tree?) instead of forcing a single "switch to main"
+# path that fails silently when another worktree already has main checked out.
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 if [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
   echo ""
   echo "⚠️  You are on branch: $CURRENT_BRANCH"
-  echo "   start-dev.sh requires the main branch (btc-dev-server.service enforces this)."
+  echo "   start-dev.sh prefers the main branch (btc-dev-server.service enforces this)."
   echo ""
+
+  # ─── Diagnostics: which options are actually viable? (BTCAAAAA-39034) ──
+  # 1. Is 'main' checked out in another worktree?
+  MAIN_HELD_BY=""
+  MAIN_HELD_SHA=""
+  _wt_path=""
+  while IFS= read -r line; do
+    case "$line" in
+      worktree*) _wt_path="${line#worktree }" ;;
+      branch*)
+        _br="${line#branch }"
+        if [[ "$_br" == "refs/heads/main" ]]; then
+          MAIN_HELD_BY="$_wt_path"
+          MAIN_HELD_SHA=$(git -C "$_wt_path" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+        fi
+        ;;
+    esac
+  done < <(git worktree list --porcelain)
+
+  # 2. Is the supervised backend already responding on :8765?
+  BACKEND_ALIVE=0
+  if curl -sf -m 2 http://localhost:8765/health >/dev/null 2>&1; then
+    BACKEND_ALIVE=1
+  fi
+
+  # 3. Is this worktree dirty?
+  DIRTY=$(git status --porcelain 2>/dev/null | grep -c '^.' || true)
+  if [[ "$DIRTY" -gt 0 ]]; then
+    echo "⚠️  Worktree has $DIRTY uncommitted change(s):"
+    git status --porcelain 2>/dev/null | sed 's/^/    /'
+    echo ""
+  fi
+
+  echo "Detected state:"
+  if [[ -n "$MAIN_HELD_BY" ]]; then
+    echo "  ✗ 'main' is checked out in another worktree: $MAIN_HELD_BY ($MAIN_HELD_SHA)"
+    echo "       → cannot 'git checkout main' here"
+  else
+    echo "  ✓ 'main' is not held elsewhere — checkout is possible"
+  fi
+  if [[ "$BACKEND_ALIVE" -eq 1 ]]; then
+    echo "  ✓ supervised backend on :8765 is responding"
+  else
+    echo "  ✗ supervised backend on :8765 is NOT responding"
+  fi
+  echo ""
+
+  # ─── Build the menu: only show options that are actually viable ────────
+  OPTIONS=()
+  OPT_DEFAULT_LETTER="c"
+
+  # [s] run uvicorn from the other main worktree (only when main is held elsewhere)
+  if [[ -n "$MAIN_HELD_BY" ]]; then
+    OPTIONS+=("s")
+  fi
+
+  # [m] git checkout main (only when main is NOT held elsewhere)
+  if [[ -z "$MAIN_HELD_BY" ]]; then
+    OPTIONS+=("m")
+    OPT_DEFAULT_LETTER="m"
+  fi
+
+  # [b] run uvicorn directly here (always; bypasses branch gate)
+  OPTIONS+=("b")
+  # If main is held elsewhere, prefer [s] as default
+  if [[ "$OPT_DEFAULT_LETTER" == "c" && -n "$MAIN_HELD_BY" ]]; then
+    OPT_DEFAULT_LETTER="s"
+  fi
+
+  # [i] isolated test instance (always; frontend only — :8765 still required)
+  OPTIONS+=("i")
+
+  # [t] ephemeral :3000 (always; no branch restriction)
+  OPTIONS+=("t")
+
+  # [c] cancel (always)
+  OPTIONS+=("c")
+
   echo "Options:"
-  echo "  [s] switch to main and start the dev server"
-  echo "  [t] use ./start-test.sh instead (ephemeral :3000, no branch restriction)"
-  echo "  [c] cancel"
+  for opt in "${OPTIONS[@]}"; do
+    case "$opt" in
+      s) printf "  [s] run uvicorn from %s (uses the existing main checkout)\n" "$MAIN_HELD_BY" ;;
+      m) echo "  [m] git checkout main and start the dev server" ;;
+      b) echo "  [b] run uvicorn directly here on $CURRENT_BRANCH (bypasses the branch gate)" ;;
+      i) echo "  [i] use ./start-test-iso.sh for an isolated instance of $CURRENT_BRANCH (frontend only; UI still hits :8765)" ;;
+      t) echo "  [t] use ./start-test.sh instead (ephemeral :3000, no branch restriction)" ;;
+      c) echo "  [c] cancel" ;;
+    esac
+  done
   echo ""
+
   if [[ -t 0 ]]; then
-    read -r -p "Action? [s/t/c]: " action
+    _opt_str=$(IFS=/; echo "${OPTIONS[*]}")
+    read -r -p "Action? [${_opt_str}] (default: $OPT_DEFAULT_LETTER): " action
+    [[ -z "$action" ]] && action="$OPT_DEFAULT_LETTER"
   else
     echo "Non-interactive: defaulting to [c] cancel." >&2
     action="c"
   fi
   case "${action,,}" in
     s)
+      # Run uvicorn from the other main worktree.
+      if [[ -z "$MAIN_HELD_BY" ]]; then
+        echo "ERROR: option 's' is only valid when 'main' is checked out in another worktree." >&2
+        exit 1
+      fi
+      echo "[start-dev] starting uvicorn from $MAIN_HELD_BY ($MAIN_HELD_SHA)..."
+      _uv_log="$MAIN_HELD_BY/.btc-uvicorn.log"
+      (
+        cd "$MAIN_HELD_BY" || { echo "ERROR: cannot cd to $MAIN_HELD_BY" >&2; exit 1; }
+        if [[ ! -x ./venv/bin/python ]]; then
+          echo "ERROR: $MAIN_HELD_BY/venv/bin/python not executable — worktree may need bootstrap." >&2
+          exit 1
+        fi
+        setsid nohup ./venv/bin/python -m uvicorn src.api.app:app --host 127.0.0.1 --port 8765 \
+          >>"$_uv_log" 2>&1 &
+        echo $! >"$MAIN_HELD_BY/.btc-uvicorn.pid"
+      ) || exit 1
+      # Wait for /health to respond.
+      _ready=0
+      for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+        if curl -sf -m 2 http://localhost:8765/health >/dev/null 2>&1; then
+          echo "[start-dev] ✓ uvicorn is up on :8765 (log: $_uv_log)"
+          _ready=1
+          break
+        fi
+        sleep 1
+      done
+      if [[ "$_ready" -ne 1 ]]; then
+        echo "ERROR: uvicorn did not respond on :8765 within 15s. See $_uv_log" >&2
+        exit 1
+      fi
+      echo "[start-dev] supervised web UI on :3010 should now connect to the backend."
+      ;;
+    m)
+      # git checkout main — only offered when main is not held elsewhere.
       echo "[start-dev] switching to main..."
-      # Prune stale worktree references so git doesn't reject checkout due to a
-      # deleted-but-untracked worktree directory (e.g. /tmp/main-merge-NNN).
       git worktree prune 2>/dev/null || true
-      DIRTY=$(git status --porcelain 2>/dev/null | grep -c '^.' || true)
       if [[ "$DIRTY" -gt 0 ]]; then
         echo "[start-dev] stashing $DIRTY uncommitted change(s)..."
         git stash push -m "start-dev auto-stash before switching to main" --include-untracked 2>&1 || {
@@ -110,12 +233,46 @@ if [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
       CURRENT_BRANCH="main"
       echo "[start-dev] now on main — continuing..."
       ;;
+    b)
+      # Run uvicorn directly here, bypassing the btc-dev-backend.service gate.
+      # WARNING: the systemd unit won't restart this if it dies — operator owns the lifecycle.
+      echo "[start-dev] starting uvicorn directly here on $CURRENT_BRANCH (bypasses branch gate)..."
+      _uv_log="$REPO_ROOT/.btc-uvicorn-direct.log"
+      _uv_pid="$REPO_ROOT/.btc-uvicorn-direct.pid"
+      if [[ ! -x ./venv/bin/python ]]; then
+        echo "ERROR: ./venv/bin/python not executable — worktree may need bootstrap." >&2
+        exit 1
+      fi
+      setsid nohup ./venv/bin/python -m uvicorn src.api.app:app --host 127.0.0.1 --port 8765 \
+        >>"$_uv_log" 2>&1 &
+      echo $! >"$_uv_pid"
+      _ready=0
+      for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+        if curl -sf -m 2 http://localhost:8765/health >/dev/null 2>&1; then
+          echo "[start-dev] ✓ uvicorn is up on :8765 (pid in $_uv_pid, log: $_uv_log)"
+          _ready=1
+          break
+        fi
+        sleep 1
+      done
+      if [[ "$_ready" -ne 1 ]]; then
+        echo "ERROR: uvicorn did not respond on :8765 within 15s. See $_uv_log" >&2
+        exit 1
+      fi
+      echo "[start-dev] NOTE: btc-dev-backend.service is inactive; this uvicorn has no auto-restart."
+      echo "[start-dev] supervised web UI on :3010 should now connect to the backend."
+      ;;
+    i)
+      echo "[start-dev] use: ./start-test-iso.sh $CURRENT_BRANCH"
+      echo "            (worktree-per-instance on a :40XX port, frontend only — UI still hits :8765)"
+      exit 0
+      ;;
     t)
       echo "[start-dev] use: ./start-test.sh"
       echo "            (runs on :3000, auto-switches to main, no systemd branch gate)"
       exit 0
       ;;
-    *)
+    c|*)
       echo "[start-dev] cancelled."
       exit 1
       ;;
