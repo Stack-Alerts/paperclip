@@ -99,18 +99,40 @@ function normalizeSide(raw?: string): 'LONG' | 'SHORT' | '—' {
   return u === 'LONG' || u === 'SHORT' ? u : '—';
 }
 
-function partialDisplay(t: Trade): string {
+/**
+ * BTCAAAAA-39027: render the Partial % cell for a single trade leg.
+ *
+ * Resolution order:
+ *  1. `partialBreakdown` (pre-formatted multi-exit string from the parent row)
+ *     wins over everything; it already includes every leg's dollar amount.
+ *  2. If the leg has `exitType`, format `Max Bars (33%): $X` / `SL (50%): $X` /
+ *     `TP1 (33%): $X` — same shape the thick client emits.
+ *  3. If the leg has NO `exitType` but DOES carry `exitPercentage`, render
+ *     `Partial (33%): $X`. The engine sometimes emits a partial-exit leg whose
+ *     exit-type label didn't survive serialization (e.g. an SL partial lost
+ *     its exit_type). Before this fix the cell bailed to '—' and the user
+ *     couldn't see how much of the position had been closed.
+ *  4. Bare '—' is reserved for the truly-empty case: neither `exitType` nor
+ *     `exitPercentage` are populated. Do not widen it into a catch-all — the
+ *     Partial % column should reflect what the engine actually computed.
+ *
+ * Exported so the BTC-39027 fallback chain can be unit-tested directly.
+ */
+export function partialDisplay(t: Trade): string {
   if (t.partialBreakdown) return t.partialBreakdown;
-  if (!t.exitType) return '—';
+  // exitPercentage is decimal 0–1 from the engine; × 100 for human display.
+  const exitPct = t.exitPercentage != null && t.exitPercentage > 0 ? t.exitPercentage : null;
+  const pctStr = exitPct != null ? ` (${(exitPct * 100).toFixed(0)}%)` : '';
+  if (!t.exitType) {
+    return exitPct != null ? `Partial${pctStr}: ${formatMoney(t.pnl)}` : '—';
+  }
   const u = t.exitType.toUpperCase();
-  // exitPercentage is decimal 0–1 from engine; multiply × 100 for display.
-  const pct = t.exitPercentage != null && t.exitPercentage > 0
-    ? ` (${(t.exitPercentage * 100).toFixed(0)}%)`
-    : '';
-  if (u === 'MAX_BARS' || u === 'TIME_LIMIT') return `Max Bars${pct}: ${formatMoney(t.pnl)}`;
-  if (u === 'SL' || u === 'STOP_LOSS') return `SL${pct}: ${formatMoney(t.pnl)}`;
-  if (/^TP[0-9]+$/.test(u)) return `${u}${pct}: ${formatMoney(t.pnl)}`;
-  return '—';
+  if (u === 'MAX_BARS' || u === 'TIME_LIMIT') return `Max Bars${pctStr}: ${formatMoney(t.pnl)}`;
+  if (u === 'SL' || u === 'STOP_LOSS') return `SL${pctStr}: ${formatMoney(t.pnl)}`;
+  if (/^TP[0-9]+$/.test(u)) return `${u}${pctStr}: ${formatMoney(t.pnl)}`;
+  // Unknown exit-type label (engine emitted a new code we don't recognize) —
+  // with a percentage we still have useful info to show; without one, bail.
+  return exitPct != null ? `Partial${pctStr}: ${formatMoney(t.pnl)}` : '—';
 }
 
 // Short exit-type codes the backend sends via exit_condition_name — these need
