@@ -31,6 +31,7 @@ Requires:
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import os
@@ -90,6 +91,42 @@ except ImportError as _gap4_err:
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "src"))
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+# BTCAAAAA-38473 Gap 6 — import the centralized branch parser and ANSI stripper
+# from the sibling helper module. Replaces the inline
+# ``origin/fix/BTCAAAAA-`` prefix check and the manual regex in this file with
+# one well-tested helper. Import is wrapped so the routine still runs in the
+# rare scenario the parser is unavailable.
+try:
+    from _merge_dispatch_branch_parser import parse_branch, strip_ansi
+    _BRANCH_PARSER_OK = True
+except Exception as _bp_import_exc:  # pragma: no cover - defensive fallback
+    logger.warning(
+        "Branch parser unavailable (%s); falling back to inline prefix check",
+        _bp_import_exc,
+    )
+    _BRANCH_PARSER_OK = False
+
+    def parse_branch(branch_name):  # type: ignore[no-redef]
+        """Inline fallback when the parser module is missing."""
+        if not branch_name:
+            return None
+        cleaned = branch_name.strip()
+        prefix = "origin/"
+        if cleaned.startswith(prefix):
+            cleaned = cleaned[len(prefix):]
+        if not cleaned.startswith("fix/BTCAAAAA-"):
+            return None
+        tail = cleaned[len("fix/"):]
+        identifier, _, slug = tail.partition("-")
+        if not identifier.startswith("BTCAAAAA-") or not identifier[len("BTCAAAAA-"):].isdigit():
+            return None
+        return {"identifier": identifier, "slug": slug, "raw": branch_name}
+
+    def strip_ansi(text):  # type: ignore[no-redef]
+        """No-op fallback when the parser module is missing."""
+        return text
 
 logging.basicConfig(
     level=logging.INFO,
@@ -490,10 +527,11 @@ def find_branch_for_sha(sha: str) -> str | None:
         if not branches:
             return None
 
-        # Find the first origin/fix/* branch
+        # Find the first origin/fix/* branch — BTCAAAAA-38473 Gap 6: use the
+        # centralized parser instead of an inline prefix check.
         for branch in branches:
             branch = branch.strip()
-            if branch.startswith("origin/fix/BTCAAAAA-"):
+            if parse_branch(branch) is not None:
                 return branch.replace("origin/", "")
 
         # Fallback: use first branch
@@ -869,12 +907,20 @@ Manual intervention required. Routine: [{MERGE_DISPATCH_TRACKING}](/BTCAAAAA/iss
         logger.error("Failed to escalate failure: %s", exc)
 
 
-def process_issue(issue: dict[str, Any]) -> dict[str, Any]:
-    """Process a single in_review issue for merge dispatch."""
+def process_issue(issue: dict[str, Any], dry_run: bool = False) -> dict[str, Any]:
+    """Process a single in_review issue for merge dispatch.
+
+    When ``dry_run`` is True the routine logs what it WOULD do (open a PR via
+    ``gh pr create`` and squash-merge it) without actually calling ``gh`` or
+    mutating the issue. Used by BTCAAAAA-38473 Gap 6 to make the routine safe
+    for local smoke-tests against paperclip boards without write access.
+    """
     issue_id = issue.get("id", "")
     issue_identifier = issue.get("identifier", "")
 
     logger.info("Processing issue %s", issue_identifier)
+    if dry_run:
+        logger.info("[dry-run] merge_dispatch would process %s", issue_identifier)
 
     # Step 1: Extract Fix-SHA from comments (primary trigger — no interaction gate)
     comments = fetch_issue_comments(issue_id)
@@ -1006,6 +1052,19 @@ def process_issue(issue: dict[str, Any]) -> dict[str, Any]:
     if existing_pr:
         logger.info("PR already exists for branch %s: PR #%d", branch, existing_pr.get("number"))
         pr = existing_pr
+    elif dry_run:
+        # BTCAAAAA-38473 Gap 6: dry-run mode skips gh pr create entirely.
+        # Log the synthetic PR shape and continue so the rest of the routine
+        # can be exercised without write access.
+        logger.info(
+            "[dry-run] would create PR via gh pr create: branch=%s title='[Automated] Merge %s (%s)'",
+            branch, branch, sha[:8],
+        )
+        pr = {
+            "number": 0,
+            "html_url": f"https://github.com/dry-run/{branch}",
+            "dry_run": True,
+        }
     else:
         # Try to create PR
         title = f"[Automated] Merge {branch} ({sha[:8]})"
@@ -1025,7 +1084,11 @@ def process_issue(issue: dict[str, Any]) -> dict[str, Any]:
     logger.info("PR #%d opened for issue %s", pr_number, issue_identifier)
 
     # Step 7: Merge the PR
-    merge_result = merge_pr(session, pr_number)
+    if dry_run:
+        logger.info("[dry-run] would merge PR #%d via gh pr merge --squash", pr_number)
+        merge_result = {"sha": sha, "dry_run": True}
+    else:
+        merge_result = merge_pr(session, pr_number)
     if merge_result is _CI_PENDING:
         logger.info("PR #%d CI checks still pending for %s; sweep will retry", pr_number, issue_identifier)
         return {
@@ -1115,7 +1178,12 @@ PR #{pr_number} has been merged via squash.
 This issue is now marked as done.
 """
 
-    if not comment_on_issue(issue_id, comment_body):
+    if dry_run:
+        logger.info(
+            "[dry-run] would comment on issue %s with merge-complete notice",
+            issue_identifier,
+        )
+    elif not comment_on_issue(issue_id, comment_body):
         logger.warning("Failed to post comment, but PR was merged")
 
     # BTCAAAAA-38472 Gap 4 lint: defer done-PATCH when latest comment lacks
@@ -1137,23 +1205,30 @@ This issue is now marked as done.
             "merge_sha": merge_sha,
         }
 
-    if not update_issue_status(issue_id, "done", "Merged via automated dispatch"):
+    if dry_run:
+        logger.info("[dry-run] would PATCH issue %s status -> done", issue_identifier)
+    elif not update_issue_status(issue_id, "done", "Merged via automated dispatch"):
         logger.warning("Failed to update status, but PR was merged")
 
-    return {
+    result: dict[str, Any] = {
         "issue": issue_identifier,
         "action": "merged",
         "pr_number": pr_number,
         "pr_url": pr_url,
         "merge_sha": merge_sha,
     }
+    if dry_run:
+        result["dry_run"] = True
+    return result
 
 
-def dispatch_for_issue(issue_id: str) -> int:
+def dispatch_for_issue(issue_id: str, dry_run: bool = False) -> int:
     """Agent-finish trigger: dispatch a merge for a single just-finished issue.
 
     Invoked at close-out (see CLAUDE.md) right after an agent sets an issue to in_review
     with a Fix-SHA, so the merge is prompt instead of waiting for the periodic sweep.
+    ``dry_run`` propagates into :func:`process_issue` so the same dispatch path can
+    be exercised without mutating the issue or creating a PR (BTCAAAAA-38473 Gap 6).
     """
     logger.info("Agent-finish merge dispatch for issue %s", issue_id)
     issue = fetch_issue(issue_id)
@@ -1183,7 +1258,7 @@ def dispatch_for_issue(issue_id: str) -> int:
         return 0
 
     try:
-        result = process_issue(issue)
+        result = process_issue(issue, dry_run=dry_run)
     except Exception as e:
         result = {"issue": issue.get("identifier", issue_id), "action": "error", "error": str(e)}
 
@@ -1199,14 +1274,29 @@ def main(argv: list[str] | None = None) -> int:
     With no args, runs the periodic backup sweep over all in_review issues. The sweep
     is event-gated (BTCAAAAA-38258): it early-exits when the in_review set is
     unchanged since the last sweep AND the watermark is within the safety floor.
+
+    ``--dry-run`` (BTCAAAAA-38473 Gap 6) logs what the routine WOULD do without
+    actually creating PRs, merging them, or flipping issue status. Useful for
+    local smoke-tests against paperclip boards without write access.
     """
-    argv = sys.argv[1:] if argv is None else argv
-    if "--issue" in argv:
-        idx = argv.index("--issue")
-        if idx + 1 >= len(argv):
-            logger.error("--issue requires an issue id")
-            return 2
-        return dispatch_for_issue(argv[idx + 1])
+    parser = argparse.ArgumentParser(
+        prog="merge_dispatch_routine",
+        description="Dispatch fix branches to PR + squash-merge on GitHub.",
+    )
+    parser.add_argument(
+        "--issue",
+        metavar="ISSUE_ID",
+        help="Agent-finish trigger: dispatch a single just-finished issue by id.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Log what the routine would do without creating PRs or merging.",
+    )
+    args = parser.parse_args(argv if argv is not None else sys.argv[1:])
+
+    if args.issue:
+        return dispatch_for_issue(args.issue, dry_run=args.dry_run)
 
     # BTCAAAAA-38470 Gap 2 — token-scope preflight BEFORE any work. Refuse to
     # scan or merge if `gh` cannot reach the upstream repo. Prevents silent
@@ -1266,7 +1356,7 @@ def main(argv: list[str] | None = None) -> int:
     results = []
     for issue in issues:
         try:
-            result = process_issue(issue)
+            result = process_issue(issue, dry_run=args.dry_run)
             results.append(result)
         except Exception as e:
             issue_id = issue.get("identifier", "?")

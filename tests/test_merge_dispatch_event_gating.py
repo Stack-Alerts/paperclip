@@ -212,7 +212,7 @@ def test_dispatch_for_issue_bypasses_watermark(tmp_path, monkeypatch):
          patch.object(mdr, "save_watermark") as mock_save:
         rc = mdr.dispatch_for_issue("iss-1")
     assert rc == 0
-    mock_proc.assert_called_once_with(issue)
+    mock_proc.assert_called_once_with(issue, dry_run=False)
     mock_load.assert_not_called()
     mock_save.assert_not_called()
 

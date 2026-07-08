@@ -115,8 +115,9 @@ class TestMergeGate:
         with patch.object(mod, "fetch_issue_comments", return_value=[{"body": f"Fix-SHA: {sha}"}]), \
             patch.object(mod, "sha_exists_locally", return_value=True), \
             patch.object(mod, "is_ancestor_of_main", return_value=False), \
-            patch.object(mod, "find_branch_for_sha", return_value=None):
-            result = mod.process_issue(issue)
+            patch.object(mod, "find_branch_for_sha", return_value=None), \
+            patch.object(mod, "find_branch_by_issue_id", return_value=None):
+            result = mod.process_issue(issue, dry_run=False)
         assert result["action"] == "skip"
         assert result["reason"] == "branch_not_pushed"
 
@@ -176,7 +177,7 @@ class TestAgentFinishDispatch:
             patch.object(mod, "process_issue", return_value={"issue": "BTCAAAAA-6", "action": "skip", "reason": "sha_not_pushed"}) as proc:
             rc = mod.dispatch_for_issue("x")
         assert rc == 0
-        proc.assert_called_once_with(issue)
+        proc.assert_called_once_with(issue, dry_run=False)
 
     def test_main_routes_issue_flag(self):
         """main(['--issue', id]) delegates to dispatch_for_issue."""
@@ -184,7 +185,7 @@ class TestAgentFinishDispatch:
         with patch.object(mod, "dispatch_for_issue", return_value=0) as disp:
             rc = mod.main(["--issue", "abc"])
         assert rc == 0
-        disp.assert_called_once_with("abc")
+        disp.assert_called_once_with("abc", dry_run=False)
 
 
 class TestSessionManagement:
@@ -254,8 +255,8 @@ class TestOutputFormat:
         with patch("merge_dispatch_routine.find_in_review_issues", return_value=[]):
             from merge_dispatch_routine import main
 
-            # Run main (which should return 0 for success)
-            result = main()
+            # Pass argv=[] explicitly so argparse doesn't pick up pytest's argv.
+            result = main([])
             assert result == 0
 
     def test_result_action_types(self):

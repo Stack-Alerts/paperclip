@@ -24,6 +24,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -80,6 +81,44 @@ except ImportError as _gap4_err:
         # handler's success path must remain runnable in degraded test envs.
         return True
     _GAP4_IMPORTS_OK = False
+
+
+# BTCAAAAA-38473 Gap 6 — import the centralized branch parser and ANSI stripper
+# from the sibling helper module. ``update_issue`` and ``add_comment`` already
+# call ``strip_ansi`` on their text payloads (lines 283 / 304) so we must wire
+# the import up here too; an inline fallback keeps the handler runnable in
+# degraded environments where the parser module isn't on sys.path.
+try:
+    from _merge_dispatch_branch_parser import parse_branch, strip_ansi
+    _BRANCH_PARSER_OK = True
+except Exception as _bp_import_exc:  # pragma: no cover - defensive fallback
+    logger.warning(
+        "Branch parser unavailable (%s); falling back to inline ANSI stripper",
+        _bp_import_exc,
+    )
+    _BRANCH_PARSER_OK = False
+
+    def parse_branch(branch_name):  # type: ignore[no-redef]
+        """Inline fallback when the parser module is missing."""
+        if not branch_name:
+            return None
+        cleaned = branch_name.strip()
+        prefix = "origin/"
+        if cleaned.startswith(prefix):
+            cleaned = cleaned[len(prefix):]
+        if not cleaned.startswith("fix/BTCAAAAA-"):
+            return None
+        tail = cleaned[len("fix/"):]
+        identifier, _, slug = tail.partition("-")
+        if not identifier.startswith("BTCAAAAA-") or not identifier[len("BTCAAAAA-"):].isdigit():
+            return None
+        return {"identifier": identifier, "slug": slug, "raw": branch_name}
+
+    def strip_ansi(text):  # type: ignore[no-redef]
+        """Inline fallback when the parser module is missing."""
+        if not text:
+            return text
+        return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
 class MergeVerificationFailed(Exception):
@@ -278,10 +317,13 @@ def checkout_execution_issue(issue_id: str) -> bool:
 
 def update_issue(issue_id: str, status: str, comment: str) -> bool:
     """PATCH issue status with a comment."""
+    # BTCAAAAA-38473 Gap 6 — sanitize Paperclip-bound text so ANSI noise from
+    # a prior CLI call doesn't render as garbled chars on cards.
+    safe_comment = strip_ansi(comment) if comment else comment
     with _http_session() as sess:
         resp = sess.patch(
             f"{_api_url()}/api/issues/{issue_id}",
-            json={"status": status, "comment": comment},
+            json={"status": status, "comment": safe_comment},
             timeout=30,
         )
         if resp.status_code in (200, 204):
@@ -296,10 +338,13 @@ def update_issue(issue_id: str, status: str, comment: str) -> bool:
 
 def add_comment(issue_id: str, body: str) -> bool:
     """Add a markdown comment to the issue."""
+    # BTCAAAAA-38473 Gap 6 — sanitize Paperclip-bound text so ANSI noise from
+    # a prior CLI call doesn't render as garbled chars on cards.
+    safe_body = strip_ansi(body) if body else body
     with _http_session() as sess:
         resp = sess.post(
             f"{_api_url()}/api/issues/{issue_id}/comments",
-            json={"body": body},
+            json={"body": safe_body},
             timeout=30,
         )
         if resp.status_code in (200, 201):
