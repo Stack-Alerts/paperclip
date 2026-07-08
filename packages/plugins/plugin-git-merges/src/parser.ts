@@ -122,6 +122,44 @@ export function parseInReviewForHours(label: string): number | null {
 }
 
 /**
+ * BTCAAAAA-39051: compute fractional hours between an ISO timestamp and
+ * "now". Used to derive the in_review age from the script's `updated_at`
+ * field (which replaced the humanised "in review for X" string in the
+ * --json output). Returns null for unparseable timestamps.
+ */
+export function hoursSince(iso: string): number | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return null;
+  const seconds = Math.max(0, (Date.now() - t) / 1000);
+  return seconds / 3600;
+}
+
+/**
+ * BTCAAAAA-39051: format the duration from an ISO timestamp to now as
+ * a humanised string matching the script's "Xm" / "Xh Ym" / "Xd Yh"
+ * format. Mirrors Python's `humanize.naturaldelta(tense='ago')` so the
+ * UI sees the same form regardless of which parser path produced the
+ * block.
+ */
+export function formatDurationFromNow(iso: string): string {
+  if (!iso) return "";
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "";
+  const seconds = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 86_400) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+  const d = Math.floor(seconds / 86_400);
+  const h = Math.floor((seconds % 86_400) / 3600);
+  return h > 0 ? `${d}d ${h}h` : `${d}d`;
+}
+
+/**
  * BTCAAAAA-39051: pick an ETA bucket from a median-minutes number.
  *   < 15 min          → "fast"    (green)
  *   15 min - 2 h      → "medium"  (yellow)
@@ -646,13 +684,23 @@ function tryParseJsonOutput(stdout: string): ParseResult | null {
       const statusRaw = (it["pr_mergeable"] as string | null) ?? "";
       const passed = Number.parseInt((it["passed"] as string) ?? "0", 10) || 0;
       const total = Number.parseInt((it["total"] as string) ?? "0", 10) || 0;
+      // BTCAAAAA-39051: the script's --json output no longer emits an
+      // "in review for X" string; instead it gives `updated_at`. Derive
+      // the same humanised form so the stuck check + UI pill can use it.
+      const updatedAt = it["updated_at"];
+      const inReviewFor = typeof updatedAt === "string"
+        ? formatDurationFromNow(updatedAt)
+        : "";
+      const inReviewHours = typeof updatedAt === "string"
+        ? hoursSince(updatedAt)
+        : null;
       blocks.push({
         index: i++,
         issueUuid: issueId,
         issueIdentifier: (it["display_key"] as string | null) ?? null,
         title: (it["title"] as string) ?? "(no title)",
-        inReviewFor: "",
-        inReviewHours: null,
+        inReviewFor,
+        inReviewHours,
         fixSha: (it["fix_sha"] as string | null) ?? null,
         fixShaMissing: !it["fix_sha"],
         prNumber: typeof it["pr_number"] === "number" ? (it["pr_number"] as number) : null,
