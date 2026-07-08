@@ -100,6 +100,16 @@ jobs:
           pip install --upgrade pip
           pip install requests python-dotenv
 
+      # BTCAAAAA-38998 (Workspace Confinement Phase 1b): section-ownership
+      # backstop. Validates that agent_ownership.json is structurally sound
+      # (schema + section coverage) so the local pre-edit guard cannot be
+      # silently disabled by a malformed manifest. This intentionally only
+      # VALIDATES the manifest — it does not enforce per-agent scope in CI, so
+      # it never false-positives on legitimate in-scope edits. Exit 2 = invalid
+      # manifest → job fails.
+      - name: Validate agent ownership manifest
+        run: python scripts/agent_ownership_guard.py --validate
+
       - name: Run lock gate with JSON summary
         id: gate
         env:

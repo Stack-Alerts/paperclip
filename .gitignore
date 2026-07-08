@@ -187,7 +187,9 @@ DELIVERABLES.txt
 /backtest_matrix_*.json
 /poll-output.json
 /scan-output.json
-/lock_gate_exceptions.json
+# NOTE: lock_gate_exceptions.json is board-governed source (not an auto-generated
+# artifact) — it MUST stay tracked so the module lock gate can read the
+# board-approved exception allowlist in CI. Do not re-add it here (BTCAAAAA-38998).
 /lock_module_verification_registry.json
 
 # Root-level SQLite databases (runtime data, not source)
