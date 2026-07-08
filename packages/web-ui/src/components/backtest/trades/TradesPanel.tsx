@@ -3,6 +3,10 @@
 import { useMemo, useState, Fragment } from 'react';
 import { Trade } from '@/lib/strategy-builder/types';
 import { useFontSizes } from '@/components/backtest/backtestFontScale';
+// BTCAAAAA-39020: shared group-by-base-id helpers. BTCAAAAA-39025: the
+// group P&L % math now uses entry notional (entryPrice × sum of leg qty) and
+// divides the USD P&L sum by it — see tradeGrouping.ts for the full rationale.
+import { groupTradesById, TradeGroup } from './tradeGrouping';
 
 export interface TradesPanelProps {
   trades?: Trade[];
@@ -154,37 +158,9 @@ function notesDisplay(t: Trade): string {
   return exitNote;
 }
 
-// Strip trailing .N or _N suffix to get base trade ID (e.g. "5.1" → "5").
-// The registry assigns dot notation ("5.1"), so the regex accepts both separators.
-function baseTradeId(id: string): string {
-  return String(id).replace(/[._]\d+$/, '');
-}
-
-interface TradeGroup {
-  baseId: string;
-  trades: Trade[];
-  totalPnl: number;
-  totalPnlPct: number;
-}
-
-// Group individual partial-exit records by base trade ID.
-// Preserves insertion order so Trade 5 (with partials 5.1, 5.2, 5.3) stays together.
-function groupTradesById(raw: Trade[]): TradeGroup[] {
-  const map = new Map<string, TradeGroup>();
-  const order: string[] = [];
-  for (const t of raw) {
-    const b = baseTradeId(String(t.id));
-    if (!map.has(b)) {
-      map.set(b, { baseId: b, trades: [], totalPnl: 0, totalPnlPct: 0 });
-      order.push(b);
-    }
-    const g = map.get(b)!;
-    g.trades.push(t);
-    g.totalPnl += t.pnl;
-    g.totalPnlPct += t.pnlPercentage;
-  }
-  return order.map(b => map.get(b)!);
-}
+// Strip trailing .N or _N suffix is now provided by `baseTradeId` in
+// ./tradeGrouping, along with `groupTradesById` and the `TradeGroup` type.
+// See tradeGrouping.ts for BTCAAAAA-39025's corrected P&L % math.
 
 function sortGroupValue(g: TradeGroup, key: ColumnKey): number | string {
   const first = g.trades[0];
