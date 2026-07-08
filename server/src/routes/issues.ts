@@ -5415,13 +5415,6 @@ export function issueRoutes(
       if (activeRecoveryAction.ownerAgentId !== actorAgentId) {
         res.status(403).json({
           error: "Agent is not the owner of this recovery action",
-          details: {
-            issueId: issue.id,
-            recoveryActionId: activeRecoveryAction.id,
-            actorAgentId,
-            recoveryOwnerAgentId: activeRecoveryAction.ownerAgentId,
-            securityPrinciples: ["Least Privilege", "Complete Mediation"],
-          },
         });
         return;
       }
@@ -5432,10 +5425,6 @@ export function issueRoutes(
       // POST /api/issues/:id/comments instead.
       res.status(403).json({
         error: "Recovery-action follow-up comments are agent-only; use POST /api/issues/:id/comments",
-        details: {
-          issueId: issue.id,
-          recoveryActionId: activeRecoveryAction.id,
-        },
       });
       return;
     }
