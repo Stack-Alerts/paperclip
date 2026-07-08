@@ -48,6 +48,41 @@ from urllib3.util import Retry
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+
+def _load_env_file(path: Path) -> None:
+    """Populate os.environ from a KEY=VALUE file. Skips blanks and comments.
+
+    Used as a fallback when the script is invoked from a context that does not
+    pre-export GH_TOKEN / PAPERCLIP_API_KEY (e.g. the */5 * * * * cron line in
+    the operator's crontab, which otherwise logs 'No valid GitHub token
+    available' every 5 minutes because GH_TOKEN is unset AND `gh` is not on
+    the systemd user PATH). See BTCAAAAA-39034.
+    """
+    if not path.is_file():
+        return
+    try:
+        for line in path.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            if not key:
+                continue
+            os.environ.setdefault(key, value.strip())
+    except OSError as exc:
+        logging.getLogger("merge_ready_watcher").warning(
+            "Could not read env file %s: %s", path, exc
+        )
+
+
+# Pull GH_TOKEN / PAPERCLIP_* from <repo>/.env if not already in the environment.
+# The cron entry does not export these, so the watcher would otherwise exit
+# with "No valid GitHub token available" before doing any work.
+_load_env_file(REPO_ROOT / ".env")
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
