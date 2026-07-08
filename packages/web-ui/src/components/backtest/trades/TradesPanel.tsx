@@ -250,6 +250,23 @@ export function groupNotesPreview(legs: Trade[]): { preview: string; full: strin
   return { preview, full };
 }
 
+/**
+ * BTCAAAAA-39026: per-leg displayId for the collapsed-view "Trade #" column.
+ *
+ * Multi-leg groups (2+ partial-exit legs of the same parent trade) keep the
+ * `${baseId}.${ti + 1}` shape so partial exits stay distinguishable (5.1, 5.2,
+ * 5.3). Single-leg groups render just the baseId (5) — previously the cell
+ * always appended ".1", which made a single-leg trade look like a partial
+ * exit even though it wasn't.
+ *
+ * Exported so the acceptance fixture in __tests__/legDisplayId.test.ts can
+ * pin down the exact displayIds without rendering the table.
+ */
+export function legDisplayId(group: TradeGroup, ti: number): string {
+  if (group.trades.length <= 1) return group.baseId;
+  return `${group.baseId}.${ti + 1}`;
+}
+
 // Strip trailing .N or _N suffix is now provided by `baseTradeId` in
 // ./tradeGrouping, along with `groupTradesById` and the `TradeGroup` type.
 // See tradeGrouping.ts for BTCAAAAA-39025's corrected P&L % math.
@@ -449,7 +466,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
                         key={`${group.baseId}-${ti}`}
                         trade={trade}
                         rowBg={rowBg}
-                        displayId={`${group.baseId}.${ti + 1}`}
+                        displayId={legDisplayId(group, ti)}
                         isCollapsed={isCollapsed}
                         onToggleCollapse={() => toggleCollapse(group.baseId)}
                       />
