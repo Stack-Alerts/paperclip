@@ -3,6 +3,10 @@
 import { useMemo, useState, Fragment } from 'react';
 import { Trade } from '@/lib/strategy-builder/types';
 import { useFontSizes } from '@/components/backtest/backtestFontScale';
+// BTCAAAAA-39028: hover-expand the collapsed totals row's NOTES preview via the
+// institutional-grade tooltip BTC-39021 introduced. Same component MetricsPanel
+// and LiquidationRiskMeter already consume; import path matches the convention.
+import { RichTooltip, type TooltipContent } from '@/components/strategy-builder/RichTooltip';
 // BTCAAAAA-39020: shared group-by-base-id helpers. BTCAAAAA-39025: the
 // group P&L % math now uses entry notional (entryPrice × sum of leg qty) and
 // divides the USD P&L sum by it — see tradeGrouping.ts for the full rationale.
@@ -178,6 +182,72 @@ function notesDisplay(t: Trade): string {
     return exitNote !== '—' ? `${exitNote} | ${sigStr}` : sigStr;
   }
   return exitNote;
+}
+
+/**
+ * BTCAAAAA-39028: effective status for a collapsed group's Total row.
+ *
+ * Precedence (matches thick-client TradesPanel collapsed totals):
+ *   - any OPEN leg → "OPEN" (the group isn't fully exited yet)
+ *   - else any PARTIAL leg → "PARTIAL" (some legs closed, others not)
+ *   - else "CLOSED" (all legs closed)
+ *
+ * Engine sometimes emits lowercase status strings (e.g. "open"/"closed") — we
+ * normalize via `normalizeStatus` so casing doesn't flip the verdict.
+ *
+ * Exported for direct unit testing — the TotalRow rendering layer only invokes
+ * this with 2+ legs (single-trade groups skip TotalRow), but the helpers are
+ * defensive about empty/single-trade inputs so they degrade gracefully if the
+ * caller ever changes.
+ */
+export function groupEffectiveStatus(legs: Trade[]): 'OPEN' | 'PARTIAL' | 'CLOSED' {
+  if (legs.length === 0) return 'CLOSED';
+  const statuses = legs.map(t => normalizeStatus(t.status));
+  if (statuses.some(s => s === 'OPEN')) return 'OPEN';
+  if (statuses.some(s => s === 'PARTIAL')) return 'PARTIAL';
+  return 'CLOSED';
+}
+
+/**
+ * BTCAAAAA-39028: partial-exit count for the collapsed group's Total row.
+ *
+ * Distinct from the per-row "Partial %" column (which shows the exit breakdown
+ * for a single leg). The Total row aggregates to "N partials" so users see at
+ * a glance how many legs a collapsed group represents.
+ *
+ * Singular/plural: "1 partial" / "2 partials" — matches the thick-client copy
+ * the trade notes already use. Empty group renders as "0 partials" defensively
+ * even though TotalRow never invokes this with 0 legs at the render layer.
+ */
+export function groupPartialCount(legs: Trade[]): string {
+  const n = legs.length;
+  return `${n} partial${n === 1 ? '' : 's'}`;
+}
+
+/**
+ * BTCAAAAA-39028: truncated notes preview + full text for the collapsed group's
+ * Total row NOTES cell.
+ *
+ * - Closing leg = `legs[legs.length - 1]` (last in array). `groupTradesById`
+ *   preserves engine order, and `sortGroupValue` already establishes this
+ *   "last leg = closing leg" pattern at line 199.
+ * - `full` is what `notesDisplay(closing)` renders, including any
+ *   entry-signal annotation appended for "TP2 Hit | SIGNAL(BULLISH_BREAK)" etc.
+ * - `preview` is the first 3-5 words of `full` plus a horizontal ellipsis
+ *   (HORIZONTAL ELLIPSIS U+2026). If the note is ≤ 5 words, no ellipsis.
+ * - If `full` is empty or the engine rendered '—', both preview and full are
+ *   defensive — preview stays '—', full becomes '' so the tooltip omits an
+ *   empty body.
+ */
+export function groupNotesPreview(legs: Trade[]): { preview: string; full: string } {
+  if (legs.length === 0) return { preview: '—', full: '' };
+  const closing = legs[legs.length - 1];
+  const full = notesDisplay(closing);
+  if (!full || full === '—') return { preview: '—', full: '' };
+  const words = full.split(/\s+/);
+  const slice = words.slice(0, Math.min(5, Math.max(3, words.length))).join(' ');
+  const preview = words.length > 5 ? `${slice}…` : slice;
+  return { preview, full };
 }
 
 // Strip trailing .N or _N suffix is now provided by `baseTradeId` in
@@ -599,6 +669,15 @@ function TotalRow({
   const pnlColor = group.totalPnl > 0 ? ACCENT.success : group.totalPnl < 0 ? ACCENT.error : 'var(--text-muted)';
   const pctColor = group.totalPnlPct > 0 ? ACCENT.success : group.totalPnlPct < 0 ? ACCENT.error : 'var(--text-muted)';
 
+  // BTCAAAAA-39028: STATUS / PARTIAL % / NOTES used to render literal '—' here
+  // regardless of the group's actual data. Compute real aggregates via the
+  // exported helpers, then render with status color matching TradeRow (line
+  // 667: OPEN=success, PARTIAL=warning, CLOSED=muted).
+  const status = groupEffectiveStatus(group.trades);
+  const statusColor = status === 'OPEN' ? ACCENT.success : status === 'PARTIAL' ? ACCENT.warning : 'var(--text-muted)';
+  const partial = groupPartialCount(group.trades);
+  const { preview: notesPreview, full: notesFull } = groupNotesPreview(group.trades);
+
   const cellStyle: React.CSSProperties = {
     padding: '6px 8px',
     borderBottom: '2px solid var(--border)',
@@ -617,6 +696,23 @@ function TotalRow({
     cursor: 'pointer',
     userSelect: 'none',
   };
+
+  // BTCAAAAA-39028: NOTES preview gets the BTC-39021 institutional tooltip so
+  // users can hover to see the full note (including any appended entry-signal
+  // annotation). Only wrap when there's actually something to show in the body.
+  const notesCellStyle: React.CSSProperties = {
+    ...cellStyle,
+    color: 'var(--text-secondary)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: 170,
+  };
+  const notesTooltip: TooltipContent | null = notesFull
+    ? { title: `Trade ${group.baseId} — Notes`, body: notesFull }
+    : null;
+  const notesSpan = (
+    <span style={{ fontStyle: notesPreview === '—' ? 'italic' : 'normal' }}>{notesPreview}</span>
+  );
 
   return (
     <tr
@@ -637,9 +733,11 @@ function TotalRow({
       </td>
       <td style={{ ...cellStyle, color: pnlColor, fontWeight: 700 }}>{formatMoney(group.totalPnl)}</td>
       <td style={{ ...cellStyle, color: pctColor, fontWeight: 700 }}>{`${group.totalPnlPct.toFixed(2)}%`}</td>
-      <td style={{ ...cellStyle, color: 'var(--text-muted)', fontStyle: 'italic' }}>—</td>
-      <td style={{ ...cellStyle, color: 'var(--text-muted)', fontStyle: 'italic' }}>—</td>
-      <td style={{ ...cellStyle, color: 'var(--text-muted)', fontStyle: 'italic' }}>—</td>
+      <td style={{ ...cellStyle, color: statusColor, fontWeight: 600 }}>{status}</td>
+      <td style={{ ...cellStyle, color: 'var(--text-secondary)' }}>{partial}</td>
+      <td style={notesCellStyle}>
+        {notesTooltip ? <RichTooltip content={notesTooltip}>{notesSpan}</RichTooltip> : notesSpan}
+      </td>
     </tr>
   );
 }
