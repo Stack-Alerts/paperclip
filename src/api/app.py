@@ -78,6 +78,14 @@ from .models import (
     TradeDecisionModel,
 )
 from .redis_client import make_async_client
+from src.backup import runtime as backup_runtime
+from src.backup.api_router import backup_router
+from src.backup.scheduler import (
+    BackupScheduler,
+    get_scheduler,
+    install_scheduler,
+    reset_scheduler_instance,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -254,9 +262,32 @@ async def lifespan(app: FastAPI):
     _redis = make_async_client()
     _start_time = time.monotonic()
     logger.info("BTE API: Redis client initialised")
-    yield
-    await _redis.aclose()
-    logger.info("BTE API: Redis client closed")
+
+    # Backup scheduler P3 — APScheduler + croniter with callbacks that
+    # delegate to ``src.backup.runtime`` for the actual upload + retention.
+    # ``start()`` validates the cron expression; on parse failure the
+    # scheduler is not started but the API still serves requests and
+    # ``POST /api/backup/run-now`` still works.
+    reset_scheduler_instance()
+    install_scheduler(
+        BackupScheduler(
+            run_backup=backup_runtime.run_backup,
+            run_retention=backup_runtime.run_retention,
+        )
+    )
+    sched = get_scheduler()
+    await sched.start()
+    app.state.backup_scheduler = sched
+
+    try:
+        yield
+    finally:
+        try:
+            await sched.shutdown(timeout=30.0)
+        except Exception:
+            logger.exception("Backup scheduler shutdown failed")
+        await _redis.aclose()
+        logger.info("BTE API: Redis client closed")
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +310,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(backup_router, prefix="/api/backup")
 
 
 # ---------------------------------------------------------------------------
