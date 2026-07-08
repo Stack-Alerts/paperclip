@@ -15,6 +15,7 @@ import {
   type GitMergesConfig,
   type MergeBlock,
   type MergeQueueSnapshot,
+  type RunningJob,
   type ScanRecord,
   type ScanStatus,
 } from "./constants.js";
@@ -31,6 +32,7 @@ import type {
 } from "./constants.js";
 
 /**
+ * Minimal `.env` loader for the BTC repo. Mirrors the python script's
  * Keys used to store plugin state in the Paperclip instance state store.
  * Persisted across worker restarts so scan history and the current
  * config survive plugin reloads.
@@ -262,17 +264,17 @@ async function fetchIssueIdentifiers(
         );
         if (!res.ok) return;
         const body = (await res.json()) as { identifier?: unknown };
-        if (typeof body.identifier === "string" && body.identifier.length > 0) {
-          out.set(uuid, body.identifier);
+          if (typeof body.identifier === "string" && body.identifier.length > 0) {
+            out.set(uuid, body.identifier);
+          }
+        } catch {
+          // Per-issue failures are non-fatal — keep going.
         }
-      } catch {
-        // Per-issue failures are non-fatal — keep going.
-      }
-    });
-    await Promise.allSettled(tasks);
-  } finally {
-    clearTimeout(timeoutId);
-  }
+      });
+      await Promise.allSettled(tasks);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   return out;
 }
 
@@ -510,6 +512,139 @@ const plugin = definePlugin({
     });
 
     // ---- Data: snapshot (config + status + latest + history + blocks) ---
+    // ---- Data: running (dispatch jobs in progress) ---------------------
+    // BTCAAAAA-39051: the "Now processing" panel. Polls the dispatch
+    // routine's in_progress execution issues via the Paperclip REST
+    // API and exposes them as a list. The data handler is cheap (one
+    // HTTP GET, one cache lookup) so the UI can poll it every 1.5 s
+    // without thrashing the API; we ALSO cache the result for
+    // `runningRefreshIntervalSeconds` to limit how often we hit the
+    // API even when the UI is not polling.
+    ctx.data.register(DATA_KEYS.running, async () => {
+      const configValue = await ctx.state.get({
+        scopeKind: "instance",
+        stateKey: CONFIG_STATE_KEY,
+      });
+      const config = coerceConfig(configValue);
+      return await fetchRunningJobs(
+        config.repoPath,
+        config.runningRefreshIntervalSeconds,
+      );
+    });
+
+    // BTCAAAAA-39051: in-memory cache for the running-jobs data handler.
+    // We poll the Paperclip API at most once per `refreshSeconds`; the
+    // UI may poll the data channel much more often, and we just return
+    // the cached result. This keeps the API load low even with the UI
+    // polling every 1.5s.
+    let runningCache: {
+      at: number;
+      value: { jobs: RunningJob[]; lastDispatchAt: string | null };
+    } | null = null;
+
+    /**
+     * BTCAAAAA-39051: query the Paperclip API for the dispatch routine's
+     * currently-in-progress execution issues. Caches the result for
+     * `refreshSeconds` to limit API load.
+     *
+     * The "linked in_review issue" surface is the dispatch job's own
+     * title (which the closure-gate routine sets to "Phase 4a:
+     * Merge-Dispatch Routine"). A future iteration can walk the
+     * dispatch job's comments to find the actual in_review UUID.
+     */
+    async function fetchRunningJobs(
+      repoPath: string,
+      refreshSeconds: number,
+    ): Promise<{ jobs: RunningJob[]; lastDispatchAt: string | null }> {
+      const now = Date.now();
+      if (runningCache && now - runningCache.at < refreshSeconds * 1000) {
+        return runningCache.value;
+      }
+      const env = loadDotenv(repoPath);
+      const apiUrl = (
+        env.PAPERCLIP_API_URL ?? process.env.PAPERCLIP_API_URL ?? ""
+      ).trim();
+      const apiKey = (
+        env.PAPERCLIP_API_KEY ?? process.env.PAPERCLIP_API_KEY ?? ""
+      ).trim();
+      const companyId = (
+        env.PAPERCLIP_COMPANY_ID ?? process.env.PAPERCLIP_COMPANY_ID ?? ""
+      ).trim();
+      const empty: { jobs: RunningJob[]; lastDispatchAt: string | null } = {
+        jobs: [],
+        lastDispatchAt: runningCache?.value.lastDispatchAt ?? null,
+      };
+      if (!apiUrl || !apiKey || !companyId) {
+        runningCache = { at: now, value: empty };
+        return empty;
+      }
+      try {
+        const DISPATCH_ROUTINE_ID =
+          "908726dc-c9be-4b0f-91fc-f990ffbfcf5c";
+        const DISPATCH_AGENT_ID =
+          "2b9152a6-07f6-4ae9-87fa-c824012c9ff6";
+        const params = new URLSearchParams({
+          assigneeAgentId: DISPATCH_AGENT_ID,
+          status: "in_progress",
+          limit: "10",
+        });
+        const url = `${apiUrl.replace(/\/+$/, "")}/api/companies/${companyId}/issues?${params}`;
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            Accept: "application/json",
+          },
+          signal: AbortSignal.timeout(5_000),
+        });
+        if (!res.ok) {
+          runningCache = { at: now, value: empty };
+          return empty;
+        }
+        const data = (await res.json()) as unknown;
+        if (!Array.isArray(data)) {
+          runningCache = { at: now, value: empty };
+          return empty;
+        }
+        const jobs: RunningJob[] = [];
+        for (const entry of data) {
+          if (!isPlainObject(entry)) continue;
+          const originKind = entry["originKind"];
+          const originId = entry["originId"];
+          if (originKind !== "routine_execution") continue;
+          if (originId !== DISPATCH_ROUTINE_ID) continue;
+          const uuid = entry["id"];
+          const identifier = entry["identifier"];
+          const title = entry["title"];
+          const createdAt = entry["createdAt"];
+          const assignee = entry["assigneeAgentId"];
+          if (typeof uuid !== "string") continue;
+          if (typeof createdAt !== "string") continue;
+          const startedMs = new Date(createdAt).getTime();
+          if (!Number.isFinite(startedMs)) continue;
+          jobs.push({
+            issueUuid: uuid,
+            issueIdentifier: typeof identifier === "string" ? identifier : null,
+            linkedIssueTitle: typeof title === "string" ? title : null,
+            startedAt: createdAt,
+            elapsedSeconds: Math.max(0, Math.round((now - startedMs) / 1000)),
+            hasAgent: typeof assignee === "string" && assignee.length > 0,
+          });
+        }
+        const value = {
+          jobs,
+          lastDispatchAt: runningCache?.value.lastDispatchAt ?? null,
+        };
+        runningCache = { at: now, value };
+        return value;
+      } catch (err) {
+        ctx.logger.warn("Git Merges: running-jobs fetch failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        runningCache = { at: now, value: empty };
+        return empty;
+      }
+    }
+
     ctx.data.register(DATA_KEYS.snapshot, async () => {
       const [
         configValue,
