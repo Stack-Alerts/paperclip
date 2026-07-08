@@ -73,11 +73,10 @@ def _output_path(tf: str, year: int, month: int) -> Path:
 
 
 def _csv_to_df(raw: bytes) -> pd.DataFrame:
-    """Parse a Binance monthly CSV (no header) into the standard schema."""
+    """Parse a Binance monthly CSV (has a header row matching _CSV_COLS) into the standard schema."""
     df = pd.read_csv(
         io.StringIO(raw.decode("utf-8")),
-        header=None,
-        names=_CSV_COLS,
+        header=0,
         dtype={
             "open_time": "int64",
             "open": "float64",

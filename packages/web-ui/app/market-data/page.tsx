@@ -230,7 +230,12 @@ export default function MarketDataPage() {
         tooOldGapMonths.length > 0
           ? tooOldGapMonths.reduce((a, b) => (a > b ? a : b))
           : todayMonth;
-      const result = await runBulkBackfill(fromMonth, toMonth, true);
+      // Force re-download: skipExisting=true short-circuits in bulk_archive_backfill.py
+      // when a monthly parquet already exists, so partial files (e.g. 2025-12 1h with
+      // only 24 rows, 2026-01 15m with only 1536 rows) never get refilled. The merge
+      // is row-level idempotent (drop_duplicates+sort_values), so re-downloading the
+      // full month is safe.
+      const result = await runBulkBackfill(fromMonth, toMonth, false);
       const s = result.summary;
       setBulkBackfillResult(
         result.success
