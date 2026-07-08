@@ -88,8 +88,29 @@ SMOKE_ENABLED = os.environ.get("CLOSURE_GATE_SMOKE", "1") != "0"
 SMOKE_TIMEOUT_SECONDS = 240
 SMOKE_FAIL_LABEL = "closure-gate-smoke-failed"
 
-# Regex for Fix-SHA comment: line-anchored
-FIX_SHA_PATTERN = re.compile(r"^Fix-SHA: ([0-9a-f]{40})$", re.MULTILINE)
+# Regex for Fix-SHA comment: line-anchored. Accepts optional leading
+# emphasis wrapper (`, `, `_`, `~`, one or two of each, with optional
+# whitespace) AND optional backticks wrapping the SHA itself, so that
+# comments formatted as
+#   Fix-SHA: <sha>            (plain)
+#   Fix-SHA: `<sha>`          (backticks)
+#   **Fix-SHA: <sha>**        (bold)
+#   _Fix-SHA: <sha>_          (italic)
+#   `Fix-SHA: <sha>`          (leading backticks)
+# all match. The previous strict pattern `^Fix-SHA: ([0-9a-f]{40})$`
+# rejected backticked and bolded forms, which caused the dispatch
+# routine's "Pre-dispatch already-merged detection — closing issue"
+# comment (formatted as `` Fix-SHA: `<sha>` ``) to be treated as
+# "no Fix-SHA in latest comment", which deferred the done PATCH
+# indefinitely. See BTCAAAAA-39034 for the original report.
+# Mirrors the tolerance already present in FIX_SHA_NONE_PATTERN
+# (BTCAAAAA-38727). The `^` anchor still rejects mid-line prose like
+# "we could not provide Fix-SHA: <sha> here" — we want the marker to
+# be on its own line.
+FIX_SHA_PATTERN = re.compile(
+    r"^\s*(?:[*_~`]{1,2}\s*)?Fix-SHA:\s+`?([0-9a-f]{40})`?\s*(?:[*_~`]{1,2}\s*)?$",
+    re.MULTILINE,
+)
 
 # Line-anchored "no code commit" exemption marker for operational/non-code closures
 # (rclone reauth, routine pause/resume, manual rollback, etc.). Closure-gate
