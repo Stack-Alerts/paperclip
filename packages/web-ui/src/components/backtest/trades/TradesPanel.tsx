@@ -6,7 +6,7 @@ import { useFontSizes } from '@/components/backtest/backtestFontScale';
 // BTCAAAAA-39028: hover-expand the collapsed totals row's NOTES preview via the
 // institutional-grade tooltip BTC-39021 introduced. Same component MetricsPanel
 // and LiquidationRiskMeter already consume; import path matches the convention.
-import { RichTooltip, type TooltipContent } from '@/components/strategy-builder/RichTooltip';
+import { RichTooltip, type TooltipContent, type TooltipSection } from '@/components/strategy-builder/RichTooltip';
 // BTCAAAAA-39020: shared group-by-base-id helpers. BTCAAAAA-39025: the
 // group P&L % math now uses entry notional (entryPrice × sum of leg qty) and
 // divides the USD P&L sum by it — see tradeGrouping.ts for the full rationale.
@@ -182,6 +182,150 @@ function notesDisplay(t: Trade): string {
     return exitNote !== '—' ? `${exitNote} | ${sigStr}` : sigStr;
   }
   return exitNote;
+}
+
+// BTCAAAAA-39020: institutional-grade hover tooltip for the Notes column.
+// Reopens the umbrella ticket: per-leg notes (TradeRow) and group-level notes
+// (TotalRow) must share the SAME structure so users see the same four sections
+// no matter which row they hover — `Exit` (what closed the leg), `Entry Signals`
+// (what opened it), `Position` (size, prices, duration), and `Result` (P&L USD
+// and %). The flat `title=` attr that TradeRow used previously is gone.
+//
+// `scope: 'leg'` (default) renders one exit-line + the signals that opened the
+// leg + position size for that leg. `scope: 'group'` renders the aggregate
+// exit-info + all entry signals across the group's legs + aggregate position
+// totals (sum qty, weighted avg entry/exit, total bars). Both scopes produce
+// identical TooltipContent shape (title + body + sections) so the markup in
+// TradesPanel is uniform and RichTooltip renders them identically.
+export interface NotesTooltipOpts {
+  scope?: 'leg' | 'group';
+  tradeId?: string | number;
+  // group-aggregate inputs (only used when scope === 'group')
+  totalPnl?: number;
+  totalPnlPct?: number;
+  totalQty?: number;
+  totalBars?: number;
+  weightedEntry?: number;
+  weightedExit?: number;
+  legCount?: number;
+  // Override the rendered body line. Defaults to notesDisplay(t). The TotalRow
+  // passes the joined `notesFull` string from groupNotesPreview so the group's
+  // hover preview matches the per-row preview format.
+  bodyOverride?: string;
+}
+
+function formatUsd(n: number | undefined): string {
+  if (n === undefined || n === null || Number.isNaN(n)) return '—';
+  const sign = n < 0 ? '-' : '';
+  return `${sign}$${Math.abs(n).toFixed(2)}`;
+}
+
+function formatPct(n: number | undefined): string {
+  if (n === undefined || n === null || Number.isNaN(n)) return '—';
+  const sign = n > 0 ? '+' : '';
+  return `${sign}${n.toFixed(2)}%`;
+}
+
+function formatPrice(n: number | undefined): string {
+  if (n === undefined || n === null || Number.isNaN(n)) return '—';
+  return `$${n.toFixed(2)}`;
+}
+
+function formatQty(n: number | undefined): string {
+  if (n === undefined || n === null || Number.isNaN(n)) return '—';
+  return n.toFixed(4);
+}
+
+export function notesTooltipContent(t: Trade, opts: NotesTooltipOpts = {}): TooltipContent {
+  const scope = opts.scope ?? 'leg';
+  const idLabel = opts.tradeId !== undefined ? `Trade ${opts.tradeId}` : `Trade ${t.id}`;
+  const title = `${idLabel} — Notes`;
+  const body = opts.bodyOverride ?? notesDisplay(t);
+
+  const sections: TooltipSection[] = [];
+
+  // ── Exit section ─────────────────────────────────────────────────────────
+  const exitItems: string[] = [];
+  const rawNotes = (t.notes ?? '').trim();
+  const isAbbrev = rawNotes === '' || EXIT_TYPE_CODES.has(rawNotes.toUpperCase());
+  if (!isAbbrev && rawNotes) {
+    exitItems.push(`Engine note: ${rawNotes}`);
+  }
+  if (t.exitType) {
+    const u = t.exitType.toUpperCase().trim();
+    let pretty = u;
+    if (/^TP[0-9]+$/.test(u)) pretty = `${u} (Take Profit)`;
+    else if (u === 'SL' || u === 'STOP_LOSS') pretty = 'SL (Stop Loss)';
+    else if (u === 'MAX_BARS') pretty = 'Max Bars (time-based exit)';
+    else if (u === 'TIME_LIMIT') pretty = 'Time Limit';
+    exitItems.push(`Exit type: ${pretty}`);
+  }
+  if (typeof t.exitPercentage === 'number' && t.exitPercentage > 0) {
+    exitItems.push(`Closed ${(t.exitPercentage * 100).toFixed(0)}% of position`);
+  }
+  if (t.status) {
+    exitItems.push(`Status: ${String(t.status).toUpperCase()}`);
+  }
+  if (scope === 'group' && t.partialBreakdown) {
+    exitItems.push(`Breakdown: ${t.partialBreakdown}`);
+  }
+  if (exitItems.length > 0) {
+    sections.push({ header: 'Exit', items: exitItems });
+  }
+
+  // ── Entry Signals section ────────────────────────────────────────────────
+  if (t.entrySignals && t.entrySignals.length > 0) {
+    sections.push({
+      header: 'Entry Signals',
+      items: t.entrySignals.map(s => `• ${s}`),
+    });
+  }
+
+  // ── Position section ─────────────────────────────────────────────────────
+  if (scope === 'group') {
+    const posItems: string[] = [];
+    if (opts.legCount !== undefined) {
+      posItems.push(`Legs: ${opts.legCount}`);
+    }
+    posItems.push(`Total qty: ${formatQty(opts.totalQty ?? t.quantity)}`);
+    posItems.push(`Weighted entry: ${formatPrice(opts.weightedEntry ?? t.entryPrice)}`);
+    posItems.push(`Weighted exit: ${formatPrice(opts.weightedExit ?? t.exitPrice)}`);
+    posItems.push(`Side: ${t.side ?? '—'}`);
+    if (opts.totalBars !== undefined || t.bars !== undefined) {
+      posItems.push(`Bars held: ${opts.totalBars ?? t.bars}`);
+    }
+    sections.push({ header: 'Position', items: posItems });
+  } else {
+    const posItems: string[] = [
+      `Side: ${t.side ?? '—'}`,
+      `Qty: ${formatQty(t.quantity)}`,
+      `Entry: ${formatPrice(t.entryPrice)}`,
+      `Exit: ${formatPrice(t.exitPrice)}`,
+      `Bars: ${t.bars ?? 0}`,
+    ];
+    sections.push({ header: 'Position', items: posItems });
+  }
+
+  // ── Result section ───────────────────────────────────────────────────────
+  if (scope === 'group') {
+    sections.push({
+      header: 'Result',
+      items: [
+        `P&L: ${formatUsd(opts.totalPnl ?? t.pnl)}`,
+        `Return: ${formatPct(opts.totalPnlPct ?? t.pnlPercentage)}`,
+      ],
+    });
+  } else {
+    sections.push({
+      header: 'Result',
+      items: [
+        `P&L: ${formatUsd(t.pnl)}`,
+        `Return: ${formatPct(t.pnlPercentage)}`,
+      ],
+    });
+  }
+
+  return { title, body, sections };
 }
 
 /**
@@ -793,7 +937,12 @@ function TotalRow({
 
   // BTCAAAAA-39028: NOTES preview gets the BTC-39021 institutional tooltip so
   // users can hover to see the full note (including any appended entry-signal
-  // annotation). Only wrap when there's actually something to show in the body.
+  // annotation).
+  //
+  // BTCAAAAA-39020 reopen: always render the sectioned RichTooltip (Exit /
+  // Entry Signals / Position / Result) so the TotalRow hover shape matches the
+  // TradeRow hover shape exactly — fixes the "tooltip structures differ"
+  // complaint. The closing leg carries the partialBreakdown surfaced in Exit.
   const notesCellStyle: React.CSSProperties = {
     ...cellStyle,
     color: 'var(--text-secondary)',
@@ -801,8 +950,20 @@ function TotalRow({
     textOverflow: 'ellipsis',
     maxWidth: 170,
   };
-  const notesTooltip: TooltipContent | null = notesFull
-    ? { title: `Trade ${group.baseId} — Notes`, body: notesFull }
+  const closingLeg = group.trades[group.trades.length - 1] ?? group.trades[0];
+  const groupNotesTooltip: TooltipContent | null = closingLeg
+    ? notesTooltipContent(closingLeg, {
+        scope: 'group',
+        tradeId: group.baseId,
+        bodyOverride: notesPreview !== '—' ? notesFull : undefined,
+        totalPnl: group.totalPnl,
+        totalPnlPct: group.totalPnlPct,
+        totalQty: summary.totalQty,
+        totalBars: summary.totalBars,
+        weightedEntry: summary.entryPrice,
+        weightedExit: summary.exitPrice,
+        legCount: group.trades.length,
+      })
     : null;
   const notesSpan = (
     <span style={{ fontStyle: notesPreview === '—' ? 'italic' : 'normal' }}>{notesPreview}</span>
@@ -834,7 +995,7 @@ function TotalRow({
       <td style={{ ...cellStyle, color: statusColor, fontWeight: 600 }}>{status}</td>
       <td style={{ ...cellStyle, color: 'var(--text-secondary)' }}>{partial}</td>
       <td style={notesCellStyle}>
-        {notesTooltip ? <RichTooltip content={notesTooltip}>{notesSpan}</RichTooltip> : notesSpan}
+        {groupNotesTooltip ? <RichTooltip content={groupNotesTooltip}>{notesSpan}</RichTooltip> : notesSpan}
       </td>
     </tr>
   );
@@ -907,7 +1068,13 @@ function TradeRow({
       </td>
       <td style={{ ...cellStyle, color: statusColor, fontWeight: 600 }}>{status}</td>
       <td style={{ ...cellStyle, color: pnlColor }}>{partial}</td>
-      <td style={{ ...cellStyle, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }} title={notesDisplay(trade)}>{notesDisplay(trade)}</td>
+      <td style={{ ...cellStyle, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }}>
+        <RichTooltip content={notesTooltipContent(trade, { tradeId: displayId })}>
+          <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'help' }}>
+            {notesDisplay(trade)}
+          </span>
+        </RichTooltip>
+      </td>
     </tr>
   );
 }
