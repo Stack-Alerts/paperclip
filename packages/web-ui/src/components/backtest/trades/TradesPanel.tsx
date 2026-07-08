@@ -113,9 +113,19 @@ function partialDisplay(t: Trade): string {
 // expansion into human-readable notes rather than being returned verbatim.
 const EXIT_TYPE_CODES = new Set(['TP1','TP2','TP3','TP4','TP5','SL','STOP_LOSS','MAX_BARS','TIME_LIMIT']);
 
-// BTCAAAAA-39020: sticky section header ("Trade History" h3) sits on top of
-// the sticky thead so they don't overlap while the body scrolls. Keep in sync
-// with SectionShell h3 padding (10px top + 10px bottom + ~18px line-height).
+// BTCAAAAA-39024: cap the scroll area so the sticky thead has a bounded
+// scroll context. Without an explicit maxHeight the parent (SectionShell)
+// grows to fit the table and the scroll div's `overflow:auto` produces no
+// actual vertical scroll, making the thead's `position:sticky` a no-op for
+// page scroll. ~600px fits ~12 rows + sticky h3 + sticky thead + totals —
+// tall enough to be useful, short enough to keep column headers visible at
+// common zoom levels on 1080p screens.
+const SECTION_MAX_HEIGHT = 'min(70vh, 600px)';
+
+// BTCAAAAA-39020 + BTCAAAAA-39024: thead sticks just below the sticky
+// section title (h3). Matches SectionShell h3 height (10px+10px padding +
+// ~18px line-height + 1px border). Both the h3 and thead share the
+// SectionShell scroll div, so they stack correctly during vertical scroll.
 const SECTION_HEADER_HEIGHT = 38;
 
 function notesDisplay(t: Trade): string {
@@ -295,7 +305,7 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
           />
         }
       >
-        <div style={{ overflowX: 'auto', minWidth: 0, ...smallZoom }}>
+        <div style={{ minWidth: 0, ...smallZoom }}>
           <table
             style={{
               minWidth: totalWidth,
@@ -309,8 +319,13 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
             <colgroup>
               {COLUMNS.map(c => (<col key={c.key} style={{ width: c.width }} />))}
             </colgroup>
-            {/* BTCAAAAA-39020: thead sticks at SECTION_HEADER_HEIGHT so it
-                sits below the sticky section title (Trade History / buttons). */}
+            {/* BTCAAAAA-39024: thead sticks just below the sticky h3 inside
+                the SectionShell scroll div. The h3 + thead now share a
+                single scroll context (SectionShell's `overflow:auto` div),
+                so they stack correctly during vertical scroll. Previous
+                version had h3 sticky to the page and thead sticky to a
+                wrapper that never actually scrolled, so the thead pinned
+                never engaged. */}
             <thead style={{ position: 'sticky', top: SECTION_HEADER_HEIGHT, zIndex: 1 }}>
               <tr>
                 {COLUMNS.map(col => {
@@ -403,8 +418,13 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
 
 // Frameless section container matching the dialog's SectionCard pattern:
 // subtle hairline border, transparent tinted background, muted uppercase
-// title with a hairline divider underneath. BTCAAAAA-39020: header sticks to
-// the top of the scroll container so the title stays visible while rows scroll.
+// title with a hairline divider underneath. BTCAAAAA-39024: h3 now lives
+// INSIDE the inner scroll div (not as a sibling of it) so it shares a
+// scroll context with the sticky thead — the two stickies can then stack
+// correctly (h3 pins to top:0, thead pins to top:SECTION_HEADER_HEIGHT)
+// during vertical scroll. Previously the h3 was page-level sticky while
+// the thead was wrapper-level sticky, so they were in different scroll
+// contexts and the thead never actually pinned.
 function SectionShell({
   title,
   actions,
@@ -420,29 +440,50 @@ function SectionShell({
       style={{
         border: '1px solid var(--border)',
         background: 'rgb(28 61 76 / 2%)',
+        // flex column + minHeight:0 lets the inner scroll div shrink to
+        // SECTION_MAX_HEIGHT instead of stretching to fit content.
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
       }}
     >
-      <h3
-        className="text-xs font-semibold uppercase tracking-wider"
+      <div
         style={{
-          color: 'var(--text-secondary)',
-          padding: '10px 14px',
-          borderBottom: '1px solid var(--border)',
-          margin: 0,
-          position: 'sticky',
-          top: 0,
-          zIndex: 3,
-          background: 'var(--bg-deep)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
+          // This div is the scroll context for BOTH the h3 (sticky top:0)
+          // and the table thead (sticky top:SECTION_HEADER_HEIGHT). Setting
+          // overflow:auto on both axes keeps horizontal scroll for narrow
+          // viewports while capping vertical scroll at SECTION_MAX_HEIGHT.
+          overflow: 'auto',
+          maxHeight: SECTION_MAX_HEIGHT,
+          minHeight: 0,
         }}
       >
-        <span>{title}</span>
-        {actions && <span style={{ display: 'inline-flex', gap: 6 }}>{actions}</span>}
-      </h3>
-      {children}
+        <h3
+          className="text-xs font-semibold uppercase tracking-wider"
+          style={{
+            color: 'var(--text-secondary)',
+            padding: '10px 14px',
+            borderBottom: '1px solid var(--border)',
+            margin: 0,
+            position: 'sticky',
+            top: 0,
+            // zIndex above thead so the title overlays the column-header
+            // row when both are pinned at the top of the scroll container.
+            zIndex: 3,
+            background: 'var(--bg-deep)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            // Pin the h3 height so the thead's sticky offset is deterministic.
+            flexShrink: 0,
+          }}
+        >
+          <span>{title}</span>
+          {actions && <span style={{ display: 'inline-flex', gap: 6 }}>{actions}</span>}
+        </h3>
+        {children}
+      </div>
     </section>
   );
 }
