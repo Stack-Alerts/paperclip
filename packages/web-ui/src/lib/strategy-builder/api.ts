@@ -1,5 +1,5 @@
 // Typed fetch wrapper for REST endpoints
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8765';
+export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8765';
 
 export interface RequestOptions extends RequestInit {
   query?: Record<string, string | number>;

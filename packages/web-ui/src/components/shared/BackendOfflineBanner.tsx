@@ -3,7 +3,7 @@
 import { useBackendHealth } from '@/hooks/useBackendHealth';
 
 export function BackendOfflineBanner() {
-  const { connectionState, error, lastChecked } = useBackendHealth();
+  const { connectionState, error, lastChecked, recheck } = useBackendHealth();
 
   if (connectionState !== 'disconnected') return null;
 
@@ -18,10 +18,9 @@ export function BackendOfflineBanner() {
     : null;
 
   function retry() {
-    // Force a page-level health re-check by reloading; the hook will re-poll
-    // immediately on mount.  A full reload is safe here because the app
-    // persists strategy state in localStorage.
-    window.location.reload();
+    // Trigger an immediate health probe via the shared hook. Avoids a full
+    // page reload (which would wipe any in-flight UI state and add latency).
+    void recheck();
   }
 
   return (

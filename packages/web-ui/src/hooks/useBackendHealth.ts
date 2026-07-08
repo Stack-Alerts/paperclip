@@ -18,12 +18,13 @@ export interface BackendHealthState {
   health: BackendHealth | null;
   lastChecked: Date | null;
   error: string | null;
+  recheck: () => Promise<void>;
 }
 
 const POLL_INTERVAL_MS = 15_000;
 
 export function useBackendHealth(): BackendHealthState {
-  const [state, setState] = useState<BackendHealthState>({
+  const [state, setState] = useState<Omit<BackendHealthState, 'recheck'>>({
     connectionState: 'checking',
     health: null,
     lastChecked: null,
@@ -32,8 +33,9 @@ export function useBackendHealth(): BackendHealthState {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmounted = useRef(false);
 
-  const check = async () => {
+  const check = async (manual = false) => {
     if (unmounted.current) return;
+    if (manual) setState(prev => ({ ...prev, connectionState: 'checking', error: null }));
     try {
       const data = await get<BackendHealth>('/health');
       if (!unmounted.current) {
@@ -55,13 +57,21 @@ export function useBackendHealth(): BackendHealthState {
       }
     }
     if (!unmounted.current) {
-      timerRef.current = setTimeout(check, POLL_INTERVAL_MS);
+      timerRef.current = setTimeout(() => { check(false); }, POLL_INTERVAL_MS);
     }
+  };
+
+  const recheck = async () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    await check(true);
   };
 
   useEffect(() => {
     unmounted.current = false;
-    check();
+    check(false);
     return () => {
       unmounted.current = true;
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -69,5 +79,5 @@ export function useBackendHealth(): BackendHealthState {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return state;
+  return { ...state, recheck };
 }

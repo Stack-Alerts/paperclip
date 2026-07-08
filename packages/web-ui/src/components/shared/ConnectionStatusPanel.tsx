@@ -2,6 +2,7 @@
 
 import { useBackendHealth } from '@/hooks/useBackendHealth';
 import { useNextCandleCountdown } from '@/hooks/useNextCandleCountdown';
+import { BASE_URL } from '@/lib/strategy-builder/api';
 
 function formatUptime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -21,7 +22,7 @@ interface Props {
 }
 
 export function ConnectionStatusPanel({ collapsed }: Props) {
-  const { connectionState, health, error } = useBackendHealth();
+  const { connectionState, health, error, recheck } = useBackendHealth();
   const candleSecondsLeft = useNextCandleCountdown();
 
   const isConnected = connectionState === 'connected';
@@ -114,6 +115,48 @@ export function ConnectionStatusPanel({ collapsed }: Props) {
           }}
         >
           {error.length > 40 ? error.slice(0, 40) + '…' : error}
+        </div>
+      )}
+
+      {/* API base URL so the user knows which port to check */}
+      {!isConnected && (
+        <div
+          style={{
+            fontSize: 9,
+            color: 'var(--text-muted)',
+            paddingLeft: 13,
+            fontFamily: 'monospace',
+            wordBreak: 'break-all',
+          }}
+          title="Backend API base URL"
+        >
+          {BASE_URL}
+        </div>
+      )}
+
+      {/* Retry button — hidden when connected, disabled while checking */}
+      {!isConnected && (
+        <div style={{ paddingLeft: 13, marginTop: 2 }}>
+          <button
+            type="button"
+            onClick={() => { void recheck(); }}
+            disabled={isChecking}
+            style={{
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              padding: '3px 8px',
+              borderRadius: 3,
+              border: '1px solid var(--text-muted, #6b7280)',
+              background: isChecking ? 'var(--bg-muted, #1f2937)' : 'transparent',
+              color: isChecking ? 'var(--text-muted)' : 'var(--text-primary)',
+              cursor: isChecking ? 'not-allowed' : 'pointer',
+              opacity: isChecking ? 0.6 : 1,
+            }}
+          >
+            {isChecking ? 'Checking…' : 'Retry connection'}
+          </button>
         </div>
       )}
 
