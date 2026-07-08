@@ -5,7 +5,7 @@ Wants=touch-index-bug-worker.timer
 
 [Service]
 Type=oneshot
-ExecStart=%h/projects/BTC-Trade-Engine-PaperClip/venv/bin/python %h/projects/BTC-Trade-Engine-PaperClip/scripts/run_touch_index_bug_worker.py --lookback-minutes 30 --validate
+ExecStart=%h/projects/BTC-Trade-Engine-PaperClip/venv/bin/python %h/projects/BTC-Trade-Engine-PaperClip/scripts/run_touch_index_bug_worker.py --lookback-minutes 30
 StandardOutput=journal
 StandardError=journal
 
