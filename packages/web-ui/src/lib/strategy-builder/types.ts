@@ -374,6 +374,14 @@ export interface Trade {
   exitPercentage?: number;
   // Partial exit breakdown from thick-client _aggregate_exits (e.g. "TP1: $X | TP2: $Y").
   partialBreakdown?: string;
+  // BTC-39057: per-leg risk-guard metadata so the webui SIZE column can derive
+  // a fallback size when the engine omits `quantity`. Both fields are optional;
+  // when BOTH are populated, derivedSize() can recover size as
+  // `riskUsd / stopDistanceAtEntry` (i.e. the position notional the stop would
+  // have lost). Mirrors the fields on src/api/serializers.py for the future
+  // cross-window sync (BTC-29339).
+  riskUsd?: number;
+  stopDistanceAtEntry?: number;
 }
 
 // UI State for panels and modals

@@ -479,6 +479,94 @@ export function legDisplayId(group: TradeGroup, ti: number): string {
   return `${group.baseId}.${ti + 1}`;
 }
 
+/**
+ * BTCAAAAA-39057: derive a per-row SIZE when the engine omits `quantity`,
+ * so the SIZE column doesn't bail to '—' for every leg the backend fails
+ * to populate. Returns the rendered value plus a reason code so the cell
+ * can show a per-row tooltip explaining what it knows.
+ *
+ * Tier 1 (reported): `quantity > 0` → use it as-is. The engine reported the
+ *   actual filled quantity; this is the happy path and the reason still
+ *   survives in the return so callers can log / surface a "backend reported
+ *   size" audit note if they ever need it.
+ *
+ * Tier 2 (partialBreakdown present): the engine emits `partialBreakdown` as
+ *   a pre-formatted string like "TP1: $33.00 (33%) | TP2: $66.00 (66%)".
+ *   That string carries USD P&L and the percentage share but NOT per-leg
+ *   size, so we cannot recover the qty from it. We surface this as
+ *   `value: null` + the breakdown string in the tooltip so the operator
+ *   can see the engine *did* emit data — it just didn't include size.
+ *
+ * Tier 3 (riskGuard derivation): if BOTH `riskUsd` and
+ *   `stopDistanceAtEntry` are populated and positive, the position notional
+ *   the stop would have lost is `riskUsd / stopDistanceAtEntry`. That
+ *   gives a position size in the same unit as `quantity` (price-units
+ *   cancel; USD / USD-per-unit = units). It is the *notional the stop
+ *   would lose*, not the actual fill — close enough for a diagnostic
+ *   fallback when the backend omits `quantity` entirely.
+ *
+ * Tier 4 (unavailable): nothing to show. Render '—' with a per-row tooltip
+ *   naming exactly what is missing, so the operator has a precise phrase
+ *   to grep when triaging backend gaps.
+ *
+ * Exported so the acceptance fixture in __tests__/sizeColumn.test.ts can
+ * pin down the chain without rendering the table.
+ */
+export type DerivedSizeReason = 'reported' | 'partialBreakdown' | 'riskGuard' | 'unavailable';
+
+export function derivedSize(trade: Trade): {
+  value: number | null;
+  reason: DerivedSizeReason;
+  tooltip: string;
+} {
+  if (typeof trade.quantity === 'number' && trade.quantity > 0) {
+    return {
+      value: trade.quantity,
+      reason: 'reported',
+      tooltip:
+        `Trade ${trade.id}: backend reported size ${trade.quantity.toFixed(4)}.`,
+    };
+  }
+
+  const breakdown = trade.partialBreakdown;
+  if (typeof breakdown === 'string' && breakdown.length > 0) {
+    return {
+      value: null,
+      reason: 'partialBreakdown',
+      tooltip:
+        `Trade ${trade.id}: backend omitted quantity, but the partial-exit ` +
+        `breakdown "${breakdown}" was emitted. The breakdown carries USD P&L ` +
+        `and the exit-percentage share but not per-leg size, so SIZE cannot ` +
+        `be derived from it.`,
+    };
+  }
+
+  if (
+    typeof trade.riskUsd === 'number' &&
+    trade.riskUsd > 0 &&
+    typeof trade.stopDistanceAtEntry === 'number' &&
+    trade.stopDistanceAtEntry > 0
+  ) {
+    const derived = trade.riskUsd / trade.stopDistanceAtEntry;
+    return {
+      value: derived,
+      reason: 'riskGuard',
+      tooltip:
+        `Trade ${trade.id}: backend omitted quantity. Derived size = ` +
+        `riskUsd (${trade.riskUsd}) / stopDistanceAtEntry ` +
+        `(${trade.stopDistanceAtEntry}) = ${derived.toFixed(4)}.`,
+    };
+  }
+
+  return {
+    value: null,
+    reason: 'unavailable',
+    tooltip:
+      `Trade ${trade.id}: no size reported and not derivable from the risk ` +
+      `guard (riskUsd or stopDistanceAtEntry missing).`,
+  };
+}
+
 // Strip trailing .N or _N suffix is now provided by `baseTradeId` in
 // ./tradeGrouping, along with `groupTradesById` and the `TradeGroup` type.
 // See tradeGrouping.ts for BTCAAAAA-39025's corrected P&L % math.
@@ -1024,6 +1112,21 @@ function TradeRow({
   const statusColor = status === 'OPEN' ? ACCENT.success : status === 'PARTIAL' ? ACCENT.warning : 'var(--text-muted)';
   const partial = partialDisplay(trade);
 
+  // BTCAAAAA-39057: per-row SIZE column now goes through derivedSize() so
+  // trades that lack `quantity` no longer bail to '—' silently. The helper
+  // picks the best available source (reported → partialBreakdown-acknowledged
+  // → riskGuard-derived → unavailable) and we only attach the RichTooltip on
+  // the non-reported paths — happy-path trades get no tooltip noise.
+  const size = derivedSize(trade);
+  const sizeDisplay = size.value !== null ? size.value.toFixed(4) : '—';
+  const sizeTooltip: TooltipContent | null =
+    size.reason === 'reported'
+      ? null
+      : {
+          title: `Trade ${trade.id} — SIZE (${size.reason})`,
+          body: size.tooltip,
+        };
+
   const cellStyle: React.CSSProperties = {
     padding: '10px 8px',
     borderBottom: '1px solid var(--border)',
@@ -1058,7 +1161,15 @@ function TradeRow({
       <td style={cellStyle} title={trade.entryTime}>{formatTime(trade.entryTime)}</td>
       <td style={cellStyle}>{trade.symbol ?? 'BTC.P/USDT'}</td>
       <td style={{ ...cellStyle, color: sideColor, fontWeight: 600 }}>{side}</td>
-      <td style={cellStyle}>{trade.quantity > 0 ? trade.quantity.toFixed(4) : '—'}</td>
+      <td style={cellStyle}>
+        {sizeTooltip ? (
+          <RichTooltip content={sizeTooltip}>
+            <span>{sizeDisplay}</span>
+          </RichTooltip>
+        ) : (
+          sizeDisplay
+        )}
+      </td>
       <td style={cellStyle}>{formatMoney(trade.entryPrice)}</td>
       <td style={cellStyle}>{trade.exitPrice ? formatMoney(trade.exitPrice) : '—'}</td>
       <td style={cellStyle}>{formatDuration(trade.bars)}</td>
