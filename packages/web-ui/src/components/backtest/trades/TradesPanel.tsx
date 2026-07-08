@@ -251,6 +251,74 @@ export function groupNotesPreview(legs: Trade[]): { preview: string; full: strin
 }
 
 /**
+ * BTCAAAAA-39020 (round 2): per-group aggregate values for the Total row's
+ * middle columns (Date/Time, Symbol, Side, Size, Entry, Exit, Duration).
+ *
+ * The original TotalRow collapsed those seven columns into a single
+ * `<td colSpan={7}>` containing only the leg count text — visually that left
+ * 6 of the 7 columns looking empty (the "many empty columns" complaint from
+ * the user). The fix is to render real aggregate values per column instead,
+ * so the totals row reads as a proper group summary in both expanded and
+ * collapsed states.
+ *
+ * Source-of-truth rules (each independent — mix-and-match so partial data
+ * degrades gracefully):
+ *   - entryTime  → first leg's entryTime (parent trade open bar). All legs
+ *                  of the same parent share an entry timestamp.
+ *   - symbol     → first leg's symbol (all legs share). Falls back to the
+ *                  BTC.P/USDT default TradeRow uses on line 817 when the
+ *                  engine didn't populate one.
+ *   - side       → first leg's side (LONG/SHORT/— via normalizeSide).
+ *   - totalQty   → sum of leg quantities (gross capital committed). Each
+ *                  leg carries the partial-exit size, so summing recovers
+ *                  the parent position size.
+ *   - entryPrice → first leg's entryPrice (parent fill price).
+ *   - exitPrice  → closing leg's exitPrice (last leg's fill). May be 0 for
+ *                  an OPEN leg; TradeRow falls back to '—' in that case.
+ *   - totalBars  → sum of leg bars (total hold time across legs).
+ *
+ * Defensive: empty group yields zero/empty strings so the cells fall back
+ * to the same '—' / '$0.00' formatting the per-row renderer would produce.
+ *
+ * Exported so the acceptance fixture in __tests__/groupRowSummary.test.ts
+ * can pin down the math without rendering the table.
+ */
+export function groupRowSummary(legs: Trade[]): {
+  entryTime: string;
+  symbol: string;
+  side: 'LONG' | 'SHORT' | '—';
+  totalQty: number;
+  entryPrice: number;
+  exitPrice: number;
+  totalBars: number;
+} {
+  if (legs.length === 0) {
+    return {
+      entryTime: '',
+      symbol: 'BTC.P/USDT',
+      side: '—',
+      totalQty: 0,
+      entryPrice: 0,
+      exitPrice: 0,
+      totalBars: 0,
+    };
+  }
+  const first = legs[0];
+  const closing = legs[legs.length - 1];
+  const totalQty = legs.reduce((s, t) => s + (t.quantity ?? 0), 0);
+  const totalBars = legs.reduce((s, t) => s + (t.bars ?? 0), 0);
+  return {
+    entryTime: first.entryTime ?? '',
+    symbol: first.symbol ?? 'BTC.P/USDT',
+    side: normalizeSide(first.side),
+    totalQty,
+    entryPrice: first.entryPrice ?? 0,
+    exitPrice: closing.exitPrice ?? 0,
+    totalBars,
+  };
+}
+
+/**
  * BTCAAAAA-39026: per-leg displayId for the collapsed-view "Trade #" column.
  *
  * Multi-leg groups (2+ partial-exit legs of the same parent trade) keep the
@@ -695,6 +763,15 @@ function TotalRow({
   const partial = groupPartialCount(group.trades);
   const { preview: notesPreview, full: notesFull } = groupNotesPreview(group.trades);
 
+  // BTCAAAAA-39020: per-row aggregates (entry time, symbol, side, total size,
+  // entry price, closing-leg exit price, total duration) so the previously
+  // empty 7 columns render real values when a multi-leg group is collapsed.
+  const summary = groupRowSummary(group.trades);
+  const summarySideColor =
+    summary.side === 'LONG' ? ACCENT.success
+    : summary.side === 'SHORT' ? ACCENT.error
+    : 'var(--text-muted)';
+
   const cellStyle: React.CSSProperties = {
     padding: '6px 8px',
     borderBottom: '2px solid var(--border)',
@@ -745,9 +822,13 @@ function TotalRow({
         <span style={{ marginRight: 4 }}>{isCollapsed ? '▶' : '▼'}</span>
         #{group.baseId} Total
       </td>
-      <td colSpan={7} style={{ ...cellStyle, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-        {group.trades.length} partial exits{isCollapsed ? ' (collapsed)' : ''}
-      </td>
+      <td style={cellStyle} title={summary.entryTime}>{formatTime(summary.entryTime)}</td>
+      <td style={cellStyle}>{summary.symbol}</td>
+      <td style={{ ...cellStyle, color: summarySideColor, fontWeight: 600 }}>{summary.side}</td>
+      <td style={cellStyle}>{summary.totalQty > 0 ? summary.totalQty.toFixed(4) : '—'}</td>
+      <td style={cellStyle}>{summary.entryPrice > 0 ? formatMoney(summary.entryPrice) : '—'}</td>
+      <td style={cellStyle}>{summary.exitPrice > 0 ? formatMoney(summary.exitPrice) : '—'}</td>
+      <td style={cellStyle}>{summary.totalBars > 0 ? formatDuration(summary.totalBars) : '—'}</td>
       <td style={{ ...cellStyle, color: pnlColor, fontWeight: 700 }}>{formatMoney(group.totalPnl)}</td>
       <td style={{ ...cellStyle, color: pctColor, fontWeight: 700 }}>{`${group.totalPnlPct.toFixed(2)}%`}</td>
       <td style={{ ...cellStyle, color: statusColor, fontWeight: 600 }}>{status}</td>
