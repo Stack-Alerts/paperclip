@@ -35,8 +35,11 @@ interface Column { key: ColumnKey; label: string; width: number; sortable: boole
 // Matches PyQt5 column order/widths from trades_panel.py:230,252.
 // Widths trimmed (BTCAAAAA-35662) so total ~1185px fits 1280px+ screens.
 // "Date/Time" widened (BTCAAAAA-36001) to fit MM/DD HH:MM:SS + padding.
+// "Trade #" header widened (BTCAAAAA-39020) to fit the longer label.
+// BTCAAAAA-39020: Trade # cells render a clickable chevron so users can
+// collapse a trade group from any partial row OR the total summary row.
 const COLUMNS: Column[] = [
-  { key: 'id',       label: 'ID',        width: 55,  sortable: true,  tooltip: 'Trade sequence number. Partial exits share a base ID (e.g. 5.1, 5.2 = sub-exits of trade 5).' },
+  { key: 'id',       label: 'Trade #',   width: 75,  sortable: true,  tooltip: 'Trade sequence number. Partial exits share a base ID (e.g. 5.1, 5.2 = sub-exits of trade 5). Click a Trade # to collapse or expand that group.' },
   { key: 'time',     label: 'Date/Time', width: 115, sortable: true,  tooltip: 'Entry timestamp (bar open time). Hover a cell for the full ISO-8601 timestamp.' },
   { key: 'symbol',   label: 'Symbol',    width: 100, sortable: false, tooltip: 'Traded instrument. Defaults to BTC.P/USDT (perpetual futures) when not set by the engine.' },
   { key: 'side',     label: 'Side',      width: 65,  sortable: true,  tooltip: 'Trade direction: LONG = buy-to-open, SHORT = sell-to-open. Green = long, red = short.' },
@@ -109,6 +112,11 @@ function partialDisplay(t: Trade): string {
 // Short exit-type codes the backend sends via exit_condition_name — these need
 // expansion into human-readable notes rather than being returned verbatim.
 const EXIT_TYPE_CODES = new Set(['TP1','TP2','TP3','TP4','TP5','SL','STOP_LOSS','MAX_BARS','TIME_LIMIT']);
+
+// BTCAAAAA-39020: sticky section header ("Trade History" h3) sits on top of
+// the sticky thead so they don't overlap while the body scrolls. Keep in sync
+// with SectionShell h3 padding (10px top + 10px bottom + ~18px line-height).
+const SECTION_HEADER_HEIGHT = 38;
 
 function notesDisplay(t: Trade): string {
   const rawNotes = (t.notes ?? '').trim();
@@ -188,6 +196,10 @@ function sortGroupValue(g: TradeGroup, key: ColumnKey): number | string {
 export function TradesPanel({ trades = [] }: TradesPanelProps) {
   const [sortKey, setSortKey] = useState<ColumnKey>('id');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  // BTCAAAAA-39020: collapsed baseIds hide partial-exit rows. Empty set = all
+  // expanded (default). Click a Trade # cell to toggle a single group, or use
+  // the expand-all / collapse-all / reset-view controls in the section header.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   // BTCAAAAA-38790: header Aa−/Aa+ control scales the small-text data here too
   // (summary strip + trade table); the TRADE HISTORY section title stays fixed.
   const fontSizes = useFontSizes();
@@ -229,6 +241,22 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
     }
   };
 
+  // BTCAAAAA-39020: per-group collapse + bulk controls. Toggling one baseId
+  // never affects the others, and reset clears sort + collapse in one call.
+  const toggleCollapse = (baseId: string) => setCollapsed(prev => {
+    const next = new Set(prev);
+    if (next.has(baseId)) next.delete(baseId);
+    else next.add(baseId);
+    return next;
+  });
+  const expandAll = () => setCollapsed(new Set());
+  const collapseAll = () => setCollapsed(new Set(sortedGroups.map(g => g.baseId)));
+  const resetView = () => {
+    setSortKey('id');
+    setSortDir('asc');
+    setCollapsed(new Set());
+  };
+
   if (trades.length === 0) {
     return (
       <div className="flex flex-col min-w-0">
@@ -256,7 +284,17 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
         <PerformanceSummary summary={summary} hasTrades />
       </div>
 
-      <SectionShell title="Trade History">
+      <SectionShell
+        title="Trade History"
+        actions={
+          <HeaderActions
+            hasGroups={sortedGroups.length > 0}
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
+            onResetView={resetView}
+          />
+        }
+      >
         <div style={{ overflowX: 'auto', minWidth: 0, ...smallZoom }}>
           <table
             style={{
@@ -271,7 +309,9 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
             <colgroup>
               {COLUMNS.map(c => (<col key={c.key} style={{ width: c.width }} />))}
             </colgroup>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+            {/* BTCAAAAA-39020: thead sticks at SECTION_HEADER_HEIGHT so it
+                sits below the sticky section title (Trade History / buttons). */}
+            <thead style={{ position: 'sticky', top: SECTION_HEADER_HEIGHT, zIndex: 1 }}>
               <tr>
                 {COLUMNS.map(col => {
                   const isSorted = col.sortable && sortKey === col.key;
@@ -317,13 +357,27 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
             <tbody>
               {sortedGroups.map((group, gi) => {
                 const rowBg = gi % 2 === 0 ? 'transparent' : 'rgb(81 126 227 / 4%)';
+                const isCollapsed = collapsed.has(group.baseId);
+                const visibleTrades = isCollapsed ? [] : group.trades;
                 return (
                   <Fragment key={group.baseId}>
-                    {group.trades.map((trade, ti) => (
-                      <TradeRow key={`${trade.id}-${ti}`} trade={trade} rowBg={rowBg} />
+                    {visibleTrades.map((trade, ti) => (
+                      <TradeRow
+                        key={`${group.baseId}-${ti}`}
+                        trade={trade}
+                        rowBg={rowBg}
+                        displayId={`${group.baseId}.${ti + 1}`}
+                        isCollapsed={isCollapsed}
+                        onToggleCollapse={() => toggleCollapse(group.baseId)}
+                      />
                     ))}
                     {group.trades.length > 1 && (
-                      <TotalRow group={group} rowBg={rowBg} />
+                      <TotalRow
+                        group={group}
+                        rowBg={rowBg}
+                        isCollapsed={isCollapsed}
+                        onToggleCollapse={() => toggleCollapse(group.baseId)}
+                      />
                     )}
                   </Fragment>
                 );
@@ -349,8 +403,17 @@ export function TradesPanel({ trades = [] }: TradesPanelProps) {
 
 // Frameless section container matching the dialog's SectionCard pattern:
 // subtle hairline border, transparent tinted background, muted uppercase
-// title with a hairline divider underneath.
-function SectionShell({ title, children }: { title: string; children: React.ReactNode }) {
+// title with a hairline divider underneath. BTCAAAAA-39020: header sticks to
+// the top of the scroll container so the title stays visible while rows scroll.
+function SectionShell({
+  title,
+  actions,
+  children,
+}: {
+  title: string;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section
       className="rounded-[4px]"
@@ -366,12 +429,67 @@ function SectionShell({ title, children }: { title: string; children: React.Reac
           padding: '10px 14px',
           borderBottom: '1px solid var(--border)',
           margin: 0,
+          position: 'sticky',
+          top: 0,
+          zIndex: 3,
+          background: 'var(--bg-deep)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
         }}
       >
-        {title}
+        <span>{title}</span>
+        {actions && <span style={{ display: 'inline-flex', gap: 6 }}>{actions}</span>}
       </h3>
       {children}
     </section>
+  );
+}
+
+// BTCAAAAA-39020: bulk-trade-history controls anchored to the right of the
+// sticky section header. Disabled state is honored so the empty-state branch
+// (no groups to expand/collapse) can't get a confusing click.
+function HeaderActions({
+  hasGroups,
+  onExpandAll,
+  onCollapseAll,
+  onResetView,
+}: {
+  hasGroups: boolean;
+  onExpandAll: () => void;
+  onCollapseAll: () => void;
+  onResetView: () => void;
+}) {
+  const disabled = !hasGroups;
+  const btn = (label: string, onClick: () => void, title: string) => (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        background: 'transparent',
+        color: disabled ? 'var(--text-muted)' : 'var(--text-secondary)',
+        border: '1px solid var(--border)',
+        borderRadius: 3,
+        padding: '3px 8px',
+        fontSize: 11,
+        textTransform: 'lowercase',
+        letterSpacing: '0.02em',
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <>
+      {btn('expand all', onExpandAll, 'Expand every collapsed trade group')}
+      {btn('collapse all', onCollapseAll, 'Collapse every trade group to its totals')}
+      {btn('Reset view', onResetView, 'Sort by Trade # ascending and expand all groups')}
+    </>
   );
 }
 
@@ -426,7 +544,17 @@ function SummaryItem({ label, value, valueColor, tooltip }: { label: string; val
   );
 }
 
-function TotalRow({ group, rowBg }: { group: TradeGroup; rowBg: string }) {
+function TotalRow({
+  group,
+  rowBg,
+  isCollapsed,
+  onToggleCollapse,
+}: {
+  group: TradeGroup;
+  rowBg: string;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}) {
   const [hovered, setHovered] = useState(false);
   const bg = hovered ? 'rgb(81 126 227 / 7%)' : rowBg;
   const pnlColor = group.totalPnl > 0 ? ACCENT.success : group.totalPnl < 0 ? ACCENT.error : 'var(--text-muted)';
@@ -440,17 +568,33 @@ function TotalRow({ group, rowBg }: { group: TradeGroup; rowBg: string }) {
     fontSize: 11,
   };
 
+  // BTCAAAAA-39020: Trade # cell shows the chevron + baseId, mirrors the
+  // per-row trigger so users can expand a collapsed group from the totals row.
+  const idCellStyle: React.CSSProperties = {
+    ...cellStyle,
+    color: 'var(--text-secondary)',
+    fontWeight: 700,
+    fontStyle: 'italic',
+    cursor: 'pointer',
+    userSelect: 'none',
+  };
+
   return (
     <tr
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{ background: bg, borderTop: '1px solid var(--border)' }}
     >
-      <td style={{ ...cellStyle, color: 'var(--text-secondary)', fontWeight: 700, fontStyle: 'italic' }}>
+      <td
+        style={idCellStyle}
+        onClick={onToggleCollapse}
+        title={`Trade ${group.baseId} — click to ${isCollapsed ? 'expand' : 'collapse'} partial-exit rows`}
+      >
+        <span style={{ marginRight: 4 }}>{isCollapsed ? '▶' : '▼'}</span>
         #{group.baseId} Total
       </td>
       <td colSpan={7} style={{ ...cellStyle, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-        {group.trades.length} partial exits
+        {group.trades.length} partial exits{isCollapsed ? ' (collapsed)' : ''}
       </td>
       <td style={{ ...cellStyle, color: pnlColor, fontWeight: 700 }}>{formatMoney(group.totalPnl)}</td>
       <td style={{ ...cellStyle, color: pctColor, fontWeight: 700 }}>{`${group.totalPnlPct.toFixed(2)}%`}</td>
@@ -461,7 +605,19 @@ function TotalRow({ group, rowBg }: { group: TradeGroup; rowBg: string }) {
   );
 }
 
-function TradeRow({ trade, rowBg }: { trade: Trade; rowBg: string }) {
+function TradeRow({
+  trade,
+  rowBg,
+  displayId,
+  isCollapsed,
+  onToggleCollapse,
+}: {
+  trade: Trade;
+  rowBg: string;
+  displayId: string;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}) {
   const [hovered, setHovered] = useState(false);
   const bg = hovered ? 'rgb(81 126 227 / 9%)' : rowBg;
   const side = normalizeSide(trade.side);
@@ -479,13 +635,30 @@ function TradeRow({ trade, rowBg }: { trade: Trade; rowBg: string }) {
     whiteSpace: 'nowrap',
   };
 
+  // BTCAAAAA-39020: Trade # is rendered as a clickable chevron + sequential id
+  // (e.g. "▼ 5.1"). Backend sends only the base ID for partials; the parent
+  // passes the renumbered displayId so each row gets its own sub-index.
+  const idCellStyle: React.CSSProperties = {
+    ...cellStyle,
+    cursor: 'pointer',
+    userSelect: 'none',
+    fontVariantNumeric: 'tabular-nums',
+  };
+
   return (
     <tr
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{ background: bg }}
     >
-      <td style={cellStyle}>{trade.id}</td>
+      <td
+        style={idCellStyle}
+        onClick={onToggleCollapse}
+        title={`Trade ${displayId} — click to ${isCollapsed ? 'expand' : 'collapse'} this trade group`}
+      >
+        <span style={{ marginRight: 4 }}>{isCollapsed ? '▶' : '▼'}</span>
+        {displayId}
+      </td>
       <td style={cellStyle} title={trade.entryTime}>{formatTime(trade.entryTime)}</td>
       <td style={cellStyle}>{trade.symbol ?? 'BTC.P/USDT'}</td>
       <td style={{ ...cellStyle, color: sideColor, fontWeight: 600 }}>{side}</td>
