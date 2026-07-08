@@ -208,12 +208,34 @@ export default function MarketDataPage() {
     setBulkBackfilling(true);
     setBulkBackfillResult(null);
     try {
-      const result = await runBulkBackfill('2024-01', '2026-04', true);
+      // Compute the backfill window from the actual non-repairable gap dates so
+      // recent gaps (which would otherwise fall outside the previous static
+      // 2024-01..2026-04 window as time advances) actually get covered by the
+      // bulk-backfill POST. Fall back to a wide history→today range when
+      // verifyResults hasn't populated yet.
+      const tooOldGapMonths = (verifyResults
+        ? Object.values(verifyResults).flatMap((r) => r.gaps ?? [])
+        : []
+      )
+        .filter((g) => !g.repairable)
+        .flatMap((g) => [g.gapStart, g.gapEnd])
+        .filter((s): s is string => !!s)
+        .map((s) => s.slice(0, 7));
+      const todayMonth = new Date().toISOString().slice(0, 7);
+      const fromMonth =
+        tooOldGapMonths.length > 0
+          ? tooOldGapMonths.reduce((a, b) => (a < b ? a : b))
+          : '2024-01';
+      const toMonth =
+        tooOldGapMonths.length > 0
+          ? tooOldGapMonths.reduce((a, b) => (a > b ? a : b))
+          : todayMonth;
+      const result = await runBulkBackfill(fromMonth, toMonth, true);
       const s = result.summary;
       setBulkBackfillResult(
         result.success
-          ? `Downloaded ${s.downloaded} month/TF files (${s.totalBars.toLocaleString()} bars), skipped ${s.skipped} existing.`
-          : `Finished with ${s.errors} error(s). ${result.message}`,
+          ? `Downloaded ${s.downloaded} month/TF files (${s.totalBars.toLocaleString()} bars), skipped ${s.skipped} existing. Coverage: ${fromMonth} → ${toMonth}.`
+          : `Finished with ${s.errors} error(s) over ${fromMonth} → ${toMonth}. ${result.message}`,
       );
       if (result.success) {
         await loadStatus();
@@ -224,7 +246,7 @@ export default function MarketDataPage() {
     } finally {
       setBulkBackfilling(false);
     }
-  }, [loadStatus, handleVerify]);
+  }, [loadStatus, handleVerify, verifyResults]);
 
   const timeframes = status?.timeframeFreshness ?? {};
   const allStatuses = status?.allStatus ?? {};
