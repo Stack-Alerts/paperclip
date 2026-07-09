@@ -416,6 +416,95 @@ function createRoutineDispatchFingerprint(input: {
   return crypto.createHash("sha256").update(canonical).digest("hex");
 }
 
+/**
+ * Extract the underlying postgres error message from a Drizzle-wrapped
+ * error. Drizzle's `pg-core/session.ts` logs a "Failed query: <sql>"
+ * message and embeds the real error on `error.cause`. Storing only
+ * `error.message` in `routine_runs.failure_reason` hides the actual
+ * constraint/code/detail, making failure diagnosis impossible. This
+ * helper walks the error chain to find the deepest error (the
+ * underlying postgres error) and formats a compact reason that
+ * preserves the constraint name, sqlstate, and detail when present.
+ */
+function formatRoutineFailureReason(error: unknown): string {
+  const seen = new Set<unknown>();
+  let cursor: unknown = error;
+  let depth = 0;
+  let deepestMessage = "";
+  // Walk the chain once for the deepest message and once for the deepest
+  // metadata (code/constraint/detail). Postgres errors typically live at
+  // the end of the chain (Drizzle's DrizzleQueryError wraps them in `cause`).
+  while (cursor && !seen.has(cursor) && depth < 10) {
+    seen.add(cursor);
+    if (cursor && typeof cursor === "object") {
+      const c = cursor as { message?: unknown; cause?: unknown };
+      const msg = typeof c.message === "string" ? c.message : "";
+      if (msg.length > deepestMessage.length) {
+        deepestMessage = msg;
+      }
+      cursor = c.cause;
+    } else {
+      cursor = undefined;
+    }
+    depth += 1;
+  }
+  // Second pass: walk the chain and collect the deepest available
+  // postgres error fields. Prefer the chain-end (postgres) over the
+  // chain-start (drizzle) for `code` / `constraint_name` / `detail`.
+  // The `postgres` driver exposes the constraint as `constraint_name`
+  // (not `constraint`), so we accept either.
+  const seen2 = new Set<unknown>();
+  let cur2: unknown = error;
+  let code: unknown;
+  let constraintName: unknown;
+  let detail: unknown;
+  while (cur2 && !seen2.has(cur2) && depth < 20) {
+    seen2.add(cur2);
+    if (cur2 && typeof cur2 === "object") {
+      const c = cur2 as {
+        cause?: unknown;
+        code?: unknown;
+        constraint?: unknown;
+        constraint_name?: unknown;
+        constraintName?: unknown;
+        detail?: unknown;
+      };
+      if (typeof c.code !== "undefined" && typeof code === "undefined") code = c.code;
+      if (
+        typeof constraintName === "undefined" &&
+        (c.constraint_name !== undefined
+          ? c.constraint_name
+          : c.constraint !== undefined
+            ? c.constraint
+            : c.constraintName !== undefined
+              ? c.constraintName
+              : undefined)
+      ) {
+        constraintName =
+          c.constraint_name !== undefined
+            ? c.constraint_name
+            : c.constraint !== undefined
+              ? c.constraint
+              : c.constraintName;
+      }
+      if (typeof c.detail !== "undefined" && typeof detail === "undefined") detail = c.detail;
+      cur2 = c.cause;
+    } else {
+      cur2 = undefined;
+    }
+    depth += 1;
+  }
+  const top = error instanceof Error ? error.message : String(error);
+  const extras: string[] = [];
+  if (typeof code === "string" || typeof code === "number") extras.push(`code=${code}`);
+  if (typeof constraintName === "string" && constraintName.length > 0) {
+    extras.push(`constraint=${constraintName}`);
+  }
+  if (typeof detail === "string" && detail.length > 0) extras.push(`detail=${detail.slice(0, 200)}`);
+  const head = top && top !== deepestMessage ? `${top} | ` : "";
+  return `${head}${deepestMessage}${extras.length > 0 ? ` [${extras.join(", ")}]` : ""}`;
+}
+
 function createRoutineEnvFingerprint(env: unknown) {
   const canonical = JSON.stringify(normalizeRoutineDispatchFingerprintValue(env ?? null));
   return crypto.createHash("sha256").update(canonical).digest("hex");
@@ -1561,35 +1650,105 @@ export function routineService(
             executionWorkspaceSettings: input.executionWorkspaceSettings ?? null,
           });
         } catch (error) {
+          // Detect a duplicate-key violation on issues_open_routine_execution_uq.
+          // The postgres-js driver exposes the constraint name as
+          // `constraint_name` and the SQLSTATE as `code`; older pg libs /
+          // Drizzle's wrapper expose them as `constraint` (no code).
+          // Walk the cause chain so we don't miss the field when Drizzle
+          // wraps the underlying postgres error.
+          const findField = (
+            e: unknown,
+            keys: readonly string[],
+          ): string | number | undefined => {
+            let cur: unknown = e;
+            const seen = new Set<unknown>();
+            let depth = 0;
+            while (cur && !seen.has(cur) && depth < 10) {
+              seen.add(cur);
+              if (cur && typeof cur === "object") {
+                const c = cur as Record<string, unknown> & { cause?: unknown };
+                for (const k of keys) {
+                  const v = c[k];
+                  if (typeof v === "string" || typeof v === "number") return v;
+                }
+              }
+              cur = (cur as { cause?: unknown }).cause;
+              depth += 1;
+            }
+            return undefined;
+          };
+          const errorCode = findField(error, ["code"]);
+          const constraintName = findField(error, ["constraint_name", "constraint", "constraintName"]);
           const isOpenExecutionConflict =
-            !!error &&
-            typeof error === "object" &&
-            "code" in error &&
-            (error as { code?: string }).code === "23505" &&
-            "constraint" in error &&
-            (error as { constraint?: string }).constraint === "issues_open_routine_execution_uq";
+            errorCode === "23505" &&
+            constraintName === "issues_open_routine_execution_uq";
           if (!isOpenExecutionConflict || input.routine.concurrencyPolicy === "always_enqueue") {
             throw error;
           }
 
+          // Look up the live exec issue first. If none is found, the
+          // stuck issue may exist but be detached from any live heartbeat
+          // run (e.g. the prior run was bulk-cancelled). Self-heal by
+          // cancelling those orphaned open issues for the same fingerprint
+          // and treating this run as coalesced.
           const existingIssue = await findLiveExecutionIssue(input.routine, txDb, dispatchFingerprint, {
             kind: issueOriginKind,
             id: issueOriginId,
           });
-          if (!existingIssue) throw error;
+
+          let selfHealedIssue: Awaited<ReturnType<typeof findLiveExecutionIssue>> | null = null;
+          if (!existingIssue) {
+            const orphaned = await txDb
+              .select()
+              .from(issues)
+              .where(
+                and(
+                  eq(issues.companyId, input.routine.companyId),
+                  eq(issues.originKind, issueOriginKind),
+                  eq(issues.originId, issueOriginId),
+                  eq(issues.originFingerprint, dispatchFingerprint),
+                  inArray(issues.status, OPEN_ISSUE_STATUSES),
+                  isNull(issues.hiddenAt),
+                ),
+              )
+              .orderBy(asc(issues.createdAt))
+              .limit(1);
+            if (orphaned.length > 0) {
+              selfHealedIssue = orphaned[0];
+              await txDb
+                .update(issues)
+                .set({
+                  status: "cancelled",
+                  cancelledAt: new Date(),
+                  updatedAt: new Date(),
+                })
+                .where(eq(issues.id, orphaned[0].id));
+              logger.warn(
+                {
+                  routineId: input.routine.id,
+                  orphanedIssueId: orphaned[0].id,
+                  orphanedIdentifier: orphaned[0].identifier,
+                },
+                "routine dispatch: self-healed orphaned open exec issue (no live heartbeat_run linked) — cancelling to unblock future runs",
+              );
+            }
+          }
+
+          const resolvedIssue = existingIssue ?? selfHealedIssue;
+          if (!resolvedIssue) throw error;
           const status = input.routine.concurrencyPolicy === "skip_if_active" ? "skipped" : "coalesced";
           if (manualRunnerUserId) {
             await touchIssueForUserInbox(txDb, {
               companyId: input.routine.companyId,
-              issueId: existingIssue.id,
+              issueId: resolvedIssue.id,
               userId: manualRunnerUserId,
               touchedAt: triggeredAt,
             });
           }
           const updated = await finalizeRun(createdRun.id, {
             status,
-            linkedIssueId: existingIssue.id,
-            coalescedIntoRunId: existingIssue.originRunId,
+            linkedIssueId: resolvedIssue.id,
+            coalescedIntoRunId: resolvedIssue.originRunId,
             completedAt: triggeredAt,
           }, txDb);
           await updateRoutineTouchedState({
@@ -1597,7 +1756,7 @@ export function routineService(
             triggerId: input.trigger?.id ?? null,
             triggeredAt,
             status,
-            issueId: existingIssue.id,
+            issueId: resolvedIssue.id,
             nextRunAt,
           }, txDb);
           return updated ?? createdRun;
@@ -1630,7 +1789,7 @@ export function routineService(
         if (createdIssue) {
           await txDb.delete(issues).where(eq(issues.id, createdIssue.id));
         }
-        const failureReason = error instanceof Error ? error.message : String(error);
+        const failureReason = formatRoutineFailureReason(error);
         const failed = await finalizeRun(createdRun.id, {
           status: "failed",
           failureReason,
