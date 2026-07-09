@@ -105,6 +105,8 @@ import {
   sanitizeRuntimeServiceBaseEnv,
 } from "./workspace-runtime.js";
 import { issueService } from "./issues.js";
+import { repairStaleIssueProjectIdentity } from "./issue-project-identity-repair.js";
+import { preflightAgentSessionResume } from "./agent-session-coherence.js";
 import {
   buildIssueMonitorClearedPatch,
   buildIssueMonitorTriggeredPatch,
@@ -1782,7 +1784,7 @@ export interface ModelProfileApplication {
 
 export type ResolvedWorkspaceForRun = {
   cwd: string;
-  source: "project_primary" | "task_session" | "agent_home";
+  source: "project_primary" | "task_session" | "agent_runtime" | "agent_home";
   projectId: string | null;
   workspaceId: string | null;
   repoUrl: string | null;
@@ -1812,6 +1814,21 @@ export function prioritizeProjectWorkspaceCandidatesForRun<T extends ProjectWork
 
 function readNonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+async function readRuntimeAgentCwd(db: Db, agentId: string): Promise<string | null> {
+  // The runtime_state table itself does not carry cwd — it lives on the latest
+  // task session. This is the same lookup the runtime API response synthesizes
+  // in getRuntimeState(); reuse that source rather than duplicating it.
+  const [taskRow] = await db
+    .select({ sessionParamsJson: agentTaskSessions.sessionParamsJson })
+    .from(agentTaskSessions)
+    .where(eq(agentTaskSessions.agentId, agentId))
+    .orderBy(desc(agentTaskSessions.updatedAt), desc(agentTaskSessions.createdAt))
+    .limit(1);
+  if (!taskRow) return null;
+  const params = parseObject(taskRow.sessionParamsJson);
+  return readNonEmptyString(params.cwd);
 }
 
 function readModelProfileKey(value: unknown): ModelProfileKey | null {
@@ -5013,6 +5030,32 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
           workspaceHints,
           warnings: [],
         };
+      }
+    }
+
+    // Manual on-demand and other wake types without an issue-scoped task
+    // session never populate previousSessionParams. Fall back to the agent's
+    // own runtime_state.sessionParamsJson.cwd so the manager agent resumes in
+    // its real project checkout instead of bouncing to an empty agent_home.
+    if (!issueId && !sessionCwd) {
+      const runtimeCwd = await readRuntimeAgentCwd(db, agent.id);
+      if (runtimeCwd && !isUnsafeSessionWorkspaceCwd(runtimeCwd)) {
+        const runtimeCwdExists = await fs
+          .stat(runtimeCwd)
+          .then((stats) => stats.isDirectory())
+          .catch(() => false);
+        if (runtimeCwdExists) {
+          return {
+            cwd: runtimeCwd,
+            source: "agent_runtime" as const,
+            projectId: resolvedProjectId,
+            workspaceId: null,
+            repoUrl: null,
+            repoRef: null,
+            workspaceHints,
+            warnings: [],
+          };
+        }
       }
     }
 
@@ -9446,11 +9489,18 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
     if (executionWorkspace.projectId && !readNonEmptyString(context.projectId)) {
       context.projectId = executionWorkspace.projectId;
     }
+    const preflightOutcome = await preflightAgentSessionResume(db, agent.id);
+    let runtimeSessionForResume: string | null = null;
+    if (preflightOutcome.kind === "resume") {
+      runtimeSessionForResume = preflightOutcome.sessionId;
+    }
     const runtimeSessionFallback = taskKey || resetTaskSession
       ? null
-      : isCanonicalSessionIdForAdapter(agent.adapterType, runtime.sessionId)
-        ? runtime.sessionId
-        : null;
+      : runtimeSessionForResume ?? (
+          isCanonicalSessionIdForAdapter(agent.adapterType, runtime.sessionId)
+            ? runtime.sessionId
+            : null
+        );
     const runtimeSessionDisplayId = truncateDisplayId(
       explicitResumeSessionDisplayId ??
         taskSessionForRun?.sessionDisplayId ??
@@ -9466,7 +9516,9 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
         )
       : runtimeSessionDisplayId;
     let runtimeSessionIdForAdapter =
-      readNonEmptyString(runtimeSessionParams?.sessionId) ?? runtimeSessionFallback;
+      runtimeSessionForResume ??
+      readNonEmptyString(runtimeSessionParams?.sessionId) ??
+      runtimeSessionFallback;
     let runtimeSessionParamsForAdapter = normalizeSessionParams(
       stripConfiguredModelFromSessionParams(runtimeSessionParams),
     );
@@ -9675,6 +9727,36 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
       for (const warning of runtimeWorkspaceWarnings) {
         const logEntry = formatRuntimeWorkspaceWarningLog(warning);
         await onLog(logEntry.stream, logEntry.chunk);
+      }
+      if (
+        issueRef &&
+        issueRef.projectWorkspaceId &&
+        !issueRef.projectId &&
+        GIT_SENSITIVE_LOCAL_ADAPTER_TYPES.has(agent.adapterType)
+      ) {
+        const repairOutcome = await repairStaleIssueProjectIdentity(db, issueRef);
+        if (repairOutcome.repaired) {
+          await logActivity(db, {
+            companyId: run.companyId,
+            actorType: "system",
+            actorId: "system",
+            agentId: agent.id,
+            runId: run.id,
+            action: "issue.project_identity_repaired",
+            entityType: "issue",
+            entityId: repairOutcome.issueId,
+            details: {
+              identifier: repairOutcome.issueIdentifier,
+              repairedProjectId: repairOutcome.repairedProjectId,
+              source: repairOutcome.source,
+              reason: "stale_workspace_link_missing_project_id",
+            },
+          });
+          await onLog(
+            "stdout",
+            `[paperclip] Repaired missing project id on ${repairOutcome.issueIdentifier ?? repairOutcome.issueId} from project workspace ${issueRef.projectWorkspaceId} before adapter launch.\n`,
+          );
+        }
       }
       await assertGitSensitiveAdapterWorkspaceValid({
         adapterType: agent.adapterType,

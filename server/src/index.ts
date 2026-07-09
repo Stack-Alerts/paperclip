@@ -44,6 +44,7 @@ import {
   reconcileCodexLocalManagedHomesOnStartup,
   reconcilePersistedRuntimeServicesOnStartup,
   routineService,
+  sweepAgentSessionPointers,
 } from "./services/index.js";
 import {
   parseAdapterRegistryEnv,
@@ -843,6 +844,14 @@ export async function startServer(): Promise<StartedServer> {
         logger.warn({ ...swept }, "startup stale-lock sweeper cleared issue locks");
       }
 
+      const sessionSweep = await sweepAgentSessionPointers(db as never);
+      if (sessionSweep.cleared > 0 || sessionSweep.errors > 0) {
+        logger.warn(
+          { ...sessionSweep },
+          "startup agent-session sweep cleared stale session pointers",
+        );
+      }
+
       const reviewed = await heartbeat.reconcileProductivityReviews();
       if (reviewed.created > 0 || reviewed.updated > 0 || reviewed.failed > 0) {
         logger.warn({ ...reviewed }, "startup productivity reconciliation created or updated review work");
@@ -878,10 +887,28 @@ export async function startServer(): Promise<StartedServer> {
             logger.info({ ...result }, "routine scheduler tick enqueued runs");
           }
         })
-        .catch((err) => {
+.catch((err) => {
           logger.error({ err }, "routine scheduler tick failed");
         });
-  
+
+      // Periodically verify that every claude_local agent's runtime_state
+      // session pointer still points at a real on-disk conversation. A run
+      // can preflight one agent at a time, but this sweep catches idle agents
+      // so the dashboard and activity log reflect stale pointers without
+      // waiting for the next heartbeat.
+      void sweepAgentSessionPointers(db as never)
+        .then((result) => {
+          if (result.cleared > 0 || result.errors > 0) {
+            logger.warn(
+              { ...result },
+              "agent-session sweep cleared stale session pointers",
+            );
+          }
+        })
+        .catch((err) => {
+          logger.error({ err }, "agent-session sweep failed");
+        });
+
       // Periodically reap orphaned runs (5-min staleness threshold) and make sure
       // persisted queued work is still being driven forward.
       void heartbeat

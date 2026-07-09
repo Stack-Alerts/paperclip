@@ -87,6 +87,18 @@ export { workspaceOperationService } from "./workspace-operations.js";
 export { workspaceFileResourceService } from "./workspace-file-resources.js";
 export { workProductService } from "./work-products.js";
 export { logActivity, type LogActivityInput } from "./activity-log.js";
+export {
+  preflightAgentSessionResume,
+  sweepAgentSessionPointers,
+  type PreflightAgentSessionResumeOutcome,
+  type SweepAgentSessionPointersResult,
+} from "./agent-session-coherence.js";
+export {
+  claudeLocalSessionFilePath,
+  encodeClaudeProjectDirSegment,
+  isClaudeLocalSessionFileMissing,
+  resolveSharedClaudeConfigDir,
+} from "./claude-local-session.js";
 export { notifyHireApproved, type NotifyHireApprovedInput } from "./hire-hook.js";
 export { publishLiveEvent, subscribeCompanyLiveEvents } from "./live-events.js";
 export {
