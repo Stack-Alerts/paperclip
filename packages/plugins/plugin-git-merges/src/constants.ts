@@ -23,6 +23,7 @@ export const DATA_KEYS = {
   snapshot: "git-merges-snapshot",
   status: "git-merges-status",
   issueMap: "git-merges-issue-map",
+  running: "git-merges-running",
 } as const;
 
 export const ACTION_KEYS = {
@@ -65,6 +66,28 @@ export const DEFAULT_CONFIG = {
   maxOutputChars: 5_000_000,
   // Soft timeout for a single scan.
   scanTimeoutSeconds: 120,
+  /**
+   * BTCAAAAA-39051: stuck detection threshold.
+   * An in_review PR is flagged "stuck" if BOTH:
+   *   (a) it has been in_review for at least this many hours, AND
+   *   (b) its derived progress signals (status pill, progress counts,
+   *       fix-SHA presence, PR number) are byte-identical to the
+   *       previous scan's snapshot (no progress in the last interval).
+   * Default: 24h. Lower for tighter dev-loop use; raise for prod.
+   */
+  stuckThresholdHours: 24,
+  /**
+   * BTCAAAAA-39051: ETA history size.
+   * Keep the last N in_review→done transitions (by closure timestamp)
+   * to compute median per status category for the ETA estimate.
+   */
+  etaHistorySize: 20,
+  /**
+   * BTCAAAAA-39051: how often the worker refreshes the "Now processing"
+   * panel by querying the dispatch-routine's in_progress execution issues.
+   * 10s is a good balance between freshness and API load.
+   */
+  runningRefreshIntervalSeconds: 10,
 } as const;
 
 export type GitMergesConfig = {
@@ -79,6 +102,9 @@ export type GitMergesConfig = {
   showJson: boolean;
   maxOutputChars: number;
   scanTimeoutSeconds: number;
+  stuckThresholdHours: number;
+  etaHistorySize: number;
+  runningRefreshIntervalSeconds: number;
 };
 
 export type ScanRecord = {
@@ -205,6 +231,12 @@ export type MergeBlock = {
   title: string;
   /** "in review for Xm" relative age string from the script. */
   inReviewFor: string;
+  /**
+   * BTCAAAAA-39051: in_review age in hours, parsed from inReviewFor
+   * ("44h 30m" → 44.5, "5m" → 0.083). Used for stuck-threshold comparisons
+   * and the ETA estimate. `null` when unparseable.
+   */
+  inReviewHours: number | null;
   /** Full fix-SHA if recorded on the issue's closure comment. */
   fixSha: string | null;
   /** `true` when the fix-SHA line was `NOT FOUND`. */
@@ -226,6 +258,26 @@ export type MergeBlock = {
   checks: MergeCheck[];
   /** Stamp for compare diffs. Stable across runs for the same issue UUID. */
   diffKey: string;
+  /**
+   * BTCAAAAA-39051: true if this block is "stuck" — in_review for at
+   * least config.stuckThresholdHours AND no progress in the last
+   * previousBlocks comparison. Computed in the parser; persisted in
+   * history for the filter chip in the UI.
+   */
+  isStuck: boolean;
+  /**
+   * BTCAAAAA-39051: ETA in minutes, derived from historical closures
+   * bucketed by status. `null` when unknown (no Fix-SHA, no PR, etc.)
+   */
+  etaMinutes: number | null;
+  /**
+   * BTCAAAAA-39051: human-readable ETA bucket for the UI. One of:
+   *   "fast" (< 15 min, green)
+   *   "medium" (15 min - 2 h, yellow)
+   *   "slow" (> 2 h, red)
+   *   "unknown" (no Fix-SHA / no PR / insufficient history)
+   */
+  etaBucket: "fast" | "medium" | "slow" | "unknown";
 };
 
 export type MergeCheck = {
@@ -246,6 +298,63 @@ export type MergeTotals = {
   waiting: number;
   failing: number;
   noPrOrSha: number;
+  /** BTCAAAAA-39051: count of in_review PRs flagged as stuck. */
+  stuck: number;
+};
+
+// ---------------------------------------------------------------------------
+// BTCAAAAA-39051: ETA + Running types
+// ---------------------------------------------------------------------------
+
+/**
+ * One historical in_review→done transition. Captured when the closure-gate
+ * routine marks a previously-in_review issue as `done`, so we can compute
+ * median durations per status category for the ETA estimate.
+ */
+export type EtaSample = {
+  /** ISO timestamp the issue was last seen as in_review. */
+  inReviewAt: string;
+  /** ISO timestamp the issue was last seen as done. */
+  closedAt: string;
+  /** Status bucket the issue was in at the moment of closure. */
+  status: MergeStatus;
+  /** Wall-clock duration in minutes from inReviewAt → closedAt. */
+  durationMinutes: number;
+  /** Paperclip issue identifier for cross-referencing. */
+  issueIdentifier: string | null;
+};
+
+/**
+ * Aggregated ETA per status bucket. Computed from EtaSample[] in the worker.
+ * `null` median/sample count means insufficient data.
+ */
+export type EtaByStatus = {
+  ready: { medianMinutes: number | null; sampleCount: number };
+  waiting: { medianMinutes: number | null; sampleCount: number };
+  failing: { medianMinutes: number | null; sampleCount: number };
+  "no-pr": { medianMinutes: number | null; sampleCount: number };
+  "no-sha": { medianMinutes: number | null; sampleCount: number };
+  unknown: { medianMinutes: number | null; sampleCount: number };
+};
+
+/**
+ * One in-progress execution issue for the merge-dispatch routine.
+ * Polled from the Paperclip API in the worker, surfaced via the
+ * "Now processing" panel in the UI.
+ */
+export type RunningJob = {
+  /** Paperclip issue UUID. */
+  issueUuid: string;
+  /** Paperclip issue identifier (e.g. `BTCAAAAA-38557`). */
+  issueIdentifier: string | null;
+  /** Title from the linked in_review issue (the dispatch target). */
+  linkedIssueTitle: string | null;
+  /** ISO timestamp the dispatch execution issue was created. */
+  startedAt: string;
+  /** Wall-clock elapsed time in seconds since startedAt. */
+  elapsedSeconds: number;
+  /** True if the checkout owner matches an active agent. */
+  hasAgent: boolean;
 };
 
 // ---------------------------------------------------------------------------

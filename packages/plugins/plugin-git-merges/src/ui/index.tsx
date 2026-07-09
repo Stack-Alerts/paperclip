@@ -185,6 +185,19 @@ const pillErrStyle: CSSProperties = {
   color: "#fca5a5",
 };
 
+/**
+ * BTCAAAAA-39051: stuck pill — distinct from the failing-CI pill so
+ * operators can tell "CI is red and we're waiting on it" apart from
+ * "this PR has been in queue for >24h with no progress at all".
+ */
+const stuckPillStyle: CSSProperties = {
+  ...pillStyle,
+  borderColor: "color-mix(in srgb, #d97706 70%, var(--border))",
+  background: "color-mix(in srgb, #d97706 18%, transparent)",
+  color: "#fcd34d",
+  fontWeight: 600,
+};
+
 const codeInlineStyle: CSSProperties = {
   fontFamily:
     "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
@@ -230,8 +243,15 @@ const visitedPillStyle: CSSProperties = {
 // localStorage key used to persist which blocks the user has clicked
 // into since a given scan started. The full value is a JSON object
 // keyed by scan `startedAt` ISO string; values are arrays of diffKey.
-// Stale entries (scans no longer in the snapshot) are pruned lazily.
 const VISITED_STORAGE_KEY = "paperclip.git-merges.visited-blocks";
+
+/**
+ * BTCAAAAA-39051: hard-coded default stuck threshold (in hours). Mirrors
+ * DEFAULT_CONFIG.stuckThresholdHours in the worker; the tooltip on the
+ * STUCK pill in the card shows this value. Operators tune it from the
+ * settings page.
+ */
+const STUCK_THRESHOLD_HOURS = 24;
 
 type VisitedMap = Record<string, string[]>;
 
@@ -1241,6 +1261,7 @@ export function GitMergesPage(_props: PluginPageProps) {
               : "no data yet"}
           </span>
         </div>
+        <NowProcessingPanel />
         <QueueTabs
           blocks={snapshot?.blocks ?? []}
           previousBlocks={snapshot?.previousBlocks ?? null}
@@ -1312,6 +1333,148 @@ const tabButtonStyle = (active: boolean): CSSProperties => ({
   cursor: "pointer",
 });
 
+/**
+ * BTCAAAAA-39051: stuck-filter toggle button style. The active state
+ * uses the same amber palette as the STUCK pill so the visual
+ * language stays consistent (orange = "needs attention").
+ */
+const stuckFilterButtonStyle = (active: boolean): CSSProperties => ({
+  appearance: "none",
+  border: "1px solid color-mix(in srgb, #d97706 50%, var(--border))",
+  background: active
+    ? "color-mix(in srgb, #d97706 22%, transparent)"
+    : "transparent",
+  color: active ? "#fcd34d" : "var(--muted, #888)",
+  padding: "4px 10px",
+  fontSize: "12px",
+  fontWeight: active ? 600 : 400,
+  borderRadius: "999px",
+  cursor: "pointer",
+});
+
+/**
+ * BTCAAAAA-39051: small panel above the queue showing the merge-
+ * dispatch routine's currently-in-progress execution issues. Polls
+ * the `git-merges-running` data channel every 2s while visible.
+ * Empty state shows the time-since-last-dispatch (when known).
+ */
+function NowProcessingPanel() {
+  const runningQuery = usePluginData<{
+    jobs: Array<{
+      issueUuid: string;
+      issueIdentifier: string | null;
+      linkedIssueTitle: string | null;
+      startedAt: string;
+      elapsedSeconds: number;
+      hasAgent: boolean;
+    }>;
+    lastDispatchAt: string | null;
+  }>(DATA_KEYS.running, { jobs: [], lastDispatchAt: null });
+
+  // Poll every 2s while mounted. Cheap — the worker caches the result.
+  useEffect(() => {
+    const id = setInterval(() => runningQuery.refresh(), 2000);
+    return () => clearInterval(id);
+  }, [runningQuery]);
+
+  const data = runningQuery.data;
+  const jobs = data?.jobs ?? [];
+  const lastDispatchAt = data?.lastDispatchAt ?? null;
+
+  // Empty state: no active dispatches right now.
+  if (jobs.length === 0) {
+    return (
+      <div
+        style={{
+          ...mutedTextStyle,
+          padding: "6px 10px",
+          fontSize: "12px",
+          border: "1px dashed var(--border)",
+          borderRadius: "6px",
+          marginBottom: "10px",
+        }}
+        title="No active dispatch jobs right now. The Phase 4a routine picks up in_review issues every 5 minutes."
+      >
+        {lastDispatchAt
+          ? `⚙ No active dispatches — last run ${formatRelativeTime(lastDispatchAt)}`
+          : "⚙ No active dispatches"}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        padding: "8px 10px",
+        border: "1px solid color-mix(in srgb, #2563eb 50%, var(--border))",
+        borderRadius: "6px",
+        background: "color-mix(in srgb, #2563eb 8%, transparent)",
+        marginBottom: "10px",
+        display: "grid",
+        gap: "4px",
+      }}
+      title="Active merge-dispatch jobs. Updated every 2s."
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          fontSize: "12px",
+          fontWeight: 600,
+          color: "#93c5fd",
+        }}
+      >
+        <span
+          style={{
+            display: "inline-block",
+            width: "8px",
+            height: "8px",
+            borderRadius: "50%",
+            background: "#3b82f6",
+            animation: "pulse 1.4s ease-in-out infinite",
+          }}
+        />
+        Now processing ({jobs.length})
+      </div>
+      {jobs.map((job) => (
+        <div
+          key={job.issueUuid}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            fontSize: "12px",
+            paddingLeft: "14px",
+            color: "var(--text)",
+          }}
+        >
+          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
+            {job.issueIdentifier ?? job.issueUuid.slice(0, 8) + "…"}
+            {job.linkedIssueTitle ? ` — ${job.linkedIssueTitle}` : ""}
+          </span>
+          <span style={mutedTextStyle}>
+            {job.hasAgent ? "agent working" : "queued"} ·{" "}
+            {formatElapsedSeconds(job.elapsedSeconds)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function formatElapsedSeconds(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  return `${(seconds / 3600).toFixed(1)}h`;
+}
+
+function formatRelativeTime(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 0) return "just now";
+  return `${formatElapsedSeconds(Math.round(ms / 1000))} ago`;
+}
+
 function QueueTabs({
   blocks,
   previousBlocks,
@@ -1346,7 +1509,12 @@ function QueueTabs({
   approvalCount: number;
 }) {
   const [tab, setTab] = useState<QueueTab>("blocks");
+  // BTCAAAAA-39051: stuck-only filter. Default ON so operators see
+  // the actionable set first; can be turned off to see all in-review.
+  const [stuckOnly, setStuckOnly] = useState<boolean>(true);
   const hasPrevious = previousBlocks !== null && previousBlocks.length > 0;
+  const stuckCount = blocks.filter((b) => b.isStuck).length;
+  const visibleBlocks = stuckOnly ? blocks.filter((b) => b.isStuck) : blocks;
 
   return (
     <div>
@@ -1358,7 +1526,7 @@ function QueueTabs({
           style={tabButtonStyle(tab === "blocks")}
           onClick={() => setTab("blocks")}
         >
-          Blocks ({blocks.length})
+          Blocks ({stuckOnly ? `${stuckCount}/${blocks.length}` : blocks.length})
         </button>
         <button
           type="button"
@@ -1412,13 +1580,42 @@ function QueueTabs({
         </button>
       </div>
       {tab === "blocks" ? (
-        <BlocksView
-          blocks={blocks}
-          deltaByKey={deltaByKey}
-          visited={visited}
-          onVisit={onVisit}
-          companyPrefix={companyPrefix}
-        />
+        <div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 0",
+              flexWrap: "wrap",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setStuckOnly((v) => !v)}
+              style={stuckFilterButtonStyle(stuckOnly)}
+              title={
+                stuckOnly
+                  ? `Showing ${stuckCount} stuck of ${blocks.length} in-review. Click to show all.`
+                  : `Showing all ${blocks.length} in-review. Click to filter to stuck only (>= ${STUCK_THRESHOLD_HOURS}h, no progress).`
+              }
+            >
+              {stuckOnly ? "⚠ Stuck only" : "Show all"} ({stuckOnly ? stuckCount : blocks.length})
+            </button>
+            {stuckOnly && blocks.length > stuckCount ? (
+              <span style={mutedTextStyle}>
+                {blocks.length - stuckCount} non-stuck hidden — click "Show all" to view
+              </span>
+            ) : null}
+          </div>
+          <BlocksView
+            blocks={visibleBlocks}
+            deltaByKey={deltaByKey}
+            visited={visited}
+            onVisit={onVisit}
+            companyPrefix={companyPrefix}
+          />
+        </div>
       ) : tab === "diff" ? (
         <DiffView
           current={blocks}
@@ -1512,6 +1709,56 @@ function MergeStatusPill({ status }: { status: MergeStatus }) {
   if (status === "no-pr") return <span style={pillWarnStyle}>no PR found</span>;
   if (status === "no-sha") return <span style={pillWarnStyle}>no Fix-SHA</span>;
   return <span style={pillStyle}>unknown</span>;
+}
+
+/**
+ * BTCAAAAA-39051: ETA pill — shows the estimated time-to-merge based on
+ * historical closure durations bucketed by status. Green for fast (<15 min),
+ * yellow for medium (15 min - 2 h), red for slow (>2 h), grey for unknown.
+ */
+function EtaPill({
+  bucket,
+  minutes,
+}: {
+  bucket: MergeBlock["etaBucket"];
+  minutes: number | null;
+}) {
+  const styleByBucket = {
+    fast: pillOkStyle,
+    medium: pillWarnStyle,
+    slow: pillErrStyle,
+    unknown: pillStyle,
+  } as const;
+  const labelByBucket = {
+    fast: "ETA ~quick",
+    medium: "ETA ~medium",
+    slow: "ETA ~slow",
+    unknown: "ETA unknown",
+  } as const;
+  const style = styleByBucket[bucket];
+  const label =
+    minutes != null && bucket !== "unknown"
+      ? `ETA ~${formatEtaMinutes(minutes)}`
+      : labelByBucket[bucket];
+  return (
+    <span
+      style={style}
+      title={
+        minutes != null
+          ? `Median duration for this status bucket (last ${"~20"} closures): ${formatEtaMinutes(minutes)}`
+          : "ETA unknown — insufficient history for this status bucket"
+      }
+    >
+      {label}
+    </span>
+  );
+}
+
+function formatEtaMinutes(minutes: number): string {
+  if (minutes < 1) return "<1 min";
+  if (minutes < 60) return `${Math.round(minutes)} min`;
+  if (minutes < 60 * 24) return `${(minutes / 60).toFixed(1)} h`;
+  return `${(minutes / (60 * 24)).toFixed(1)} d`;
 }
 
 function ProgressBar({
@@ -1731,6 +1978,15 @@ function MergeBlockCard({
         </div>
         <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
           {diffBadge}
+          {block.isStuck ? (
+            <span
+              style={stuckPillStyle}
+              title={`In review for ${block.inReviewFor || "a long time"} with no progress since the last scan. Threshold: ${STUCK_THRESHOLD_HOURS}h (configurable in settings).`}
+            >
+              ⚠ STUCK
+            </span>
+          ) : null}
+          <EtaPill bucket={block.etaBucket} minutes={block.etaMinutes} />
           <MergeStatusPill status={block.status} />
         </div>
       </div>
@@ -2702,6 +2958,12 @@ export function GitMergesSettingsPage(_props: PluginSettingsPageProps) {
     showJson,
     maxOutputChars: Math.max(1000, Math.min(5_000_000, maxOutputChars)),
     scanTimeoutSeconds: Math.max(10, Math.min(3600, scanTimeoutSeconds)),
+    // BTCAAAAA-39051: new fields. The settings UI doesn't yet expose
+    // controls for these (that lands in the follow-up commit); the
+    // DEFAULT_CONFIG values are sent on save.
+    stuckThresholdHours: DEFAULT_CONFIG.stuckThresholdHours,
+    etaHistorySize: DEFAULT_CONFIG.etaHistorySize,
+    runningRefreshIntervalSeconds: DEFAULT_CONFIG.runningRefreshIntervalSeconds,
   };
 
   async function onSubmit(event: FormEvent) {

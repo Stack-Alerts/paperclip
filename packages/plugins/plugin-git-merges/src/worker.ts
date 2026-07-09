@@ -10,18 +10,29 @@ import {
   STREAM_CHANNELS,
   type BlockedChain,
   type ChainNode,
+  type EtaByStatus,
+  type EtaSample,
   type GitMergesConfig,
   type MergeBlock,
   type MergeQueueSnapshot,
+  type RunningJob,
   type ScanRecord,
   type ScanStatus,
 } from "./constants.js";
-import { parseMergeQueueOutput, diffBlocks } from "./parser.js";
-// Type imports only — referenced via `import("./constants.js").MergeBlock` etc.
+import {
+  parseMergeQueueOutput,
+  diffBlocks,
+  augmentBlocksWithStuckAndEta,
+  countStuck,
+} from "./parser.js";
+// Type imports only — referenced via `import("./constants.js").MergeStatus` etc.
 // in helper signatures below.
-import type {} from "./constants.js";
+import type {
+  MergeStatus,
+} from "./constants.js";
 
 /**
+ * Minimal `.env` loader for the BTC repo. Mirrors the python script's
  * Keys used to store plugin state in the Paperclip instance state store.
  * Persisted across worker restarts so scan history and the current
  * config survive plugin reloads.
@@ -33,6 +44,7 @@ const STATUS_STATE_KEY = "scan-status";
 const PREVIOUS_BLOCKS_KEY = "previous-blocks";
 const PREVIOUS_SCAN_STARTED_AT_KEY = "previous-blocks-started-at";
 const ISSUE_MAP_KEY = "issue-map";
+const ETA_HISTORY_STATE_KEY = "eta-history";
 const HISTORY_LIMIT = 12;
 
 /**
@@ -76,6 +88,7 @@ function emptyTotals(): import("./constants.js").MergeTotals {
     waiting: 0,
     failing: 0,
     noPrOrSha: 0,
+    stuck: 0,
   };
 }
 
@@ -89,6 +102,68 @@ function isMergeBlocksArray(value: unknown): value is MergeBlock[] {
       typeof entry.diffKey === "string"
     );
   });
+}
+
+function isEtaSampleArray(value: unknown): value is EtaSample[] {
+  if (!Array.isArray(value)) return false;
+  return value.every((entry) => {
+    if (!isPlainObject(entry)) return false;
+    return (
+      typeof entry.inReviewAt === "string" &&
+      typeof entry.closedAt === "string" &&
+      typeof entry.status === "string" &&
+      typeof entry.durationMinutes === "number"
+    );
+  });
+}
+
+/**
+ * BTCAAAAA-39051: compute median in-review→done duration per status
+ * bucket from the historical closure samples. Used by the parser's
+ * augmentation to attach an ETA estimate to each block.
+ *
+ * Only the last `maxSamples` entries are considered, so a stale status
+ * doesn't poison the estimate. We sort and pick the middle value
+ * (true median, not average) so outliers (e.g. one CI run that took
+ * 6 hours) don't pull the estimate up.
+ */
+function computeEtaByStatus(
+  samples: EtaSample[],
+  maxSamples: number,
+): EtaByStatus {
+  const byStatus: Record<MergeStatus, number[]> = {
+    ready: [],
+    waiting: [],
+    failing: [],
+    "no-pr": [],
+    "no-sha": [],
+    unknown: [],
+  };
+  // samples are already in chronological order in storage; keep the most
+  // recent `maxSamples` by trimming the front if necessary.
+  const window = samples.length > maxSamples ? samples.slice(-maxSamples) : samples;
+  for (const sample of window) {
+    if (sample.status in byStatus) {
+      byStatus[sample.status].push(sample.durationMinutes);
+    }
+  }
+  const median = (values: number[]): number | null => {
+    if (values.length === 0) return null;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    if (sorted.length % 2 === 1) return sorted[mid] ?? null;
+    const a = sorted[mid - 1] ?? 0;
+    const b = sorted[mid] ?? 0;
+    return (a + b) / 2;
+  };
+  return {
+    ready: { medianMinutes: median(byStatus.ready), sampleCount: byStatus.ready.length },
+    waiting: { medianMinutes: median(byStatus.waiting), sampleCount: byStatus.waiting.length },
+    failing: { medianMinutes: median(byStatus.failing), sampleCount: byStatus.failing.length },
+    "no-pr": { medianMinutes: median(byStatus["no-pr"]), sampleCount: byStatus["no-pr"].length },
+    "no-sha": { medianMinutes: median(byStatus["no-sha"]), sampleCount: byStatus["no-sha"].length },
+    unknown: { medianMinutes: median(byStatus.unknown), sampleCount: byStatus.unknown.length },
+  };
 }
 
 function mergeBlocksWithIdentifierCache(
@@ -189,17 +264,17 @@ async function fetchIssueIdentifiers(
         );
         if (!res.ok) return;
         const body = (await res.json()) as { identifier?: unknown };
-        if (typeof body.identifier === "string" && body.identifier.length > 0) {
-          out.set(uuid, body.identifier);
+          if (typeof body.identifier === "string" && body.identifier.length > 0) {
+            out.set(uuid, body.identifier);
+          }
+        } catch {
+          // Per-issue failures are non-fatal — keep going.
         }
-      } catch {
-        // Per-issue failures are non-fatal — keep going.
-      }
-    });
-    await Promise.allSettled(tasks);
-  } finally {
-    clearTimeout(timeoutId);
-  }
+      });
+      await Promise.allSettled(tasks);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   return out;
 }
 
@@ -265,6 +340,21 @@ function coerceConfig(value: unknown): GitMergesConfig {
       10,
       Math.min(3600, Math.floor(v.scanTimeoutSeconds)),
     );
+  if (typeof v.stuckThresholdHours === "number" && Number.isFinite(v.stuckThresholdHours))
+    base.stuckThresholdHours = Math.max(
+      1,
+      Math.min(720, Math.floor(v.stuckThresholdHours)),
+    );
+  if (typeof v.etaHistorySize === "number" && Number.isFinite(v.etaHistorySize))
+    base.etaHistorySize = Math.max(
+      5,
+      Math.min(200, Math.floor(v.etaHistorySize)),
+    );
+  if (typeof v.runningRefreshIntervalSeconds === "number" && Number.isFinite(v.runningRefreshIntervalSeconds))
+    base.runningRefreshIntervalSeconds = Math.max(
+      5,
+      Math.min(300, Math.floor(v.runningRefreshIntervalSeconds)),
+    );
   return base;
 }
 
@@ -285,6 +375,9 @@ function mergeConfigUpdate(
     showJson: incoming.showJson,
     maxOutputChars: incoming.maxOutputChars,
     scanTimeoutSeconds: incoming.scanTimeoutSeconds,
+    stuckThresholdHours: incoming.stuckThresholdHours,
+    etaHistorySize: incoming.etaHistorySize,
+    runningRefreshIntervalSeconds: incoming.runningRefreshIntervalSeconds,
   };
 }
 
@@ -401,6 +494,139 @@ const plugin = definePlugin({
     });
 
     // ---- Data: snapshot (config + status + latest + history + blocks) ---
+    // ---- Data: running (dispatch jobs in progress) ---------------------
+    // BTCAAAAA-39051: the "Now processing" panel. Polls the dispatch
+    // routine's in_progress execution issues via the Paperclip REST
+    // API and exposes them as a list. The data handler is cheap (one
+    // HTTP GET, one cache lookup) so the UI can poll it every 1.5 s
+    // without thrashing the API; we ALSO cache the result for
+    // `runningRefreshIntervalSeconds` to limit how often we hit the
+    // API even when the UI is not polling.
+    ctx.data.register(DATA_KEYS.running, async () => {
+      const configValue = await ctx.state.get({
+        scopeKind: "instance",
+        stateKey: CONFIG_STATE_KEY,
+      });
+      const config = coerceConfig(configValue);
+      return await fetchRunningJobs(
+        config.repoPath,
+        config.runningRefreshIntervalSeconds,
+      );
+    });
+
+    // BTCAAAAA-39051: in-memory cache for the running-jobs data handler.
+    // We poll the Paperclip API at most once per `refreshSeconds`; the
+    // UI may poll the data channel much more often, and we just return
+    // the cached result. This keeps the API load low even with the UI
+    // polling every 1.5s.
+    let runningCache: {
+      at: number;
+      value: { jobs: RunningJob[]; lastDispatchAt: string | null };
+    } | null = null;
+
+    /**
+     * BTCAAAAA-39051: query the Paperclip API for the dispatch routine's
+     * currently-in-progress execution issues. Caches the result for
+     * `refreshSeconds` to limit API load.
+     *
+     * The "linked in_review issue" surface is the dispatch job's own
+     * title (which the closure-gate routine sets to "Phase 4a:
+     * Merge-Dispatch Routine"). A future iteration can walk the
+     * dispatch job's comments to find the actual in_review UUID.
+     */
+    async function fetchRunningJobs(
+      repoPath: string,
+      refreshSeconds: number,
+    ): Promise<{ jobs: RunningJob[]; lastDispatchAt: string | null }> {
+      const now = Date.now();
+      if (runningCache && now - runningCache.at < refreshSeconds * 1000) {
+        return runningCache.value;
+      }
+      const env = loadDotenv(repoPath);
+      const apiUrl = (
+        env.PAPERCLIP_API_URL ?? process.env.PAPERCLIP_API_URL ?? ""
+      ).trim();
+      const apiKey = (
+        env.PAPERCLIP_API_KEY ?? process.env.PAPERCLIP_API_KEY ?? ""
+      ).trim();
+      const companyId = (
+        env.PAPERCLIP_COMPANY_ID ?? process.env.PAPERCLIP_COMPANY_ID ?? ""
+      ).trim();
+      const empty: { jobs: RunningJob[]; lastDispatchAt: string | null } = {
+        jobs: [],
+        lastDispatchAt: runningCache?.value.lastDispatchAt ?? null,
+      };
+      if (!apiUrl || !apiKey || !companyId) {
+        runningCache = { at: now, value: empty };
+        return empty;
+      }
+      try {
+        const DISPATCH_ROUTINE_ID =
+          "908726dc-c9be-4b0f-91fc-f990ffbfcf5c";
+        const DISPATCH_AGENT_ID =
+          "2b9152a6-07f6-4ae9-87fa-c824012c9ff6";
+        const params = new URLSearchParams({
+          assigneeAgentId: DISPATCH_AGENT_ID,
+          status: "in_progress",
+          limit: "10",
+        });
+        const url = `${apiUrl.replace(/\/+$/, "")}/api/companies/${companyId}/issues?${params}`;
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            Accept: "application/json",
+          },
+          signal: AbortSignal.timeout(5_000),
+        });
+        if (!res.ok) {
+          runningCache = { at: now, value: empty };
+          return empty;
+        }
+        const data = (await res.json()) as unknown;
+        if (!Array.isArray(data)) {
+          runningCache = { at: now, value: empty };
+          return empty;
+        }
+        const jobs: RunningJob[] = [];
+        for (const entry of data) {
+          if (!isPlainObject(entry)) continue;
+          const originKind = entry["originKind"];
+          const originId = entry["originId"];
+          if (originKind !== "routine_execution") continue;
+          if (originId !== DISPATCH_ROUTINE_ID) continue;
+          const uuid = entry["id"];
+          const identifier = entry["identifier"];
+          const title = entry["title"];
+          const createdAt = entry["createdAt"];
+          const assignee = entry["assigneeAgentId"];
+          if (typeof uuid !== "string") continue;
+          if (typeof createdAt !== "string") continue;
+          const startedMs = new Date(createdAt).getTime();
+          if (!Number.isFinite(startedMs)) continue;
+          jobs.push({
+            issueUuid: uuid,
+            issueIdentifier: typeof identifier === "string" ? identifier : null,
+            linkedIssueTitle: typeof title === "string" ? title : null,
+            startedAt: createdAt,
+            elapsedSeconds: Math.max(0, Math.round((now - startedMs) / 1000)),
+            hasAgent: typeof assignee === "string" && assignee.length > 0,
+          });
+        }
+        const value = {
+          jobs,
+          lastDispatchAt: runningCache?.value.lastDispatchAt ?? null,
+        };
+        runningCache = { at: now, value };
+        return value;
+      } catch (err) {
+        ctx.logger.warn("Git Merges: running-jobs fetch failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        runningCache = { at: now, value: empty };
+        return empty;
+      }
+    }
+
     ctx.data.register(DATA_KEYS.snapshot, async () => {
       const [
         configValue,
@@ -975,6 +1201,42 @@ async function executeScan(
     }
   }
 
+  // BTCAAAAA-39051: post-process parsed blocks to compute `isStuck` +
+  // `etaMinutes` + `etaBucket`. The augmentation needs the previous
+  // blocks (for progress comparison) and the ETA history (for the
+  // median-per-status lookup). Both are read from instance state.
+  //
+  // We do this BEFORE identifier resolution so the in-memory object
+  // identity of `parsed.blocks[i]` matches what's in `record.blocks`
+  // after the assignment below. (The augmentation returns a new array;
+  // we replace `parsed.blocks` with it.)
+  const previousBlocksForStuck = isMergeBlocksArray(
+    await ctx.state.get({
+      scopeKind: "instance",
+      stateKey: PREVIOUS_BLOCKS_KEY,
+    }),
+  )
+    ? ((await ctx.state.get({
+        scopeKind: "instance",
+        stateKey: PREVIOUS_BLOCKS_KEY,
+      })) as MergeBlock[])
+    : null;
+  const etaHistoryValue = await ctx.state.get({
+    scopeKind: "instance",
+    stateKey: ETA_HISTORY_STATE_KEY,
+  });
+  const etaByStatus = computeEtaByStatus(
+    isEtaSampleArray(etaHistoryValue) ? etaHistoryValue : [],
+    config.etaHistorySize,
+  );
+  parsed.blocks = augmentBlocksWithStuckAndEta(
+    parsed.blocks,
+    previousBlocksForStuck,
+    config.stuckThresholdHours,
+    etaByStatus,
+  );
+  parsed.totals.stuck = countStuck(parsed.blocks);
+
   // Attach parsed structure to the record so future scans can read it
   // for diffs, and so the UI's `latest` payload has everything it needs.
   record.blocks = parsed.blocks;
@@ -1014,6 +1276,81 @@ async function executeScan(
     { scopeKind: "instance", stateKey: STATUS_STATE_KEY },
     nextStatus,
   );
+
+  // BTCAAAAA-39051: capture ETA samples for blocks that left the queue
+  // between the previous scan and this one. A block "leaves" when its
+  // diffKey is in the previous scan's blocks but not in the current
+  // scan's blocks. For each such block we record a (inReviewAt,
+  // closedAt, status, durationMinutes) tuple, which feeds the ETA
+  // estimate for future scans.
+  //
+  // We use the same `previousScanRecord` that was loaded at the start
+  // of this scan (see the early read further up in this function);
+  // that variable is in scope here.
+  if (previousScanRecord && previousScanRecord.blocks && record.blocks) {
+    try {
+      const previousKeys = new Set(previousScanRecord.blocks.map((b) => b.diffKey));
+      const currentKeys = new Set(record.blocks.map((b) => b.diffKey));
+      const closedSamples: EtaSample[] = [];
+      for (const prev of previousScanRecord.blocks) {
+        if (currentKeys.has(prev.diffKey)) continue;
+        // Block left the queue between scans — capture the closure.
+        const inReviewAt = previousScanRecord.startedAt;
+        if (!inReviewAt) continue;
+        // closedAt is "now" (the new scan's startedAt is the best
+        // approximation of when the change was observed). Falls back
+        // to the new record's startedAt for edge cases.
+        const closedAt = record.startedAt ?? new Date().toISOString();
+        const inReviewMs = new Date(inReviewAt).getTime();
+        const closedMs = new Date(closedAt).getTime();
+        if (!Number.isFinite(inReviewMs) || !Number.isFinite(closedMs)) continue;
+        const durationMinutes = Math.max(0, (closedMs - inReviewMs) / 60_000);
+        if (durationMinutes < 0 || durationMinutes > 60 * 24 * 30) {
+          // Sanity: skip pathological durations (>30d) which usually
+          // indicate a clock issue or stale data.
+          continue;
+        }
+        closedSamples.push({
+          inReviewAt,
+          closedAt,
+          status: prev.status,
+          durationMinutes,
+          issueIdentifier: prev.issueIdentifier,
+        });
+      }
+      if (closedSamples.length > 0) {
+        const existing = isEtaSampleArray(etaHistoryValue) ? etaHistoryValue : [];
+        // Dedupe by issueIdentifier+inReviewAt (defensive: the previous
+        // scan may have been repeated due to a network blip, so don't
+        // double-count the same closure).
+        const seen = new Set<string>();
+        for (const s of existing) {
+          const k = `${s.issueIdentifier ?? s.inReviewAt}::${s.inReviewAt}`;
+          seen.add(k);
+        }
+        const merged: EtaSample[] = [...existing];
+        for (const s of closedSamples) {
+          const k = `${s.issueIdentifier ?? ""}::${s.inReviewAt}`;
+          if (seen.has(k)) continue;
+          seen.add(k);
+          merged.push(s);
+        }
+        // Keep only the most recent N×2 samples (some headroom over
+        // etaHistorySize so computeEtaByStatus has full coverage on
+        // each status bucket even when the queue is dominated by one
+        // status).
+        const trimmed = merged.slice(-Math.max(config.etaHistorySize * 2, 40));
+        await ctx.state.set(
+          { scopeKind: "instance", stateKey: ETA_HISTORY_STATE_KEY },
+          trimmed,
+        );
+      }
+    } catch (err) {
+      ctx.logger.warn("Git Merges: ETA sample capture failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
   ctx.streams.emit(STREAM_CHANNELS.output, {
     kind: "scan-finish",
