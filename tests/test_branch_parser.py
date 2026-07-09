@@ -116,3 +116,56 @@ def test_strip_ansi_handles_empty_string():
 
 def test_strip_ansi_removes_cursor_positioning():
     assert bp.strip_ansi("before\x1b[2Kafter") == "beforeafter"
+
+
+# ---------------------------------------------------------------------------
+# has_precompletion_marker tests (BTCAAAAA-39070)
+# ---------------------------------------------------------------------------
+
+
+def test_has_precompletion_marker_matches_anchor_line():
+    body = (
+        "## Pre-Completion Diff Warning\n"
+        "\n"
+        "Working tree in this issue's workspace has uncommitted changes..."
+    )
+    assert bp.has_precompletion_marker(body) is True
+
+
+def test_has_precompletion_marker_matches_with_bold_wrapper():
+    body = "**Pre-Completion Diff Warning** for issue BTCAAAAA-39070."
+    assert bp.has_precompletion_marker(body) is True
+
+
+def test_has_precompletion_marker_matches_with_underscore_wrapper():
+    body = "_Pre-Completion Diff Warning_ — push your fix branch now."
+    assert bp.has_precompletion_marker(body) is True
+
+
+def test_has_precompletion_marker_matches_with_backtick_wrapper():
+    body = "`Pre-Completion Diff Warning` posted by precompletion cron."
+    assert bp.has_precompletion_marker(body) is True
+
+
+def test_has_precompletion_marker_matches_leading_whitespace():
+    body = "  Pre-Completion Diff Warning\n  Followed by body."
+    assert bp.has_precompletion_marker(body) is True
+
+
+def test_has_precompletion_marker_case_insensitive():
+    body = "pre-completion diff warning — lowercase version."
+    assert bp.has_precompletion_marker(body) is True
+
+
+def test_has_precompletion_marker_rejects_mid_line_prose():
+    body = "I posted a Pre-Completion Diff Warning earlier today."
+    assert bp.has_precompletion_marker(body) is False
+
+
+def test_has_precompletion_marker_rejects_unrelated_content():
+    assert bp.has_precompletion_marker("nothing to see here") is False
+
+
+def test_has_precompletion_marker_rejects_empty_or_none():
+    assert bp.has_precompletion_marker("") is False
+    assert bp.has_precompletion_marker(None) is False

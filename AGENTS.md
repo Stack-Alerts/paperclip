@@ -361,3 +361,46 @@ real risk in this company. The `paperclip` skill already enforces this in
 Step 8, but agents that load a reduced skill subset or suffer context drift
 in long sessions can still skip the final PATCH. This block is the last-line
 defense loaded from the workspace itself.
+
+## Pre-Completion Diff Warning Routine (BTCAAAAA-39070)
+
+The `precompletion-warning` cron scans `in_progress` issues every 15 minutes
+and posts a `Pre-Completion Diff Warning` comment when an agent's workspace
+has uncommitted changes that would be lost when the heartbeat session ends.
+It runs from `.github/workflows/precompletion-warning.yml` (self-hosted
+runner, concurrency group `precompletion-warning`, `*/15 * * * *`) and is
+implemented by `scripts/precompletion_diff_check.py`.
+
+### Suppression rules
+
+The warning is intentionally idempotent. A cycle is skipped when ANY of the
+following holds:
+
+1. The state file `data/precompletion_warnings.json` records a warning
+   for this issue within the last **60 minutes** (cooldown window).
+2. The issue's comment thread already contains a comment carrying the
+   `Pre-Completion Diff Warning` marker (state-file-wipe resilience —
+   the marker check survives even when `data/` is lost).
+3. The issue's `executionLockedAt` is within the last **10 minutes**
+   (the agent is actively checked out — let it work).
+4. The workspace is missing, has no `cwd`, or is not a `git_repo` workspace.
+   Subdirectory workspaces are not diffed (per the section-confinement
+   guidance in BTC board memory).
+
+### What to do when you see the warning
+
+When you receive a `Pre-Completion Diff Warning` comment on your assigned
+issue, push your working changes to your `fix/BTCAAAAA-NNN-<slug>` branch
+before the next 15-minute cycle. The next cycle will detect the committed
+working tree, see no `git diff --stat HEAD` output, and silently skip the
+issue. No manual `in_progress` reset is needed — the cron is read-only with
+respect to the repo and the issue; it only posts comments.
+
+### Why this is here
+
+Agents working under the dispatch model sometimes accumulate uncommitted
+edits in the workspace between heartbeats. When the session ends, those
+edits vanish because the worktree is reset. This cron gives the assignee a
+single in-thread reminder before the next cycle hits the timeout — far
+better than losing the work silently and re-discovering it via a stalled
+PR.
