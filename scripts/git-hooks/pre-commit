@@ -1,0 +1,26 @@
+#!/bin/bash
+# paperclip-btcaaaaa-main pre-commit hook
+#
+# Captures a snapshot before any commit lands in the worktree. The snapshot
+# includes the current DB state + worktree git ref, so a `git reset --hard`
+# followed by `recovery.sh restore <id>` recovers the system even if the
+# commit breaks paperclip.
+
+set -euo pipefail
+REPO="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+[ -n "$REPO" ] || exit 0
+RECOVERY="$REPO/scripts/recovery.sh"
+[ -x "$RECOVERY" ] || exit 0
+
+case "$REPO" in
+  *paperclip-btcaaaaa-main*) ;;
+  *) exit 0 ;;
+esac
+
+# skip if this isn't the paperclip-btcaaaaa-main worktree
+# only fire for commits that touch code (skip doc-only / whitespace-only)
+git diff --cached --stat 2>/dev/null | grep -q '|' || exit 0
+
+# background snapshot, non-blocking
+( "$RECOVERY" snapshot --no-upload >> "/home/sirrus/.paperclip/logs/recovery.log" 2>&1 ) &
+disown || true
