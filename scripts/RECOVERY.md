@@ -60,12 +60,20 @@ snapshot (only the files that changed) regardless of snapshot count.
 
 ## How restore works
 
-1. Stops the paperclip tmux session (if running).
-2. Starts a temporary embedded-postgres on a free port and loads the
-   snapshot's `paperclip-*.sql.gz` into a fresh `paperclip` database.
-3. Backs up the current `/home/sirrus/.paperclip-worktrees/instances/paperclip-btcaaaaa-main/db/`
+1. Stops the paperclip tmux session AND the embedded-postgres child
+   process (it must be quiet before step 3's rsync — otherwise rsync
+   overwrites files postgres is holding open, producing torn writes).
+2. Backs up the current
+   `/home/sirrus/.paperclip-worktrees/instances/paperclip-btcaaaaa-main/db/`
    to `/home/sirrus/paperclip-snapshots/restore-before-<id>/data/`.
-4. Extracts the data bundle (the snapshot's tarball) over `/`.
+3. Restores the data dir from the snapshot, then **clears the live
+   `pg_wal/`** so postgres does a fresh startup from the snapshot's base
+   (the snapshot excludes `pg_wal` by design; the live WAL is from the
+   pre-kill postgres and is inconsistent with the new base).
+4. Starts a temporary embedded-postgres (after `initdb`) on a free port
+   and loads the snapshot's `paperclip-*.sql.gz` (custom `-Fc` format)
+   via `pg_restore`. This is a sanity check that the SQL dump is
+   well-formed; the live data dir has the snapshot's base from step 3.
 5. `git checkout` the worktree to the snapshot's recorded ref.
 6. `pnpm install --frozen-lockfile && pnpm --filter @paperclipai/server build && pnpm --filter @paperclipai/ui build`
 7. Restarts `./scripts/launch-dev.sh` and waits for `/api/health` to come up.

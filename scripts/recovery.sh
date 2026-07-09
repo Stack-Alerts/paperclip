@@ -489,7 +489,20 @@ do_restore() {
   pkill -TERM -f "tsx.*src/index.ts" 2>/dev/null || true
   pkill -TERM -f "dev-runner.ts dev"  2>/dev/null || true
   pkill -TERM -f "pnpm dev:once"      2>/dev/null || true
-  sleep 2
+  # IMPORTANT: also kill the embedded-postgres child process. Killing only
+  # the paperclip API server leaves postgres running and holding files
+  # inside $DATA_DIR open for write. Step 3's rsync --delete then
+  # overwrites those files under postgres's feet, producing torn writes
+  # and a corrupt live db. Match either the embedded-postgres binary
+  # invoked with our DATA_DIR, or any postgres holding our DB_PORT.
+  pkill -TERM -f "embedded-postgres/linux-x64/native/bin/postgres.*-D $DATA_DIR" 2>/dev/null || true
+  pkill -TERM -f "postgres.*-p $DB_PORT" 2>/dev/null || true
+  # Give postgres a moment for a clean shutdown (writes shutdown checkpoint)
+  sleep 3
+  # If postgres is still alive, force-kill it. We need $DATA_DIR quiescent
+  # before step 3's rsync runs.
+  pkill -KILL -f "embedded-postgres/linux-x64/native/bin/postgres.*-D $DATA_DIR" 2>/dev/null || true
+  sleep 1
 
   # 2) backup current data dir
   local backup_dir="$LOG_DIR/restore-before-$id"
@@ -507,6 +520,21 @@ do_restore() {
     rsync -a --delete \
       --exclude='pg_wal' --exclude='postmaster.pid' --exclude='postmaster.opts' \
       "$staging/data/" "$DATA_DIR/" 2>&1 | tail -2 || true
+    # The rsync above intentionally excludes pg_wal because the snapshot
+    # is captured without pg_wal. But the live pg_wal (from before the
+    # postgres kill in step 1) is now inconsistent with the rsync'd base
+    # — its checkpoint and committed-tx ranges point at the OLD data
+    # files. Postgres startup would fail with
+    # "could not locate a valid checkpoint record" or, worse, replay
+    # WAL and roll back the rsync'd data. Clear pg_wal so postgres does
+    # a fresh startup from the snapshot's base only.
+    log "  clearing live pg_wal (inconsistent with snapshot base)..."
+    rm -rf "$DATA_DIR/pg_wal"
+    mkdir -p "$DATA_DIR/pg_wal"
+    # Same for pg_replslot / pg_logical / pg_stat — they may carry WAL
+    # references too.
+    rm -rf "$DATA_DIR/pg_replslot" "$DATA_DIR/pg_logical" "$DATA_DIR/pg_stat_tmp" "$DATA_DIR/pg_snapshots"
+    mkdir -p "$DATA_DIR/pg_replslot" "$DATA_DIR/pg_logical" "$DATA_DIR/pg_stat_tmp" "$DATA_DIR/pg_snapshots"
   else
     note "  (snapshot has no data/ — DB restore only)"
   fi
@@ -517,21 +545,56 @@ do_restore() {
   sql_gz="$(find "$staging" -maxdepth 3 -name 'paperclip-*.sql.gz' 2>/dev/null | head -1)"
   if [[ -n "$sql_gz" && -f "$sql_gz" ]]; then
     local tmp_pgdir="/tmp/paperclip-restore-pg-$$"
+    # Clean and initdb the temp pgdata dir. The previous version of this
+    # script tried to start postgres -D directly without initdb, which
+    # always failed with "required WAL directory does not exist" — leaving
+    # the SQL restore as a no-op and the live db in whatever state step 3's
+    # rsync left it. Always initdb so the temp postgres can start.
+    rm -rf "$tmp_pgdir"
+    mkdir -p "$tmp_pgdir"
+    if ! /home/sirrus/paperclip-btcaaaaa-main/node_modules/.pnpm/@embedded-postgres+linux-x64@18.1.0-beta.16/node_modules/@embedded-postgres/linux-x64/native/bin/initdb \
+        -D "$tmp_pgdir" \
+        -U "$PG_USER" \
+        --pwfile=<(echo "$PG_PASS") \
+        --auth=trust \
+        --encoding=UTF8 \
+        --locale=C >>/tmp/paperclip-restore-pg.log 2>&1; then
+      die "initdb failed for temp restore postgres (see /tmp/paperclip-restore-pg.log)"
+    fi
     /home/sirrus/paperclip-btcaaaaa-main/node_modules/.pnpm/@embedded-postgres+linux-x64@18.1.0-beta.16/node_modules/@embedded-postgres/linux-x64/native/bin/postgres \
-      -D "$tmp_pgdir" -p "$((DB_PORT+1))" >/tmp/paperclip-restore-pg.log 2>&1 &
+      -D "$tmp_pgdir" -p "$((DB_PORT+1))" >>/tmp/paperclip-restore-pg.log 2>&1 &
     local pg_pid=$!
     sleep 4
     if ! PGPASSWORD="$PG_PASS" psql -h 127.0.0.1 -p "$((DB_PORT+1))" -U "$PG_USER" -d postgres -c "CREATE DATABASE paperclip OWNER paperclip;" 2>&1; then
       kill $pg_pid 2>/dev/null || true
       die "failed to start restore postgres"
     fi
-    if zcat "$sql_gz" | PGPASSWORD="$PG_PASS" psql -h 127.0.0.1 -p "$((DB_PORT+1))" -U "$PG_USER" -d paperclip 2>&1 | tail -5; then
-      kill $pg_pid 2>/dev/null || true
-      sleep 2
-      log "  DB restored successfully"
+    # Detect pg_dump format from the magic bytes. `-Fc` (custom) dumps
+    # start with "PGDMP" and require pg_restore; plain-text dumps would
+    # be loaded via psql here. The paperclip-backup snapshot script uses
+    # -Fc, so we route accordingly.
+    local sql_magic
+    sql_magic="$(zcat "$sql_gz" 2>/dev/null | head -c 5 2>/dev/null || true)"
+    if [[ "$sql_magic" == "PGDMP" ]]; then
+      if zcat "$sql_gz" | PGPASSWORD="$PG_PASS" pg_restore \
+            -h 127.0.0.1 -p "$((DB_PORT+1))" -U "$PG_USER" -d paperclip \
+            --no-owner --no-privileges --quiet 2>&1 | tail -10; then
+        kill $pg_pid 2>/dev/null || true
+        sleep 2
+        log "  DB restored successfully (pg_restore from custom dump)"
+      else
+        kill $pg_pid 2>/dev/null || true
+        die "DB restore failed (pg_restore)"
+      fi
     else
-      kill $pg_pid 2>/dev/null || true
-      die "DB restore failed"
+      if zcat "$sql_gz" | PGPASSWORD="$PG_PASS" psql -h 127.0.0.1 -p "$((DB_PORT+1))" -U "$PG_USER" -d paperclip 2>&1 | tail -5; then
+        kill $pg_pid 2>/dev/null || true
+        sleep 2
+        log "  DB restored successfully (psql from plain-text dump)"
+      else
+        kill $pg_pid 2>/dev/null || true
+        die "DB restore failed (psql)"
+      fi
     fi
   else
     note "  (no SQL dump in snapshot — skipping DB restore)"
