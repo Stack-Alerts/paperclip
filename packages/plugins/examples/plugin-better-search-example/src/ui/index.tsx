@@ -993,7 +993,7 @@ export function BetterSearchSidebar({ context }: PluginSidebarProps) {
   const companyPrefix = context.companyPrefix;
   const hostNavigation = useHostNavigation();
   const hostLocation = useHostLocation();
-  const href = companyPrefix ? `/${companyPrefix}/search` : "/search";
+  const href = companyPrefix ? `/${companyPrefix}/find` : "/find";
   const isActive =
     hostLocation.pathname === href ||
     hostLocation.pathname.startsWith(`${href}/`);

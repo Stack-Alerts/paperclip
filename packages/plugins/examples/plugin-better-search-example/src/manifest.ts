@@ -46,7 +46,7 @@ const manifest: PaperclipPluginManifestV1 = {
         id: PAGE_SLOT_ID,
         displayName: "Better Search",
         exportName: "BetterSearchPage",
-        routePath: "search",
+        routePath: "find",
       },
       {
         type: "inboxToolbarButton",
