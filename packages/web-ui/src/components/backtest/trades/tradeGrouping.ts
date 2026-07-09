@@ -20,6 +20,26 @@
 // Ties on exitTime fall back to entryTime so two legs that closed on the same
 // bar stay in entry order; `Array.prototype.sort` is stable in modern engines
 // so any further tie preserves the original emission order.
+//
+// BTCAAAAA-39063: the engine's per-trade counter is global, NOT per-position,
+// so a fresh position opened weeks later can be emitted with the same base ID
+// as an earlier position that has already closed (e.g. "2", "2.1", "2.2" for
+// the 12/07 single-leg trade, then "2.1", "2.2" for the 03/21 two-leg chain,
+// then "2.1", "2.2", "2.3" for the 05/26 three-leg chain). `baseTradeId`
+// strips ANY trailing `.N` suffix, so without a defensive check these three
+// distinct positions collapse into one "Trade 2" parent whose P&L aggregates
+// are nonsense and whose leg ordering mixes unrelated exits (the local-board
+// screenshot showed leg 2.3 displaying "SL 67%" because the 03/21 67% SL
+// close and the 05/26 TP legs all shared the same parent). The fix groups by
+// a COMPOSITE key (engineBaseId, entryTime, entryPrice) — the same position
+// shares all three, but unrelated positions differ on at least entryTime.
+// After all trades are bucketed, we detect engine-base collisions: if the
+// engine base "2" produced multiple composite-key groups, every one of those
+// groups gets an `mmdd` discriminator (e.g. "2-1207", "2-0321", "2-0526")
+// so React keys, collapse state, sort, and TotalRow display stay unique.
+// Engine bases that produced exactly one group (the common case — a single
+// position) keep their bare engine baseId for visual continuity with engine
+// numbering.
 
 import { Trade } from '@/lib/strategy-builder/types';
 
@@ -90,6 +110,41 @@ function compareLegsByCloseTime(a: Trade, b: Trade): number {
 }
 
 /**
+ * Format an entry-time string as `mmdd` (zero-padded month+day) for use as a
+ * position discriminator. Engine base IDs collide across positions (BTC-39063)
+ * so the date suffix lets the UI tell 2025-12-07's "Trade 2" apart from
+ * 2026-03-21's "Trade 2" and 2026-05-26's "Trade 2" at a glance. Tolerates
+ * full ISO strings (`2025-12-07T14:00:00Z`) by parsing only the leading
+ * `YYYY-MM-DD`; falls back to `0000` for missing or malformed inputs so the
+ * discriminator shape stays consistent (rather than risking an empty suffix
+ * that would collide with the bare engine baseId).
+ */
+function formatMmdd(entryTime: string): string {
+  if (!entryTime) return '0000';
+  const m = entryTime.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '0000';
+  return `${m[2]}${m[3]}`;
+}
+
+/**
+ * Internal bookkeeping record for one composite-key bucket during grouping.
+ * Stripped from the public return — only `baseId`, `trades`, `totalPnl`,
+ * `totalPnlPct` are exposed via the public `TradeGroup` shape. The
+ * `engineBase` field is the pre-discriminator id used solely for collision
+ * detection; `entryTime` and `entryPrice` are the canonical values of the
+ * composite key (every leg in the same group shares them by construction).
+ */
+interface InternalGroup {
+  baseId: string;
+  engineBase: string;
+  entryTime: string;
+  entryPrice: number;
+  trades: Trade[];
+  totalPnl: number;
+  totalPnlPct: number;
+}
+
+/**
  * Group partial-exit trade rows by their parent base ID and compute the
  * aggregate P&L fields. `totalPnlPct` is the USD P&L sum divided by the
  * parent-trade entry notional (BTCAAAAA-39025), so the displayed group
@@ -101,34 +156,88 @@ function compareLegsByCloseTime(a: Trade, b: Trade): number {
  * is reliably the chronological closing leg for downstream consumers
  * (`groupNotesPreview`, `groupRowSummary.exitPrice`, TotalRow tooltip,
  * `sortGroupValue` 'status' branch).
+ *
+ * BTCAAAAA-39063 defense: grouping is keyed by the COMPOSITE
+ * (engineBaseId, entryTime, entryPrice) tuple, not by `baseTradeId` alone.
+ * The engine's per-trade counter is global, so distinct positions opened
+ * weeks apart can be emitted with the same base id ("2", "2.1", "2.2"…).
+ * Without the composite key those positions would collapse into one "Trade 2"
+ * parent. After bucketing, we count how many buckets share each engine base:
+ * if exactly one bucket has that engine base, we keep the bare id for visual
+ * parity with engine numbering; if multiple buckets share an engine base,
+ * we suffix every colliding bucket's `baseId` with its entry-time `mmdd`
+ * (e.g. "2-1207", "2-0321", "2-0526") so React keys, collapse state, sort,
+ * and TotalRow display stay unique. The composite key intentionally uses
+ * `entryTime` (not `exitTime`) because the bug is about positions — and a
+ * position's identity is anchored at its entry bar, not its close.
  */
 export function groupTradesById(raw: Trade[]): TradeGroup[] {
-  const map = new Map<string, TradeGroup>();
+  // Phase 1: bucket by composite key (engineBase, entryTime, entryPrice).
+  // We keep insertion order in `order` so the outer group list follows the
+  // engine's natural trade sequence, matching prior behavior.
+  const map = new Map<string, InternalGroup>();
   const order: string[] = [];
 
   for (const t of raw) {
-    const b = baseTradeId(t.id);
-    let g = map.get(b);
+    const engineBase = baseTradeId(t.id);
+    const entryTime = t.entryTime ?? '';
+    const entryPrice = t.entryPrice ?? 0;
+    const compositeKey = `${engineBase}|${entryTime}|${entryPrice}`;
+    let g = map.get(compositeKey);
     if (!g) {
-      g = { baseId: b, trades: [], totalPnl: 0, totalPnlPct: 0 };
-      map.set(b, g);
-      order.push(b);
+      g = {
+        baseId: engineBase,
+        engineBase,
+        entryTime,
+        entryPrice,
+        trades: [],
+        totalPnl: 0,
+        totalPnlPct: 0,
+      };
+      map.set(compositeKey, g);
+      order.push(compositeKey);
     }
     g.trades.push(t);
     g.totalPnl += t.pnl ?? 0;
   }
 
-  for (const b of order) {
-    const g = map.get(b)!;
-    // BTCAAAAA-39061: sort legs within each group by chronological close so
-    // `legs[length - 1]` is the real closing leg, not whatever the engine
-    // emitted last. The engine can interleave 100% SL closes with later TP
-    // partials, which previously made a parent group's "closing leg" point
-    // at an earlier partial rather than the actual final exit.
+  // Phase 2: detect engine-base collisions and apply the mmdd discriminator
+  // ONLY to groups that share their engine base with at least one other group.
+  // Bare engine bases (the common single-position case) are left untouched so
+  // the visual label "Trade 5" still matches engine numbering.
+  const engineBaseCounts = new Map<string, number>();
+  for (const key of order) {
+    const g = map.get(key)!;
+    engineBaseCounts.set(g.engineBase, (engineBaseCounts.get(g.engineBase) ?? 0) + 1);
+  }
+  for (const key of order) {
+    const g = map.get(key)!;
+    if (engineBaseCounts.get(g.engineBase)! > 1) {
+      g.baseId = `${g.engineBase}-${formatMmdd(g.entryTime)}`;
+    }
+  }
+
+  // Phase 3: sort legs within each group by chronological close, then compute
+  // the notional-derived aggregate percentage. Leg sort and P&L math are
+  // unchanged from BTC-39025 / BTC-39061; we keep them post-relabel so the
+  // `entryNotionalForGroup` helper still reads the first leg's `entryPrice`
+  // (every leg of the same composite group shares it).
+  for (const key of order) {
+    const g = map.get(key)!;
     g.trades.sort(compareLegsByCloseTime);
     const notional = entryNotionalForGroup(g.trades);
     g.totalPnlPct = notional > 0 ? (g.totalPnl / notional) * 100 : 0;
   }
 
-  return order.map(b => map.get(b)!);
+  // Phase 4: strip the internal-only fields so consumers see the public
+  // `TradeGroup` shape unchanged.
+  return order.map(key => {
+    const g = map.get(key)!;
+    return {
+      baseId: g.baseId,
+      trades: g.trades,
+      totalPnl: g.totalPnl,
+      totalPnlPct: g.totalPnlPct,
+    };
+  });
 }

@@ -254,4 +254,145 @@ describe('tradeGrouping — BTCAAAAA-39025', () => {
       expect(groupTradesById([])).toEqual([]);
     });
   });
+
+  /**
+   * BTCAAAAA-39063: the engine can emit multiple DISTINCT positions that share
+   * the same engine baseId when its per-trade counter increments across
+   * positions instead of per-base. The local-board report was that "Trade 2.1
+   * had a 100% SL close but then partials and other closes followed" —
+   * confusing because trade 2.1/2.2/2.3 in the screenshot were actually three
+   * distinct positions (entryTimes 12/07, 03/21, 05/26) with different entry
+   * prices ($89,551/$70,595/$76,873), NOT one position with partial exits.
+   *
+   * The engine's `trade_registry.py` keys positions on full `entry_ts`, so
+   * each position is a distinct registry entry. But the engine's per-trade
+   * counter still numbers them sequentially ("2.1", "2.2", "2.3") across
+   * positions, so the leg IDs alone cannot disambiguate. The fix groups by
+   * COMPOSITE key (engineBaseId, entryTime, entryPrice) and appends an mmdd
+   * discriminator (e.g. "2-1207", "2-0321") to the `baseId` of each colliding
+   * group so React keys, collapse state, sort, and TotalRow display stay
+   * unique. Non-colliding baseIds (a single position with id "10") keep their
+   * bare engine baseId for visual continuity.
+   */
+  describe('groupTradesById — composite-key defense (BTCAAAAA-39063)', () => {
+    it('splits three positions sharing engine baseId "2" into separate groups with mmdd discriminators (BTC-39063 reproducer)', () => {
+      // Three distinct positions all numbered "2.x" by the engine because the
+      // engine's per-trade counter increments across positions. The local-board
+      // screenshot showed these collapsed into one "Trade 2" with mixed dates
+      // and prices. Group entries use the actual board-reported times and
+      // prices (rounded for clarity).
+      const pos1 = makeTimedLeg({
+        id: '2.1', entryTime: '2025-12-07T14:00:00Z', exitTime: '2025-12-07T20:00:00Z',
+        entryPrice: 89551, quantity: 0.5025, pnl: 500, pnlPercentage: 1,
+      });
+      const pos2a = makeTimedLeg({
+        id: '2.1', entryTime: '2026-03-21T10:00:00Z', exitTime: '2026-03-21T14:00:00Z',
+        entryPrice: 70595, quantity: 0.2104, pnl: 100, pnlPercentage: 33,
+      });
+      const pos2b = makeTimedLeg({
+        id: '2.2', entryTime: '2026-03-21T10:00:00Z', exitTime: '2026-03-21T18:00:00Z',
+        entryPrice: 70595, quantity: 0.4271, pnl: 200, pnlPercentage: 67,
+      });
+      const pos3a = makeTimedLeg({
+        id: '2.1', entryTime: '2026-05-26T09:00:00Z', exitTime: '2026-05-26T12:00:00Z',
+        entryPrice: 76873, quantity: 0.1932, pnl: 50, pnlPercentage: 33,
+      });
+      const pos3b = makeTimedLeg({
+        id: '2.2', entryTime: '2026-05-26T09:00:00Z', exitTime: '2026-05-26T15:00:00Z',
+        entryPrice: 76873, quantity: 0.1932, pnl: 60, pnlPercentage: 33,
+      });
+      const pos3c = makeTimedLeg({
+        id: '2.3', entryTime: '2026-05-26T09:00:00Z', exitTime: '2026-05-26T19:00:00Z',
+        entryPrice: 76873, quantity: 0.1990, pnl: 70, pnlPercentage: 34,
+      });
+
+      const groups = groupTradesById([pos1, pos2a, pos2b, pos3a, pos3b, pos3c]);
+
+      // Three distinct positions → three groups
+      expect(groups).toHaveLength(3);
+
+      // Each group carries a unique mmdd discriminator (insertion order preserved)
+      expect(groups.map(g => g.baseId)).toEqual(['2-1207', '2-0321', '2-0526']);
+
+      // pos1 (12/07 single-leg position) is in the 1207 group
+      expect(groups[0].trades.map(t => t.id)).toEqual(['2.1']);
+      // pos2 03/21 TP chain is in the 0321 group, sorted by exitTime
+      expect(groups[1].trades.map(t => t.id)).toEqual(['2.1', '2.2']);
+      // pos3 05/26 TP chain is in the 0526 group
+      expect(groups[2].trades.map(t => t.id)).toEqual(['2.1', '2.2', '2.3']);
+    });
+
+    it('does NOT apply the discriminator when a single engine baseId has multiple legs from ONE position (real partials)', () => {
+      // Same entryTime + same entryPrice → composite key is identical, so all
+      // legs collapse to one group. This is the case BTC-39025 / BTC-39061
+      // already handle — we must NOT regress it. Bare engine baseId preserved
+      // so the visual label "Trade 5" still matches engine numbering.
+      const leg1 = makeTimedLeg({
+        id: '5.1', entryTime: '2026-01-15T10:00:00Z', exitTime: '2026-01-15T12:00:00Z',
+        entryPrice: 50000, quantity: 0.33, pnl: 33, pnlPercentage: 1,
+      });
+      const leg2 = makeTimedLeg({
+        id: '5.2', entryTime: '2026-01-15T10:00:00Z', exitTime: '2026-01-15T14:00:00Z',
+        entryPrice: 50000, quantity: 0.33, pnl: -66, pnlPercentage: -2,
+      });
+      const leg3 = makeTimedLeg({
+        id: '5.3', entryTime: '2026-01-15T10:00:00Z', exitTime: '2026-01-15T16:00:00Z',
+        entryPrice: 50000, quantity: 0.34, pnl: 102, pnlPercentage: 3,
+      });
+
+      const groups = groupTradesById([leg1, leg2, leg3]);
+
+      expect(groups).toHaveLength(1);
+      // No collision → bare engine baseId preserved (BTC-39061 regression guard)
+      expect(groups[0].baseId).toBe('5');
+      expect(groups[0].trades.map(t => t.id)).toEqual(['5.1', '5.2', '5.3']);
+    });
+
+    it('splits two positions sharing engine baseId but with different entryTimes', () => {
+      // Defensive: even when entryPrice matches (rare in practice), differing
+      // entryTimes alone are enough to separate them. Proves the composite
+      // key's entryTime field is load-bearing, not redundant with entryPrice.
+      const a = makeTimedLeg({
+        id: '7.1', entryTime: '2026-01-15T10:00:00Z', exitTime: '2026-01-15T12:00:00Z',
+        entryPrice: 50000, quantity: 1, pnl: 100, pnlPercentage: 2,
+      });
+      const b = makeTimedLeg({
+        id: '7.1', entryTime: '2026-02-20T10:00:00Z', exitTime: '2026-02-20T12:00:00Z',
+        entryPrice: 50000, quantity: 1, pnl: 200, pnlPercentage: 4,
+      });
+
+      const groups = groupTradesById([a, b]);
+
+      expect(groups).toHaveLength(2);
+      expect(groups.map(g => g.baseId)).toEqual(['7-0115', '7-0220']);
+    });
+
+    it('preserves bare baseIds for non-colliding engine baseIds while discriminating the colliding ones', () => {
+      // Mixed: "10" appears once (no collision, bare), "2" appears three times
+      // (collision, all three get mmdd discriminators). The fix must NOT touch
+      // "10" — it has no collision so adding a discriminator would be visual
+      // noise that breaks parity with engine numbering for non-colliding cases.
+      const ten = makeTimedLeg({
+        id: '10.1', entryTime: '2026-04-10T10:00:00Z', exitTime: '2026-04-10T12:00:00Z',
+        entryPrice: 60000, quantity: 0.5, pnl: 150, pnlPercentage: 3,
+      });
+      const twoA = makeTimedLeg({
+        id: '2.1', entryTime: '2025-12-07T14:00:00Z', exitTime: '2025-12-07T20:00:00Z',
+        entryPrice: 89551, quantity: 0.5, pnl: 500, pnlPercentage: 1,
+      });
+      const twoB = makeTimedLeg({
+        id: '2.1', entryTime: '2026-03-21T10:00:00Z', exitTime: '2026-03-21T14:00:00Z',
+        entryPrice: 70595, quantity: 0.21, pnl: 100, pnlPercentage: 33,
+      });
+      const twoC = makeTimedLeg({
+        id: '2.2', entryTime: '2026-03-21T10:00:00Z', exitTime: '2026-03-21T18:00:00Z',
+        entryPrice: 70595, quantity: 0.43, pnl: 200, pnlPercentage: 67,
+      });
+
+      const groups = groupTradesById([ten, twoA, twoB, twoC]);
+
+      expect(groups).toHaveLength(3);
+      expect(groups.map(g => g.baseId)).toEqual(['10', '2-1207', '2-0321']);
+    });
+  });
 });
