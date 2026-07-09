@@ -142,6 +142,30 @@ The `Fix-SHA:` line must be on its own, must match `^Fix-SHA: [0-9a-f]{40}$`, an
 - GitHub branch protection rules → Phase 4b ([BTCAAAAA-30042](/BTCAAAAA/issues/BTCAAAAA-30042)).
 <!-- END:merge-governance -->
 
+<!-- BEGIN:session-end-autosave -->
+## SessionEnd autosave contract (BTCAAAAA-39068)
+
+Every Paperclip run terminates the working tree at some point — clean exit, timeout, OOM, harness restart, model error, or watchdog kill. `AGENTS.md` mandates branch+commit+push but enforces nothing; prior to this contract, uncommitted changes vanished silently on termination. The `scripts/session_end_autosave.py` hook closes that gap.
+
+**Behavior:**
+
+- Runs automatically at Paperclip run end (and from `scripts/opencode_watchdog.py` BEFORE SIGTERM).
+- Only acts when the active branch matches `^fix/BTCAAAAA-` or `^feat/BTCAAAAA-`. All other branches are untouched.
+- If the branch has uncommitted/staged changes, stages them (`git add -A`) and creates a WIP commit:
+  `WIP(BTCAAAAA-NNN): auto-snapshot <run-id>`
+- Force-pushes the WIP commit (`git push origin <branch> --force-with-lease`) so the next run can resume from origin.
+- Logs every step to `.paperclip/autosave.log` with ISO timestamps.
+- Pure-stdlib Python — no extra dependencies.
+
+**Opting out:** set `AUTOSAVE=0` or `PAPERCLIP_NO_AUTOSAVE=1` in the environment, OR pass `--no-autosave` on the CLI. Use this for intentional discards (e.g. you're about to delete a throwaway branch anyway).
+
+**Verifying:** after a run ends, run `tail -n 20 .paperclip/autosave.log` and look for the `[autosave]` line for your branch.
+
+**CI:** `.github/workflows/session-end-smoke.yml` exercises the hook on every PR against a `fix/BTCAAAAA-*` / `feat/BTCAAAAA-*` branch. The hook is covered by the smoke workflow and by `scripts/opencode_watchdog.py`'s integration test path.
+
+**Why a Tier-1 contract:** without this, every other merge-process improvement is moot — work can still vanish mid-run. This was the root cause of the lost-work incidents the board flagged in the parent epic.
+<!-- END:session-end-autosave -->
+
 ## Dev Server Entry Points (BTCAAAAA-31132)
 
 To eliminate operator confusion between the supervised and ephemeral dev servers, the
