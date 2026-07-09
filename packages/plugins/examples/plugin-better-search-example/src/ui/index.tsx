@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   useHostContext,
+  useHostLocation,
+  useHostNavigation,
   usePluginAction,
   usePluginData,
   type PluginSidebarProps,
@@ -861,11 +863,14 @@ export function InboxToolbarPresets() {
 
 export function BetterSearchSidebar({ context }: PluginSidebarProps) {
   const companyPrefix = context.companyPrefix;
+  const hostNavigation = useHostNavigation();
+  const hostLocation = useHostLocation();
   const href = companyPrefix ? `/${companyPrefix}` : "/";
+  const isActive = hostLocation.pathname === "/" || hostLocation.pathname === `/${companyPrefix}`;
 
   return (
     <a
-      href={href}
+      {...hostNavigation.linkProps(href)}
       style={{
         display: "flex",
         alignItems: "center",
@@ -876,6 +881,7 @@ export function BetterSearchSidebar({ context }: PluginSidebarProps) {
         color: "var(--foreground)",
         fontSize: "13px",
         fontWeight: 500,
+        background: isActive ? "var(--accent)" : "transparent",
       }}
       title="Better Search"
     >
