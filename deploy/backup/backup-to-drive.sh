@@ -194,10 +194,10 @@ case "${OK_VAL:-}" in
 esac
 
 _do_oauth_connectivity_check() {
-    if rclone lsd gdrive:Paperclip-Backups --config "$RCLONE_CONFIG" --ask-password=false </dev/null 2>/dev/null; then
+    if rclone lsd gdrive:Paperclip-Backups --config "$RCLONE_CONFIG" --ask-password=false --contimeout 30s --timeout 60s </dev/null 2>/dev/null; then
         return 0
     elif [ "${IS_ENCRYPTED:-}" = "true" ]; then
-        if rclone lsd gdrive:Paperclip-Backups --config "$RCLONE_CONFIG" </dev/null 2>/dev/null; then
+        if rclone lsd gdrive:Paperclip-Backups --config "$RCLONE_CONFIG" --contimeout 30s --timeout 60s </dev/null 2>/dev/null; then
             return 0
         fi
     fi
