@@ -1,7 +1,23 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { TradesPanel } from '@/components/backtest/trades/TradesPanel';
+import { TradesPanel, notesTooltipContent } from '@/components/backtest/trades/TradesPanel';
 import type { Trade } from '@/lib/strategy-builder/types';
+
+// BTCAAAAA-39021: stable substrings we expect to surface inside the
+// institutional-grade Notes tooltip. Sourced verbatim from
+// docs/research/strategy_notes_tooltip_research.json so the test stays
+// authoritative against drift in either the production code or the research
+// artifact (the research JSON landed on main via squash-merge #370 / BTC-39023).
+const BULLISH_BREAKOUT_THESIS_FRAGMENTS = [
+  'Initial Balance Breakout',
+  'weight=30',
+  'category=PATTERNS',
+] as const;
+
+const SL_RISK_GUARD_FRAGMENTS = [
+  'STOP_LOSS_PCT=0.02',
+  'DAILY_LOSS_LIMIT=$500',
+] as const;
 
 function makeTrade(overrides: Partial<Trade> = {}): Trade {
   return {
@@ -177,6 +193,68 @@ describe('TradesPanel — BTCAAAAA-39020 trade-collapse + sub-id numbering', () 
     // Sticky positioning is what survives scroll — assert the inline style.
     expect(h3!.getAttribute('style') ?? '').toMatch(/position:\s*sticky/);
     expect(thead!.getAttribute('style') ?? '').toMatch(/position:\s*sticky/);
+  });
+});
+
+describe('TradesPanel — BTCAAAAA-39021 institutional-grade tooltip uplift', () => {
+  it('Entry Signals section for BULLISH_BREAKOUT references the building block, weight, and category', () => {
+    // The tooltip should no longer just list raw signal names — it must cite
+    // the building-block provenance (from docs/research/strategy_notes_
+    // tooltip_research.json, BULLISH_BREAKOUT.entrySignals[0]) so users can
+    // audit the source of the trade.
+    const tooltip = notesTooltipContent(
+      makeTrade({ entrySignals: ['BULLISH_BREAKOUT'] })
+    );
+    const signals = (tooltip.sections ?? []).find(
+      (s) => s.header === 'Entry Signals'
+    );
+    expect(signals).toBeDefined();
+    const items = (signals?.items ?? []).join(' | ');
+    for (const fragment of BULLISH_BREAKOUT_THESIS_FRAGMENTS) {
+      expect(items).toContain(fragment);
+    }
+  });
+
+  it('Position section for SL exit references RiskEnforcer STOP_LOSS_PCT and DAILY_LOSS_LIMIT', () => {
+    // The Position block must surface the risk-guard VALUES that justify the
+    // exit — STOP_LOSS_PCT=0.02 (per-trade cap) and DAILY_LOSS_LIMIT=$500
+    // (daily loss budget) — sourced verbatim from
+    // docs/research/strategy_notes_tooltip_research.json
+    // (_meta.riskEnforcerRef → src/strategies/risk_enforcer.py).
+    const tooltip = notesTooltipContent(makeTrade({ exitType: 'SL' }));
+    const position = (tooltip.sections ?? []).find(
+      (s) => s.header === 'Position'
+    );
+    expect(position).toBeDefined();
+    const items = (position?.items ?? []).join(' | ');
+    for (const fragment of SL_RISK_GUARD_FRAGMENTS) {
+      expect(items).toContain(fragment);
+    }
+  });
+
+  it('keeps the Notes column width at 170px in the colgroup and per-row maxWidth', () => {
+    // Acceptance criteria: "Notes column width unchanged (pixel count +
+    // visual ratio vs neighboring columns)". We assert BOTH anchors — the
+    // <col> reserving 170px for the column slot AND the per-cell maxWidth
+    // that clamps TradeRow and TotalRow notes cells. The RichTooltip
+    // overlay is rendered via createPortal, so column width is independent
+    // of the tooltip body (no reflow when the overlay expands outward).
+    const trades = [makeTrade({ id: '1' }), ...makePartialGroup('2', 2)];
+    const { container } = render(<TradesPanel trades={trades} />);
+
+    const cols = container.querySelectorAll('col');
+    expect(cols).toHaveLength(13);
+    expect(cols[12].getAttribute('style') ?? '').toMatch(/width:\s*170/);
+
+    const dataRows = container.querySelectorAll('tbody tr');
+    expect(dataRows.length).toBeGreaterThan(0);
+    for (const row of Array.from(dataRows)) {
+      const cells = row.querySelectorAll('td');
+      const notesCell = cells[cells.length - 1];
+      expect(notesCell).toBeDefined();
+      const inline = notesCell!.getAttribute('style') ?? '';
+      expect(inline).toMatch(/max-width:\s*170/);
+    }
   });
 });
 

@@ -184,6 +184,32 @@ function notesDisplay(t: Trade): string {
   return exitNote;
 }
 
+// BTCAAAAA-39021: building-block + category lookup so the Entry Signals
+// section of the institutional-grade tooltip can cite real provenance
+// instead of the bare signal code. Sourced verbatim from
+// docs/research/strategy_notes_tooltip_research.json (research merges on
+// main via squash #370 / BTC-39023). Self-contained — the UI does NOT
+// import the JSON at runtime; hard-coded keys cover the signals the engine
+// actually emits, and unknown signals fall back to the raw code so the
+// tooltip stays useful even for newly-added detectors.
+const SIGNAL_RESEARCH: Record<string, { display: string; weight: number; category: string }> = {
+  BULLISH_BREAKOUT: { display: 'Initial Balance Breakout', weight: 30, category: 'PATTERNS' },
+};
+
+// BTCAAAAA-39021: RiskEnforcer guard values surfaced in the Position section
+// for SL / STOP_LOSS exits so users can verify the exit against the
+// documented guard rail. Sourced verbatim from
+// src/strategies/risk_enforcer.py (the same constants referenced under
+// _meta.riskEnforcerRef in the research JSON).
+const RISK_GUARD_TEXT = {
+  SL: 'Risk guard: STOP_LOSS_PCT=0.02 (per-trade cap), DAILY_LOSS_LIMIT=$500 (daily loss budget)',
+};
+
+function isSlExit(exitType: string | undefined): boolean {
+  const u = (exitType ?? '').toUpperCase().trim();
+  return u === 'SL' || u === 'STOP_LOSS';
+}
+
 // BTCAAAAA-39020: institutional-grade hover tooltip for the Notes column.
 // Reopens the umbrella ticket: per-leg notes (TradeRow) and group-level notes
 // (TotalRow) must share the SAME structure so users see the same four sections
@@ -277,7 +303,12 @@ export function notesTooltipContent(t: Trade, opts: NotesTooltipOpts = {}): Tool
   if (t.entrySignals && t.entrySignals.length > 0) {
     sections.push({
       header: 'Entry Signals',
-      items: t.entrySignals.map(s => `• ${s}`),
+      items: t.entrySignals.map(s => {
+        const meta = SIGNAL_RESEARCH[s];
+        return meta
+          ? `• ${s} — ${meta.display} (weight=${meta.weight}, category=${meta.category})`
+          : `• ${s}`;
+      }),
     });
   }
 
@@ -294,6 +325,9 @@ export function notesTooltipContent(t: Trade, opts: NotesTooltipOpts = {}): Tool
     if (opts.totalBars !== undefined || t.bars !== undefined) {
       posItems.push(`Bars held: ${opts.totalBars ?? t.bars}`);
     }
+    if (isSlExit(t.exitType)) {
+      posItems.push(RISK_GUARD_TEXT.SL);
+    }
     sections.push({ header: 'Position', items: posItems });
   } else {
     const posItems: string[] = [
@@ -303,6 +337,9 @@ export function notesTooltipContent(t: Trade, opts: NotesTooltipOpts = {}): Tool
       `Exit: ${formatPrice(t.exitPrice)}`,
       `Bars: ${t.bars ?? 0}`,
     ];
+    if (isSlExit(t.exitType)) {
+      posItems.push(RISK_GUARD_TEXT.SL);
+    }
     sections.push({ header: 'Position', items: posItems });
   }
 
