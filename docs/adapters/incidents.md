@@ -63,3 +63,44 @@ do not edit historic rows — add a new row instead.
   heartbeat, mark the tracking issue `blocked` with the host operator
   as the unblock owner; do not retry the closure-gate path until the
   agent is back to `idle`/`running`.
+
+## 2026-05-09 / 2026-07-09 — claude_local five-hour rate-limit recovery (NautilusEngineer)
+
+- **Issue:** [BTCAAAAA-799](/BTCAAAAA/issues/BTCAAAAA-799) — NautilusEngineer
+  (agent `a472d315-3e2e-4c3b-a1ba-a931295628cc`) entered `error` status with
+  last successful heartbeat at `2026-05-09T14:21:43Z`. Same `claude_local`
+  adapter family as the two rows above but a **third distinct** failure
+  mode: an external Claude API quota signal, not a watchdog or process-loss
+  event.
+- **Root cause:** External Claude API quota. The upstream response body was
+  `claude_transient_upstream: "You've hit your limit · resets 4:30pm
+  (Europe/Warsaw)"` with `rateLimitType: five_hour`. All four `claude_local`
+  agents on the company (NautilusEngineer, RepoSteward, QAEngineer,
+  DevelopmentManager) hit the same quota boundary within the same
+  five-minute window and entered `error` together. This is a server-side
+  quota reset, **not** an adapter-wrapper fault — recovery is automatic on
+  the next upstream reset window (`Europe/Warsaw` 16:30 in this case), and
+  the next heartbeat for each agent succeeds without any local action.
+- **Code change:** None. The `claude_local` adapter wrapper behaviour
+  matches its contract; the quota window is enforced by Claude and
+  surfaces verbatim in `errorReason`.
+- **Verification:** Issue was closed on `2026-05-09T15:29:05.292Z` after the
+  upstream quota reset cleared and the subsequent heartbeat run
+  `2f31e77a-0987-4fc7-98ac-e53c47d400f7` succeeded. The closure-gate
+  routine reopened it on `2026-07-06T11:22:23.820Z` because the original
+  closure comment lacked a `Fix-SHA:` tag on `btcaaaaa-main`. This
+  audit-trail commit provides the verifiable anchor. NautilusEngineer is
+  `running` with `errorReason: null` as of `2026-07-09T12:49Z`; the related
+  stalled tasks BTCAAAAA-778 and BTCAAAAA-594 are tracked separately and
+  BTCAAAAA-594 is blocked on testnet credentials (a human-action item,
+  unrelated to the adapter state).
+- **Action for future occurrences:** Read `errorReason` before assuming
+  anything (per the `project-claude-local-failure-modes` memory note).
+  An upstream-quota signature — body containing `claude_transient_upstream`,
+  `rateLimitType: five_hour`, or the phrases "you've hit your limit",
+  "resets", or quota-window timestamps — is **API-quota driven** and
+  self-clearing at the next reset window. Do **not** mark the tracking
+  issue `blocked` waiting on host-side remediation; the unblock path is
+  the upstream quota reset, not local adapter supervision. Distinguish
+  carefully from the process-loss mode above (which names a pid) and the
+  transient mode (which recovers silently on the next watchdog tick).
