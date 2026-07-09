@@ -16,9 +16,18 @@ export const DEFAULT_CONFIG = {
     offsiteKeep: 30,
     // Schedule for the auto-prune. Format:
     //   "every Nh"  → run every N hours (e.g. "every 24h")
-    //   "every Nd"  → run every N days  (e.g. "every 7d")
+    //   "every Nd"  → run every N days (e.g. "every 7d")
     //   ""          → disabled
     offsiteSchedule: "every 168h",
+    // GDrive tiered-backup retention (used by gdrive-tiered-upload.sh):
+    //   gdriveTierEnabled      toggle the whole tiered backup flow
+    //   gdriveTierDailyKeep    how many daily-tier dirs to keep on GDrive
+    //   gdriveTierHourlyKeep   how many hourly-tier dirs to keep on GDrive
+    //   gdriveTierRoot         GDrive prefix (default Paperclip-Backups)
+    gdriveTierEnabled: true,
+    gdriveTierDailyKeep: 3,
+    gdriveTierHourlyKeep: 2,
+    gdriveTierRoot: "Paperclip-Backups",
 };
 export const DATA_KEYS = {
     listing: "listing",
@@ -51,3 +60,19 @@ export const STATE_KEYS = {
     backupRunning: "backup-running",
 };
 //# sourceMappingURL=constants.js.map
+
+export const RECOVERY_SCRIPT_KEY = "recoveryScript";
+export const RECOVERY_SCRIPT_KEY_TIERED = "gdriveTieredUploadScript";
+export const RECOVERY_ACTION_KEYS = {
+    forceBackup: "force-backup",
+    forceRestore: "force-restore",
+    deleteRecoverySnapshots: "delete-recovery-snapshots",
+    uploadDailyBackup: "upload-daily-backup",
+    uploadHourlyBackup: "upload-hourly-backup",
+    setTierKeep: "set-tier-keep",
+};
+export const RECOVERY_DATA_KEYS = {
+    snapshots: "recovery-snapshots",
+    recoveryStatus: "recovery-status",
+    tierStatus: "gdrive-tier-status",
+};

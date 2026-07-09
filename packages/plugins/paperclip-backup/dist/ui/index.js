@@ -40,6 +40,18 @@ function StatusDot({ ok }) {
 }
 function ActionButton(props) {
     const variant = props.variant ?? "primary";
+    // Use hardcoded dark colors instead of `var(--primary)` /
+    // `var(--primary-foreground)` etc. The host's theme variables
+    // resolve to near-white in dark mode (--primary → oklch(0.985 0 0)),
+    // which would render the "primary" buttons as bright white blocks
+    // against the dark page. Hardcoding keeps the buttons visually
+    // consistent regardless of theme.
+    //   primary → dark blue (#1e40af, Tailwind blue-800)
+    //   danger  → dark red  (#b91c1c, Tailwind red-700)
+    //   default → dark slate (#374151, Tailwind slate-700)
+    // All variants get light text (#f8fafc) for contrast on the dark fill.
+    const isPrimary = variant === "primary";
+    const isDanger = variant === "danger";
     const baseStyle = {
         padding: "8px 14px",
         borderRadius: 6,
@@ -47,10 +59,14 @@ function ActionButton(props) {
         fontSize: 13,
         cursor: props.busy || props.disabled ? "not-allowed" : "pointer",
         opacity: props.busy || props.disabled ? 0.6 : 1,
-        border: "1px solid var(--border, #e5e7eb)",
-        background: variant === "primary" ? "var(--primary, #2563eb)" : "var(--card, #fff)",
-        color: variant === "primary" ? "var(--primary-foreground, #fff)" : "var(--destructive, #dc2626)",
-        borderColor: variant === "danger" ? "var(--destructive, #dc2626)" : "var(--border, #e5e7eb)",
+        border: "1px solid transparent",
+        background: isPrimary
+            ? "#1e40af"
+            : isDanger
+                ? "#b91c1c"
+                : "#374151",
+        color: "#f8fafc",
+        borderColor: isDanger ? "#991b1b" : "transparent",
     };
     const elapsed = props.busy && props.elapsedMs != null
         ? ` (${Math.floor(props.elapsedMs / 1000)}s)`
@@ -262,7 +278,36 @@ export function BackupManagerPage({ context }) {
     const pruneOffsite = usePluginAction("prune-offsite");
     const restoreOffsite = usePluginAction("restore-offsite");
     const restoreLocal = usePluginAction("restore-local");
+    const forceBackup = usePluginAction("force-backup");
+    const forceRestore = usePluginAction("force-restore");
+    const deleteRecoverySnapshots = usePluginAction("delete-recovery-snapshots");
+    const uploadDailyBackup = usePluginAction("upload-daily-backup");
+    const uploadHourlyBackup = usePluginAction("upload-hourly-backup");
+    const setTierKeep = usePluginAction("set-tier-keep");
     const [refreshTick, setRefreshTick] = useState(0);
+    // _tick: refreshTick ensures the picker re-fetches when the user clicks
+    // "Refresh" (see refreshRecoverySnapshots below). Without it, the React
+    // hook keeps returning the cached result and a newly-created snapshot
+    // wouldn't appear until the next SDK-side refetch.
+    const recoverySnapshotsResult = usePluginData("recovery-snapshots", { _tick: refreshTick });
+    const recoverySnapshots = recoverySnapshotsResult && recoverySnapshotsResult.data;
+    const recoverySnapshotsError = recoverySnapshotsResult && recoverySnapshotsResult.error;
+    const tierStatusResult = usePluginData("gdrive-tier-status", { _tick: refreshTick });
+    const tierStatus = tierStatusResult && tierStatusResult.data;
+    const { data: statusData } = usePluginData("status", { companyId });
+    // Prefer /proc-detected running recovery script (works for orphans and any
+    // script the worker spawned). Fall back to in-state backupRunning if /proc
+    // finds nothing. ONLY consider recovery.sh here, not backup-to-drive.sh
+    // — that belongs to the Backup status widget above.
+    const procRunning = recoverySnapshots && Array.isArray(recoverySnapshots.runningSnapshots)
+        ? recoverySnapshots.runningSnapshots.find(function (r) { return /recovery\.sh/.test(r.cmd || ""); }) || null
+        : null;
+    const stateRunning = statusData && statusData.backupRunning ? statusData.backupRunning : null;
+    const stateRecovery = stateRunning && stateRunning.recovery === true;
+    const stateForced = stateRunning && stateRunning.isForced === true;
+    const forceRunning = procRunning
+        ? { pid: procRunning.pid, startedAt: procRunning.startedAt, cmd: procRunning.cmd, stage: procRunning.stage, stageDetail: procRunning.stageDetail, progress: procRunning.progress, isForced: stateForced || /--force/.test(procRunning.cmd || "") }
+        : (stateRecovery && stateForced ? stateRunning : null);
     const [busy, setBusy] = useState(null);
     const [result, setResult] = useState(null);
     const [restorePath, setRestorePath] = useState("");
@@ -520,7 +565,7 @@ export function BackupManagerPage({ context }) {
                                                     borderRadius: 4,
                                                     fontFamily: "ui-monospace, monospace",
                                                     fontSize: 12,
-                                                } })] }), _jsx(ActionButton, { label: "Restore from offsite", busy: busy === "restore-off", onClick: triggerRestoreOffsite, variant: "danger", hint: "Downloads + extracts the chosen backup", elapsedMs: elapsedMs })] })] })] }), _jsx(ResultBanner, { result: result, onDismiss: () => setResult(null) })] }));
+                                                } })] }), _jsx(ActionButton, { label: "Restore from offsite", busy: busy === "restore-off", onClick: triggerRestoreOffsite, variant: "danger", hint: "Downloads + extracts the chosen backup", elapsedMs: elapsedMs })] })] })] }), _jsx(ResultBanner, { result: result, onDismiss: () => setResult(null) }), _jsx(ForceRecoverySection, { forceBackup: forceBackup, forceRestore: forceRestore, deleteRecoverySnapshots: deleteRecoverySnapshots, uploadDailyBackup: uploadDailyBackup, uploadHourlyBackup: uploadHourlyBackup, setTierKeep: setTierKeep, recoverySnapshots: recoverySnapshots, recoverySnapshotsError: recoverySnapshotsError, tierStatus: tierStatus, refreshRecoverySnapshots: function () { setRefreshTick(function (n) { return n + 1; }); }, forceRunning: forceRunning, Button: ActionButton })] }));
 }
 // ---------------------------------------------------------------------------
 // Settings page
@@ -597,3 +642,274 @@ function Field(props) {
                 } })] }));
 }
 //# sourceMappingURL=index.js.map
+function ForceRecoverySection({ forceBackup, forceRestore, deleteRecoverySnapshots, uploadDailyBackup, uploadHourlyBackup, setTierKeep, recoverySnapshots, recoverySnapshotsError, tierStatus, refreshRecoverySnapshots, forceRunning, Button }) {
+    // Format ISO timestamps (UTC) as local time so the displayed clock matches
+    // the operator's wall clock. Falls back to the raw string if parsing fails.
+    function formatTimestamp(iso) {
+        if (!iso) return "";
+        try {
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return iso;
+            // Short, human-friendly: "2026-07-07 14:21:22 CEST"
+            const pad = function (n) { return n < 10 ? "0" + n : "" + n; };
+            const Y = d.getFullYear();
+            const M = pad(d.getMonth() + 1);
+            const D = pad(d.getDate());
+            const h = pad(d.getHours());
+            const m = pad(d.getMinutes());
+            const s = pad(d.getSeconds());
+            const tzMatch = (d.toString().match(/\(([^)]+)\)$/) || [])[1] || "";
+            const tz = tzMatch || "local";
+            return Y + "-" + M + "-" + D + " " + h + ":" + m + ":" + s + " " + tz;
+        }
+        catch {
+            return iso;
+        }
+    }
+    function Tier({ name, items, keep, count, last, error, onUpload, onChangeKeep, busyKey, busy, Button }) {
+        const idInput = "keep-input-" + name;
+        return _jsxs("div", { style: { padding: 12, border: "1px solid var(--border, #e5e7eb)", borderRadius: 6, background: "var(--card, #fafafa)" }, children: [
+            _jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }, children: [
+                _jsxs("div", { children: [
+                    _jsx("strong", { style: { fontSize: 13, textTransform: "uppercase", letterSpacing: 0.5, color: name === "daily" ? "hsl(140, 60%, 35%)" : "hsl(35, 80%, 40%)" }, children: name + " tier" }),
+                    _jsxs("span", { style: { marginLeft: 8, fontFamily: "ui-monospace, monospace", fontSize: 12 }, children: ["count ", _jsx("strong", { children: count }), " / ", _jsx("strong", { children: keep })] }),
+                ] }),
+                _jsx(Button, { label: busy === busyKey ? "Uploading\u2026" : ("Upload latest to " + name), busy: busy === busyKey, onClick: function () { onUpload(); } }),
+            ] }),
+            last ? _jsx("div", { style: { fontSize: 11, fontFamily: "ui-monospace, monospace", color: "var(--muted-foreground, #6b7280)", marginBottom: 6 }, children: "most recent: " + last }) : null,
+            items && items.length ? _jsx("div", { style: { fontSize: 11, fontFamily: "ui-monospace, monospace", maxHeight: 70, overflow: "auto", padding: 4, background: "var(--muted, #f9fafb)", border: "1px solid var(--border, #e5e7eb)", borderRadius: 4, marginBottom: 6 }, children: items.slice().sort().reverse().map(function (id) {
+                return _jsx("div", { style: { padding: "1px 0" }, children: id });
+            }) }) : null,
+            error ? _jsx("div", { style: { fontSize: 11, color: "var(--destructive, #b91c1c)", marginBottom: 6 }, children: error }) : null,
+            _jsxs("div", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12 }, children: [
+                _jsx("span", { children: "Retention (keep):" }),
+                _jsx("input", { type: "number", min: 1, max: 365, defaultValue: keep, id: idInput, style: { width: 60, padding: "2px 6px", border: "1px solid var(--border, #e5e7eb)", borderRadius: 4 } }),
+                _jsx("button", { type: "button", onClick: function () {
+                    var inp = typeof document !== "undefined" ? document.getElementById(idInput) : null;
+                    var v = inp && inp.value ? parseInt(inp.value, 10) : NaN;
+                    onChangeKeep(v);
+                }, style: { marginLeft: 4, padding: "2px 8px", fontSize: 11, border: "1px solid transparent", borderRadius: 4, background: "#1e40af", color: "#f8fafc", cursor: "pointer" }, children: "Save" }),
+            ] }),
+        ] });
+    }
+    function TierPanel({ uploadDailyBackup, uploadHourlyBackup, setTierKeep, tierStatus, refreshRecoverySnapshots, setLast, busy, setBusy, Button }) {
+        function doUpload(kind, action) {
+            setBusy("upload-" + kind);
+            setLast({ ok: true, message: "uploading latest snapshot to " + kind + " tier\u2026" });
+            action({}).then(function (r) {
+                setLast({ ok: true, message: r && r.message ? r.message : (kind + " upload dispatched (pid=" + (r && r.pid) + ")") });
+            }).catch(function (err) {
+                setLast({ ok: false, message: err && err.message ? err.message : String(err) });
+            }).finally(function () {
+                setBusy(null);
+                setTimeout(refreshRecoverySnapshots, 2000);
+            });
+        }
+        function doChangeKeep(tier, keepValue) {
+            if (!Number.isFinite(keepValue) || keepValue < 1) {
+                setLast({ ok: false, message: "keep must be a positive integer" });
+                return;
+            }
+            setBusy("set-keep-" + tier);
+            setTierKeep({ tier: tier, keep: keepValue }).then(function (r) {
+                setLast({ ok: !!r && r.ok, message: r && r.message ? r.message : "Set " + tier + " keep=" + keepValue });
+            }).catch(function (err) {
+                setLast({ ok: false, message: err && err.message ? err.message : String(err) });
+            }).finally(function () {
+                setBusy(null);
+                setTimeout(refreshRecoverySnapshots, 1500);
+            });
+        }
+        return _jsxs("div", { style: { marginTop: 8, padding: 10, border: "1px solid var(--border, #e5e7eb)", borderRadius: 6, background: "color-mix(in oklab, hsl(50, 60%, 95%) 30%, var(--card, #fff))" }, children: [
+            _jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }, children: [
+                _jsx("strong", { style: { fontSize: 13 }, children: "GDrive tiered backup" }),
+                _jsx("span", { style: { fontSize: 11, color: "var(--muted-foreground, #6b7280)", fontFamily: "ui-monospace, monospace" }, children: tierStatus && tierStatus.enabled === false ? "disabled" : ("root: " + (tierStatus && tierStatus.tierRoot ? tierStatus.tierRoot : "Paperclip-Backups")) }),
+            ] }),
+            tierStatus && tierStatus.enabled === false
+                ? _jsx("div", { style: { fontSize: 12, color: "var(--muted-foreground, #6b7280)" }, children: "Tiered backup is disabled in plugin config." })
+                : _jsxs("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }, children: [
+                    _jsx(Tier, { name: "daily", items: (tierStatus && tierStatus.daily) || [], keep: (tierStatus && tierStatus.keep && tierStatus.keep.daily) || 3, count: (tierStatus && tierStatus.counts && tierStatus.counts.daily) || 0, last: tierStatus && tierStatus.lastUpload && tierStatus.lastUpload.daily, error: tierStatus && tierStatus.errors && tierStatus.errors.daily, onUpload: function () { return doUpload("daily", uploadDailyBackup); }, onChangeKeep: function (v) { return doChangeKeep("daily", v); }, busyKey: "upload-daily", busy: busy, Button: Button }),
+                    _jsx(Tier, { name: "hourly", items: (tierStatus && tierStatus.hourly) || [], keep: (tierStatus && tierStatus.keep && tierStatus.keep.hourly) || 2, count: (tierStatus && tierStatus.counts && tierStatus.counts.hourly) || 0, last: tierStatus && tierStatus.lastUpload && tierStatus.lastUpload.hourly, error: tierStatus && tierStatus.errors && tierStatus.errors.hourly, onUpload: function () { return doUpload("hourly", uploadHourlyBackup); }, onChangeKeep: function (v) { return doChangeKeep("hourly", v); }, busyKey: "upload-hourly", busy: busy, Button: Button }),
+                ] }),
+        ] });
+    }
+    const [open, setOpen] = useState(true);
+    const [busy, setBusy] = useState(null);
+    const [last, setLast] = useState(null);
+    const [selected, setSelected] = useState({});
+    const [showStubs, setShowStubs] = useState(false);
+    const snaps = recoverySnapshots && Array.isArray(recoverySnapshots.snapshots) ? recoverySnapshots.snapshots : [];
+    const visibleSnaps = showStubs ? snaps : snaps.filter(function (s) { return (s.apparentBytes || 0) >= 1024 || (s.bytes || 0) >= 1024; });
+    const stubCount = snaps.length - visibleSnaps.length;
+    const snapCount = visibleSnaps.length;
+    const totalApparentBytes = recoverySnapshots && typeof recoverySnapshots.totalApparentBytes === "number"
+        ? recoverySnapshots.totalApparentBytes
+        : snaps.reduce(function (a, s) { return a + (s.apparentBytes || 0); }, 0);
+    const totalDeltaBytes = recoverySnapshots && typeof recoverySnapshots.totalDeltaBytes === "number"
+        ? recoverySnapshots.totalDeltaBytes
+        : snaps.reduce(function (a, s) { return a + (s.deltaBytes || s.bytes || 0); }, 0);
+    // Each snapshot's logical size if restored alone, summed across all = totalApparentBytes.
+    // Real on-disk cost = totalDeltaBytes (cross-snapshot inode-dedup aware).
+    // Savings (logical - real) shown separately.
+    const savingsBytes = Math.max(0, totalApparentBytes - totalDeltaBytes);
+    const savingsPct = totalApparentBytes > 0 ? Math.round((savingsBytes / totalApparentBytes) * 100) : 0;
+    const allSelected = snapCount > 0 && visibleSnaps.every(function (s) { return !!selected[s.id]; });
+    const someSelected = visibleSnaps.some(function (s) { return !!selected[s.id]; });
+    const selectedIds = visibleSnaps.filter(function (s) { return !!selected[s.id]; }).map(function (s) { return s.id; });
+    const toggleOne = function (id) {
+        setSelected(function (prev) {
+            const next = Object.assign({}, prev);
+            if (next[id]) { delete next[id]; } else { next[id] = true; }
+            return next;
+        });
+    };
+    const toggleAll = function () {
+        if (allSelected) { setSelected({}); }
+        else { const next = {}; snaps.forEach(function (s) { next[s.id] = true; }); setSelected(next); }
+    };
+    const doForceBackup = async () => {
+        setBusy("force-backup"); setLast(null);
+        try {
+            const r = await forceBackup({});
+            setLast({ ok: true, message: r && r.message ? r.message : "Force backup started (pid=" + (r && r.pid) + ")" });
+        }
+        catch (err) { setLast({ ok: false, message: err && err.message ? err.message : String(err) }); }
+        finally { setBusy(null); }
+    };
+    const doForceRestore = async (id) => {
+        setBusy("force-restore-" + id); setLast(null);
+        try {
+            const r = await forceRestore({ subcommand: "restore", id });
+            setLast({ ok: !!(r && r.ok), message: r && r.message ? r.message : ("exit " + (r && r.exitCode)) });
+        }
+        catch (err) { setLast({ ok: false, message: err && err.message ? err.message : String(err) }); }
+        finally { setBusy(null); }
+    };
+    const doDelete = async (ids, opName) => {
+        if (!ids || ids.length === 0) return;
+        if (typeof window !== "undefined" && typeof window.confirm === "function") {
+            const ok = window.confirm("Delete " + ids.length + " recovery snapshot" + (ids.length === 1 ? "" : "s") + "?\n\n" + ids.join("\n") + "\n\nThis permanently removes the hardlink snapshot directories from disk. The latest 2 snapshots are protected and will be skipped.");
+            if (!ok) return;
+        }
+        setBusy(opName); setLast(null);
+        try {
+            const r = await deleteRecoverySnapshots({ ids });
+            const deletedCount = r && Array.isArray(r.deleted) ? r.deleted.length : 0;
+            const skippedCount = r && Array.isArray(r.skipped) ? r.skipped.length : 0;
+            const errCount = r && Array.isArray(r.errors) ? r.errors.length : 0;
+            const skippedMsg = skippedCount > 0 ? " (" + skippedCount + " skipped — newest 2 protected)" : "";
+            setLast({ ok: !!(r && r.ok !== false && errCount === 0), message: r && r.message ? r.message + skippedMsg : ("Deleted " + deletedCount) });
+            setSelected({});
+            refreshRecoverySnapshots();
+        }
+        catch (err) { setLast({ ok: false, message: err && err.message ? err.message : String(err) }); }
+        finally { setBusy(null); }
+    };
+    const doDeleteOne = function (id) { return doDelete([id], "force-delete-" + id); };
+    const doDeleteSelected = function () { return doDelete(selectedIds.slice(), "force-delete-batch"); };
+    return _jsxs("section", { style: { marginTop: 16, padding: 16, border: "1px solid var(--border, #e5e7eb)", borderRadius: 8, background: "var(--card, #fafafa)" }, children: [
+        _jsxs("header", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }, children: [
+            _jsx("h3", { style: { margin: 0, fontSize: 16 }, children: "Force backup & recovery" }),
+            _jsxs("div", { style: { display: "flex", gap: 8 }, children: [
+                _jsx(Button, { label: busy === "force-backup" ? "Starting…" : (forceRunning ? "Snapshot running…" : "Take recovery snapshot now"), busy: busy === "force-backup" || !!forceRunning, onClick: doForceBackup, hint: "calls recovery.sh snapshot --no-upload (local hardlink-incremental; no GDrive upload)" }),
+                _jsx(Button, { label: open ? "Hide recovery points" : "Pick recovery point", onClick: function () { setOpen(!open); } }),
+            ] }),
+        ] }),
+        TierPanel({ uploadDailyBackup: uploadDailyBackup, uploadHourlyBackup: uploadHourlyBackup, setTierKeep: setTierKeep, tierStatus: tierStatus, refreshRecoverySnapshots: refreshRecoverySnapshots, setLast: setLast, busy: busy, setBusy: setBusy, Button: Button }),
+        forceRunning ? _jsx("div", { style: { marginTop: 8, marginBottom: 8, padding: 10, background: "color-mix(in oklab, var(--primary) 8%, var(--card))", border: "1px solid color-mix(in oklab, var(--primary) 20%, var(--border))", borderRadius: 6 }, children:
+            (function () {
+                const stage = forceRunning.stage || "running";
+                const stageLabel = stage === "uploading" ? "Uploading snapshot to Google Drive" : stage === "packing" ? "Packing worktree (tar+gzip)" : stage === "pruning" ? "Pruning old snapshots" : stage === "snapshotting" ? "Creating incremental snapshot (rsync --link-dest)" : stage === "snapshot" ? "Creating snapshot" : stage === "running" ? "Snapshot running" : stage;
+                const progress = forceRunning.progress;
+                return _jsxs("div", { style: { display: "flex", flexDirection: "column", gap: 6 }, children: [
+                    _jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }, children: [
+                        _jsxs("div", { children: [
+                            _jsx("strong", { style: { fontSize: 13 }, children: stageLabel }),
+                            _jsx("div", { style: { color: "var(--muted-foreground, #6b7280)", fontSize: 11, fontFamily: "ui-monospace, monospace", marginTop: 2 }, children: "pid " + String(forceRunning.pid) + " \u00b7 started " + formatTimestamp(forceRunning.startedAt) + (forceRunning.stageDetail ? " \u00b7 " + String(forceRunning.stageDetail) : "") }),
+                        ] }),
+                        progress && progress.percent !== null && progress.percent !== undefined ? _jsx("span", { style: { fontFamily: "ui-monospace, monospace", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }, children: progress.percent.toFixed(1) + "%" }) : null,
+                    ] }),
+                    progress && progress.percent !== null && progress.percent !== undefined ? _jsx("div", { style: { height: 8, background: "var(--muted, #f3f4f6)", borderRadius: 4, overflow: "hidden", border: "1px solid var(--border, #e5e7eb)" }, children:
+                        _jsx("div", { style: { width: progress.percent + "%", height: "100%", background: "linear-gradient(90deg, var(--primary, #2563eb) 0%, color-mix(in oklab, var(--primary, #2563eb) 70%, white) 100%)", transition: "width 0.6s ease" }, children: "" })
+                    }) : null,
+                    progress && progress.totalBytes ? _jsxs("div", { style: { color: "var(--muted-foreground, #6b7280)", fontSize: 11, fontFamily: "ui-monospace, monospace" }, children: [
+                        (progress.uploadBytes / (1024 * 1024)).toFixed(1) + " MiB / " + (progress.totalBytes / (1024 * 1024)).toFixed(0) + " MiB \u00b7 rclone pid " + String(progress.rclonePid),
+                        (function () {
+                            const child = forceRunning.children && forceRunning.children.find(function (c) { return c.pid === progress.rclonePid; });
+                            if (!child || !child.startedAt) return "";
+                            const elapsedMs = Date.now() - new Date(child.startedAt).getTime();
+                            if (elapsedMs <= 0 || progress.uploadBytes <= 0) return "";
+                            const rate = progress.uploadBytes / (elapsedMs / 1000);
+                            const remaining = Math.max(0, progress.totalBytes - progress.uploadBytes);
+                            if (rate <= 0) return "";
+                            const etaSec = remaining / rate;
+                            const etaLabel = etaSec >= 60 ? Math.round(etaSec / 60) + " min" : Math.round(etaSec) + " sec";
+                            return " \u00b7 " + (rate / (1024 * 1024)).toFixed(2) + " MB/s \u00b7 ETA " + etaLabel;
+                        })(),
+                    ] }) : null,
+                    _jsx("div", { style: { fontSize: 11, color: "var(--muted-foreground, #6b7280)" }, children: "incremental rsync \u2014 typically finishes in seconds (only changed bytes are written; rest are hardlinks)" }),
+                ] });
+            })()
+        }) : null,
+        _jsxs("div", { style: { marginTop: 4, marginBottom: 8, fontSize: 12, color: "var(--muted-foreground, #6b7280)" }, children: [
+            "Recovery snapshots: " + snapCount + " \u00b7 logical " + Math.round(totalApparentBytes / (1024 * 1024)) + " MiB if all restored \u00b7 actual on-disk " + Math.round(totalDeltaBytes / (1024 * 1024)) + " MiB (hardlink-deduped; saved " + savingsPct + "\u202f% / " + Math.round(savingsBytes / (1024 * 1024)) + " MiB)",
+        ] }),
+        last ? _jsx("div", { style: { marginTop: 8, padding: 8, fontFamily: "ui-monospace, monospace", fontSize: 12, color: last.ok ? "var(--muted-foreground, #6b7280)" : "var(--destructive, #dc2626)", background: "var(--muted, #f3f4f6)", borderRadius: 4 }, children: last.message }) : null,
+        open ? _jsxs("div", { style: { marginTop: 12 }, children: [
+            recoverySnapshotsError ? _jsx("div", { style: { color: "var(--destructive, #dc2626)", fontSize: 12, marginBottom: 8 }, children: "Could not list snapshots: " + String(recoverySnapshotsError) }) : null,
+            stubCount > 0 ? _jsx("div", { style: { fontSize: 12, color: "var(--muted-foreground, #6b7280)", marginBottom: 8 }, children: [
+                stubCount + " empty " + (stubCount === 1 ? "stub" : "stubs") + " hidden \u2014 only " + visibleSnaps.length + " real " + (visibleSnaps.length === 1 ? "backup" : "backups") + " on disk ",
+                _jsx("button", { type: "button", onClick: function () { setShowStubs(!showStubs); }, style: { padding: "2px 8px", fontSize: 11, border: "1px solid transparent", borderRadius: 4, background: "var(--muted, #374151)", cursor: "pointer", color: "#f8fafc" }, children: showStubs ? "Hide stubs" : "Show " + stubCount + " stub" + (stubCount === 1 ? "" : "s") }),
+            ] }) : null,
+            visibleSnaps.length === 0 && stubCount === 0 ? _jsx("div", { style: { color: "var(--muted-foreground, #6b7280)", fontSize: 12 }, children: "No snapshots available at /home/sirrus/paperclip-snapshots" }) : null,
+            visibleSnaps.length > 0 ? _jsxs("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "4px 10px", background: "var(--muted, #f3f4f6)", borderTop: "1px solid var(--border, #e5e7eb)", borderLeft: "1px solid var(--border, #e5e7eb)", borderRight: "1px solid var(--border, #e5e7eb)", fontSize: 12 }, children: [
+                _jsx("input", { type: "checkbox", checked: allSelected, onChange: toggleAll, "aria-label": "Select all snapshots" }),
+                _jsxs("span", { style: { flex: 1 }, children: [
+                    allSelected ? "All " + visibleSnaps.length + " selected" : (someSelected ? selectedIds.length + " selected" : "Select all"),
+                ] }),
+                someSelected ? _jsx(Button, { label: "Delete selected (" + selectedIds.length + ")", busy: busy === "force-delete-batch", variant: "danger", onClick: doDeleteSelected }) : null,
+            ] }) : null,
+            _jsx("div", { style: { border: "1px solid var(--border, #e5e7eb)", borderRadius: 4 }, children:
+                (function () {
+                    const total = visibleSnaps.length;
+                    // Compute an HSL gradient from green (newest, idx 0) to red
+                    // (oldest, idx total-1). Saturation/lightness tuned so even the
+                    // extremes are readable on white backgrounds.
+                    function ageColor(idx) {
+                        if (total <= 1) return "hsl(120, 60%, 35%)";
+                        const ratio = idx / (total - 1); // 0=newest, 1=oldest
+                        const hue = 120 - 120 * ratio; // 120 (green) -> 0 (red)
+                        return "hsl(" + hue.toFixed(0) + ", 55%, 38%)";
+                    }
+                    return visibleSnaps.map(function (s) {
+                        const idx = visibleSnaps.indexOf(s);
+                        const isProtected = idx < 2;
+                        const isMaster = idx === 0;
+                        const tsColor = ageColor(idx);
+                        return _jsxs("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderBottom: "1px solid var(--border, #e5e7eb)", background: selected[s.id] ? "var(--accent, #f3f4f6)" : (isMaster ? "color-mix(in oklab, hsl(120, 55%, 60%) 8%, var(--card, #fff))" : undefined) }, children: [
+                            _jsx("input", { type: "checkbox", checked: !!selected[s.id], disabled: isProtected, onChange: function () { toggleOne(s.id); }, "aria-label": "Select " + s.id }),
+                            _jsxs("div", { style: { flex: 1, fontFamily: "ui-monospace, monospace", fontSize: 12 }, children: [
+                                _jsxs("strong", { children: [
+                                    s.id,
+                                    isMaster ? " \u00b7 \u25cf MASTER" : "",
+                                    isProtected && !isMaster ? " \u00b7 protected" : "",
+                                    !isProtected ? "" : "",
+                                ] }),
+                                _jsx("div", { style: { color: tsColor, fontSize: 11, fontWeight: isMaster ? 600 : 400 }, children: [
+                                    (s.apparentBytes ? Math.round(s.apparentBytes / (1024 * 1024)) + " MB" : "\u2014"),
+                                    (s.deltaBytes !== undefined && s.deltaBytes !== null && s.apparentBytes ? " (new +" + (s.deltaBytes >= 1024 * 1024 ? Math.round(s.deltaBytes / (1024 * 1024)) + " MB" : Math.max(1, Math.round(s.deltaBytes / 1024)) + " KB") + ")" : ""),
+                                    " \u00b7 ",
+                                    formatTimestamp(s.timestamp),
+                                ] }),
+                            ] }),
+                            _jsx(Button, { label: busy === "force-restore-" + s.id ? "Restoring\u2026" : "Restore", busy: busy === "force-restore-" + s.id, onClick: function () { doForceRestore(s.id); }, variant: "danger" }),
+                            isProtected ? _jsx("span", { style: { fontSize: 11, color: "var(--muted-foreground, #6b7280)" }, children: " " }) : _jsx(Button, { label: busy === "force-delete-" + s.id ? "Deleting\u2026" : "Delete", busy: busy === "force-delete-" + s.id, variant: "danger", onClick: function () { doDeleteOne(s.id); } }),
+                        ] });
+                    });
+                })()
+            }),
+            _jsx("div", { style: { marginTop: 8, display: "flex", gap: 8 }, children: _jsx(Button, { label: "Refresh", onClick: refreshRecoverySnapshots }) }),
+        ] }) : null,
+    ] });
+}
+
