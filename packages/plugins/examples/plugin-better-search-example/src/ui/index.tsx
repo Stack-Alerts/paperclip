@@ -865,8 +865,10 @@ export function BetterSearchSidebar({ context }: PluginSidebarProps) {
   const companyPrefix = context.companyPrefix;
   const hostNavigation = useHostNavigation();
   const hostLocation = useHostLocation();
-  const href = companyPrefix ? `/${companyPrefix}` : "/";
-  const isActive = hostLocation.pathname === "/" || hostLocation.pathname === `/${companyPrefix}`;
+  const href = companyPrefix ? `/${companyPrefix}/search` : "/search";
+  const isActive =
+    hostLocation.pathname === href ||
+    hostLocation.pathname.startsWith(`${href}/`);
 
   return (
     <a
@@ -900,5 +902,39 @@ export function BetterSearchSidebar({ context }: PluginSidebarProps) {
       </svg>
       <span>Search</span>
     </a>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Full-page search
+// ---------------------------------------------------------------------------
+
+export function BetterSearchPage() {
+  return (
+    <div
+      style={{
+        maxWidth: "880px",
+        margin: "0 auto",
+        padding: "16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+      }}
+    >
+      <h1 style={{ fontSize: "18px", fontWeight: 600, margin: 0 }}>
+        Better Search
+      </h1>
+      <p
+        style={{
+          color: "var(--muted-foreground)",
+          fontSize: "13px",
+          margin: 0,
+        }}
+      >
+        Deep search across issue titles, descriptions, and comments. Filter
+        by Human or AI author. Save frequently-used searches as presets.
+      </p>
+      <BetterSearchPanel />
+    </div>
   );
 }

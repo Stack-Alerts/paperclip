@@ -3,6 +3,7 @@ import type { PaperclipPluginManifestV1 } from "@paperclipai/plugin-sdk";
 const PLUGIN_ID = "paperclip-better-search-example";
 const SIDEBAR_SLOT_ID = "better-search-sidebar";
 const PANEL_SLOT_ID = "better-search-panel";
+const PAGE_SLOT_ID = "better-search-page";
 const INBOX_TOOLBAR_SLOT_ID = "better-search-inbox-toolbar";
 
 const manifest: PaperclipPluginManifestV1 = {
@@ -16,6 +17,7 @@ const manifest: PaperclipPluginManifestV1 = {
   categories: ["workspace", "ui"],
   capabilities: [
     "ui.sidebar.register",
+    "ui.page.register",
     "issues.read",
     "issue.comments.read",
     "plugin.state.read",
@@ -38,6 +40,13 @@ const manifest: PaperclipPluginManifestV1 = {
         id: PANEL_SLOT_ID,
         displayName: "Better Search",
         exportName: "BetterSearchPanel",
+      },
+      {
+        type: "page",
+        id: PAGE_SLOT_ID,
+        displayName: "Better Search",
+        exportName: "BetterSearchPage",
+        routePath: "search",
       },
       {
         type: "inboxToolbarButton",
