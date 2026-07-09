@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { inferOpenAiCompatibleBiller, type AdapterExecutionContext, type AdapterExecutionResult } from "@paperclipai/adapter-utils";
+import { inferOpenAiCompatibleBiller, runAdapterSessionEndAutosave, type AdapterExecutionContext, type AdapterExecutionResult } from "@paperclipai/adapter-utils";
 import {
   adapterExecutionTargetIsRemote,
   adapterExecutionTargetRemoteCwd,
@@ -1086,6 +1086,20 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
           `[paperclip] Restoring workspace changes from ${describeAdapterExecutionTarget(executionTarget)}.\n`,
         );
         await restoreRemoteWorkspace();
+      }
+      // SessionEnd autosave hook — push WIP to protected branch before run end.
+      const autosaveResult = await runAdapterSessionEndAutosave(ctx, {
+        onLog: async (stream, chunk) => {
+          try { await onLog(stream, chunk); } catch { /* sink may be closed */ }
+        },
+      });
+      if (!autosaveResult.skipped && autosaveResult.invoked) {
+        try {
+          await onLog(
+            "stdout",
+            `[paperclip] SessionEnd autosave (${runId}): exitCode=${autosaveResult.exitCode ?? "null"} reason=${autosaveResult.reason}\n`,
+          );
+        } catch { /* ignore */ }
       }
     }
   } finally {

@@ -74,6 +74,18 @@ export type {
   RuntimeStatusUpdate,
 } from "./runtime-progress.js";
 export { inferOpenAiCompatibleBiller } from "./billing.js";
+export { runSessionEndAutosave } from "./session-end-autosave.js";
+export type {
+  RunSessionEndAutosaveOptions,
+  RunSessionEndAutosaveResult,
+} from "./session-end-autosave.js";
+export {
+  runAdapterSessionEndAutosave,
+} from "./session-end-autosave.js";
+export type {
+  AdapterSessionEndAutosaveContextLike,
+  RunAdapterSessionEndAutosaveOptions,
+} from "./session-end-autosave.js";
 // Keep the root adapter-utils entry browser-safe because the UI imports it.
 // The sandbox callback bridge stays available via its dedicated subpath export.
 export type {

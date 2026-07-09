@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { inferOpenAiCompatibleBiller, type AdapterExecutionContext, type AdapterExecutionResult } from "@paperclipai/adapter-utils";
+import { inferOpenAiCompatibleBiller, runAdapterSessionEndAutosave, type AdapterExecutionContext, type AdapterExecutionResult } from "@paperclipai/adapter-utils";
 import {
   adapterExecutionTargetIsRemote,
   adapterExecutionTargetRemoteCwd,
@@ -757,6 +757,25 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     }
     if (localSkillsDir) {
       await fs.rm(localSkillsDir, { recursive: true, force: true }).catch(() => undefined);
+    }
+    // SessionEnd autosave hook — push any uncommitted WIP from this run to its
+    // protected branch before we let the run terminate. The helper is
+    // fire-and-forget; it never throws and respects PAPERCLIP_NO_AUTOSAVE=1
+    // (and the script's own AUTOSAVE=0 check). Snapshot failures cannot block
+    // run termination — see AGENTS.md §12 for the contract.
+    const autosaveResult = await runAdapterSessionEndAutosave(
+      { runId, context },
+      {
+        workspaceCwd: workspaceCwd || undefined,
+        onLog: async (stream, chunk) => {
+          try { await onLog(stream, chunk); } catch { /* log sink may already be closed at run end */ }
+        },
+      },
+    );
+    if (!autosaveResult.skipped && autosaveResult.invoked) {
+      try {
+        await onLog("stdout", `[paperclip] SessionEnd autosave (${runId}): exitCode=${autosaveResult.exitCode ?? "null"} reason=${autosaveResult.reason}\n`);
+      } catch { /* ignore — sink may be closed */ }
     }
   }
 }

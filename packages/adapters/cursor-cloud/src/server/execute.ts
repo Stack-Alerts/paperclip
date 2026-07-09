@@ -9,7 +9,7 @@ import {
   type SDKAgent,
   type SDKMessage,
 } from "@cursor/sdk";
-import type { AdapterExecutionContext, AdapterExecutionResult, AdapterInvocationMeta } from "@paperclipai/adapter-utils";
+import { runAdapterSessionEndAutosave, type AdapterExecutionContext, type AdapterExecutionResult, type AdapterInvocationMeta } from "@paperclipai/adapter-utils";
 import {
   DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE,
   asBoolean,
@@ -602,6 +602,20 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       } catch {
         // Best effort only.
       }
+    }
+    // SessionEnd autosave hook — push any uncommitted WIP from this run to its
+    // protected branch before we let the run terminate. The helper is
+    // fire-and-forget; it never throws and respects PAPERCLIP_NO_AUTOSAVE=1
+    // (and the script's own AUTOSAVE=0 check). Snapshot failures cannot block
+    // run termination — see AGENTS.md §12 for the contract. cursor-cloud has
+    // no onLog sink in this finally scope, so stdout/stderr from the script
+    // is intentionally swallowed (the script's own .paperclip/autosave.log
+    // still captures it for diagnostics).
+    try {
+      await runAdapterSessionEndAutosave(ctx);
+    } catch {
+      // defensive — the helper is contractually non-throwing, but never let
+      // an autosave failure escape into the run terminator
     }
   }
 }

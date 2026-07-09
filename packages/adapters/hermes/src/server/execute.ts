@@ -21,10 +21,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import type {
-  AdapterExecutionContext,
-  AdapterExecutionResult,
-  UsageSummary,
+import {
+  runAdapterSessionEndAutosave,
+  type AdapterExecutionContext,
+  type AdapterExecutionResult,
+  type UsageSummary,
 } from "@paperclipai/adapter-utils";
 
 import {
@@ -578,6 +579,16 @@ export async function execute(
   if (persistSession && parsed.sessionId) {
     executionResult.sessionParams = { sessionId: parsed.sessionId };
     executionResult.sessionDisplayId = parsed.sessionId.slice(0, 16);
+  }
+
+  // SessionEnd autosave hook — push any uncommitted WIP from this run to its
+  // protected branch before we let the run terminate. The helper is contractually
+  // non-throwing (PAPERCLIP_NO_AUTOSAVE=1 / AUTOSAVE=0 opt-out honored inside),
+  // but we wrap defensively so an autosave failure can never block termination.
+  try {
+    await runAdapterSessionEndAutosave(ctx);
+  } catch {
+    // never let autosave failures propagate into the run terminator
   }
 
   return executionResult;

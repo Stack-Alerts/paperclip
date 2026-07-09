@@ -3,6 +3,7 @@ import type {
   AdapterExecutionResult,
   AdapterRuntimeServiceReport,
 } from "@paperclipai/adapter-utils";
+import { runAdapterSessionEndAutosave } from "@paperclipai/adapter-utils";
 import {
   asNumber,
   asString,
@@ -1482,6 +1483,20 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       };
     } finally {
       client.close();
+      // SessionEnd autosave hook — push any uncommitted WIP from this run to its
+      // protected branch before we let the run terminate. The helper is
+      // fire-and-forget; it never throws and respects PAPERCLIP_NO_AUTOSAVE=1
+      // (and the script's own AUTOSAVE=0 check). Snapshot failures cannot block
+      // run termination — see AGENTS.md §12 for the contract. openclaw-gateway
+      // has no onLog sink in scope here (the client was just closed), so the
+      // script's stdout/stderr is intentionally swallowed (the script's own
+      // .paperclip/autosave.log still captures it for diagnostics).
+      try {
+        await runAdapterSessionEndAutosave(ctx);
+      } catch {
+        // defensive — the helper is contractually non-throwing, but never let
+        // an autosave failure escape into the run terminator
+      }
     }
   }
 }
