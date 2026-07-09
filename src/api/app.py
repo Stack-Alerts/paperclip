@@ -2290,7 +2290,7 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
                 "symbol": t.get("symbol") or "BTC.P/USDT",
                 "entryPrice": float(t.get("entry_price") or t.get("entryPrice") or 0),
                 "exitPrice": float(t.get("exit_price") or t.get("exitPrice") or 0),
-                "quantity": float(t.get("quantity") or t.get("size") or 0),
+                "quantity": float(t.get("partial_size") or t.get("position_size") or t.get("quantity") or t.get("size") or 0),
                 "pnl": float(t.get("pnl") or 0),
                 "pnlPercentage": float(t.get("pnl_pct") or t.get("pnl_percent") or t.get("pnlPercentage") or 0),
                 "bars": int(t.get("bars_held") or t.get("barsHeld") or t.get("bars") or 0),
