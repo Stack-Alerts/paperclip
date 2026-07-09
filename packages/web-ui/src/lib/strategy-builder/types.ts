@@ -374,6 +374,14 @@ export interface Trade {
   exitPercentage?: number;
   // Partial exit breakdown from thick-client _aggregate_exits (e.g. "TP1: $X | TP2: $Y").
   partialBreakdown?: string;
+  // BTCAAAAA-39062: surfaced from the engine's `partial_exit` bool so the
+  // NOTES column can append "(partial)" to leg rows that did NOT fully close
+  // the parent position. Mirrors src/optimizer_v3/core/trade_registry.py:86
+  // (`partial_exit: bool = False`) — emitted by src/api/app.py normalization
+  // and consumed by TradesPanel.notesDisplay. False for both single-leg full
+  // closes and the chronological closing leg of a multi-leg group (engine
+  // convention); True for every non-closing partial-exit leg.
+  partialExit?: boolean;
   // BTC-39057: per-leg risk-guard metadata so the webui SIZE column can derive
   // a fallback size when the engine omits `quantity`. Both fields are optional;
   // when BOTH are populated, derivedSize() can recover size as

@@ -158,7 +158,33 @@ const SECTION_MAX_HEIGHT = 'min(70vh, 600px)';
 // SectionShell scroll div, so they stack correctly during vertical scroll.
 const SECTION_HEADER_HEIGHT = 38;
 
-function notesDisplay(t: Trade): string {
+/**
+ * BTCAAAAA-39062: render the per-leg NOTES cell body. Pure helper, exported
+ * so the BTC-39062 unit tests can pin the new "(partial)" / bare copy without
+ * rendering the table.
+ *
+ * Output shape:
+ *   1. Pretty-print `notes` / `exitType` into the canonical exit reason:
+ *      TP1 → "TP1 Hit", SL / STOP_LOSS → "Stop Loss Hit",
+ *      MAX_BARS / TIME_LIMIT → "Max Hold Time (N bars)", unknown → raw.
+ *   2. **NEW** — append ` (partial)` when `t.partialExit === true`. Mirrors the
+ *      engine's `partial_exit` bool (src/api/app.py normalization, surfaced
+ *      from src/optimizer_v3/core/trade_registry.py:86,118). This signals to
+ *      the user that the leg did NOT fully close the parent position — e.g. a
+ *      TP1 leg is "TP1 Hit (partial)" rather than "TP1 Hit". Single-leg full
+ *      closes AND the chronological closing leg of a multi-leg group leave
+ *      `partialExit` False, so they render without the suffix. Distinguishing
+ *      multi-leg closing legs from single-leg closes would require group-
+ *      context plumbing (out of scope here; the wake accepts bare copy for
+ *      single-leg closes).
+ *   3. If `entrySignals` is non-empty, append ` | SIGNAL(...)` after the exit
+ *      note (matches thick-client exit_hierarchy_evaluator note format).
+ *
+ * Defensive: missing notes / exitType / partialExit fall back to the existing
+ * em-dash sentinel "—", preserving the BTC-39020 round-2 contract that the
+ * body of an empty trade is exactly "—" rather than "NaN" / "undefined".
+ */
+export function notesDisplay(t: Trade): string {
   const rawNotes = (t.notes ?? '').trim();
   const isAbbrev = rawNotes === '' || EXIT_TYPE_CODES.has(rawNotes.toUpperCase());
 
@@ -172,6 +198,16 @@ function notesDisplay(t: Trade): string {
     else if (u === 'MAX_BARS' || u === 'TIME_LIMIT') exitNote = `Max Hold Time (${t.bars ?? 0} bars)`;
     else if (u) exitNote = u;
     else exitNote = '—';
+  }
+
+  // BTCAAAAA-39062: append "(partial)" for non-closing partial-exit legs.
+  // Placed BEFORE entry-signal concatenation so the canonical shape stays
+  // `<exit> (partial) | SIGNAL(...)` — uniform across all four exit kinds
+  // (TP1 / SL / STOP_LOSS / MAX_BARS). `partialExit` is `undefined`-tolerant
+  // for legacy rows that pre-date the API field; the strict `=== true`
+  // prevents accidentally appending "(partial)" for a missing field.
+  if (t.partialExit === true && exitNote !== '—') {
+    exitNote = `${exitNote} (partial)`;
   }
 
   // Append entry signals (e.g. "SIGNAL(BULLISH_BREAK)") when present — mirrors

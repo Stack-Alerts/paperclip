@@ -2300,6 +2300,18 @@ def _run_backtest_in_thread(run_id: str, strategy: dict, config: dict) -> None:
                 "entrySignals": t.get("entry_signals") or [],
                 "exitPercentage": float(t.get("exit_percentage") or 0),
                 "partialBreakdown": t.get("partial_exit_breakdown"),
+                # BTCAAAAA-39062: forward the engine's partial_exit bool so the
+                # webui NOTES column can append "(partial)" to leg rows that did
+                # NOT fully close the parent position. Mirrors
+                # src/optimizer_v3/core/trade_registry.py:86,118 — emitted by the
+                # engine for every non-closing partial-exit leg and False for
+                # single-leg full closes + the chronological closing leg of a
+                # multi-leg group. Coerced to a real bool so the front-end gets a
+                # stable shape regardless of whether upstream emitted 1/0, "true",
+                # or null. `partial_size` is already folded into `quantity`
+                # above; `partial_exit_breakdown` is already forwarded as
+                # `partialBreakdown` so the live request shape stays minimal.
+                "partialExit": bool(t.get("partial_exit") or False),
             })
 
         wins = [t for t in trades if (t.get("pnl") or 0) > 0]
