@@ -1,0 +1,43 @@
+{
+  "name": "paperclip-backup",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Paperclip Backup & Restore plugin — offsite (rclone → Google Drive) and local DB dump management surfaced in the Paperclip UI.",
+  "paperclipPlugin": {
+    "manifest": "./dist/manifest.js",
+    "worker": "./dist/worker.js",
+    "ui": "./dist/ui/"
+  },
+  "keywords": [
+    "paperclip",
+    "plugin",
+    "backup",
+    "rclone",
+    "gdrive",
+    "disaster-recovery"
+  ],
+  "author": "Stack-Alerts",
+  "license": "MIT",
+  "scripts": {
+    "prebuild": "pnpm --filter @paperclipai/plugin-sdk ensure-build-deps",
+    "build": "pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && pnpm exec esbuild src/worker.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/worker.js --external:electron --external:fsevents && tsc --emitDeclarationOnly --outDir dist && node ./scripts/build-ui.mjs",
+    "clean": "rm -rf dist",
+    "typecheck": "pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && tsc --noEmit"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@paperclipai/plugin-sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}
