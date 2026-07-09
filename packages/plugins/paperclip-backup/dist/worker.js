@@ -11,6 +11,7 @@ import {
   readFileSync,
   promises as fs2
 } from "node:fs";
+import nodePath from "node:path";
 import path2 from "node:path";
 
 // ../sdk/dist/define-plugin.js
@@ -4211,7 +4212,8 @@ var INBOX_MINE_ISSUE_STATUS_FILTER = INBOX_MINE_ISSUE_STATUSES.join(",");
 var ISSUE_PRIORITIES = ["critical", "high", "medium", "low"];
 var ISSUE_WORK_MODES = ["standard", "ask", "planning"];
 var MAX_ISSUE_REQUEST_DEPTH = 1024;
-var ISSUE_COMMENT_AUTHOR_TYPES = ["user", "agent", "system", "routine"];
+var CLOSURE_GATE_FIX_SHA_MODES = ["off", "advisory", "enforce"];
+var ISSUE_COMMENT_AUTHOR_TYPES = ["user", "agent", "system"];
 var ISSUE_COMMENT_PRESENTATION_KINDS = ["message", "system_notice"];
 var ISSUE_COMMENT_PRESENTATION_TONES = ["neutral", "info", "success", "warning", "danger"];
 var ISSUE_COMMENT_METADATA_ROW_TYPES = [
@@ -4368,32 +4370,6 @@ var ENVIRONMENT_DRIVERS = ["local", "ssh", "sandbox", "plugin"];
 var ENVIRONMENT_STATUSES = ["active", "archived"];
 var ENVIRONMENT_LEASE_STATUSES = ["active", "released", "expired", "failed", "retained", "pending_cleanup"];
 var ENVIRONMENT_LEASE_CLEANUP_STATUSES = ["pending", "success", "failed"];
-var ENVIRONMENT_CUSTOM_IMAGE_TEMPLATE_KINDS = [
-  "snapshot",
-  "image",
-  "provider_template",
-  "unknown"
-];
-var ENVIRONMENT_CUSTOM_IMAGE_TEMPLATE_STATUSES = [
-  "active",
-  "superseded",
-  "revoked",
-  "failed"
-];
-var ENVIRONMENT_CUSTOM_IMAGE_SETUP_SESSION_STATUSES = [
-  "starting",
-  "waiting_for_user",
-  "capturing",
-  "promoted",
-  "cancelled",
-  "timed_out",
-  "failed"
-];
-var ENVIRONMENT_CUSTOM_IMAGE_SETUP_CONNECTION_TYPES = [
-  "ssh",
-  "browser_terminal",
-  "unknown"
-];
 var ROUTINE_STATUSES = ["active", "paused", "archived"];
 var ROUTINE_CONCURRENCY_POLICIES = ["coalesce_if_active", "always_enqueue", "skip_if_active"];
 var ROUTINE_CATCH_UP_POLICIES = ["skip_missed", "enqueue_missed_with_cap"];
@@ -4495,8 +4471,7 @@ var PERMISSION_KEYS = [
   "tasks:assign_scope",
   "tasks:manage_active_checkouts",
   "pipelines:write",
-  "joins:approve",
-  "routines:execute_comment"
+  "joins:approve"
 ];
 var PLUGIN_STATUSES = [
   "installed",
@@ -4625,6 +4600,7 @@ var PLUGIN_UI_SLOT_TYPES = [
   "sidebarPanel",
   "projectSidebarItem",
   "globalToolbarButton",
+  "inboxToolbarButton",
   "toolbarButton",
   "contextMenuItem",
   "commentAnnotation",
@@ -4672,6 +4648,7 @@ var PLUGIN_LAUNCHER_PLACEMENT_ZONES = [
   "sidebarPanel",
   "projectSidebarItem",
   "globalToolbarButton",
+  "inboxToolbarButton",
   "toolbarButton",
   "contextMenuItem",
   "commentAnnotation",
@@ -5052,13 +5029,13 @@ var createCompanySchema = external_exports.object({
   name: external_exports.string().min(1),
   description: external_exports.string().optional().nullable(),
   budgetMonthlyCents: external_exports.number().int().nonnegative().optional().default(0),
-  attachmentMaxBytes: attachmentMaxBytesSchema.optional(),
-  defaultResponsibleUserId: external_exports.string().min(1).nullable().optional()
+  attachmentMaxBytes: attachmentMaxBytesSchema.optional()
 });
 var updateCompanySchema = createCompanySchema.partial().extend({
   status: external_exports.enum(COMPANY_STATUSES).optional(),
   spentMonthlyCents: external_exports.number().int().nonnegative().optional(),
   requireBoardApprovalForNewAgents: external_exports.boolean().optional(),
+  closureGateFixSha: external_exports.enum(CLOSURE_GATE_FIX_SHA_MODES).optional(),
   feedbackDataSharingEnabled: external_exports.boolean().optional(),
   feedbackDataSharingConsentAt: external_exports.coerce.date().nullable().optional(),
   feedbackDataSharingConsentByUserId: external_exports.string().min(1).nullable().optional(),
@@ -5078,9 +5055,6 @@ var updateCompanyBrandingSchema = external_exports.object({
 );
 
 // ../../shared/src/validators/secret.ts
-var secretKeySchema = external_exports.string().trim().min(1).max(120).regex(/^[a-zA-Z0-9_.-]+$/);
-var secretVersionSelectorSchema = external_exports.union([external_exports.literal("latest"), external_exports.number().int().positive()]);
-var creatableSecretStatusSchema = external_exports.enum(["active", "disabled", "archived"]);
 var envBindingPlainSchema = external_exports.object({
   type: external_exports.literal("plain"),
   value: external_exports.string()
@@ -5088,25 +5062,17 @@ var envBindingPlainSchema = external_exports.object({
 var envBindingSecretRefSchema = external_exports.object({
   type: external_exports.literal("secret_ref"),
   secretId: external_exports.string().uuid(),
-  version: secretVersionSelectorSchema.optional()
-});
-var envBindingUserSecretRefSchema = external_exports.object({
-  type: external_exports.literal("user_secret_ref"),
-  key: secretKeySchema,
-  version: secretVersionSelectorSchema.optional(),
-  required: external_exports.boolean().optional().default(true),
-  allowMissingOverride: external_exports.boolean().optional().default(false)
+  version: external_exports.union([external_exports.literal("latest"), external_exports.number().int().positive()]).optional()
 });
 var envBindingSchema = external_exports.union([
   external_exports.string(),
   envBindingPlainSchema,
-  envBindingSecretRefSchema,
-  envBindingUserSecretRefSchema
+  envBindingSecretRefSchema
 ]);
 var envConfigSchema = external_exports.record(external_exports.string(), envBindingSchema);
 var createSecretSchema = external_exports.object({
   name: external_exports.string().min(1),
-  key: secretKeySchema.optional(),
+  key: external_exports.string().min(1).regex(/^[a-zA-Z0-9_.-]+$/).optional(),
   provider: external_exports.enum(SECRET_PROVIDERS).optional(),
   providerConfigId: external_exports.string().uuid().optional().nullable(),
   managedMode: external_exports.enum(SECRET_MANAGED_MODES).optional(),
@@ -5141,24 +5107,15 @@ var createSecretSchema = external_exports.object({
     });
   }
 });
-function requireSecretRotationInput(value, ctx) {
-  if (!value.value?.trim() && !value.externalRef?.trim() && value.providerVersionRef == null && value.providerConfigId == null) {
-    ctx.addIssue({
-      code: external_exports.ZodIssueCode.custom,
-      path: ["value"],
-      message: "Secret rotation requires value, externalRef, providerVersionRef, or providerConfigId"
-    });
-  }
-}
 var rotateSecretSchema = external_exports.object({
   value: external_exports.string().min(1).optional().nullable(),
   externalRef: external_exports.string().optional().nullable(),
   providerVersionRef: external_exports.string().optional().nullable(),
   providerConfigId: external_exports.string().uuid().optional().nullable()
-}).superRefine(requireSecretRotationInput);
+});
 var updateSecretSchema = external_exports.object({
   name: external_exports.string().min(1).optional(),
-  key: secretKeySchema.optional(),
+  key: external_exports.string().min(1).regex(/^[a-zA-Z0-9_.-]+$/).optional(),
   status: external_exports.enum(SECRET_STATUSES).optional(),
   providerConfigId: external_exports.string().uuid().optional().nullable(),
   description: external_exports.string().optional().nullable(),
@@ -5172,71 +5129,8 @@ var secretBindingTargetSchema = external_exports.object({
 });
 var createSecretBindingSchema = secretBindingTargetSchema.extend({
   secretId: external_exports.string().uuid(),
-  versionSelector: secretVersionSelectorSchema.default("latest"),
+  versionSelector: external_exports.union([external_exports.literal("latest"), external_exports.number().int().positive()]).default("latest"),
   required: external_exports.boolean().default(true),
-  label: external_exports.string().optional().nullable()
-});
-var createUserSecretDefinitionSchema = external_exports.object({
-  key: secretKeySchema,
-  name: external_exports.string().trim().min(1).max(160),
-  description: external_exports.string().trim().max(500).optional().nullable(),
-  status: creatableSecretStatusSchema.optional(),
-  provider: external_exports.enum(SECRET_PROVIDERS).optional(),
-  providerConfigId: external_exports.string().uuid().optional().nullable(),
-  managedMode: external_exports.enum(SECRET_MANAGED_MODES).optional(),
-  providerMetadata: external_exports.record(external_exports.string(), external_exports.unknown()).optional().nullable(),
-  usageGuidance: external_exports.string().trim().max(1e3).optional().nullable()
-});
-var updateUserSecretDefinitionSchema = external_exports.object({
-  name: external_exports.string().trim().min(1).max(160).optional(),
-  description: external_exports.string().trim().max(500).optional().nullable(),
-  status: external_exports.enum(SECRET_STATUSES).optional(),
-  providerConfigId: external_exports.string().uuid().optional().nullable(),
-  providerMetadata: external_exports.record(external_exports.string(), external_exports.unknown()).optional().nullable(),
-  usageGuidance: external_exports.string().trim().max(1e3).optional().nullable()
-});
-var createUserSecretValueSchema = external_exports.object({
-  definitionKey: secretKeySchema.optional(),
-  definitionId: external_exports.string().uuid().optional(),
-  value: external_exports.string().min(1).optional().nullable(),
-  externalRef: external_exports.string().optional().nullable(),
-  providerVersionRef: external_exports.string().optional().nullable(),
-  providerConfigId: external_exports.string().uuid().optional().nullable()
-}).superRefine((value, ctx) => {
-  if (!value.definitionKey && !value.definitionId) {
-    ctx.addIssue({
-      code: external_exports.ZodIssueCode.custom,
-      path: ["definitionId"],
-      message: "User secret value requires definitionId or definitionKey"
-    });
-  }
-  if (!value.value?.trim() && !value.externalRef?.trim()) {
-    ctx.addIssue({
-      code: external_exports.ZodIssueCode.custom,
-      path: ["value"],
-      message: "User secret value requires value or externalRef"
-    });
-  }
-});
-var updateUserSecretValueSchema = external_exports.object({
-  status: external_exports.enum(SECRET_STATUSES).optional(),
-  value: external_exports.string().min(1).optional().nullable(),
-  externalRef: external_exports.string().min(1).optional().nullable(),
-  providerVersionRef: external_exports.string().min(1).optional().nullable(),
-  providerConfigId: external_exports.string().uuid().optional().nullable()
-});
-var rotateUserSecretValueSchema = external_exports.object({
-  value: external_exports.string().min(1).optional().nullable(),
-  externalRef: external_exports.string().min(1).optional().nullable(),
-  providerVersionRef: external_exports.string().min(1).optional().nullable(),
-  providerConfigId: external_exports.string().uuid().optional().nullable()
-}).superRefine(requireSecretRotationInput);
-var createUserSecretDeclarationSchema = secretBindingTargetSchema.extend({
-  definitionKey: secretKeySchema,
-  envKey: external_exports.string().trim().min(1),
-  versionSelector: secretVersionSelectorSchema.default("latest"),
-  required: external_exports.boolean().default(true),
-  allowMissingOverride: external_exports.boolean().default(false),
   label: external_exports.string().optional().nullable()
 });
 var safeShortText = external_exports.string().trim().min(1).max(160);
@@ -5436,86 +5330,6 @@ var probeEnvironmentConfigSchema = external_exports.object({
   config: external_exports.record(external_exports.string(), external_exports.unknown()).optional().default({}),
   envVars: envConfigSchema.optional().default({}),
   metadata: external_exports.record(external_exports.string(), external_exports.unknown()).optional().nullable()
-}).strict();
-
-// ../../shared/src/validators/environment-custom-images.ts
-var isoDateTime = external_exports.union([external_exports.date(), external_exports.string().datetime()]);
-var providerKeySchema = external_exports.string().min(1).max(200);
-var optionalRecordSchema = external_exports.record(external_exports.string(), external_exports.unknown()).optional().nullable();
-var environmentCustomImageTemplateKindSchema = external_exports.enum(ENVIRONMENT_CUSTOM_IMAGE_TEMPLATE_KINDS);
-var environmentCustomImageTemplateStatusSchema = external_exports.enum(ENVIRONMENT_CUSTOM_IMAGE_TEMPLATE_STATUSES);
-var environmentCustomImageSetupSessionStatusSchema = external_exports.enum(
-  ENVIRONMENT_CUSTOM_IMAGE_SETUP_SESSION_STATUSES
-);
-var environmentCustomImageSetupConnectionTypeSchema = external_exports.enum(
-  ENVIRONMENT_CUSTOM_IMAGE_SETUP_CONNECTION_TYPES
-);
-var environmentCustomImageSetupConnectionSummarySchema = external_exports.object({
-  type: environmentCustomImageSetupConnectionTypeSchema,
-  username: external_exports.string().min(1).max(200).optional().nullable(),
-  hostRedacted: external_exports.literal(true).optional().default(true),
-  portRedacted: external_exports.literal(true).optional().default(true),
-  label: external_exports.string().min(1).max(200).optional().nullable(),
-  instructions: external_exports.string().min(1).max(1e3).optional().nullable()
-}).strict();
-var environmentCustomImageTemplateSchema = external_exports.object({
-  id: external_exports.string().uuid(),
-  environmentId: external_exports.string().uuid(),
-  provider: providerKeySchema,
-  templateKind: environmentCustomImageTemplateKindSchema,
-  templateRef: external_exports.string().min(1).nullable(),
-  sourceTemplateRef: external_exports.string().min(1).nullable(),
-  sourceEnvironmentConfigFingerprint: external_exports.string().min(1).nullable(),
-  status: environmentCustomImageTemplateStatusSchema,
-  createdByUserId: external_exports.string().min(1).nullable(),
-  createdByAgentId: external_exports.string().uuid().nullable(),
-  capturedAt: isoDateTime.nullable(),
-  lastUsedAt: isoDateTime.nullable(),
-  supersededByTemplateId: external_exports.string().uuid().nullable(),
-  metadata: optionalRecordSchema,
-  createdAt: isoDateTime,
-  updatedAt: isoDateTime
-}).strict();
-var environmentCustomImageSetupSessionSchema = external_exports.object({
-  id: external_exports.string().uuid(),
-  environmentId: external_exports.string().uuid(),
-  templateId: external_exports.string().uuid().nullable(),
-  promotedTemplateId: external_exports.string().uuid().nullable(),
-  provider: providerKeySchema,
-  providerLeaseId: external_exports.string().min(1).nullable(),
-  environmentLeaseId: external_exports.string().uuid().nullable(),
-  status: environmentCustomImageSetupSessionStatusSchema,
-  startedByUserId: external_exports.string().min(1).nullable(),
-  startedByAgentId: external_exports.string().uuid().nullable(),
-  baseTemplateRef: external_exports.string().min(1).nullable(),
-  expiresAt: isoDateTime.nullable(),
-  finishedAt: isoDateTime.nullable(),
-  failureReason: external_exports.string().min(1).nullable(),
-  connectionSummary: environmentCustomImageSetupConnectionSummarySchema.nullable(),
-  connectionSecretRef: external_exports.string().min(1).nullable(),
-  metadata: optionalRecordSchema,
-  createdAt: isoDateTime,
-  updatedAt: isoDateTime
-}).strict();
-var startEnvironmentCustomImageSetupSessionSchema = external_exports.object({
-  templateId: external_exports.string().uuid().optional().nullable(),
-  ttlSeconds: external_exports.number().int().min(60).max(24 * 60 * 60).optional()
-}).strict();
-var finishEnvironmentCustomImageSetupSessionSchema = external_exports.object({
-  metadata: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
-}).strict();
-var cancelEnvironmentCustomImageSetupSessionSchema = external_exports.object({
-  reason: external_exports.string().min(1).max(1e3).optional()
-}).strict();
-var createEnvironmentCustomImageTerminalSessionTokenSchema = external_exports.object({}).strict().default({});
-var environmentCustomImageTerminalSessionTokenSchema = external_exports.object({
-  id: external_exports.string().min(1),
-  token: external_exports.string().min(32),
-  expiresAt: isoDateTime,
-  setupSessionId: external_exports.string().min(1),
-  environmentId: external_exports.string().min(1),
-  connectionType: external_exports.literal("ssh"),
-  websocketPath: external_exports.string().min(1)
 }).strict();
 
 // ../../shared/src/validators/external-object.ts
@@ -6198,8 +6012,6 @@ var createIssueBaseSchema = external_exports.object({
   assigneeAgentId: external_exports.string().uuid().optional().nullable(),
   assigneeUserId: external_exports.string().optional().nullable(),
   requestDepth: issueRequestDepthInputSchema.optional().default(0),
-  createdByUserId: external_exports.string().optional().nullable(),
-  responsibleUserId: external_exports.string().optional().nullable(),
   billingCode: external_exports.string().optional().nullable(),
   assigneeAdapterOverrides: issueAssigneeAdapterOverridesSchema.optional().nullable(),
   executionPolicy: issueExecutionPolicySchema.optional().nullable(),
@@ -6240,11 +6052,7 @@ var createIssueLabelSchema = external_exports.object({
   name: external_exports.string().trim().min(1).max(48),
   color: external_exports.string().regex(/^#(?:[0-9a-fA-F]{6})$/, "Color must be a 6-digit hex value")
 });
-var updateIssueSchema = createIssueBaseSchema.omit({
-  createdByUserId: true,
-  responsibleUserId: true,
-  watchdog: true
-}).partial().extend({
+var updateIssueSchema = createIssueBaseSchema.omit({ watchdog: true }).partial().extend({
   requestDepth: issueRequestDepthInputSchema.optional(),
   assigneeAgentId: external_exports.string().trim().min(1).optional().nullable(),
   comment: multilineTextSchema.pipe(external_exports.string().min(1)).optional(),
@@ -6335,10 +6143,6 @@ var addIssueCommentSchema = external_exports.object({
   resume: external_exports.boolean().optional(),
   interrupt: external_exports.boolean().optional()
 });
-var addIssueRecoveryActionCommentSchema = external_exports.object({
-  body: multilineTextSchema.pipe(external_exports.string().min(1)),
-  recoveryActionId: external_exports.string().uuid().optional()
-}).strict();
 var issueThreadInteractionStatusSchema = external_exports.enum(ISSUE_THREAD_INTERACTION_STATUSES);
 var issueThreadInteractionKindSchema = external_exports.enum(ISSUE_THREAD_INTERACTION_KINDS);
 var issueThreadInteractionContinuationPolicySchema = external_exports.enum(
@@ -6418,7 +6222,6 @@ var askUserQuestionsPayloadSchema = external_exports.object({
   version: external_exports.literal(1),
   title: external_exports.string().trim().max(240).nullable().optional(),
   submitLabel: external_exports.string().trim().max(120).nullable().optional(),
-  supersedeOnUserComment: external_exports.boolean().optional(),
   questions: external_exports.array(askUserQuestionsQuestionSchema).min(1).max(10)
 }).superRefine((value, ctx) => {
   const seenQuestionIds = /* @__PURE__ */ new Set();
@@ -6454,8 +6257,6 @@ var askUserQuestionsResultSchema = external_exports.object({
   answers: external_exports.array(askUserQuestionsAnswerSchema).max(20),
   cancelled: external_exports.literal(true).optional(),
   cancellationReason: external_exports.string().trim().max(4e3).nullable().optional(),
-  expirationReason: external_exports.literal("superseded_by_comment").optional(),
-  commentId: external_exports.string().uuid().nullable().optional(),
   summaryMarkdown: external_exports.string().max(2e4).nullable().optional()
 });
 var requestConfirmationHrefSchema = external_exports.string().trim().min(1).max(2e3).refine((value) => {
@@ -6820,8 +6621,7 @@ var routineRevisionSnapshotRoutineV1Schema = external_exports.object({
   concurrencyPolicy: external_exports.enum(ROUTINE_CONCURRENCY_POLICIES),
   catchUpPolicy: external_exports.enum(ROUTINE_CATCH_UP_POLICIES),
   variables: external_exports.array(routineVariableSchema),
-  env: envConfigSchema.nullable().default(null),
-  responsibleUserId: external_exports.string().nullable().default(null)
+  env: envConfigSchema.nullable().default(null)
 }).strict();
 var routineRevisionSnapshotTriggerV1Schema = external_exports.object({
   id: external_exports.string().uuid(),
@@ -8261,36 +8061,6 @@ var pluginToolDeclarationSchema = external_exports.object({
   description: external_exports.string().min(1),
   parametersSchema: jsonSchemaSchema
 });
-var pluginEnvironmentTemplateConfigFieldSchema = external_exports.string().min(1).max(100).regex(
-  /^[A-Za-z_][A-Za-z0-9_-]*$/,
-  "Template config binding fields must be top-level config keys using letters, digits, underscores, or hyphens"
-).refine((value) => value !== "provider", {
-  message: "Template config binding must not replace the sandbox provider key"
-});
-var pluginEnvironmentTemplateConfigBindingSchema = external_exports.object({
-  field: pluginEnvironmentTemplateConfigFieldSchema,
-  unsetFields: external_exports.array(pluginEnvironmentTemplateConfigFieldSchema).max(20).optional()
-}).strict().superRefine((value, ctx) => {
-  const unsetFields = value.unsetFields ?? [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const [index, field] of unsetFields.entries()) {
-    if (field === value.field) {
-      ctx.addIssue({
-        code: external_exports.ZodIssueCode.custom,
-        message: "Template config binding cannot unset the same field it sets",
-        path: ["unsetFields", index]
-      });
-    }
-    if (seen.has(field)) {
-      ctx.addIssue({
-        code: external_exports.ZodIssueCode.custom,
-        message: "Template config binding unsetFields must be unique",
-        path: ["unsetFields", index]
-      });
-    }
-    seen.add(field);
-  }
-});
 var pluginEnvironmentDriverDeclarationSchema = external_exports.object({
   driverKey: external_exports.string().min(1).regex(
     /^[a-z0-9][a-z0-9._-]*$/,
@@ -8300,12 +8070,6 @@ var pluginEnvironmentDriverDeclarationSchema = external_exports.object({
   displayName: external_exports.string().min(1).max(100),
   description: external_exports.string().max(500).optional(),
   supportsReusableLeases: external_exports.boolean().optional(),
-  supportsInteractiveSetup: external_exports.boolean().optional(),
-  interactiveSetupConnectionTypes: external_exports.array(external_exports.string().min(1).max(100)).max(10).optional(),
-  supportsTemplateCapture: external_exports.boolean().optional(),
-  templateRefKind: external_exports.string().min(1).max(100).optional(),
-  templateConfigBinding: pluginEnvironmentTemplateConfigBindingSchema.optional(),
-  supportsTemplateDelete: external_exports.boolean().optional(),
   configSchema: jsonSchemaSchema
 });
 var pluginManagedAgentDeclarationSchema = external_exports.object({
@@ -9080,16 +8844,6 @@ var API = {
   companies: `${API_PREFIX}/companies`,
   agents: `${API_PREFIX}/agents`,
   projects: `${API_PREFIX}/projects`,
-  environments: `${API_PREFIX}/environments`,
-  environmentCustomImageTemplate: `${API_PREFIX}/environments/:environmentId/custom-image-template`,
-  environmentCustomImageTemplateDisable: `${API_PREFIX}/environments/:environmentId/custom-image-template`,
-  environmentCustomImageTemplateRollback: `${API_PREFIX}/environments/:environmentId/custom-image-template/rollback`,
-  environmentCustomImageSetupSessions: `${API_PREFIX}/environments/:environmentId/custom-image-setup-sessions`,
-  environmentCustomImageSetupSession: `${API_PREFIX}/environment-custom-image-setup-sessions/:sessionId`,
-  environmentCustomImageSetupSessionTerminalToken: `${API_PREFIX}/environment-custom-image-setup-sessions/:sessionId/terminal-session-token`,
-  environmentCustomImageSetupSessionTerminalWs: `${API_PREFIX}/environment-custom-image-setup-sessions/:sessionId/terminal/ws`,
-  environmentCustomImageSetupSessionFinish: `${API_PREFIX}/environment-custom-image-setup-sessions/:sessionId/finish`,
-  environmentCustomImageSetupSessionCancel: `${API_PREFIX}/environment-custom-image-setup-sessions/:sessionId/cancel`,
   issues: `${API_PREFIX}/issues`,
   issueWatchdog: `${API_PREFIX}/issues/:issueId/watchdog`,
   issueTreeControl: `${API_PREFIX}/issues/:issueId/tree-control`,
@@ -9097,11 +8851,6 @@ var API = {
   goals: `${API_PREFIX}/goals`,
   approvals: `${API_PREFIX}/approvals`,
   secrets: `${API_PREFIX}/secrets`,
-  userSecretDefinitions: `${API_PREFIX}/companies/:companyId/user-secret-definitions`,
-  userSecretDefinition: `${API_PREFIX}/companies/:companyId/user-secret-definitions/:definitionId`,
-  userSecretDefinitionCoverage: `${API_PREFIX}/companies/:companyId/user-secret-definitions/:definitionId/coverage`,
-  myUserSecrets: `${API_PREFIX}/companies/:companyId/me/user-secrets`,
-  myUserSecret: `${API_PREFIX}/companies/:companyId/me/user-secrets/:secretId`,
   secretProviderConfigs: `${API_PREFIX}/secret-provider-configs`,
   secretProviderConfigDiscoveryPreview: `${API_PREFIX}/companies/:companyId/secret-provider-configs/discovery/preview`,
   costs: `${API_PREFIX}/costs`,
@@ -10333,16 +10082,6 @@ function startWorkerRpcHost(options) {
         return handleEnvironmentRealizeWorkspace(params);
       case "environmentExecute":
         return handleEnvironmentExecute(params);
-      case "environmentStartInteractiveSetup":
-        return handleEnvironmentStartInteractiveSetup(params);
-      case "environmentGetInteractiveSetup":
-        return handleEnvironmentGetInteractiveSetup(params);
-      case "environmentCaptureTemplate":
-        return handleEnvironmentCaptureTemplate(params);
-      case "environmentCancelInteractiveSetup":
-        return handleEnvironmentCancelInteractiveSetup(params);
-      case "environmentDeleteTemplate":
-        return handleEnvironmentDeleteTemplate(params);
       default:
         throw Object.assign(new Error(`Unknown method: ${method}`), { code: JSONRPC_ERROR_CODES.METHOD_NOT_FOUND });
     }
@@ -10389,16 +10128,6 @@ function startWorkerRpcHost(options) {
       supportedMethods.push("environmentRealizeWorkspace");
     if (plugin.definition.onEnvironmentExecute)
       supportedMethods.push("environmentExecute");
-    if (plugin.definition.onEnvironmentStartInteractiveSetup)
-      supportedMethods.push("environmentStartInteractiveSetup");
-    if (plugin.definition.onEnvironmentGetInteractiveSetup)
-      supportedMethods.push("environmentGetInteractiveSetup");
-    if (plugin.definition.onEnvironmentCaptureTemplate)
-      supportedMethods.push("environmentCaptureTemplate");
-    if (plugin.definition.onEnvironmentCancelInteractiveSetup)
-      supportedMethods.push("environmentCancelInteractiveSetup");
-    if (plugin.definition.onEnvironmentDeleteTemplate)
-      supportedMethods.push("environmentDeleteTemplate");
     return { ok: true, supportedMethods };
   }
   async function handleHealth() {
@@ -10587,36 +10316,6 @@ function startWorkerRpcHost(options) {
       throw methodNotImplemented("environmentExecute");
     }
     return plugin.definition.onEnvironmentExecute(params);
-  }
-  async function handleEnvironmentStartInteractiveSetup(params) {
-    if (!plugin.definition.onEnvironmentStartInteractiveSetup) {
-      throw methodNotImplemented("environmentStartInteractiveSetup");
-    }
-    return plugin.definition.onEnvironmentStartInteractiveSetup(params);
-  }
-  async function handleEnvironmentGetInteractiveSetup(params) {
-    if (!plugin.definition.onEnvironmentGetInteractiveSetup) {
-      throw methodNotImplemented("environmentGetInteractiveSetup");
-    }
-    return plugin.definition.onEnvironmentGetInteractiveSetup(params);
-  }
-  async function handleEnvironmentCaptureTemplate(params) {
-    if (!plugin.definition.onEnvironmentCaptureTemplate) {
-      throw methodNotImplemented("environmentCaptureTemplate");
-    }
-    return plugin.definition.onEnvironmentCaptureTemplate(params);
-  }
-  async function handleEnvironmentCancelInteractiveSetup(params) {
-    if (!plugin.definition.onEnvironmentCancelInteractiveSetup) {
-      throw methodNotImplemented("environmentCancelInteractiveSetup");
-    }
-    return plugin.definition.onEnvironmentCancelInteractiveSetup(params);
-  }
-  async function handleEnvironmentDeleteTemplate(params) {
-    if (!plugin.definition.onEnvironmentDeleteTemplate) {
-      throw methodNotImplemented("environmentDeleteTemplate");
-    }
-    return plugin.definition.onEnvironmentDeleteTemplate(params);
   }
   function allowsEvent(filter, event) {
     const payload = event.payload;
@@ -10873,7 +10572,202 @@ function readInstanceConfig(cfg = {}) {
 function resolveCompanyId(params) {
   return params?.companyId ?? process.env.PAPERCLIP_COMPANY_ID ?? null;
 }
-var LISTING_TTL_MS = 3e4;
+function resolveLocalBackupDir(cfg) {
+  const candidates = [];
+  try {
+    let dir = process.cwd();
+    for (let i = 0; i < 6; i += 1) {
+      const cfgPath = `${dir}/.paperclip/config.json`;
+      if (existsSync(cfgPath)) {
+        const raw = readFileSync(cfgPath, "utf8");
+        const parsed = JSON.parse(raw);
+        const backupDir = parsed.database?.backup?.dir;
+        if (backupDir) {
+          candidates.push({ path: backupDir, source: "paperclip-config" });
+        }
+        break;
+      }
+      const parent = nodePath.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  } catch {
+  }
+  const envHome = process.env.PAPERCLIP_HOME;
+  if (envHome) {
+    const cwd = process.cwd();
+    const cwdName = cwd.split("/").filter(Boolean).pop() ?? "";
+    const worktreeRoot = nodePath.resolve(cwd, "..");
+    const worktreeName = worktreeRoot.split("/").filter(Boolean).pop() ?? "";
+    if (worktreeName) {
+      candidates.push({
+        path: `${envHome}/instances/${worktreeName}/data/backups`,
+        source: "env"
+      });
+    }
+    if (cwdName) {
+      candidates.push({
+        path: `${envHome}/instances/${cwdName}/data/backups`,
+        source: "env"
+      });
+    }
+    candidates.push({ path: `${envHome}/data/backups`, source: "env" });
+  }
+  if (cfg.paperclipHome && cfg.backupsSubdir) {
+    candidates.push({ path: `${cfg.paperclipHome}/${cfg.backupsSubdir}`, source: "config" });
+  }
+  for (const c of candidates) {
+    try {
+      if (existsSync(c.path)) return { dir: c.path, source: c.source };
+    } catch {
+    }
+  }
+  return {
+    dir: candidates[0]?.path ?? `${cfg.paperclipHome}/${cfg.backupsSubdir}`,
+    source: candidates[0]?.source ?? "default"
+  };
+}
+async function readLocalDumps(dir) {
+  try {
+    const entries = await fs2.readdir(dir);
+    const dumps = [];
+    for (const name of entries) {
+      if (!name.startsWith("paperclip-") || !name.endsWith(".sql.gz")) continue;
+      try {
+        const s = await fs2.stat(`${dir}/${name}`);
+        dumps.push({
+          filename: name,
+          path: `${dir}/${name}`,
+          sizeBytes: s.size,
+          mtime: s.mtime.toISOString(),
+          ageDays: Math.max(0, Math.floor((Date.now() - s.mtime.getTime()) / 864e5))
+        });
+      } catch {
+      }
+    }
+    dumps.sort((a, b) => a.mtime < b.mtime ? 1 : a.mtime > b.mtime ? -1 : 0);
+    return dumps;
+  } catch {
+    return [];
+  }
+}
+async function readOffsiteBackups(cfg, companyId) {
+  const remote = cfg.rcloneRemote;
+  const prefix = `Paperclip-Backups/${companyId}`;
+  let pass = "";
+  for (const candidate of [
+    process.env.HOME ? `${process.env.HOME}/.config/rclone/rclone-pass` : null,
+    "/home/sirrus/.config/rclone/rclone-pass",
+    "/root/.config/rclone/rclone-pass"
+  ]) {
+    if (!candidate) continue;
+    if (existsSync(candidate)) {
+      try {
+        pass = readFileSync(candidate, "utf8").trim();
+        if (pass) break;
+      } catch {
+      }
+    }
+  }
+  const MAX_MONTHS_PER_YEAR = 3;
+  const MAX_DAYS_PER_MONTH = 7;
+  const MAX_HOURS_PER_DAY = 6;
+  const MAX_LEAVES = 80;
+  async function lsjsonDir(remotePath) {
+    const child = spawn(
+      "rclone",
+      ["lsjson", "--dirs-only", "--no-modtime", remotePath],
+      {
+        env: {
+          ...process.env,
+          RCLONE_CONFIG: cfg.rcloneConfig,
+          ...pass ? { RCLONE_CONFIG_PASS: pass } : {}
+        },
+        stdio: ["ignore", "pipe", "pipe"]
+      }
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (b) => stdout += b.toString());
+    child.stderr.on("data", (b) => stderr += b.toString());
+    const code = await new Promise((res) => child.on("exit", (c) => res(c ?? 0)));
+    if (code !== 0) return [];
+    const out = [];
+    for (const line of stdout.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const obj = JSON.parse(trimmed);
+        if (!obj.Path) continue;
+        out.push({
+          Path: obj.Path,
+          Name: obj.Name ?? obj.Path.split("/").pop() ?? obj.Path,
+          Size: obj.Size ?? 0,
+          IsDir: !!obj.IsDir,
+          ModTime: obj.ModTime
+        });
+      } catch {
+      }
+    }
+    return out;
+  }
+  function newestFirst(arr) {
+    return arr.slice().sort((a, b) => a.Path < b.Path ? 1 : a.Path > b.Path ? -1 : 0);
+  }
+  const backups = [];
+  const years = newestFirst(await lsjsonDir(`${remote}:${prefix}/`));
+  const PARALLEL = 4;
+  async function runWithCap(items, limit, fn) {
+    const out = [];
+    let i = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (i < items.length) {
+        const idx = i++;
+        out[idx] = await fn(items[idx]);
+      }
+    });
+    await Promise.all(workers);
+    return out;
+  }
+  for (const y of years) {
+    if (backups.length >= MAX_LEAVES) break;
+    if (!y.IsDir) continue;
+    const monthsRaw = newestFirst(await lsjsonDir(`${remote}:${prefix}/${y.Path}/`)).slice(0, MAX_MONTHS_PER_YEAR);
+    const monthPaths = monthsRaw.filter((m) => m.IsDir).map((m) => ({ y: y.Path, m }));
+    const dayLists = await runWithCap(
+      monthPaths,
+      PARALLEL,
+      async ({ y: y2, m }) => newestFirst(await lsjsonDir(`${remote}:${prefix}/${y2}/${m.Path}/`)).slice(0, MAX_DAYS_PER_MONTH)
+    );
+    const dayPaths = [];
+    for (let i = 0; i < dayLists.length; i += 1) {
+      for (const d of dayLists[i] ?? []) {
+        if (d.IsDir) dayPaths.push({ y: monthPaths[i].y, m: monthPaths[i].m.Path, d });
+      }
+    }
+    const hourLists = await runWithCap(
+      dayPaths,
+      PARALLEL,
+      async ({ y: y2, m, d }) => newestFirst(await lsjsonDir(`${remote}:${prefix}/${y2}/${m}/${d.Path}/`)).slice(0, MAX_HOURS_PER_DAY)
+    );
+    for (let i = 0; i < hourLists.length; i += 1) {
+      if (backups.length >= MAX_LEAVES) break;
+      for (const h of hourLists[i] ?? []) {
+        if (backups.length >= MAX_LEAVES) break;
+        if (!h.IsDir) continue;
+        if (!/^\d{4}$/.test(h.Name ?? h.Path)) continue;
+        const fullPath = `${dayPaths[i].y}/${dayPaths[i].m}/${dayPaths[i].d.Path}/${h.Name ?? h.Path}`;
+        backups.push({
+          path: `${prefix}/${fullPath}`,
+          modified: h.ModTime,
+          sizeBytes: h.Size ?? 0
+        });
+      }
+    }
+  }
+  return { remote: `${remote}:${prefix}`, prefix, backups };
+}
+var LISTING_TTL_MS = 5 * 6e4;
 var listingCache = /* @__PURE__ */ new Map();
 async function findRunningBackupProcs() {
   const out = [];
@@ -10915,25 +10809,86 @@ var pluginInstance = definePlugin({
       const companyId = p.companyId || "default";
       const cfg = readInstanceConfig();
       const cached = listingCache.get(companyId);
-      if (cached && Date.now() - cached.at < LISTING_TTL_MS && !cached.refreshing) {
+      if (cached && Date.now() - cached.at < LISTING_TTL_MS) {
         return cached.listing;
       }
+      const resolved = resolveLocalBackupDir(cfg);
+      const localDumps = await readLocalDumps(resolved.dir);
+      const localBytes = localDumps.reduce((s, d) => s + d.sizeBytes, 0);
+      const placeholderOffsite = {
+        remote: `${cfg.rcloneRemote}:Paperclip-Backups/${companyId}`,
+        prefix: `Paperclip-Backups/${companyId}`,
+        backups: [],
+        count: 0,
+        totalBytes: 0,
+        loading: true
+      };
       const listing = {
-        local: { dir: null, dumps: [], count: 0, totalBytes: 0 },
-        offsite: { remote: null, prefix: null, backups: [], count: 0 },
-        retention: { keep: cfg.defaultKeep, candidates: 0 },
-        offsiteRetention: { keep: cfg.offsiteKeep, candidates: 0, totalBytes: 0 },
+        local: {
+          dir: resolved.dir,
+          dirSource: resolved.source,
+          dumps: localDumps,
+          count: localDumps.length,
+          totalBytes: localBytes
+        },
+        offsite: placeholderOffsite,
+        retention: {
+          keep: cfg.defaultKeep,
+          candidates: Math.max(0, localDumps.length - cfg.defaultKeep)
+        },
+        offsiteRetention: {
+          keep: cfg.offsiteKeep,
+          candidates: 0,
+          totalBytes: 0
+        },
         config: cfg,
         loading: false,
         requestedCompanyId: companyId,
         listingAt: Date.now(),
-        listingFresh: true
+        listingFresh: false
       };
       listingCache.set(companyId, {
         at: Date.now(),
         listing,
-        refreshing: false
+        refreshing: true
       });
+      void (async () => {
+        try {
+          const offsite = await readOffsiteBackups(cfg, companyId);
+          const offsiteBytes = offsite.backups.reduce((s, b) => s + b.sizeBytes, 0);
+          listingCache.set(companyId, {
+            at: Date.now(),
+            listing: {
+              ...listing,
+              offsite: { ...offsite, loading: false },
+              offsiteRetention: {
+                keep: cfg.offsiteKeep,
+                candidates: Math.max(0, offsite.backups.length - cfg.offsiteKeep),
+                totalBytes: offsiteBytes
+              },
+              listingFresh: true
+            },
+            refreshing: false
+          });
+        } catch (err) {
+          ctx.logger.warn(
+            `paperclip-backup: offsite listing walk failed: companyId=${companyId} err=${err instanceof Error ? err.message : String(err)}`
+          );
+          listingCache.set(companyId, {
+            at: Date.now(),
+            listing: {
+              ...listing,
+              offsite: {
+                ...placeholderOffsite,
+                loading: false,
+                _error: err instanceof Error ? err.message : String(err)
+              },
+              listingFresh: true
+            },
+            refreshing: false
+          });
+        }
+      })();
       return listing;
     });
     ctx.data.register(DATA_KEYS.status, async () => {

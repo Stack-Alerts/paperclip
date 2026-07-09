@@ -23,6 +23,7 @@ import {
   readFileSync,
   promises as fs,
 } from "node:fs";
+import nodePath from "node:path";
 import path from "node:path";
 import {
   definePlugin,
@@ -137,6 +138,287 @@ function resolveCompanyId(params: Record<string, unknown> | undefined) {
 }
 
 // ---------------------------------------------------------------------------
+// Path / rclone helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the actual local DB-dump directory for the running instance.
+ *
+ * Priority:
+ *  1. <paperclipHome>/<backupsSubdir> from the plugin's saved config
+ *  2. <paperclipHome>/<worktree-name>/data/backups derived from env
+ *     (PAPERCLIP_HOME + a heuristic on the parent dir name)
+ *  3. <cwd>/.paperclip/config.json → .database.backup.dir
+ *  4. The first existing candidate
+ *  5. DEFAULT_CONFIG.backupsSubdir under DEFAULT_CONFIG.paperclipHome
+ *     (always returned so the UI can show the path even if it doesn't
+ *     exist on disk yet)
+ *
+ * Returns the resolved dir along with a "source" tag for diagnostics.
+ */
+function resolveLocalBackupDir(cfg: ReturnType<typeof readInstanceConfig>): {
+  dir: string;
+  source: "config" | "env" | "paperclip-config" | "default";
+} {
+  const candidates: Array<{ path: string; source: "config" | "env" | "paperclip-config" | "default" }> = [];
+
+  // 1) Read .paperclip/config.json (the paperclip server's own config).
+  //    This is the canonical, up-to-date source — the plugin's saved
+  //    config can go stale when the instance moves worktrees.
+  //
+  //    The plugin worker is spawned by the server, which runs in
+  //    <worktree>/server/. The config file lives at <worktree>/.paperclip/.
+  //    Walk up from cwd looking for it.
+  try {
+    let dir = process.cwd();
+    for (let i = 0; i < 6; i += 1) {
+      const cfgPath = `${dir}/.paperclip/config.json`;
+      if (existsSync(cfgPath)) {
+        const raw = readFileSync(cfgPath, "utf8");
+        const parsed = JSON.parse(raw) as {
+          database?: { backup?: { dir?: string } };
+        };
+        const backupDir = parsed.database?.backup?.dir;
+        if (backupDir) {
+          candidates.push({ path: backupDir, source: "paperclip-config" });
+        }
+        break;
+      }
+      const parent = nodePath.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // 2) Env-derived (worktree)
+  const envHome = process.env.PAPERCLIP_HOME;
+  if (envHome) {
+    const cwd = process.cwd();
+    const cwdName = cwd.split("/").filter(Boolean).pop() ?? "";
+    // The worktree root is typically cwd's parent when cwd is <root>/server
+    const worktreeRoot = nodePath.resolve(cwd, "..");
+    const worktreeName = worktreeRoot.split("/").filter(Boolean).pop() ?? "";
+    if (worktreeName) {
+      candidates.push({
+        path: `${envHome}/instances/${worktreeName}/data/backups`,
+        source: "env",
+      });
+    }
+    if (cwdName) {
+      candidates.push({
+        path: `${envHome}/instances/${cwdName}/data/backups`,
+        source: "env",
+      });
+    }
+    candidates.push({ path: `${envHome}/data/backups`, source: "env" });
+  }
+
+  // 3) Saved config (lowest priority — may be stale)
+  if (cfg.paperclipHome && cfg.backupsSubdir) {
+    candidates.push({ path: `${cfg.paperclipHome}/${cfg.backupsSubdir}`, source: "config" });
+  }
+
+  // 4) Return the first existing candidate, or fall back to the highest-priority one
+  for (const c of candidates) {
+    try {
+      if (existsSync(c.path)) return { dir: c.path, source: c.source };
+    } catch {
+      /* ignore */
+    }
+  }
+  // 5) Return the highest-priority candidate anyway so the UI can show the path
+  return {
+    dir: candidates[0]?.path ?? `${cfg.paperclipHome}/${cfg.backupsSubdir}`,
+    source: candidates[0]?.source ?? "default",
+  };
+}
+
+/**
+ * Read a local DB-dump file's metadata and return a normalized dump row
+ * suitable for the listing payload.
+ */
+type LocalDump = {
+  filename: string;
+  path: string;
+  sizeBytes: number;
+  mtime: string;
+  ageDays: number;
+};
+
+async function readLocalDumps(dir: string): Promise<LocalDump[]> {
+  try {
+    const entries = await fs.readdir(dir);
+    const dumps: LocalDump[] = [];
+    for (const name of entries) {
+      if (!name.startsWith("paperclip-") || !name.endsWith(".sql.gz")) continue;
+      try {
+        const s = await fs.stat(`${dir}/${name}`);
+        dumps.push({
+          filename: name,
+          path: `${dir}/${name}`,
+          sizeBytes: s.size,
+          mtime: s.mtime.toISOString(),
+          ageDays: Math.max(0, Math.floor((Date.now() - s.mtime.getTime()) / 86_400_000)),
+        });
+      } catch {
+        /* skip unreadable entry */
+      }
+    }
+    dumps.sort((a, b) => (a.mtime < b.mtime ? 1 : a.mtime > b.mtime ? -1 : 0));
+    return dumps;
+  } catch {
+    return [];
+  }
+}
+
+type OffsiteBackup = {
+  path: string;
+  modified?: string;
+  sizeBytes: number;
+};
+
+async function readOffsiteBackups(
+  cfg: ReturnType<typeof readInstanceConfig>,
+  companyId: string,
+): Promise<{ remote: string; prefix: string; backups: OffsiteBackup[]; _error?: string }> {
+  const remote = cfg.rcloneRemote;
+  const prefix = `Paperclip-Backups/${companyId}`;
+  // rclone needs RCLONE_CONFIG + RCLONE_CONFIG_PASS in its env. The plugin
+  // worker is spawned by the paperclip server with very few env vars set,
+  // so process.env.HOME is often empty. Look up the rclone pass file in
+  // common locations, preferring whichever file actually exists.
+  let pass = "";
+  for (const candidate of [
+    process.env.HOME ? `${process.env.HOME}/.config/rclone/rclone-pass` : null,
+    "/home/sirrus/.config/rclone/rclone-pass",
+    "/root/.config/rclone/rclone-pass",
+  ]) {
+    if (!candidate) continue;
+    if (existsSync(candidate)) {
+      try {
+        pass = readFileSync(candidate, "utf8").trim();
+        if (pass) break;
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  // The offsite tree is gdrive:Paperclip-Backups/<companyId>/<YYYY>/<MM>/<DD>/<HHMM>/.
+  // Each rclone lsjson call against the encrypted gdrive remote takes 1-3s
+  // (first call ~30s due to crypto setup). To bound the listing latency
+  // for the UI, walk only the most recent year → month → day → leaf
+  // branches, capped at MAX_LEAVES total. Older days / hours are not
+  // enumerated; the on-disk script (recovery.sh → gdrive-tiered-upload)
+  // prunes aggressively so most users only have the last ~30 leaves on
+  // gdrive anyway.
+  const MAX_MONTHS_PER_YEAR = 3; // newest first
+  const MAX_DAYS_PER_MONTH = 7;
+  const MAX_HOURS_PER_DAY = 6;
+  const MAX_LEAVES = 80;
+
+  // The plugin worker is spawned by the paperclip server, which sets
+  // very few env vars. process.env.HOME is often empty, so we can't use
+  // it to find ~/.config/rclone/rclone-pass. The pass-read loop above
+  // already tries multiple locations; just proceed to the listing walk.
+
+  async function lsjsonDir(remotePath: string): Promise<Array<{ Path: string; Name: string; Size: number; IsDir: boolean; ModTime?: string }>> {
+    const child = spawn(
+      "rclone",
+      ["lsjson", "--dirs-only", "--no-modtime", remotePath],
+      {
+        env: {
+          ...process.env,
+          RCLONE_CONFIG: cfg.rcloneConfig,
+          ...(pass ? { RCLONE_CONFIG_PASS: pass } : {}),
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (b) => (stdout += b.toString()));
+    child.stderr.on("data", (b) => (stderr += b.toString()));
+    const code: number = await new Promise((res) => child.on("exit", (c) => res(c ?? 0)));
+    if (code !== 0) return [];
+    const out: Array<{ Path: string; Name: string; Size: number; IsDir: boolean; ModTime?: string }> = [];
+    for (const line of stdout.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const obj = JSON.parse(trimmed) as { Path?: string; Name?: string; Size?: number; IsDir?: boolean; ModTime?: string };
+        if (!obj.Path) continue;
+        out.push({
+          Path: obj.Path,
+          Name: obj.Name ?? obj.Path.split("/").pop() ?? obj.Path,
+          Size: obj.Size ?? 0,
+          IsDir: !!obj.IsDir,
+          ModTime: obj.ModTime,
+        });
+      } catch {
+        /* skip */
+      }
+    }
+    return out;
+  }
+
+  // Newest first (alphabetical sort matches YYYY > MM > DD > HHMM)
+  function newestFirst<T extends { Path: string }>(arr: T[]): T[] {
+    return arr.slice().sort((a, b) => (a.Path < b.Path ? 1 : a.Path > b.Path ? -1 : 0));
+  }
+
+  const backups: OffsiteBackup[] = [];
+  const years = newestFirst(await lsjsonDir(`${remote}:${prefix}/`));
+  const PARALLEL = 4;
+  async function runWithCap<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
+    const out: R[] = [];
+    let i = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (i < items.length) {
+        const idx = i++;
+        out[idx] = await fn(items[idx]);
+      }
+    });
+    await Promise.all(workers);
+    return out;
+  }
+  for (const y of years) {
+    if (backups.length >= MAX_LEAVES) break;
+    if (!y.IsDir) continue;
+    const monthsRaw = newestFirst(await lsjsonDir(`${remote}:${prefix}/${y.Path}/`)).slice(0, MAX_MONTHS_PER_YEAR);
+    const monthPaths = monthsRaw.filter((m) => m.IsDir).map((m) => ({ y: y.Path, m }));
+    const dayLists = await runWithCap(monthPaths, PARALLEL, async ({ y, m }) =>
+      newestFirst(await lsjsonDir(`${remote}:${prefix}/${y}/${m.Path}/`)).slice(0, MAX_DAYS_PER_MONTH),
+    );
+    const dayPaths: Array<{ y: string; m: string; d: typeof dayLists[0][0] }> = [];
+    for (let i = 0; i < dayLists.length; i += 1) {
+      for (const d of dayLists[i] ?? []) {
+        if (d.IsDir) dayPaths.push({ y: monthPaths[i].y, m: monthPaths[i].m.Path, d });
+      }
+    }
+    const hourLists = await runWithCap(dayPaths, PARALLEL, async ({ y, m, d }) =>
+      newestFirst(await lsjsonDir(`${remote}:${prefix}/${y}/${m}/${d.Path}/`)).slice(0, MAX_HOURS_PER_DAY),
+    );
+    for (let i = 0; i < hourLists.length; i += 1) {
+      if (backups.length >= MAX_LEAVES) break;
+      for (const h of hourLists[i] ?? []) {
+        if (backups.length >= MAX_LEAVES) break;
+        if (!h.IsDir) continue;
+        if (!/^\d{4}$/.test(h.Name ?? h.Path)) continue;
+        const fullPath = `${dayPaths[i].y}/${dayPaths[i].m}/${dayPaths[i].d.Path}/${h.Name ?? h.Path}`;
+        backups.push({
+          path: `${prefix}/${fullPath}`,
+          modified: h.ModTime,
+          sizeBytes: h.Size ?? 0,
+        });
+      }
+    }
+  }
+  return { remote: `${remote}:${prefix}`, prefix, backups };
+}
+
+// ---------------------------------------------------------------------------
 // Listing cache
 //
 // The offsite listing makes an `rclone lsjson` call to Google Drive. With
@@ -145,7 +427,12 @@ function resolveCompanyId(params: Record<string, unknown> | undefined) {
 // rclone. Cache the most recent listing per companyId for LISTING_TTL_MS
 // and refresh in the background.
 // ---------------------------------------------------------------------------
-const LISTING_TTL_MS = 30_000;
+// Cache the offsite listing for 5 minutes. The full rclone walk across
+// year → month → day → HHMM is 4 levels deep, and the first rclone call
+// against the encrypted gdrive config takes ~30s for crypto setup. With
+// 5min TTL the dashboard poll is always a cache hit after the first walk,
+// and the slow walk only re-runs every 5min.
+const LISTING_TTL_MS = 5 * 60_000;
 const listingCache = new Map<
   string,
   { at: number; listing: unknown; refreshing: boolean }
@@ -212,27 +499,97 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
       const companyId = (p.companyId as string) || "default";
       const cfg = readInstanceConfig();
       const cached = listingCache.get(companyId);
-      if (cached && Date.now() - cached.at < LISTING_TTL_MS && !cached.refreshing) {
+      if (cached && Date.now() - cached.at < LISTING_TTL_MS) {
         return cached.listing;
       }
-      // For now return a minimal placeholder; a future build will replace
-      // this with a real rclone-driven listing matching dist/worker.js.
+      const resolved = resolveLocalBackupDir(cfg);
+      // Local read is fast (~50ms). The offsite walk against the encrypted
+      // gdrive takes 30s+ on the first call (crypto setup). To keep the UI
+      // responsive we run the offsite walk ASYNCHRONOUSLY: read local now,
+      // return immediately with a "loading" marker for offsite. The first
+      // call returns the local listing + an empty/loading offsite listing;
+      // the offsite walk continues in the background and the next call
+      // sees the populated cache.
+      const localDumps = await readLocalDumps(resolved.dir);
+      const localBytes = localDumps.reduce((s, d) => s + d.sizeBytes, 0);
+      const placeholderOffsite = {
+        remote: `${cfg.rcloneRemote}:Paperclip-Backups/${companyId}`,
+        prefix: `Paperclip-Backups/${companyId}`,
+        backups: [],
+        count: 0,
+        totalBytes: 0,
+        loading: true,
+      };
       const listing = {
-        local: { dir: null, dumps: [], count: 0, totalBytes: 0 },
-        offsite: { remote: null, prefix: null, backups: [], count: 0 },
-        retention: { keep: cfg.defaultKeep, candidates: 0 },
-        offsiteRetention: { keep: cfg.offsiteKeep, candidates: 0, totalBytes: 0 },
+        local: {
+          dir: resolved.dir,
+          dirSource: resolved.source,
+          dumps: localDumps,
+          count: localDumps.length,
+          totalBytes: localBytes,
+        },
+        offsite: placeholderOffsite,
+        retention: {
+          keep: cfg.defaultKeep,
+          candidates: Math.max(0, localDumps.length - cfg.defaultKeep),
+        },
+        offsiteRetention: {
+          keep: cfg.offsiteKeep,
+          candidates: 0,
+          totalBytes: 0,
+        },
         config: cfg,
         loading: false,
         requestedCompanyId: companyId,
         listingAt: Date.now(),
-        listingFresh: true,
+        listingFresh: false,
       };
+      // Mark as refreshing in the cache so the next call doesn't
+      // re-fire while the background walk is in flight.
       listingCache.set(companyId, {
         at: Date.now(),
         listing,
-        refreshing: false,
+        refreshing: true,
       });
+      // Fire the offsite walk in the background. Use void (not await)
+      // so the RPC returns immediately.
+      void (async () => {
+        try {
+          const offsite = await readOffsiteBackups(cfg, companyId);
+          const offsiteBytes = offsite.backups.reduce((s, b) => s + b.sizeBytes, 0);
+          listingCache.set(companyId, {
+            at: Date.now(),
+            listing: {
+              ...listing,
+              offsite: { ...offsite, loading: false },
+              offsiteRetention: {
+                keep: cfg.offsiteKeep,
+                candidates: Math.max(0, offsite.backups.length - cfg.offsiteKeep),
+                totalBytes: offsiteBytes,
+              },
+              listingFresh: true,
+            },
+            refreshing: false,
+          });
+        } catch (err) {
+          ctx.logger.warn(
+            `paperclip-backup: offsite listing walk failed: companyId=${companyId} err=${err instanceof Error ? err.message : String(err)}`,
+          );
+          listingCache.set(companyId, {
+            at: Date.now(),
+            listing: {
+              ...listing,
+              offsite: {
+                ...placeholderOffsite,
+                loading: false,
+                _error: err instanceof Error ? err.message : String(err),
+              },
+              listingFresh: true,
+            },
+            refreshing: false,
+          });
+        }
+      })();
       return listing;
     });
 
