@@ -25,6 +25,57 @@ type PresetsData = {
 
 type AuthorFilter = "all" | "human" | "agent";
 
+type SortBy = "relevance" | "date" | "id" | "title";
+
+const SORT_OPTIONS: { value: SortBy; label: string; title: string }[] = [
+  { value: "relevance", label: "Relevance", title: "Sort by server relevance" },
+  { value: "date", label: "Date", title: "Sort by most recent first" },
+  { value: "id", label: "ID", title: "Sort by issue identifier" },
+  { value: "title", label: "Title", title: "Sort alphabetically by title" },
+];
+
+function sortResults(results: SearchResult[], sortBy: SortBy): SearchResult[] {
+  if (sortBy === "relevance") return results;
+  const copy = results.slice();
+  switch (sortBy) {
+    case "date":
+      copy.sort((a, b) => {
+        const ta = new Date(a.createdAt).getTime();
+        const tb = new Date(b.createdAt).getTime();
+        return tb - ta;
+      });
+      return copy;
+    case "title":
+      copy.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+      return copy;
+    case "id":
+      copy.sort((a, b) => {
+        const na = parseIdentifier(a.identifier);
+        const nb = parseIdentifier(b.identifier);
+        return na - nb;
+      });
+      return copy;
+  }
+}
+
+function parseIdentifier(identifier: string | null): number {
+  if (!identifier) return Number.MAX_SAFE_INTEGER;
+  const match = identifier.match(/(\d+)$/);
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  return parseInt(match[1], 10) || 0;
+}
+
+function filterByText(results: SearchResult[], needle: string): SearchResult[] {
+  if (!needle) return results;
+  const n = needle.trim().toLowerCase();
+  if (!n) return results;
+  return results.filter((r) => {
+    const title = r.title?.toLowerCase() ?? "";
+    const identifier = r.identifier?.toLowerCase() ?? "";
+    return title.includes(n) || identifier.includes(n);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
@@ -532,6 +583,8 @@ export function BetterSearchPanel() {
   const [inputValue, setInputValue] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [filter, setFilter] = useState<AuthorFilter>("all");
+  const [sortBy, setSortBy] = useState<SortBy>("relevance");
+  const [resultFilter, setResultFilter] = useState("");
 
   // Apply any preset that was queued by the inbox toolbar button.
   useEffect(() => {
@@ -594,10 +647,12 @@ export function BetterSearchPanel() {
   );
 
   const allResults = searchData.data?.results ?? [];
-  const filtered =
+  const authorFiltered =
     filter === "all"
       ? allResults
       : allResults.filter((r) => r.latestAuthorType === filter);
+  const innerFiltered = filterByText(authorFiltered, resultFilter);
+  const sorted = sortResults(innerFiltered, sortBy);
 
   function issuesPath(identifier: string): string {
     return context.companyPrefix
@@ -610,13 +665,17 @@ export function BetterSearchPanel() {
   const hasQuery = debouncedQuery.length > 0;
   const canSavePreset = hasUserContext && (hasQuery || filter !== "all");
 
-  // Apply a preset atomically: set both query and filter, then trigger search.
+  // Apply a preset atomically: set query + filter + sort + result filter, then search.
   function applyPreset(p: Preset) {
     const q = p.query;
     const f = (p.filters.authorType as AuthorFilter) ?? "all";
+    const s = (p.filters.sortBy as SortBy | undefined) ?? "relevance";
+    const rf = typeof p.filters.resultFilter === "string" ? p.filters.resultFilter : "";
     setInputValue(q);
     setDebouncedQuery(q.trim());
     setFilter(f);
+    setSortBy(s);
+    setResultFilter(rf);
     setSavingPreset(false);
   }
 
@@ -626,7 +685,11 @@ export function BetterSearchPanel() {
       id: crypto.randomUUID(),
       name,
       query: debouncedQuery,
-      filters: { authorType: filter },
+      filters: {
+        authorType: filter,
+        sortBy,
+        resultFilter,
+      },
     };
     // Optimistic update.
     setLocalPresets((prev) => [...(prev ?? []), preset]);
@@ -708,6 +771,63 @@ export function BetterSearchPanel() {
         </div>
       )}
 
+      {hasQuery && allResults.length > 0 && (
+        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+          <label
+            style={{
+              fontSize: "11px",
+              color: "var(--muted-foreground)",
+              flexShrink: 0,
+            }}
+          >
+            Sort
+          </label>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+            title={
+              SORT_OPTIONS.find((o) => o.value === sortBy)?.title ?? undefined
+            }
+            style={{
+              flex: "0 0 auto",
+              padding: "2px 4px",
+              fontSize: "11px",
+              borderRadius: "4px",
+              border: "1px solid var(--border)",
+              background: "var(--background)",
+              color: "var(--foreground)",
+              cursor: "pointer",
+              outline: "none",
+            }}
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <input
+            type="search"
+            placeholder="Filter results…"
+            value={resultFilter}
+            onChange={(e) => setResultFilter(e.target.value)}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: "2px 6px",
+              fontSize: "11px",
+              borderRadius: "4px",
+              border: "1px solid var(--border)",
+              background: "var(--background)",
+              color: "var(--foreground)",
+              outline: "none",
+            }}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+      )}
+
       {savingPreset && (
         <SavePresetForm
           defaultName={debouncedQuery}
@@ -740,14 +860,22 @@ export function BetterSearchPanel() {
 
       {!isSearching && hasQuery && !hasError && (
         <>
-          {filtered.length === 0 ? (
+          {sorted.length === 0 ? (
             <div style={{ color: "var(--muted-foreground)", fontSize: "12px", padding: "4px 0" }}>
               No results
-              {filter !== "all" ? ` for ${filter === "human" ? "Human" : "AI Agent"} filter` : ""}
+              {filter !== "all" || resultFilter
+                ? ` for ${
+                    filter !== "all"
+                      ? `${filter === "human" ? "Human" : "AI Agent"}`
+                      : ""
+                  }${filter !== "all" && resultFilter ? " + " : ""}${
+                    resultFilter ? `text "${resultFilter}"` : ""
+                  } filter`
+                : ""}
             </div>
           ) : (
             <div style={resultListStyle}>
-              {filtered.map((result) => (
+              {sorted.map((result) => (
                 <ResultRow key={result.id} result={result} issuesPath={issuesPath} />
               ))}
             </div>
@@ -760,8 +888,8 @@ export function BetterSearchPanel() {
               paddingTop: "6px",
             }}
           >
-            {filtered.length} result{filtered.length !== 1 ? "s" : ""}
-            {allResults.length !== filtered.length
+            {sorted.length} result{sorted.length !== 1 ? "s" : ""}
+            {allResults.length !== sorted.length
               ? ` of ${allResults.length} total`
               : ""}
           </div>
