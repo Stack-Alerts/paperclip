@@ -220,3 +220,36 @@ PR #2218 (`feat/external-adapter-phase1`) adds external adapter support. See roo
 - `createServerAdapter()` must include ALL optional fields (especially `detectModel`)
 - Built-in UI adapters can shadow external plugin parsers; external override pause/resume should restore the built-in parser.
 - Reference external adapters: Droid (npm); Hermes can also be tested as an override package.
+
+## 12. SessionEnd Autosave Contract
+
+When a Paperclip run ends (normal exit, OOM kill, harness crash, watchdog SIGTERM), in-progress work on `fix/BTCAAAAA-*` and `feat/BTCAAAAA-*` branches must survive. The Tier 1 hook for this is `scripts/session_end_autosave.py`.
+
+### Invariants
+
+- **Branch scope is explicit.** Only branches matching `fix/BTCAAAAA-*` or `feat/BTCAAAAA-*` are auto-snapshotted. Every other branch (including `main`, `master`, `feat/*` without a BTCAAAAA identifier) is left untouched.
+- **Push is force-with-lease, never plain `--force`.** The autosave hook may overwrite a remote WIP branch, but it must never silently clobber an unrelated commit.
+- **Empty working tree is a no-op (exit 0).** The script must not create an empty WIP commit.
+- **Opt-out is honored.** Both `--no-autosave` and `PAPERCLIP_NO_AUTOSAVE=1` skip the snapshot entirely (exit 3) and leave the working tree dirty so the developer can decide what to do.
+
+### Exit codes
+
+| Code | Meaning |
+| ---- | ------- |
+| 0    | Success, or no-op (clean tree, non-protected branch, detached HEAD) |
+| 2    | Git invocation failed (commit or push) — caller should surface in run output |
+| 3    | Opt-out via `--no-autosave` or `PAPERCLIP_NO_AUTOSAVE=1` |
+| 4    | No `.git` reachable from the workspace cwd |
+
+### Wiring expectations
+
+Adapters and watchdogs invoke the script before the process exits:
+
+```sh
+python3 scripts/session_end_autosave.py \
+  --cwd "$PAPERCLIP_WORKSPACE_CWD" \
+  --run-id "$PAPERCLIP_RUN_ID" \
+  --issue-id "BTCAAAAA-NNNNN"
+```
+
+The script writes append-only diagnostics to `.paperclip/autosave.log`. Smoke coverage lives at `scripts/smoke/session-end-autosave-smoke.test.mjs` (run with `node scripts/smoke/session-end-autosave-smoke.test.mjs`). Add new branches to `PROTECTED_BRANCH_PREFIXES` in the script and a smoke case in the same PR — do not land one without the other.
