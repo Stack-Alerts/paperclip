@@ -27,6 +27,8 @@ type AuthorFilter = "all" | "human" | "agent";
 
 type SortBy = "relevance" | "date" | "id" | "title";
 
+const SEARCH_LIMIT = 30;
+
 const SORT_OPTIONS: { value: SortBy; label: string; title: string }[] = [
   { value: "relevance", label: "Relevance", title: "Sort by server relevance" },
   { value: "date", label: "Date", title: "Sort by most recent first" },
@@ -83,47 +85,49 @@ function filterByText(results: SearchResult[], needle: string): SearchResult[] {
 const panelStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  gap: "8px",
-  padding: "8px",
+  gap: "12px",
+  padding: "4px",
   fontSize: "13px",
 };
 
 const inputStyle: CSSProperties = {
   width: "100%",
-  padding: "6px 8px",
-  borderRadius: "6px",
+  padding: "10px 12px",
+  borderRadius: "8px",
   border: "1px solid var(--border)",
   background: "var(--background)",
   color: "var(--foreground)",
-  fontSize: "13px",
+  fontSize: "14px",
   boxSizing: "border-box",
   outline: "none",
 };
 
 const chipRowStyle: CSSProperties = {
   display: "flex",
-  gap: "4px",
+  gap: "6px",
   flexWrap: "wrap",
+  alignItems: "center",
 };
 
 function chipStyle(active: boolean): CSSProperties {
   return {
-    padding: "2px 8px",
-    borderRadius: "12px",
+    padding: "5px 12px",
+    borderRadius: "999px",
     border: `1px solid ${active ? "var(--primary, #6366f1)" : "var(--border)"}`,
     background: active ? "var(--primary, #6366f1)" : "transparent",
     color: active ? "var(--primary-foreground, #fff)" : "var(--foreground)",
     cursor: "pointer",
-    fontSize: "11px",
-    fontWeight: active ? 600 : 400,
+    fontSize: "12px",
+    fontWeight: active ? 600 : 500,
+    lineHeight: 1.2,
   };
 }
 
 const resultListStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  gap: "4px",
-  maxHeight: "420px",
+  gap: "6px",
+  maxHeight: "min(70vh, 720px)",
   overflowY: "auto",
 };
 
@@ -131,16 +135,16 @@ function resultItemStyle(hovered: boolean): CSSProperties {
   return {
     display: "flex",
     flexDirection: "column",
-    gap: "2px",
-    padding: "6px 8px",
-    borderRadius: "6px",
+    gap: "4px",
+    padding: "10px 12px",
+    borderRadius: "8px",
     background: hovered
       ? "color-mix(in srgb, var(--accent, #6366f1) 15%, transparent)"
       : "transparent",
     cursor: "pointer",
     textDecoration: "none",
     color: "inherit",
-    border: "1px solid transparent",
+    border: "1px solid var(--border)",
     transition: "background 0.1s",
   };
 }
@@ -181,12 +185,12 @@ function StatusDot({ status }: { status: string }) {
     <span
       style={{
         display: "inline-block",
-        width: "7px",
-        height: "7px",
+        width: "9px",
+        height: "9px",
         borderRadius: "50%",
         background: color,
         flexShrink: 0,
-        marginTop: "1px",
+        marginTop: "5px",
       }}
     />
   );
@@ -218,13 +222,14 @@ function ResultRow({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "6px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
         <StatusDot status={result.status} />
         <span
           style={{
             flex: 1,
             fontWeight: 500,
-            lineHeight: "1.3",
+            fontSize: "14px",
+            lineHeight: "1.4",
             overflow: "hidden",
             display: "-webkit-box",
             WebkitLineClamp: 2,
@@ -234,13 +239,23 @@ function ResultRow({
           {result.title}
         </span>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", paddingLeft: "13px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          paddingLeft: "16px",
+          fontSize: "12px",
+        }}
+      >
         {result.identifier && (
-          <span style={{ color: "var(--muted-foreground)", fontSize: "11px" }}>
+          <span style={{ color: "var(--muted-foreground)" }}>
             {result.identifier}
           </span>
         )}
-        <span style={authorBadgeStyle(result.latestAuthorType)}>{authorLabel}</span>
+        <span style={authorBadgeStyle(result.latestAuthorType)}>
+          {authorLabel}
+        </span>
       </div>
     </a>
   );
@@ -772,10 +787,21 @@ export function BetterSearchPanel() {
       )}
 
       {hasQuery && allResults.length > 0 && (
-        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "10px",
+            alignItems: "center",
+            padding: "8px 12px",
+            borderRadius: "8px",
+            border: "1px solid var(--border)",
+            background: "var(--muted, color-mix(in srgb, var(--accent) 4%, transparent))",
+          }}
+        >
           <label
             style={{
-              fontSize: "11px",
+              fontSize: "12px",
+              fontWeight: 500,
               color: "var(--muted-foreground)",
               flexShrink: 0,
             }}
@@ -790,14 +816,15 @@ export function BetterSearchPanel() {
             }
             style={{
               flex: "0 0 auto",
-              padding: "2px 4px",
-              fontSize: "11px",
-              borderRadius: "4px",
+              padding: "6px 8px",
+              fontSize: "12px",
+              borderRadius: "6px",
               border: "1px solid var(--border)",
               background: "var(--background)",
               color: "var(--foreground)",
               cursor: "pointer",
               outline: "none",
+              fontWeight: 500,
             }}
           >
             {SORT_OPTIONS.map((o) => (
@@ -814,9 +841,9 @@ export function BetterSearchPanel() {
             style={{
               flex: 1,
               minWidth: 0,
-              padding: "2px 6px",
-              fontSize: "11px",
-              borderRadius: "4px",
+              padding: "6px 10px",
+              fontSize: "13px",
+              borderRadius: "6px",
               border: "1px solid var(--border)",
               background: "var(--background)",
               color: "var(--foreground)",
@@ -825,6 +852,28 @@ export function BetterSearchPanel() {
             autoComplete="off"
             spellCheck={false}
           />
+          {(resultFilter || sortBy !== "relevance") && (
+            <button
+              type="button"
+              onClick={() => {
+                setResultFilter("");
+                setSortBy("relevance");
+              }}
+              style={{
+                flexShrink: 0,
+                padding: "5px 10px",
+                fontSize: "12px",
+                borderRadius: "6px",
+                border: "1px solid var(--border)",
+                background: "transparent",
+                color: "var(--muted-foreground)",
+                cursor: "pointer",
+              }}
+              title="Clear filter and reset sort"
+            >
+              Reset
+            </button>
+          )}
         </div>
       )}
 
@@ -861,7 +910,14 @@ export function BetterSearchPanel() {
       {!isSearching && hasQuery && !hasError && (
         <>
           {sorted.length === 0 ? (
-            <div style={{ color: "var(--muted-foreground)", fontSize: "12px", padding: "4px 0" }}>
+            <div
+              style={{
+                color: "var(--muted-foreground)",
+                fontSize: "13px",
+                padding: "16px 0",
+                textAlign: "center",
+              }}
+            >
               No results
               {filter !== "all" || resultFilter
                 ? ` for ${
@@ -883,21 +939,38 @@ export function BetterSearchPanel() {
           <div
             style={{
               color: "var(--muted-foreground)",
-              fontSize: "11px",
+              fontSize: "12px",
               borderTop: "1px solid var(--border)",
-              paddingTop: "6px",
+              paddingTop: "10px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
             }}
           >
-            {sorted.length} result{sorted.length !== 1 ? "s" : ""}
-            {allResults.length !== sorted.length
-              ? ` of ${allResults.length} total`
-              : ""}
+            <span>
+              {sorted.length} result{sorted.length !== 1 ? "s" : ""}
+              {allResults.length !== sorted.length
+                ? ` of ${allResults.length} total`
+                : ""}
+            </span>
+            {allResults.length === SEARCH_LIMIT && (
+              <span style={{ fontStyle: "italic" }}>
+                Limit {SEARCH_LIMIT} — refine to see more
+              </span>
+            )}
           </div>
         </>
       )}
 
       {!hasQuery && (
-        <div style={{ color: "var(--muted-foreground)", fontSize: "12px", padding: "4px 0" }}>
+        <div
+          style={{
+            color: "var(--muted-foreground)",
+            fontSize: "13px",
+            padding: "16px 0",
+            textAlign: "center",
+          }}
+        >
           Deep search across titles, descriptions, and comments.
         </div>
       )}
@@ -1041,27 +1114,30 @@ export function BetterSearchPage() {
   return (
     <div
       style={{
-        maxWidth: "880px",
+        maxWidth: "1200px",
         margin: "0 auto",
-        padding: "16px",
+        padding: "24px",
         display: "flex",
         flexDirection: "column",
-        gap: "12px",
+        gap: "20px",
       }}
     >
-      <h1 style={{ fontSize: "18px", fontWeight: 600, margin: 0 }}>
-        Better Search
-      </h1>
-      <p
-        style={{
-          color: "var(--muted-foreground)",
-          fontSize: "13px",
-          margin: 0,
-        }}
-      >
-        Deep search across issue titles, descriptions, and comments. Filter
-        by Human or AI author. Save frequently-used searches as presets.
-      </p>
+      <header style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+        <h1 style={{ fontSize: "22px", fontWeight: 600, margin: 0 }}>
+          Better Search
+        </h1>
+        <p
+          style={{
+            color: "var(--muted-foreground)",
+            fontSize: "13px",
+            margin: 0,
+            maxWidth: "640px",
+          }}
+        >
+          Deep search across issue titles, descriptions, and comments. Filter
+          by Human or AI author. Save frequently-used searches as presets.
+        </p>
+      </header>
       <BetterSearchPanel />
     </div>
   );
