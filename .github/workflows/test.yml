@@ -47,10 +47,13 @@ jobs:
     name: Detect python/server changes
     runs-on: ubuntu-latest
     outputs:
-      # `python` is true when any changed file is outside packages/web-ui/.
-      # Default step sets it for schedule / workflow_dispatch where the action
-      # has no base/ref to diff against — coverage gate must run nightly.
-      python: ${{ steps.filter.outputs.python || steps.default.outputs.python }}
+      # `python` is true when any changed file is outside packages/web-ui/
+      # AND is not a docs-only change. The `refine` step subtracts docs-only
+      # changes (BTCAAAAA-39048) — a docs-only PR should not trigger the
+      # 35-60 min pytest+coverage gate on the self-hosted runner. The default
+      # step sets python=true for schedule / workflow_dispatch where the
+      # action has no base/ref to diff against — coverage gate must run nightly.
+      python: ${{ steps.refine.outputs.python || steps.default.outputs.python || steps.filter.outputs.python }}
     steps:
       - uses: actions/checkout@v4.3.1
         with:
@@ -80,15 +83,58 @@ jobs:
           # emits `python=true` if ANY changed file matches any pattern,
           # `python=false` otherwise — same semantics as the previous bash
           # `grep -vq '^packages/web-ui/'` gate.
+          #
+          # `docs_only` is true when ANY changed file is under docs/. Used
+          # by the `refine` step below to subtract docs-only PRs (BTCAAAAA-39048)
+          # — a PR that touches only docs/ should skip the 35-60 min
+          # pytest+coverage gate on the self-hosted runner.
           filters: |
             python:
               - '!(packages)/**'
               - 'packages/!(web-ui)/**'
+            docs_only:
+              - 'docs/**'
 
       - name: Default python=true when dorny did not produce a value
         id: default
         if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || steps.filter.outcome != 'success' || steps.filter.outputs.python == '')
         run: echo "python=true" >> "$GITHUB_OUTPUT"
+
+      # BTCAAAAA-39048: subtract docs-only PRs. dorny's `python` filter is
+      # true when ANY non-webui file changed, which incorrectly fires on
+      # docs/ changes. Re-check the diff: if zero non-docs files changed,
+      # emit python=false so downstream jobs (test, integration-real-data,
+      # canary-smoke) skip. Schedule / workflow_dispatch still default to
+      # python=true via the step above.
+      - name: Refine change detection for docs-only PRs (BTCAAAAA-39048)
+        id: refine
+        if: always() && (github.event_name == 'pull_request' || github.event_name == 'push') && steps.filter.outputs.python == 'true'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BASE_REF:-}" ]; then
+            echo "::warning::BASE_REF is empty; skipping refine and keeping python=true"
+            echo "python=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed="$(git diff --name-only "origin/${BASE_REF}...HEAD" || true)"
+          if [ -z "$changed" ]; then
+            echo "::warning::git diff produced empty output against origin/${BASE_REF}; skipping refine and keeping python=true"
+            echo "python=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          non_docs_count="$(printf '%s\n' "$changed" | grep -cv '^docs/' || true)"
+          echo "Refine: changed files (sampled) =$(printf '%s\n' "$changed" | head -5 | tr '\n' ' ')"
+          echo "Refine: non_docs_count=${non_docs_count}"
+          if [ "$non_docs_count" = "0" ]; then
+            echo "Only docs/ files changed; emitting python=false to skip pytest+coverage gate"
+            echo "python=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Non-docs files changed; emitting python=true to run pytest+coverage gate"
+            echo "python=true" >> "$GITHUB_OUTPUT"
+          fi
 
   test:
     name: pytest + coverage gate
@@ -105,6 +151,16 @@ jobs:
           POSTGRES_DB: optimizer_v3
           POSTGRES_USER: optimizer_admin
           POSTGRES_PASSWORD: secure_password_change_me
+          # BTCAAAAA-39048 (v3): pg_isready is built on libpq and honors
+          # libpq client env vars. Setting PGUSER here means a bare
+          # `pg_isready` health-cmd connects as optimizer_admin instead of
+          # defaulting to the unix user (root inside the runner container).
+          # An earlier attempt passed `--health-cmd "pg_isready -U
+          # optimizer_admin"` directly, but `docker create` shlex-splits
+          # the args and treated `-U` as an unknown docker flag
+          # ("unknown shorthand flag: 'U' in -U"), exiting 125 before the
+          # container ever started. PGUSER is the libpq-clean fix.
+          PGUSER: optimizer_admin
         ports:
           # BTCAAAAA-38523: use a random host port (no fixed mapping) so
           # pytest jobs can run concurrently on the 2 self-hosted runners

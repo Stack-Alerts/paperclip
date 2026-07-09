@@ -1,0 +1,567 @@
+{
+  "_meta": {
+    "issue": "BTCAAAAA-39023",
+    "purpose": "Institutional-grade building-block / signal / risk mapping consumed by TradesPanel strategy-notes tooltips (BTCAAAAA-39021).",
+    "producedBy": "StrategyResearcher (e3fcab65-c9a3-45bd-97e8-5145d3d6db5e)",
+    "reviewer": "UIEngineer (9113b321-771b-481d-8ae7-33765ed9b1f5)",
+    "exitTypeCodesRef": "src/strategy_builder/ EXIT_TYPE_CODES = ['TP1','TP2','TP3','TP4','TP5','SL','STOP_LOSS','MAX_BARS','TIME_LIMIT']",
+    "registryRef": "src/detectors/building_blocks/registry.py — dual-signal validation (signal + signal_simple), @register_block decorator, category priority (OSCILLATORS=1, TREND=2, INSTITUTIONAL=3, PRICE_ACTION=4, SMC_ICT=5, PATTERNS=6)",
+    "riskEnforcerRef": "src/strategies/risk_enforcer.py — MAX_POSITION_SIZE=1, MIN_POSITION_SIZE=0.001, DAILY_LOSS_LIMIT=$500, STOP_LOSS_PCT=0.02",
+    "validIn": [
+      "src/strategies/strategy_06_range_breakout.py",
+      "src/strategies/strategy_15_bollinger_mean_reversion.py",
+      "src/strategies/strategy_05_ema_pullback.py",
+      "src/strategies/strategy_08_killzone_fib.py",
+      "src/strategies/strategy_11_williams_fractal.py",
+      "src/strategies/strategy_01_vwap_pullback.py",
+      "src/strategies/strategy_02_liquidity_sweep.py",
+      "src/strategies/strategy_03_order_block.py",
+      "src/strategies/strategy_04_ict_silver_bullet.py",
+      "src/strategies/strategy_07_eur_usd_breakout.py",
+      "src/strategies/strategy_13_breakout_pullback.py"
+    ]
+  },
+  "exitTypes": {
+    "TP1": {
+      "label": "Take Profit 1 — primary scaled exit",
+      "thesis": "TP1 closes 50% of the position at the first measured-move target (typically 1R or VWAP reversion for mean-reversion strategies), as governed by the universal TP allocation pattern (TP1=50%, TP2=30%, TP3=20%) and gated by MAX_POSITION_SIZE=1 in RiskEnforcer so no single trade concentrates risk beyond the institutional floor.",
+      "buildingBlockRef": "src/detectors/building_blocks/patterns/initial_balance_breakout.py (range breakouts) | oscillators/bollinger_bands.py (mean reversion)",
+      "metricLabels": { "allocationPct": "50%", "typicalRMultiple": "1R", "rrRatio": "≥1.0" },
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE",
+      "validIn": ["strategy_06_range_breakout", "strategy_15_bollinger_mean_reversion", "strategy_05_ema_pullback", "strategy_13_breakout_pullback"]
+    },
+    "TP2": {
+      "label": "Take Profit 2 — secondary scaled exit",
+      "thesis": "TP2 closes 30% of the position at the second measured-move target (typically 2R or opposite Bollinger Band for mean reversion), aligning with the universal TP-allocation pattern (TP1=50%, TP2=30%, TP3=20%) and constrained by MIN_POSITION_SIZE=0.001 in RiskEnforcer so the residual remains executable.",
+      "buildingBlockRef": "src/detectors/building_blocks/oscillators/bollinger_bands.py | smc_ict/break_of_structure.py",
+      "metricLabels": { "allocationPct": "30%", "typicalRMultiple": "2R", "rrRatio": "≥2.0" },
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MIN_POSITION_SIZE",
+      "validIn": ["strategy_06_range_breakout", "strategy_15_bollinger_mean_reversion", "strategy_05_ema_pullback"]
+    },
+    "TP3": {
+      "label": "Take Profit 3 — runner exit",
+      "thesis": "TP3 closes the residual 20% at the third measured-move target (typically 3R–4R or 2× initial risk for mean reversion), completing the universal TP allocation (TP1=50%, TP2=30%, TP3=20%) and intentionally leaving the runner exposed to MAX_BARS or trailing-stop continuation so the position captures the institutional-grade trend phase without breaching DAILY_LOSS_LIMIT=$500.",
+      "buildingBlockRef": "src/detectors/building_blocks/risk_management/trailing_stop.py | smc_ict/break_of_structure.py",
+      "metricLabels": { "allocationPct": "20%", "typicalRMultiple": "3R-4R", "rrRatio": "≥3.0" },
+      "riskGuardRef": "src/strategies/risk_enforcer.py:DAILY_LOSS_LIMIT",
+      "validIn": ["strategy_06_range_breakout", "strategy_15_bollinger_mean_reversion", "strategy_05_ema_pullback"]
+    },
+    "TP4": {
+      "label": "Take Profit 4 — extended runner (strategy-specific)",
+      "thesis": "TP4 is an optional fourth scaled target reserved for strategies with confluence > 80 (e.g. strategy_11_williams_fractal) where 4R measured-move continuation is supported by multi-timeframe break-of-structure confirmation; the residual position remains capped by DAILY_LOSS_LIMIT=$500 and trailing-stop L3 (2.0×ATR) so the runner cannot bleed the daily book.",
+      "buildingBlockRef": "src/detectors/building_blocks/smc_ict/break_of_structure.py | risk_management/trailing_stop.py",
+      "metricLabels": { "allocationPct": "10-15% (residual)", "typicalRMultiple": "4R", "rrRatio": "≥4.0" },
+      "riskGuardRef": "src/strategies/risk_enforcer.py:DAILY_LOSS_LIMIT",
+      "validIn": ["strategy_11_williams_fractal", "strategy_06_range_breakout"]
+    },
+    "TP5": {
+      "label": "Take Profit 5 — exhaustion runner (strategy-specific)",
+      "thesis": "TP5 is reserved for high-conviction breakouts where 5R or higher is structurally defended by IB Breakout + Wave Consolidation + BOS confluence (strategy_06); the position is reduced to MIN_POSITION_SIZE=0.001 and governed by trailing-stop L3 (2.0×ATR) so the residual auto-liquidates before breaching DAILY_LOSS_LIMIT=$500.",
+      "buildingBlockRef": "src/detectors/building_blocks/patterns/initial_balance_breakout.py | market_structure/wave_consolidation.py",
+      "metricLabels": { "allocationPct": "5% (residual)", "typicalRMultiple": "5R+", "rrRatio": "≥5.0" },
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MIN_POSITION_SIZE",
+      "validIn": ["strategy_06_range_breakout"]
+    },
+    "SL": {
+      "label": "Stop Loss — structural invalidation",
+      "thesis": "SL closes 100% of the position when price invalidates the entry thesis by breaching 1.5×ATR beyond entry (common pattern across all strategies) or the structural level behind the entry block (e.g. below BOS swing-low for LONG, above BOS swing-high for SHORT), and is auto-attached by RiskEnforcer.check_and_submit at entry ± 2% (STOP_LOSS_PCT=0.02) as the institutional floor; DAILY_LOSS_LIMIT=$500 caps the absolute USD exposure of all SL hits in a single session.",
+      "buildingBlockRef": "src/detectors/building_blocks/smc_ict/break_of_structure.py | oscillators/rsi_divergence.py | patterns/double_top.py",
+      "metricLabels": { "slMultiple": "1.5×ATR", "autoSlPct": "2% (STOP_LOSS_PCT)", "lossBudgetUSD": "500 (DAILY_LOSS_LIMIT)" },
+      "riskGuardRef": "src/strategies/risk_enforcer.py:STOP_LOSS_PCT + DAILY_LOSS_LIMIT",
+      "validIn": ["strategy_06_range_breakout", "strategy_15_bollinger_mean_reversion", "strategy_05_ema_pullback", "strategy_08_killzone_fib", "strategy_11_williams_fractal", "strategy_01_vwap_pullback", "strategy_02_liquidity_sweep", "strategy_03_order_block", "strategy_04_ict_silver_bullet", "strategy_07_eur_usd_breakout", "strategy_13_breakout_pullback"]
+    },
+    "STOP_LOSS": {
+      "label": "Stop Loss — RiskEnforcer auto-attached floor (alias of SL)",
+      "thesis": "STOP_LOSS is the RiskEnforcer.check_and_submit auto-attached stop_market at entry ± 2% (STOP_LOSS_PCT=0.02) that sits beneath every strategy-level structural SL so a fat-finger or extreme gap cannot breach MAX_POSITION_SIZE=1 or DAILY_LOSS_LIMIT=$500; it is the institutional last-resort floor, distinct from the strategy's structural SL.",
+      "buildingBlockRef": "src/strategies/risk_enforcer.py",
+      "metricLabels": { "autoSlPct": "2% (STOP_LOSS_PCT)", "lossBudgetUSD": "500 (DAILY_LOSS_LIMIT)" },
+      "riskGuardRef": "src/strategies/risk_enforcer.py:STOP_LOSS_PCT",
+      "validIn": ["strategy_06_range_breakout", "strategy_15_bollinger_mean_reversion", "strategy_05_ema_pullback", "strategy_08_killzone_fib", "strategy_11_williams_fractal", "strategy_01_vwap_pullback", "strategy_02_liquidity_sweep", "strategy_03_order_block", "strategy_04_ict_silver_bullet", "strategy_07_eur_usd_breakout", "strategy_13_breakout_pullback"]
+    },
+    "MAX_BARS": {
+      "label": "Maximum Bars Held — time-based exit",
+      "thesis": "MAX_BARS closes the position when barsHeld exceeds the strategy-specific threshold (e.g. 50–200 bars across the strategy corpus) without hitting any TP or SL, on the premise that a thesis that hasn't reached TP within the structural horizon is invalidated by time decay and must release capital for the next signal; the closure respects MIN_POSITION_SIZE=0.001 to avoid orphan lots and is bounded by DAILY_LOSS_LIMIT=$500.",
+      "buildingBlockRef": "src/detectors/building_blocks/sessions/kill_zones.py (session expiry) | market_structure/wave_consolidation.py",
+      "metricLabels": { "defaultBars": "50", "extendedBars": "200", "rationale": "time-based thesis invalidation" },
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MIN_POSITION_SIZE + DAILY_LOSS_LIMIT",
+      "validIn": ["strategy_06_range_breakout", "strategy_15_bollinger_mean_reversion", "strategy_05_ema_pullback", "strategy_08_killzone_fib", "strategy_11_williams_fractal"]
+    },
+    "TIME_LIMIT": {
+      "label": "Time Limit — kill-zone window expiry",
+      "thesis": "TIME_LIMIT closes the position at the kill-zone boundary (e.g. London close 16:00 UTC, NY close 17:00 UTC) when the thesis depends on session-specific liquidity and the session has ended, preventing the position from carrying into the next session's opposing liquidity regime; sized via MIN_POSITION_SIZE=0.001 cleanup and capped by DAILY_LOSS_LIMIT=$500.",
+      "buildingBlockRef": "src/detectors/building_blocks/sessions/kill_zones.py",
+      "metricLabels": { "sessionWindows": "London 07:00-16:00 UTC, NY 12:00-17:00 UTC, Asia 00:00-08:00 UTC", "rationale": "session liquidity expiry" },
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MIN_POSITION_SIZE",
+      "validIn": ["strategy_08_killzone_fib", "strategy_04_ict_silver_bullet", "strategy_06_range_breakout"]
+    }
+  },
+  "entrySignals": {
+    "BULLISH_BREAKOUT": {
+      "label": "Bullish Breakout",
+      "thesis": "Fired by Initial Balance Breakout (weight=30, category=PATTERNS) when price closes above the IB high with volume confirmation, gated by confluence ≥60 in strategy_06 so only multi-block-aligned breakouts reach execution, with RiskEnforcer.check_and_submit sizing the entry to MAX_POSITION_SIZE=1 and auto-attaching STOP_LOSS_PCT=0.02 floor.",
+      "buildingBlockRef": "src/detectors/building_blocks/patterns/initial_balance_breakout.py",
+      "weight": 30,
+      "category": "PATTERNS",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_06_range_breakout", "strategy_07_eur_usd_breakout", "strategy_13_breakout_pullback"]
+    },
+    "BEARISH_BREAKOUT": {
+      "label": "Bearish Breakout",
+      "thesis": "Mirror of BULLISH_BREAKOUT — fired by Initial Balance Breakout (weight=30, PATTERNS) when price closes below the IB low with volume confirmation, with confluence ≥60 in strategy_06 gating execution and RiskEnforcer attaching the SHORT-leg stop at entry + 2% (STOP_LOSS_PCT=0.02).",
+      "buildingBlockRef": "src/detectors/building_blocks/patterns/initial_balance_breakout.py",
+      "weight": 30,
+      "category": "PATTERNS",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_06_range_breakout", "strategy_07_eur_usd_breakout", "strategy_13_breakout_pullback"]
+    },
+    "BULLISH_BOS": {
+      "label": "Bullish Break of Structure",
+      "thesis": "Fired by Break of Structure (weight=20, SMC_ICT) when price closes above the most recent swing-high, confirming trend continuation; in strategy_06 the 22-point weight pairs with IB Breakout to form the high-conviction long setup, with RiskEnforcer.check_and_submit sizing to MAX_POSITION_SIZE=1 and STOP_LOSS_PCT=0.02 floor below the broken swing-low.",
+      "buildingBlockRef": "src/detectors/building_blocks/smc_ict/break_of_structure.py",
+      "weight": 20,
+      "category": "SMC_ICT",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_06_range_breakout", "strategy_05_ema_pullback", "strategy_03_order_block"]
+    },
+    "BEARISH_BOS": {
+      "label": "Bearish Break of Structure",
+      "thesis": "Mirror of BULLISH_BOS — fired by Break of Structure (weight=20, SMC_ICT) when price closes below the most recent swing-low, with strategy_06 22-point weight pairing with IB Breakdown for high-conviction shorts and RiskEnforcer attaching the SHORT stop at entry + 2% (STOP_LOSS_PCT=0.02) above the broken swing-high.",
+      "buildingBlockRef": "src/detectors/building_blocks/smc_ict/break_of_structure.py",
+      "weight": 20,
+      "category": "SMC_ICT",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_06_range_breakout", "strategy_05_ema_pullback", "strategy_03_order_block"]
+    },
+    "BULLISH_MEAN_REVERSION": {
+      "label": "Bullish Mean Reversion",
+      "thesis": "Fired by Bollinger Bands (weight=10) when RSI (weight=25, OSCILLATORS) prints below 30 (oversold) and Stochastic RSI (weight=18) prints a bullish cross, with EMA2050Trend (weight=15) confirming uptrend and VWAP (weight=15, INSTITUTIONAL) within tolerance — confluence ≥55 in strategy_15 sized to TP1=VWAP (50%), TP2=opposite BB (30%), TP3=2R (20%), SL=1.5×ATR, all gated by RiskEnforcer.",
+      "buildingBlockRef": "src/detectors/building_blocks/oscillators/bollinger_bands.py + oscillators/rsi_divergence.py + oscillators/stochastic_rsi.py + institutional/vwap.py + trends/ema_2050.py",
+      "weight": 68,
+      "category": "OSCILLATORS",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MIN_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_15_bollinger_mean_reversion"]
+    },
+    "BEARISH_MEAN_REVERSION": {
+      "label": "Bearish Mean Reversion",
+      "thesis": "Mirror of BULLISH_MEAN_REVERSION — fired by Bollinger Bands + RSI>70 (overbought) + Stochastic RSI bearish cross + EMA2050 downtrend + VWAP rejection, with strategy_15 confluence ≥55 and RiskEnforcer attaching the SHORT stop at entry + 2% above the entry candle high.",
+      "buildingBlockRef": "src/detectors/building_blocks/oscillators/bollinger_bands.py + oscillators/rsi_divergence.py + oscillators/stochastic_rsi.py + institutional/vwap.py + trends/ema_2050.py",
+      "weight": 68,
+      "category": "OSCILLATORS",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MIN_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_15_bollinger_mean_reversion"]
+    },
+    "BULLISH_RSI_DIVERGENCE": {
+      "label": "Bullish RSI Divergence",
+      "thesis": "Fired by RSI Divergence (weight=25, OSCILLATORS — highest weight in the corpus) when price prints lower-low while RSI prints higher-low, signaling exhaustion of the bearish leg; in strategy_15 this is the primary reversal trigger, paired with Bollinger Bands lower-band touch and VWAP support, sized via RiskEnforcer with STOP_LOSS_PCT=0.02 floor below the most recent swing-low.",
+      "buildingBlockRef": "src/detectors/building_blocks/oscillators/rsi_divergence.py",
+      "weight": 25,
+      "category": "OSCILLATORS",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:STOP_LOSS_PCT",
+      "validIn": ["strategy_15_bollinger_mean_reversion"]
+    },
+    "BEARISH_RSI_DIVERGENCE": {
+      "label": "Bearish RSI Divergence",
+      "thesis": "Mirror of BULLISH_RSI_DIVERGENCE — fired by RSI Divergence (weight=25) when price prints higher-high while RSI prints lower-high, signaling bullish exhaustion; in strategy_15 paired with Bollinger upper-band touch and VWAP rejection, with RiskEnforcer stop at entry + 2% above the swing-high.",
+      "buildingBlockRef": "src/detectors/building_blocks/oscillators/rsi_divergence.py",
+      "weight": 25,
+      "category": "OSCILLATORS",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:STOP_LOSS_PCT",
+      "validIn": ["strategy_15_bollinger_mean_reversion"]
+    },
+    "BULLISH_MACD_CROSS": {
+      "label": "Bullish MACD Cross",
+      "thesis": "Fired by MACD Signal (weight=25, OSCILLATORS) when MACD line crosses above signal line with histogram strength ≥150 (BTC 15min moderate threshold), confirming momentum shift; in strategy_06 the 22-point MACD weight is one of three high-conviction confluence triggers (with BOS 22pts + IB Breakout), gated by RiskEnforcer with MAX_POSITION_SIZE=1 and STOP_LOSS_PCT=0.02.",
+      "buildingBlockRef": "src/detectors/building_blocks/oscillators/macd_signal.py",
+      "weight": 25,
+      "category": "OSCILLATORS",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_06_range_breakout"]
+    },
+    "BEARISH_MACD_CROSS": {
+      "label": "Bearish MACD Cross",
+      "thesis": "Mirror of BULLISH_MACD_CROSS — fired when MACD crosses below signal with histogram magnitude ≥150; in strategy_06 pairs with IB Breakdown + Bearish BOS for high-conviction shorts, gated by RiskEnforcer with SHORT-leg stop at entry + 2%.",
+      "buildingBlockRef": "src/detectors/building_blocks/oscillators/macd_signal.py",
+      "weight": 25,
+      "category": "OSCILLATORS",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_06_range_breakout"]
+    },
+    "BULLISH_STOCHASTIC_RSI": {
+      "label": "Bullish Stochastic RSI Cross",
+      "thesis": "Fired by Stochastic RSI (weight=18, OSCILLATORS) when %K crosses above %D in oversold territory (<20), confirming mean-reversion entry; in strategy_15 this is the 18-point tertiary trigger after RSI Divergence (25pts) and Bollinger Bands (15pts), with RiskEnforcer sizing the entry and STOP_LOSS_PCT=0.02 floor.",
+      "buildingBlockRef": "src/detectors/building_blocks/oscillators/stochastic_rsi.py",
+      "weight": 18,
+      "category": "OSCILLATORS",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:STOP_LOSS_PCT",
+      "validIn": ["strategy_15_bollinger_mean_reversion"]
+    },
+    "BEARISH_STOCHASTIC_RSI": {
+      "label": "Bearish Stochastic RSI Cross",
+      "thesis": "Mirror of BULLISH_STOCHASTIC_RSI — fired when %K crosses below %D in overbought (>80), with strategy_15 18-point weight and RiskEnforcer stop at entry + 2%.",
+      "buildingBlockRef": "src/detectors/building_blocks/oscillators/stochastic_rsi.py",
+      "weight": 18,
+      "category": "OSCILLATORS",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:STOP_LOSS_PCT",
+      "validIn": ["strategy_15_bollinger_mean_reversion"]
+    },
+    "BULLISH_VWAP_RECLAIM": {
+      "label": "Bullish VWAP Reclaim",
+      "thesis": "Fired by VWAP (weight=15, INSTITUTIONAL — priority 3) when price reclaims VWAP from below with a 15min close above, signaling institutional re-accumulation; in strategy_01_vwap_pullback this is the primary long trigger and in strategy_15 it provides confluence for mean-reversion longs, gated by RiskEnforcer with MAX_POSITION_SIZE=1 and STOP_LOSS_PCT=0.02 floor below the VWAP re-test candle.",
+      "buildingBlockRef": "src/detectors/building_blocks/institutional/vwap.py",
+      "weight": 15,
+      "category": "INSTITUTIONAL",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_01_vwap_pullback", "strategy_15_bollinger_mean_reversion"]
+    },
+    "BEARISH_VWAP_REJECTION": {
+      "label": "Bearish VWAP Rejection",
+      "thesis": "Mirror of BULLISH_VWAP_RECLAIM — fired when price rejects VWAP from above with a 15min close below, signaling institutional distribution; in strategy_01 paired with the LONG signal's inverse and in strategy_15 providing mean-reversion short confluence, with RiskEnforcer attaching the SHORT stop at entry + 2%.",
+      "buildingBlockRef": "src/detectors/building_blocks/institutional/vwap.py",
+      "weight": 15,
+      "category": "INSTITUTIONAL",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_01_vwap_pullback", "strategy_15_bollinger_mean_reversion"]
+    },
+    "KILL_ZONE_ENTRY": {
+      "label": "Kill Zone Entry",
+      "thesis": "Fired by Kill Zones (weight=16, SESSIONS) when price enters a high-liquidity window (London open 07:00 UTC, NY open 12:00 UTC, London close 16:00 UTC) with directional bias from upstream blocks; in strategy_08_killzone_fib this is the primary entry gate, with TIME_LIMIT cap at session close (TIME_LIMIT exit code) and RiskEnforcer sizing to MAX_POSITION_SIZE=1 with STOP_LOSS_PCT=0.02 floor.",
+      "buildingBlockRef": "src/detectors/building_blocks/sessions/kill_zones.py",
+      "weight": 16,
+      "category": "SESSIONS",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_08_killzone_fib", "strategy_04_ict_silver_bullet"]
+    },
+    "BULLISH_DOUBLE_TOP_BREAK": {
+      "label": "Bullish Double Top Break",
+      "thesis": "Fired by Double Top (weight=30, PATTERNS — second-highest weight in corpus) when the second-top prints lower-than-first AND price breaks the neckline (note: this is the strategy_06 'failed double top' long signal), with RiskEnforcer sizing to MAX_POSITION_SIZE=1 and STOP_LOSS_PCT=0.02 floor below the neckline.",
+      "buildingBlockRef": "src/detectors/building_blocks/patterns/double_top.py",
+      "weight": 30,
+      "category": "PATTERNS",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_06_range_breakout"]
+    },
+    "BEARISH_DOUBLE_TOP": {
+      "label": "Bearish Double Top",
+      "thesis": "Fired by Double Top (weight=30, PATTERNS, direction=BEARISH) when price prints two highs within tolerance and the neckline breaks to the downside; in strategy_06 this is one of the three highest-conviction shorts (with IB Breakdown + Bearish BOS), gated by RiskEnforcer with SHORT stop at entry + 2% above the higher top.",
+      "buildingBlockRef": "src/detectors/building_blocks/patterns/double_top.py",
+      "weight": 30,
+      "category": "PATTERNS",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_06_range_breakout"]
+    },
+    "WAVE_CONSOLIDATION_BREAK": {
+      "label": "Wave Consolidation Break",
+      "thesis": "Fired by Wave Consolidation (weight=15, MARKET_STRUCTURE) when a contracting-range pattern (lower-highs + higher-lows) breaks in the direction of the prior trend; in strategy_06 this is the 12-point confluence trigger that pairs with IB Breakout + BOS + MACD for high-conviction breakouts, gated by RiskEnforcer with MAX_POSITION_SIZE=1 and STOP_LOSS_PCT=0.02 floor.",
+      "buildingBlockRef": "src/detectors/building_blocks/market_structure/wave_consolidation.py",
+      "weight": 15,
+      "category": "MARKET_STRUCTURE",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_06_range_breakout"]
+    },
+    "BULLISH_BB_SQUEEZE_BREAK": {
+      "label": "Bullish Bollinger Squeeze Break",
+      "thesis": "Fired by Bollinger Bands (weight=10, VOLATILITY) when the band-width contracts below 0.5% (BTC 15min tight threshold) and price breaks the upper band; in strategy_06 this is the 15-point confluence trigger for breakout direction, gated by RiskEnforcer with MAX_POSITION_SIZE=1 and STOP_LOSS_PCT=0.02 floor below the squeeze low.",
+      "buildingBlockRef": "src/detectors/building_blocks/volatility/bollinger_bands.py",
+      "weight": 15,
+      "category": "VOLATILITY",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_06_range_breakout"]
+    },
+    "BEARISH_BB_SQUEEZE_BREAK": {
+      "label": "Bearish Bollinger Squeeze Break",
+      "thesis": "Mirror of BULLISH_BB_SQUEEZE_BREAK — fired when band-width contracts <0.5% and price breaks the lower band, with strategy_06 15-point weight and RiskEnforcer stop at entry + 2% above the squeeze high.",
+      "buildingBlockRef": "src/detectors/building_blocks/volatility/bollinger_bands.py",
+      "weight": 15,
+      "category": "VOLATILITY",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_06_range_breakout"]
+    },
+    "BULLISH_ORDER_BLOCK": {
+      "label": "Bullish Order Block",
+      "thesis": "Fired by Order Block detector (SMC_ICT) when price retests the last bearish candle before a bullish impulse and rejects with a 15min close above the OB high; in strategy_03_order_block this is the primary long trigger, gated by RiskEnforcer with STOP_LOSS_PCT=0.02 floor below the OB low.",
+      "buildingBlockRef": "src/detectors/building_blocks/smc_ict/order_block.py",
+      "weight": 20,
+      "category": "SMC_ICT",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:STOP_LOSS_PCT",
+      "validIn": ["strategy_03_order_block"]
+    },
+    "BEARISH_ORDER_BLOCK": {
+      "label": "Bearish Order Block",
+      "thesis": "Mirror of BULLISH_ORDER_BLOCK — fired when price retests the last bullish candle before a bearish impulse, in strategy_03 primary short trigger with RiskEnforcer stop at entry + 2% above the OB high.",
+      "buildingBlockRef": "src/detectors/building_blocks/smc_ict/order_block.py",
+      "weight": 20,
+      "category": "SMC_ICT",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:STOP_LOSS_PCT",
+      "validIn": ["strategy_03_order_block"]
+    },
+    "BULLISH_LIQUIDITY_SWEEP": {
+      "label": "Bullish Liquidity Sweep",
+      "thesis": "Fired by Liquidity Sweep detector (SMC_ICT) when price sweeps below prior swing-low and reverses with a 15min close above; in strategy_02_liquidity_sweep this is the primary long trigger, gated by RiskEnforcer with MAX_POSITION_SIZE=1 and STOP_LOSS_PCT=0.02 floor below the swept low.",
+      "buildingBlockRef": "src/detectors/building_blocks/smc_ict/liquidity_sweep.py",
+      "weight": 20,
+      "category": "SMC_ICT",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_02_liquidity_sweep"]
+    },
+    "BEARISH_LIQUIDITY_SWEEP": {
+      "label": "Bearish Liquidity Sweep",
+      "thesis": "Mirror of BULLISH_LIQUIDITY_SWEEP — fired when price sweeps above prior swing-high and reverses, in strategy_02 primary short trigger with RiskEnforcer stop at entry + 2% above the swept high.",
+      "buildingBlockRef": "src/detectors/building_blocks/smc_ict/liquidity_sweep.py",
+      "weight": 20,
+      "category": "SMC_ICT",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_02_liquidity_sweep"]
+    },
+    "EMA_PULLBACK_LONG": {
+      "label": "EMA Pullback Long",
+      "thesis": "Fired by EMA2050 Trend + VWAP confluence when price pulls back to the 20-EMA in an uptrend and reclaims with a 15min close above, with RSI not overbought (<70); in strategy_05_ema_pullback this is the primary long trigger, gated by RiskEnforcer with STOP_LOSS_PCT=0.02 floor below the EMA re-test candle low.",
+      "buildingBlockRef": "src/detectors/building_blocks/trends/ema_2050.py + institutional/vwap.py + oscillators/rsi_divergence.py",
+      "weight": 55,
+      "category": "TREND",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:STOP_LOSS_PCT",
+      "validIn": ["strategy_05_ema_pullback"]
+    },
+    "EMA_PULLBACK_SHORT": {
+      "label": "EMA Pullback Short",
+      "thesis": "Mirror of EMA_PULLBACK_LONG — fired when price pulls back to the 50-EMA in a downtrend, in strategy_05 primary short trigger with RiskEnforcer stop at entry + 2% above the EMA re-test candle high.",
+      "buildingBlockRef": "src/detectors/building_blocks/trends/ema_2050.py + institutional/vwap.py + oscillators/rsi_divergence.py",
+      "weight": 55,
+      "category": "TREND",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:STOP_LOSS_PCT",
+      "validIn": ["strategy_05_ema_pullback"]
+    },
+    "WILLIAMS_FRACTAL_BREAK": {
+      "label": "Williams Fractal Break",
+      "thesis": "Fired by Williams Fractal (TREND) when a 5-bar fractal high (or low for shorts) is broken by a 15min close, signaling structural continuation; in strategy_11_williams_fractal this is the primary trigger with confluence from BOS + VWAP, gated by RiskEnforcer with MAX_POSITION_SIZE=1 and STOP_LOSS_PCT=0.02 floor.",
+      "buildingBlockRef": "src/detectors/building_blocks/trends/williams_fractal.py",
+      "weight": 18,
+      "category": "TREND",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_11_williams_fractal"]
+    },
+    "ICT_SILVER_BULLET": {
+      "label": "ICT Silver Bullet",
+      "thesis": "Fired by Silver Bullet (SMC_ICT) during the 10:00-11:00 AM EST kill-zone with FVG (Fair Value Gap) mitigation + BOS confirmation; in strategy_04_ict_silver_bullet this is the primary trigger, gated by RiskEnforcer with TIME_LIMIT exit at session close and STOP_LOSS_PCT=0.02 floor.",
+      "buildingBlockRef": "src/detectors/building_blocks/smc_ict/silver_bullet.py",
+      "weight": 22,
+      "category": "SMC_ICT",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:STOP_LOSS_PCT",
+      "validIn": ["strategy_04_ict_silver_bullet"]
+    },
+    "EUR_USD_BREAKOUT": {
+      "label": "EUR/USD Breakout",
+      "thesis": "Fired by IB Breakout (weight=30) on EUR/USD during London/NY overlap with volume confirmation; in strategy_07_eur_usd_breakout this is the primary trigger, sized to MAX_POSITION_SIZE=1 with STOP_LOSS_PCT=0.02 floor.",
+      "buildingBlockRef": "src/detectors/building_blocks/patterns/initial_balance_breakout.py",
+      "weight": 30,
+      "category": "PATTERNS",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:MAX_POSITION_SIZE + STOP_LOSS_PCT",
+      "validIn": ["strategy_07_eur_usd_breakout"]
+    },
+    "BREAKOUT_PULLBACK_CONTINUATION": {
+      "label": "Breakout Pullback Continuation",
+      "thesis": "Fired when an IB Breakout is followed by a 15min pullback to the breakout level and a reclaim with BOS confirmation; in strategy_13_breakout_pullback this is the primary trigger with high win-rate, gated by RiskEnforcer with STOP_LOSS_PCT=0.02 floor below the pullback low.",
+      "buildingBlockRef": "src/detectors/building_blocks/patterns/initial_balance_breakout.py + smc_ict/break_of_structure.py",
+      "weight": 50,
+      "category": "PATTERNS+SMC_ICT",
+      "riskGuardRef": "src/strategies/risk_enforcer.py:STOP_LOSS_PCT",
+      "validIn": ["strategy_13_breakout_pullback"]
+    },
+    "ERROR": {
+      "label": "Error — block internal fault",
+      "thesis": "Emitted by any block that encounters an internal exception or data-integrity failure (e.g. insufficient history, NaN propagation); registry.py line 231 exempts ERROR from signal_tiers requirement so the thick-client surfaces a visible fault instead of a silent miss, and the trade is recorded with status='closed' and partialBreakdown='ERROR' so the post-trade audit trail is preserved.",
+      "buildingBlockRef": "src/detectors/building_blocks/registry.py (signal_tiers exemption)",
+      "category": "SYSTEM",
+      "riskGuardRef": "src/detectors/building_blocks/registry.py:231",
+      "validIn": ["strategy_06_range_breakout", "strategy_15_bollinger_mean_reversion", "strategy_05_ema_pullback", "strategy_08_killzone_fib", "strategy_11_williams_fractal", "strategy_01_vwap_pullback", "strategy_02_liquidity_sweep", "strategy_03_order_block", "strategy_04_ict_silver_bullet", "strategy_07_eur_usd_breakout", "strategy_13_breakout_pullback"]
+    },
+    "INSUFFICIENT_DATA": {
+      "label": "Insufficient Data — block warm-up",
+      "thesis": "Emitted by any block that has not yet accumulated the minimum required candle history (e.g. 200-period EMA needs 200 15min candles = ~50 hours); registry.py line 231 exempts INSUFFICIENT_DATA from signal_tiers requirement so the strategy can continue running while the warm-up completes, with no trade recorded (status remains empty).",
+      "buildingBlockRef": "src/detectors/building_blocks/registry.py (signal_tiers exemption)",
+      "category": "SYSTEM",
+      "riskGuardRef": "src/detectors/building_blocks/registry.py:231",
+      "validIn": ["strategy_06_range_breakout", "strategy_15_bollinger_mean_reversion", "strategy_05_ema_pullback", "strategy_08_killzone_fib", "strategy_11_williams_fractal", "strategy_01_vwap_pullback", "strategy_02_liquidity_sweep", "strategy_03_order_block", "strategy_04_ict_silver_bullet", "strategy_07_eur_usd_breakout", "strategy_13_breakout_pullback"]
+    },
+    "NO_SIGNAL": {
+      "label": "No Signal — block idle",
+      "thesis": "Emitted by any block when its detection criteria are not met on a given bar; the registry exempts NO_SIGNAL from signal_tiers requirement so the absence of a signal is correctly distinguished from a malformed signal, and no trade is opened (status remains empty, partialBreakdown is null).",
+      "buildingBlockRef": "src/detectors/building_blocks/registry.py (signal_tiers exemption)",
+      "category": "SYSTEM",
+      "riskGuardRef": "src/detectors/building_blocks/registry.py:231",
+      "validIn": ["strategy_06_range_breakout", "strategy_15_bollinger_mean_reversion", "strategy_05_ema_pullback", "strategy_08_killzone_fib", "strategy_11_williams_fractal", "strategy_01_vwap_pullback", "strategy_02_liquidity_sweep", "strategy_03_order_block", "strategy_04_ict_silver_bullet", "strategy_07_eur_usd_breakout", "strategy_13_breakout_pullback"]
+    }
+  },
+  "riskGuards": {
+    "MAX_POSITION_SIZE": {
+      "label": "Max Position Size = 1 (full-lot cap)",
+      "thesis": "Hard cap on per-trade quantity enforced in src/strategies/risk_enforcer.py:MAX_POSITION_SIZE = Quantity.from_int(1); orders above this are rejected pre-trade so a single signal cannot concentrate risk beyond the institutional floor, regardless of confluence or strategy-level conviction.",
+      "source": "src/strategies/risk_enforcer.py:15",
+      "value": 1,
+      "appliesTo": "every strategy in src/strategies/"
+    },
+    "MIN_POSITION_SIZE": {
+      "label": "Min Position Size = 0.001 (Binance lot-size floor)",
+      "thesis": "Hard floor on per-trade quantity enforced in src/strategies/risk_enforcer.py:MIN_POSITION_SIZE = Quantity.from_str('0.001'); orders below this are rejected pre-trade so the residual from a TP3 runner cannot orphan below the exchange's minimum lot size, and exit code TIME_LIMIT or MAX_BARS cleanup leaves a tradeable residual.",
+      "source": "src/strategies/risk_enforcer.py:16",
+      "value": 0.001,
+      "appliesTo": "every strategy in src/strategies/"
+    },
+    "DAILY_LOSS_LIMIT": {
+      "label": "Daily Loss Limit = $500 USD",
+      "thesis": "Hard cap on cumulative realized PnL per UTC day enforced in src/strategies/risk_enforcer.py:DAILY_LOSS_LIMIT = Money('500.00', USD); when daily_pnl <= -DAILY_LOSS_LIMIT, all subsequent orders are rejected so a strategy in drawdown cannot compound losses beyond the institutional risk budget.",
+      "source": "src/strategies/risk_enforcer.py:17",
+      "value": 500.00,
+      "currency": "USD",
+      "appliesTo": "every strategy in src/strategies/"
+    },
+    "STOP_LOSS_PCT": {
+      "label": "Auto Stop Loss = 2% (RiskEnforcer floor)",
+      "thesis": "Hard cap on per-trade adverse excursion enforced in src/strategies/risk_enforcer.py:STOP_LOSS_PCT = 0.02; check_and_submit auto-attaches a stop_market at entry ± 2% as the institutional last-resort floor beneath every strategy-level structural SL (1.5×ATR or BOS swing), so a fat-finger or extreme gap cannot breach MAX_POSITION_SIZE=1 or DAILY_LOSS_LIMIT=$500.",
+      "source": "src/strategies/risk_enforcer.py:18",
+      "value": 0.02,
+      "appliesTo": "every order submitted via check_and_submit()"
+    },
+    "MIN_RISK_REWARD_RATIO": {
+      "label": "Min Risk/Reward = 1.5 (TP1 must clear 1.5R)",
+      "thesis": "Strategy-level guard requiring TP1 ≥ 1.5× the SL distance so the expected value of any signal is positive before size is allocated; in strategy_06 TP1 is 2R, in strategy_15 TP1 is VWAP reversion (typically 1.5–2R), so the threshold is structural rather than ticker-specific.",
+      "source": "src/strategies/strategy_06_range_breakout.py + src/strategies/strategy_15_bollinger_mean_reversion.py",
+      "value": 1.5,
+      "appliesTo": "all TP1 exits"
+    },
+    "MAX_BARS_HELD": {
+      "label": "Max Bars Held = 50–200 (time-based thesis invalidation)",
+      "thesis": "Strategy-level guard capping barsHeld at 50 (default) up to 200 (extended); positions exceeding the threshold are closed with exit code MAX_BARS on the premise that a thesis that hasn't reached TP within the structural horizon is invalidated by time decay, releasing capital for the next signal without breaching DAILY_LOSS_LIMIT=$500.",
+      "source": "src/strategy_builder/ BacktestConfigFull.maxBarsHeld + per-strategy constants",
+      "value": "50 (default) | 200 (extended)",
+      "appliesTo": "all strategies with barsHeld exit path"
+    },
+    "DAILY_PNL_RESET": {
+      "label": "Daily PnL Reset (UTC midnight)",
+      "thesis": "DAILY_LOSS_LIMIT is reset at UTC midnight via RiskEnforcer.should_reset_daily_pnl() so the $500 risk budget is fresh each calendar day and the strategy can resume after a drawdown without carry-over compounding; reset is keyed on UTC yday (not local tz) so backtests and live execution share the same boundary.",
+      "source": "src/strategies/risk_enforcer.py:80-88",
+      "appliesTo": "every strategy in src/strategies/"
+    },
+    "TRAILING_STOP_LEVELS": {
+      "label": "Trailing Stop = L0..L3 (ATR-scaled)",
+      "thesis": "Risk-management block (weight=8, RISK_MANAGEMENT) attaches a trailing stop at L0=0.8×ATR (tight), L1=1.2×ATR (standard), L2=1.6×ATR (balanced), or L3=2.0×ATR (wide) with atr_period=14, letting profitable positions run while protecting against reversal; the chosen level is set per-strategy (strategy_06 uses L2 balanced, strategy_15 uses L1 standard for mean reversion).",
+      "source": "src/detectors/building_blocks/risk_management/trailing_stop.py",
+      "value": { "L0": "0.8×ATR", "L1": "1.2×ATR", "L2": "1.6×ATR", "L3": "2.0×ATR", "atr_period": 14 },
+      "appliesTo": "all strategies that attach a trailing stop post-entry"
+    }
+  },
+  "positionSizing": {
+    "tp_allocation_universal": {
+      "label": "TP allocation = 50% / 30% / 20%",
+      "thesis": "Universal scaled-exit pattern applied across the strategy corpus so partial profits are realized at three measured-move targets without exposing the full position to reversal; TP1=50% locks the floor, TP2=30% captures the measured move, TP3=20% runs the structural target, with all residual sized to MIN_POSITION_SIZE=0.001 to remain executable.",
+      "source": "src/strategies/strategy_06_range_breakout.py + src/strategies/strategy_15_bollinger_mean_reversion.py + src/strategies/strategy_05_ema_pullback.py",
+      "value": { "TP1": 0.50, "TP2": 0.30, "TP3": 0.20 }
+    },
+    "stop_distance_universal": {
+      "label": "SL distance = 1.5×ATR beyond entry",
+      "thesis": "Universal stop pattern at 1.5×ATR(14) beyond entry so the SL is volatility-normalized and adapts to the current regime, with RiskEnforcer auto-attaching the ±2% (STOP_LOSS_PCT=0.02) floor beneath so a low-volatility regime cannot produce an absurdly tight structural SL.",
+      "source": "src/strategies/strategy_06_range_breakout.py + src/strategies/strategy_15_bollinger_mean_reversion.py",
+      "value": { "slAtrMultiple": 1.5, "atrPeriod": 14, "autoFloorPct": 0.02 }
+    },
+    "risk_per_trade": {
+      "label": "Risk per trade = 1% of equity (default)",
+      "thesis": "Default risk budget per trade is 1% of account equity so a 5-loss streak does not breach the institutional drawdown tolerance; sized against the SL distance (1.5×ATR) and capped by MAX_POSITION_SIZE=1 so the per-trade USD risk is volatility-normalized AND quantity-capped.",
+      "source": "src/strategy_builder/ BacktestConfigFull.riskPerTradePct (default 0.01)",
+      "value": 0.01,
+      "appliesTo": "every strategy in src/strategies/"
+    },
+    "min_confluence_threshold": {
+      "label": "Min confluence = 55–60 (strategy-dependent)",
+      "thesis": "Strategy-level guard requiring the sum of block weights for firing signals to exceed a threshold (strategy_15_bollinger_mean_reversion: 55, strategy_06_range_breakout: 60) so a single block firing alone does not allocate risk; the threshold is set per-strategy based on the block-weight distribution.",
+      "source": "src/strategies/strategy_06_range_breakout.py:min_confluence + src/strategies/strategy_15_bollinger_mean_reversion.py:min_confluence",
+      "value": { "strategy_06": 60, "strategy_15": 55, "strategy_05": 55, "strategy_13": 58 }
+    },
+    "leverage_cap": {
+      "label": "Leverage cap = 5× (configurable per strategy)",
+      "thesis": "Max leverage configurable per strategy (default 5× in BacktestConfigFull.maxLeverage) so position size can be amplified without breaching MAX_POSITION_SIZE=1 (which caps absolute quantity, not notional); backtests enforce the cap so results are reproducible, live execution respects MAX_POSITION_SIZE=1 and DAILY_LOSS_LIMIT=$500 floor.",
+      "source": "src/strategy_builder/ BacktestConfigFull.maxLeverage (default 5)",
+      "value": 5
+    },
+    "confluence_scoring": {
+      "label": "Confluence scoring = REQUIRED vs OPTIONAL block logic",
+      "thesis": "Each block's weight is classified as REQUIRED (must fire) or OPTIONAL (confluence boost) by the validator, so a single REQUIRED block failing invalidates the signal even when OPTIONAL blocks align; this is the institutional risk-desk discipline that prevents one-block-fits-all strategies from being gamed by feeding synthetic data.",
+      "source": "src/strategy_builder/ ValidationReport.executionFlow.blocks[].logic + src/detectors/building_blocks/registry.py",
+      "value": { "REQUIRED": "must fire", "OPTIONAL": "confluence boost" }
+    }
+  },
+  "indicatorMetricMap": {
+    "RSI": {
+      "label": "Relative Strength Index (14-period)",
+      "thesis": "Momentum oscillator bounded 0–100 used as oversold/overbought filter; BTC 15min zones are extreme_oversold<20, oversold<30, neutral_low<40, neutral_high<60, overbought>70, extreme_overbought>80 (from src/indicators/rsi_zones.py); primary trigger for RSI Divergence (weight=25, OSCILLATORS — highest in the corpus) and secondary filter for EMA Pullback + VWAP Reclaim strategies.",
+      "source": "src/indicators/rsi.py + src/indicators/rsi_zones.py + src/detectors/building_blocks/oscillators/rsi_divergence.py",
+      "zones": { "extreme_oversold": 20, "oversold": 30, "neutral_low": 40, "neutral_high": 60, "overbought": 70, "extreme_overbought": 80 },
+      "validIn": ["strategy_15_bollinger_mean_reversion", "strategy_05_ema_pullback", "strategy_06_range_breakout"]
+    },
+    "MACD": {
+      "label": "Moving Average Convergence Divergence (12/26/9)",
+      "thesis": "Trend-following momentum indicator with MACD line, signal line (9-period EMA of MACD), and histogram; BTC 15min strength thresholds are weak<50, moderate 50-150, strong 150-300 (from src/indicators/macd_strength.py); cross-confirmed breakouts above the strong threshold gate strategy_06 entries at the 22-point weight, with EXIT_009-aware histogram slope preventing late-entry whipsaws.",
+      "source": "src/indicators/macd.py + src/detectors/building_blocks/oscillators/macd_signal.py",
+      "thresholds": { "weak": 50, "moderate": 150, "strong": 300 },
+      "validIn": ["strategy_06_range_breakout"]
+    },
+    "BollingerBands": {
+      "label": "Bollinger Bands (20-period, 2σ)",
+      "thesis": "Volatility envelope with upper/lower bands at ±2σ of 20-period SMA; BTC 15min squeeze thresholds are tight<0.5%, normal<1.5%, wide<3.0% (from src/indicators/bollinger_squeeze.py); primary trigger for mean-reversion (strategy_15) and squeeze-breakout (strategy_06) entries with weight=10/15 respectively.",
+      "source": "src/indicators/bollinger_bands.py + src/indicators/bollinger_squeeze.py + src/detectors/building_blocks/volatility/bollinger_bands.py",
+      "squeezeThresholds": { "tight": 0.5, "normal": 1.5, "wide": 3.0 },
+      "validIn": ["strategy_15_bollinger_mean_reversion", "strategy_06_range_breakout"]
+    },
+    "StochasticRSI": {
+      "label": "Stochastic RSI (14, 14, 3, 3)",
+      "thesis": "Momentum oscillator applied to RSI (not price) with %K and %D lines bounded 0–100; oversold<20 and overbought>80 zones; tertiary trigger for mean-reversion entries in strategy_15 with weight=18, paired with RSI Divergence (weight=25) and Bollinger Bands (weight=15) for the 55-point confluence threshold.",
+      "source": "src/indicators/stochastic_rsi.py + src/detectors/building_blocks/oscillators/stochastic_rsi.py",
+      "zones": { "oversold": 20, "overbought": 80 },
+      "validIn": ["strategy_15_bollinger_mean_reversion"]
+    },
+    "VWAP": {
+      "label": "Volume-Weighted Average Price (session)",
+      "thesis": "Session-anchored volume-weighted average price used as institutional fair value; reclaim from below triggers BULLISH_VWAP_RECLAIM, rejection from above triggers BEARISH_VWAP_REJECTION, both at weight=15 in INSTITUTIONAL category (priority=3 in registry); primary target for mean-reversion TP1 in strategy_15 (50% allocation).",
+      "source": "src/indicators/vwap.py + src/detectors/building_blocks/institutional/vwap.py",
+      "validIn": ["strategy_01_vwap_pullback", "strategy_15_bollinger_mean_reversion", "strategy_05_ema_pullback", "strategy_11_williams_fractal"]
+    },
+    "EMA_20_50": {
+      "label": "Exponential Moving Average 20 / 50",
+      "thesis": "Trend-filter EMAs with the 20-EMA as fast leg and 50-EMA as slow leg; bullish alignment (20 > 50) and price above 20-EMA gates EMA_PULLBACK_LONG, bearish alignment gates EMA_PULLBACK_SHORT, both at combined weight=55 in TREND category; required input for strategy_05_ema_pullback and confluence input for strategy_15 mean reversion.",
+      "source": "src/indicators/ema.py + src/detectors/building_blocks/trends/ema_2050.py",
+      "validIn": ["strategy_05_ema_pullback", "strategy_15_bollinger_mean_reversion"]
+    },
+    "ATR": {
+      "label": "Average True Range (14-period)",
+      "thesis": "Volatility indicator used to normalize SL distance (1.5×ATR) and trailing-stop levels (L0=0.8× to L3=2.0×ATR); ATR-period=14 is the universal window so backtest and live execution share the same volatility basis; rises in ATR trigger SL widening (structural tolerance) and falls trigger SL tightening (regime-shift awareness).",
+      "source": "src/indicators/atr.py + src/detectors/building_blocks/risk_management/trailing_stop.py",
+      "value": { "period": 14, "slMultiple": 1.5, "trailLevels": { "L0": 0.8, "L1": 1.2, "L2": 1.6, "L3": 2.0 } },
+      "validIn": ["every strategy in src/strategies/"]
+    },
+    "ADX": {
+      "label": "Average Directional Index (14-period)",
+      "thesis": "Trend-strength filter with ADX>25 confirming a trending regime so the trend-following strategies (strategy_06, strategy_05) do not fire in a ranging market where breakouts fail; confluence filter, not a primary trigger, used by strategy_06 to gate the IB Breakout signal and by strategy_05 to gate the EMA Pullback signal.",
+      "source": "src/indicators/adx.py",
+      "thresholds": { "trending": 25, "strong_trend": 50 },
+      "validIn": ["strategy_06_range_breakout", "strategy_05_ema_pullback"]
+    },
+    "OBV": {
+      "label": "On-Balance Volume",
+      "thesis": "Cumulative volume indicator confirming directional volume pressure; rising OBV on a bullish breakout confirms accumulation, falling OBV on a bearish breakout confirms distribution; used by strategy_06 as a secondary confluence filter with weight=8 (low) but high institutional credibility.",
+      "source": "src/indicators/obv.py",
+      "validIn": ["strategy_06_range_breakout"]
+    },
+    "WilliamsFractal": {
+      "label": "Williams Fractal (5-bar)",
+      "thesis": "5-bar swing-point indicator marking local highs (two higher highs on each side) and local lows (two lower lows on each side); break of the most recent fractal high/low fires WILLIAMS_FRACTAL_BREAK at weight=18 in TREND category; primary trigger for strategy_11_williams_fractal.",
+      "source": "src/indicators/williams_fractal.py + src/detectors/building_blocks/trends/williams_fractal.py",
+      "value": { "period": 5 },
+      "validIn": ["strategy_11_williams_fractal"]
+    },
+    "KillZone": {
+      "label": "Kill Zone (session window)",
+      "thesis": "Time-of-day indicator marking high-liquidity windows (London 07:00-16:00 UTC, NY 12:00-17:00 UTC, Asia 00:00-08:00 UTC); primary gate for strategy_08_killzone_fib (weight=16, SESSIONS) and strategy_04_ict_silver_bullet; closes the position at session boundary via exit code TIME_LIMIT.",
+      "source": "src/indicators/kill_zones.py + src/detectors/building_blocks/sessions/kill_zones.py",
+      "windows": { "London": "07:00-16:00 UTC", "NY": "12:00-17:00 UTC", "Asia": "00:00-08:00 UTC" },
+      "validIn": ["strategy_08_killzone_fib", "strategy_04_ict_silver_bullet", "strategy_06_range_breakout"]
+    }
+  }
+}
