@@ -654,8 +654,15 @@ def pre_dispatch_already_merged_check(fix_sha: str) -> tuple[bool, str]:
 
     BTCAAAAA-38470 Gap 1 — closes the BTC-30048 chronic "Failed to create PR" loop on
     issues whose fix landed on main via squash-merge before the routine could open
-    a fresh PR. Two complementary strategies:
+    a fresh PR. Three complementary strategies (cheapest first):
 
+    0. Ancestor-of-main (BTCAAAAA-66670): `git merge-base --is-ancestor` succeeds.
+       Catches the squash-merged-and-edited-since case that defeats byte-identity
+       and log-grep — e.g. BTCAAAAA-38544 (ded79a41…) and BTCAAAAA-38552 (798d9fa7…)
+       were squash-merged into main, then later commits touched the same files.
+       Byte-identity fails (files differ on main) and the original SHA is gone
+       from main's log (squash-merge rewrites history), but the ancestry check
+       still succeeds.
     1. Byte-identity: every file touched by fix_sha is byte-equal between the
        fix commit and origin/main. Survives squash-merge and detects partial
        back-ports (only when *all* files match).
@@ -670,6 +677,14 @@ def pre_dispatch_already_merged_check(fix_sha: str) -> tuple[bool, str]:
     """
     if not fix_sha or len(fix_sha) != 40:
         return False, ""
+
+    # Strategy 0: direct ancestry — cheapest check, runs first so we short-circuit on
+    # the squash-merged-and-edited-since case that defeats byte-identity (BTCAAAAA-66670).
+    # See BTCAAAAA-66669 for the companion SHA-selection fix in extract_fix_sha_from_comments.
+    if is_ancestor_of_main(fix_sha):
+        return True, (
+            f"ancestor-of-main: {fix_sha[:8]} is already an ancestor of origin/main"
+        )
 
     # Strategy 1: byte-identity per file.
     try:

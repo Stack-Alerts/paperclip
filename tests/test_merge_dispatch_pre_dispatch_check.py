@@ -61,7 +61,8 @@ def test_returns_false_when_branch_alive_and_files_differ():
         return _fake_proc(returncode=0, stdout=b"")
 
     with patch.object(mdr, "_run_git_text", side_effect=fake_run_git), \
-         patch.object(mdr.subprocess, "run", side_effect=fake_subprocess_run):
+         patch.object(mdr.subprocess, "run", side_effect=fake_subprocess_run), \
+         patch.object(mdr, "is_ancestor_of_main", return_value=False):
         should_skip, reason = mdr.pre_dispatch_already_merged_check(VALID_SHA)
 
     assert should_skip is False
@@ -91,7 +92,8 @@ def test_returns_true_when_branch_gone_and_byte_identity_matches():
         return _fake_proc(returncode=0, stdout=b"")
 
     with patch.object(mdr, "_run_git_text", side_effect=fake_run_git), \
-         patch.object(mdr.subprocess, "run", side_effect=fake_subprocess_run):
+         patch.object(mdr.subprocess, "run", side_effect=fake_subprocess_run), \
+         patch.object(mdr, "is_ancestor_of_main", return_value=False):
         should_skip, reason = mdr.pre_dispatch_already_merged_check(VALID_SHA)
 
     assert should_skip is True
@@ -124,7 +126,8 @@ def test_returns_true_when_branch_gone_and_log_grep_matches():
         return _fake_proc(returncode=0, stdout=b"")
 
     with patch.object(mdr, "_run_git_text", side_effect=fake_run_git), \
-         patch.object(mdr.subprocess, "run", side_effect=fake_subprocess_run):
+         patch.object(mdr.subprocess, "run", side_effect=fake_subprocess_run), \
+         patch.object(mdr, "is_ancestor_of_main", return_value=False):
         should_skip, reason = mdr.pre_dispatch_already_merged_check(VALID_SHA)
 
     assert should_skip is True
@@ -157,7 +160,8 @@ def test_returns_false_when_branch_gone_and_no_match():
         return _fake_proc(returncode=0, stdout=b"")
 
     with patch.object(mdr, "_run_git_text", side_effect=fake_run_git), \
-         patch.object(mdr.subprocess, "run", side_effect=fake_subprocess_run):
+         patch.object(mdr.subprocess, "run", side_effect=fake_subprocess_run), \
+         patch.object(mdr, "is_ancestor_of_main", return_value=False):
         should_skip, reason = mdr.pre_dispatch_already_merged_check(VALID_SHA)
 
     assert should_skip is False
@@ -182,7 +186,99 @@ def test_returns_false_for_short_sha():
 def test_returns_false_when_git_subprocess_raises():
     """If git is unavailable, helper must not crash -- return (False, "")."""
     with patch.object(mdr, "list_files_changed_by_commit",
-                      side_effect=RuntimeError("git not found")):
+                      side_effect=RuntimeError("git not found")), \
+         patch.object(mdr, "is_ancestor_of_main", return_value=False):
         should_skip, reason = mdr.pre_dispatch_already_merged_check(VALID_SHA)
     assert should_skip is False
     assert reason == ""
+
+
+# --- BTCAAAAA-66670: Strategy 0 (ancestor-of-main) ---
+
+# (e) SHA is an ancestor of origin/main → skip with ancestor-of-main reason.
+
+
+def test_returns_true_via_strategy0_when_ancestor_of_main():
+    """is_ancestor_of_main returns True → skip with ancestor-of-main reason.
+
+    The cheapest check should win regardless of what the byte-identity or log-grep
+    paths would have returned (no mocks needed — strategy 0 short-circuits).
+    """
+    with patch.object(mdr, "is_ancestor_of_main", return_value=True):
+        should_skip, reason = mdr.pre_dispatch_already_merged_check(VALID_SHA)
+
+    assert should_skip is True
+    assert "ancestor-of-main" in reason
+    assert VALID_SHORT in reason
+
+
+# (f) Strategy 0 wins even when byte-identity would also have matched.
+
+
+def test_strategy0_wins_over_byte_identity_match():
+    """Both Strategy 0 (ancestor) and Strategy 1 (byte-identity) would trigger — S0 wins.
+
+    Order matters: S0 runs first because it is a single `git merge-base` call vs the
+    per-file `git show` round-trips S1 requires. The reason string must reference
+    ancestor-of-main, NOT byte-identity.
+    """
+    def fake_run_git(args, timeout=10):
+        if args[:2] == ["diff-tree", "--no-commit-id"]:
+            return "src/foo.py\n"
+        if args[:2] == ["branch", "-r"]:
+            return ""
+        if args[:2] == ["log", "origin/main"]:
+            return ""
+        return None
+
+    def fake_subprocess_run(cmd, **kwargs):
+        if len(cmd) >= 3 and cmd[1] == "show":
+            # Identical bytes → Strategy 1 would succeed.
+            return _fake_proc(returncode=0, stdout=b"identical bytes\n")
+        return _fake_proc(returncode=0, stdout=b"")
+
+    with patch.object(mdr, "_run_git_text", side_effect=fake_run_git), \
+         patch.object(mdr.subprocess, "run", side_effect=fake_subprocess_run), \
+         patch.object(mdr, "is_ancestor_of_main", return_value=True):
+        should_skip, reason = mdr.pre_dispatch_already_merged_check(VALID_SHA)
+
+    assert should_skip is True
+    assert "ancestor-of-main" in reason
+    assert "byte-identity" not in reason
+
+
+# (g) Strategy 0 wins even when the squash-merge log-grep would also have matched.
+
+
+def test_strategy0_wins_over_squash_merge_log_grep():
+    """Strategy 0 and Strategy 2 (log-grep) both would trigger — S0 wins.
+
+    Real BTCAAAAA-38544 / 38552 cases: the SHA is on main (ancestor) AND main's log
+    still references the short SHA from an earlier squash-merge before a force-push.
+    The cheapest check must short-circuit before we hit the log scan.
+    """
+    def fake_run_git(args, timeout=10):
+        if args[:2] == ["diff-tree", "--no-commit-id"]:
+            return "src/foo.py\n"
+        if args[:2] == ["branch", "-r"]:
+            return ""
+        if args[:2] == ["log", "origin/main"]:
+            return f"{VALID_SHORT} squash merge commit\n"
+        return None
+
+    def fake_subprocess_run(cmd, **kwargs):
+        if len(cmd) >= 3 and cmd[1] == "show":
+            # Different bytes — Strategy 1 would NOT have matched.
+            if cmd[2].startswith(VALID_SHA):
+                return _fake_proc(returncode=0, stdout=b"new content\n")
+            return _fake_proc(returncode=0, stdout=b"different bytes\n")
+        return _fake_proc(returncode=0, stdout=b"")
+
+    with patch.object(mdr, "_run_git_text", side_effect=fake_run_git), \
+         patch.object(mdr.subprocess, "run", side_effect=fake_subprocess_run), \
+         patch.object(mdr, "is_ancestor_of_main", return_value=True):
+        should_skip, reason = mdr.pre_dispatch_already_merged_check(VALID_SHA)
+
+    assert should_skip is True
+    assert "ancestor-of-main" in reason
+    assert "squash-merge short-circuit" not in reason
