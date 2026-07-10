@@ -10562,6 +10562,44 @@ async function runScript(scriptPath, args, extraEnv = {}) {
     });
   });
 }
+async function lsjsonDir(remotePath, rcloneConfig, rclonePass) {
+  const child = spawn(
+    "rclone",
+    ["lsjson", "--dirs-only", "--no-modtime", remotePath],
+    {
+      env: {
+        ...process.env,
+        RCLONE_CONFIG: rcloneConfig,
+        ...rclonePass ? { RCLONE_CONFIG_PASS: rclonePass } : {}
+      },
+      stdio: ["ignore", "pipe", "pipe"]
+    }
+  );
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (b) => stdout += b.toString());
+  child.stderr.on("data", (b) => stderr += b.toString());
+  const code = await new Promise((res) => child.on("exit", (c) => res(c ?? 0)));
+  if (code !== 0) return [];
+  const out = [];
+  for (const line of stdout.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const obj = JSON.parse(trimmed);
+      if (!obj.Path) continue;
+      out.push({
+        Path: obj.Path,
+        Name: obj.Name ?? obj.Path.split("/").pop() ?? obj.Path,
+        Size: obj.Size ?? 0,
+        IsDir: !!obj.IsDir,
+        ModTime: obj.ModTime
+      });
+    } catch {
+    }
+  }
+  return out;
+}
 function readInstanceConfig(cfg = {}) {
   const env = process.env.PAPERCLIP_BACKUP_CONFIG;
   let envOverride = null;
@@ -10682,7 +10720,7 @@ async function readOffsiteBackups(cfg, companyId) {
   const MAX_DAYS_PER_MONTH = 7;
   const MAX_HOURS_PER_DAY = 6;
   const MAX_LEAVES = 80;
-  async function lsjsonDir(remotePath) {
+  async function lsjsonDir2(remotePath) {
     const child = spawn(
       "rclone",
       ["lsjson", "--dirs-only", "--no-modtime", remotePath],
@@ -10724,7 +10762,7 @@ async function readOffsiteBackups(cfg, companyId) {
     return arr.slice().sort((a, b) => a.Path < b.Path ? 1 : a.Path > b.Path ? -1 : 0);
   }
   const backups = [];
-  const years = newestFirst(await lsjsonDir(`${remote}:${prefix}/`));
+  const years = newestFirst(await lsjsonDir2(`${remote}:${prefix}/`));
   const PARALLEL = 4;
   async function runWithCap(items, limit, fn) {
     const out = [];
@@ -10741,12 +10779,12 @@ async function readOffsiteBackups(cfg, companyId) {
   for (const y of years) {
     if (backups.length >= MAX_LEAVES) break;
     if (!y.IsDir) continue;
-    const monthsRaw = newestFirst(await lsjsonDir(`${remote}:${prefix}/${y.Path}/`)).slice(0, MAX_MONTHS_PER_YEAR);
+    const monthsRaw = newestFirst(await lsjsonDir2(`${remote}:${prefix}/${y.Path}/`)).slice(0, MAX_MONTHS_PER_YEAR);
     const monthPaths = monthsRaw.filter((m) => m.IsDir).map((m) => ({ y: y.Path, m }));
     const dayLists = await runWithCap(
       monthPaths,
       PARALLEL,
-      async ({ y: y2, m }) => newestFirst(await lsjsonDir(`${remote}:${prefix}/${y2}/${m.Path}/`)).slice(0, MAX_DAYS_PER_MONTH)
+      async ({ y: y2, m }) => newestFirst(await lsjsonDir2(`${remote}:${prefix}/${y2}/${m.Path}/`)).slice(0, MAX_DAYS_PER_MONTH)
     );
     const dayPaths = [];
     for (let i = 0; i < dayLists.length; i += 1) {
@@ -10757,7 +10795,7 @@ async function readOffsiteBackups(cfg, companyId) {
     const hourLists = await runWithCap(
       dayPaths,
       PARALLEL,
-      async ({ y: y2, m, d }) => newestFirst(await lsjsonDir(`${remote}:${prefix}/${y2}/${m}/${d.Path}/`)).slice(0, MAX_HOURS_PER_DAY)
+      async ({ y: y2, m, d }) => newestFirst(await lsjsonDir2(`${remote}:${prefix}/${y2}/${m}/${d.Path}/`)).slice(0, MAX_HOURS_PER_DAY)
     );
     for (let i = 0; i < hourLists.length; i += 1) {
       if (backups.length >= MAX_LEAVES) break;
@@ -11358,9 +11396,36 @@ var pluginInstance = definePlugin({
       ]);
       const dailyKeep = dailyKeepRaw && typeof dailyKeepRaw === "object" && "keep" in dailyKeepRaw ? dailyKeepRaw.keep : 3;
       const hourlyKeep = hourlyKeepRaw && typeof hourlyKeepRaw === "object" && "keep" in hourlyKeepRaw ? hourlyKeepRaw.keep : 2;
+      const cfg = readInstanceConfig();
+      const rclonePassFile = `${process.env.HOME ?? "/home/sirrus"}/.config/rclone/rclone-pass`;
+      let rclonePass = "";
+      try {
+        if (existsSync(rclonePassFile)) {
+          rclonePass = readFileSync(rclonePassFile, "utf8").trim();
+        }
+      } catch {
+      }
+      const tierRoot = cfg.gdriveTierRoot || "Paperclip-Backups";
+      const remote = cfg.rcloneRemote || "gdrive";
+      const listTier = async (tier) => {
+        try {
+          const items = await lsjsonDir(
+            `${remote}:${tierRoot}/${tier}/`,
+            cfg.rcloneConfig,
+            rclonePass
+          );
+          return items.map((i) => ({ id: i.Name, path: i.Path })).sort((a, b) => a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
+        } catch {
+          return [];
+        }
+      };
+      const [dailyItems, hourlyItems] = await Promise.all([
+        listTier("daily"),
+        listTier("hourly")
+      ]);
       return {
-        daily: { keep: dailyKeep },
-        hourly: { keep: hourlyKeep }
+        daily: { keep: dailyKeep, count: dailyItems.length, items: dailyItems },
+        hourly: { keep: hourlyKeep, count: hourlyItems.length, items: hourlyItems }
       };
     });
     ctx.jobs.register(JOB_KEYS.autoPruneOffsite, async () => {

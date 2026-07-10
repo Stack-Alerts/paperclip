@@ -113,6 +113,70 @@ async function runScript(
 }
 
 // ---------------------------------------------------------------------------
+// lsjsonDir — top-level helper that spawns `rclone lsjson --dirs-only`
+// for a single remote path and returns the parsed entries. Exposed at
+// module scope so the data providers (listing, gdrive-tier-status, …)
+// can call it without re-implementing the rclone invocation each time.
+// ---------------------------------------------------------------------------
+type LsjsonEntry = {
+  Path: string;
+  Name: string;
+  Size: number;
+  IsDir: boolean;
+  ModTime?: string;
+};
+
+async function lsjsonDir(
+  remotePath: string,
+  rcloneConfig: string,
+  rclonePass: string,
+): Promise<Array<LsjsonEntry>> {
+  const child = spawn(
+    "rclone",
+    ["lsjson", "--dirs-only", "--no-modtime", remotePath],
+    {
+      env: {
+        ...process.env,
+        RCLONE_CONFIG: rcloneConfig,
+        ...(rclonePass ? { RCLONE_CONFIG_PASS: rclonePass } : {}),
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (b) => (stdout += b.toString()));
+  child.stderr.on("data", (b) => (stderr += b.toString()));
+  const code: number = await new Promise((res) => child.on("exit", (c) => res(c ?? 0)));
+  if (code !== 0) return [];
+  const out: Array<LsjsonEntry> = [];
+  for (const line of stdout.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const obj = JSON.parse(trimmed) as Partial<LsjsonEntry> & {
+        Path?: string;
+        Name?: string;
+        Size?: number;
+        IsDir?: boolean;
+        ModTime?: string;
+      };
+      if (!obj.Path) continue;
+      out.push({
+        Path: obj.Path,
+        Name: obj.Name ?? obj.Path.split("/").pop() ?? obj.Path,
+        Size: obj.Size ?? 0,
+        IsDir: !!obj.IsDir,
+        ModTime: obj.ModTime,
+      });
+    } catch {
+      /* skip */
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Config helpers — read instance config from disk so the plugin honors the
 // operator's saved settings instead of always using DEFAULT_CONFIG.
 // ---------------------------------------------------------------------------
@@ -1202,9 +1266,45 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         hourlyKeepRaw && typeof hourlyKeepRaw === "object" && "keep" in hourlyKeepRaw
           ? (hourlyKeepRaw as { keep: number }).keep
           : 2;
+      // Look up the actual current counts of snapshots in each tier by
+      // listing the corresponding gdrive directories. The UI shows the
+      // count next to each tier so the user can see at a glance whether
+      // retention has been enforced.
+      const cfg = readInstanceConfig();
+      const rclonePassFile = `${process.env.HOME ?? "/home/sirrus"}/.config/rclone/rclone-pass`;
+      let rclonePass = "";
+      try {
+        if (existsSync(rclonePassFile)) {
+          rclonePass = readFileSync(rclonePassFile, "utf8").trim();
+        }
+      } catch {
+        /* ignore */
+      }
+      const tierRoot =
+        (cfg as { gdriveTierRoot?: string }).gdriveTierRoot || "Paperclip-Backups";
+      const remote =
+        (cfg as { rcloneRemote?: string }).rcloneRemote || "gdrive";
+      const listTier = async (tier: "daily" | "hourly") => {
+        try {
+          const items = await lsjsonDir(
+            `${remote}:${tierRoot}/${tier}/`,
+            cfg.rcloneConfig,
+            rclonePass,
+          );
+          return items
+            .map((i: LsjsonEntry) => ({ id: i.Name, path: i.Path }))
+            .sort((a: { id: string }, b: { id: string }) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+        } catch {
+          return [];
+        }
+      };
+      const [dailyItems, hourlyItems] = await Promise.all([
+        listTier("daily"),
+        listTier("hourly"),
+      ]);
       return {
-        daily: { keep: dailyKeep },
-        hourly: { keep: hourlyKeep },
+        daily: { keep: dailyKeep, count: dailyItems.length, items: dailyItems },
+        hourly: { keep: hourlyKeep, count: hourlyItems.length, items: hourlyItems },
       };
     });
 
