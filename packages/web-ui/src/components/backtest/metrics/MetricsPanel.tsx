@@ -356,7 +356,7 @@ function SparklineCard({
 }
 
 function InfoCard({
-  label, value, icon: Icon, accent, subValue, tooltip,
+  label, value, icon: Icon, accent, subValue, tooltip, className,
 }: {
   label: string;
   value: string;
@@ -364,11 +364,13 @@ function InfoCard({
   accent: Accent;
   subValue?: string;
   tooltip: TooltipContent;
+  /** Optional extra class for the outer card wrapper (BTCAAAAA-66757: glow). */
+  className?: string;
 }) {
   return (
     <RichTooltip content={tooltip}>
       <div
-        className="rounded p-3 cursor-default h-full flex flex-col gap-1.5"
+        className={`rounded p-3 cursor-default h-full flex flex-col gap-1.5${className ? ` ${className}` : ''}`}
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -911,6 +913,11 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, a
   const liquidationBufferPct = liquidationThresholdPct != null
     ? liquidationThresholdPct - Math.abs(maxDDpctVal)
     : null;
+  // BTCAAAAA-66757: a strategy is "liquidated" when the worst realised drawdown
+  // equals or exceeds the ~1/leverage liquidation move — at that point the
+  // leveraged position would have been wiped and the configuration must be
+  // flagged as non-publishable. Drives the red-pulse banner + glow.
+  const isLiquidated = liquidationBufferPct != null && liquidationBufferPct < 0;
   const sharpeStr = allTrades.length >= 2 ? result.sharpeRatio.toFixed(2) : '—';
   const sortinoStr = allTrades.length >= 2 && result.losingTrades > 0
     ? result.sortino_ratio.toFixed(2)
@@ -1312,9 +1319,32 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, a
 
   return (
     <div>
+      {/* BTCAAAAA-66757 — liquidated banner: visible at the very top of the
+          panel so the operator sees the configuration-failure flag before any
+          KPI. Rendered only when the worst drawdown exceeded the ~1/leverage
+          liquidation threshold; the strategy is then non-publishable. */}
+      {isLiquidated && (
+        <div
+          className="liquidated-banner mb-3"
+          role="alert"
+          aria-live="polite"
+        >
+          <AlertOctagon size={14} strokeWidth={2.2} aria-hidden="true" />
+          <span className="font-semibold uppercase tracking-wide">Liquidated — non-publishable</span>
+          <span className="text-[11px] font-normal opacity-90">
+            Max drawdown {Math.abs(maxDDpctVal).toFixed(2)}% exceeded the {leverage}× liquidation threshold of −{liquidationThresholdPct!.toFixed(1)}%.
+          </span>
+        </div>
+      )}
+
       {/* Hero strip: 4 large KPIs with vs-Buy&Hold deltas (mockup top row) */}
-      <SectionHeader title="Overview" subtitle="Top-line performance vs Buy & Hold benchmark" />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* BTCAAAAA-66757 — wrapper div adds the blank row above the OVERVIEW
+          header. The SectionHeader's own first:mt-0 collapses inside its parent,
+          so the spacing lives on this wrapper to keep the SectionHeader API
+          unchanged. */}
+      <div className="mt-5">
+        <SectionHeader title="Overview" subtitle="Top-line performance vs Buy & Hold benchmark" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {heroCards.map(card => (
           <HeroCard
             key={card.label}
@@ -1328,6 +1358,7 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, a
             tooltip={card.tooltip}
           />
         ))}
+        </div>
       </div>
 
       {/* Performance: equity + drawdown sparklines (preserved from v1) */}
@@ -1447,6 +1478,7 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, a
                 ? `${leverage}× → liq at −${liquidationThresholdPct.toFixed(1)}%`
                 : (riskPerTradePct != null ? `risk/trade ${riskPerTradePct}%` : undefined)}
               tooltip={TT_LIQUIDATION_BUFFER}
+              className={isLiquidated ? 'liquidated-glow' : undefined}
             />
           </div>
           {/* Liquidation Risk Meter (BTCAAAAA-38748): risk-over-time companion to
