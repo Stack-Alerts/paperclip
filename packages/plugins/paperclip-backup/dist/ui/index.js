@@ -321,6 +321,11 @@ export function BackupManagerPage({ context }) {
         _tick: refreshTick,
     });
     const { data: status } = usePluginData("status", { companyId });
+    // Locations — every path the operator needs to know about: where
+    // local DB dumps live, where recovery.sh snapshots are stored, where
+    // the per-company / hourly / daily gdrive prefixes sit, and where
+    // the rclone config + pass file live on disk.
+    const { data: locationsData } = usePluginData("locations", {});
     // While a backup is detached-running in the background, poll every
     // 30s so the page picks up completion (and the running marker clears)
     // without the user clicking anything.
@@ -519,7 +524,7 @@ export function BackupManagerPage({ context }) {
             setBusy(null);
         }
     };
-    return (_jsxs("article", { style: { display: "grid", gap: 16, padding: 16 }, children: [_jsxs("header", { children: [_jsx("h2", { style: { margin: 0, fontSize: 20 }, children: "Backup Manager" }), _jsx("p", { style: { marginTop: 4, color: "var(--muted-foreground, #6b7280)", fontSize: 13 }, children: "Offsite push (rclone \u2192 GDrive) and local DB-dump retention." })] }), error ? (_jsxs("div", { role: "alert", style: {
+    return (_jsxs("article", { style: { display: "grid", gap: 16, padding: 16 }, children: [_jsxs("header", { children: [_jsx("h2", { style: { margin: 0, fontSize: 20 }, children: "Backup Manager" }), _jsx("p", { style: { marginTop: 4, color: "var(--muted-foreground, #6b7280)", fontSize: 13 }, children: "Offsite push (rclone \u2192 GDrive) and local DB-dump retention." })] }), _jsxs("section", { style: { padding: 16, border: "1px solid var(--border, #e5e7eb)", borderRadius: 8, background: "color-mix(in oklab, var(--muted) 4%, var(--card))" }, children: [_jsx("h3", { style: { marginTop: 0, fontSize: 16 }, children: "Backup locations" }), _jsx("p", { style: { marginTop: 0, marginBottom: 8, color: "var(--muted-foreground, #6b7280)", fontSize: 12 }, children: "Every path the operator needs to know about. Locations are read from the live config and rclone environment each render." }), _jsx("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "ui-monospace, monospace" }, children: [_jsx("thead", { children: _jsxs("tr", { style: { textAlign: "left", color: "var(--muted-foreground, #6b7280)" }, children: [_jsx("th", { style: { padding: "4px 6px", width: 180 }, children: "What" }), _jsx("th", { style: { padding: "4px 6px" }, children: "Path / Where" }), _jsx("th", { style: { padding: "4px 6px", width: 200 }, children: "Note" })] }) }), _jsx("tbody", { children: (locationsData === null || locationsData === void 0 ? [] : (locationsData.items || [])).map((it) => (_jsxs("tr", { style: { borderTop: "1px solid var(--border, #e5e7eb)" }, children: [_jsx("td", { style: { padding: "4px 6px", color: "var(--muted-foreground, #6b7280)" }, children: it.id }), _jsx("td", { style: { padding: "4px 6px", wordBreak: "break-all" }, children: it.path }), _jsx("td", { style: { padding: "4px 6px", color: "var(--muted-foreground, #6b7280)" }, children: it.note || "" })] }, it.id))) })] })) ]}), error ? (_jsxs("div", { role: "alert", style: {
                     padding: 12,
                     border: "1px solid var(--destructive, #dc2626)",
                     borderRadius: 6,

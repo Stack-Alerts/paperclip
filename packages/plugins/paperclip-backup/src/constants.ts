@@ -45,6 +45,7 @@ export const DATA_KEYS = {
   status: "status",
   config: "config",
   recoverySnapshots: "recovery-snapshots",
+  locations: "locations",
 };
 
 export const SCRIPT_KEYS = {

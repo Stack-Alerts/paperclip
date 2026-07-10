@@ -765,6 +765,88 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
       return await runScript(cfg.pruneScript, [String(keep)]);
     });
 
+    // ---------------------------------------------------------------------
+    // locations — show the operator where every backup type lives on disk
+    // and on gdrive. Consumed by the UI to render a "Locations" panel
+    // in the Backup Manager page so it is obvious at a glance where the
+    // local DB dumps, the recovery snapshots, the per-company offsite
+    // prefix, and the hourly/daily tiered-offsite prefixes all sit.
+    // ---------------------------------------------------------------------
+    ctx.data.register(DATA_KEYS.locations, async () => {
+      const cfg = readInstanceConfig();
+      const companyId =
+        process.env.PAPERCLIP_COMPANY_ID ||
+        "73419cf3-bd37-4a7c-8782-311ccb47fced";
+      const rcloneRemote = cfg.rcloneRemote || "gdrive";
+      const tierRoot = cfg.gdriveTierRoot || "Paperclip-Backups";
+      const paperclipHome = cfg.paperclipHome || "/home/sirrus/.paperclip";
+      const snapshotsDir =
+        process.env.PAPERCLIP_RECOVERY_DIR || "/home/sirrus/paperclip-snapshots";
+      const resolved = resolveLocalBackupDir(cfg);
+      return {
+        items: [
+          {
+            id: "local-db-dumps",
+            kind: "local",
+            path: resolved.dir,
+            note: `source=${resolved.source}`,
+          },
+          {
+            id: "recovery-snapshots",
+            kind: "local",
+            path: snapshotsDir,
+            note: "recovery.sh snapshot --no-upload writes here",
+          },
+          {
+            id: "offsite-per-company",
+            kind: "offsite-per-company",
+            path: `${rcloneRemote}:${tierRoot}/${companyId}/<YYYY>/<MM>/<DD>/<HHMM>/`,
+            note: "recovery.sh snapshot + auto-offsite-backup default",
+          },
+          {
+            id: "offsite-tier-hourly",
+            kind: "offsite-tier-hourly",
+            path: `${rcloneRemote}:${tierRoot}/hourly/`,
+            note: "upload-hourly-backup keeps N=2",
+          },
+          {
+            id: "offsite-tier-daily",
+            kind: "offsite-tier-daily",
+            path: `${rcloneRemote}:${tierRoot}/daily/`,
+            note: "upload-daily-backup keeps N=3",
+          },
+          {
+            id: "offsite-worktree",
+            kind: "offsite-tier-worktree",
+            path: `${rcloneRemote}:${tierRoot}/${companyId}/<YYYY>/<MM>/<DD>/<HHMM>/worktree-snapshot-*.tar.gz`,
+            note: "auto-offsite-backup every 2h",
+          },
+          {
+            id: "rclone-config",
+            kind: "config",
+            path: cfg.rcloneConfig || "/home/sirrus/.config/rclone/rclone.conf",
+          },
+          {
+            id: "rclone-pass",
+            kind: "config",
+            path: `${process.env.HOME || "/home/sirrus"}/.config/rclone/rclone-pass`,
+            note: "read at runtime by every rclone child spawn",
+          },
+          {
+            id: "worktree-backup-script",
+            kind: "config",
+            path: cfg.worktreeBackupScript || `${paperclipHome}/scripts/worktree-offsite.sh`,
+          },
+          {
+            id: "paperclip-home",
+            kind: "config",
+            path: paperclipHome,
+          },
+        ],
+        generatedAt: new Date().toISOString(),
+      };
+    });
+
     ctx.actions.register(
       ACTION_KEYS.restoreOffsite,
       async (params: unknown) => {
