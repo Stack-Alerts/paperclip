@@ -28,7 +28,8 @@ import {
   TT_EXIT_TYPE,
   TT_VOLATILITY, TT_VAR_95, TT_CVAR_95, TT_EXPOSURE_TIME,
   TT_PAYOFF_RATIO, TT_LARGEST_WIN, TT_LARGEST_LOSS, TT_CURRENCY,
-  TT_ADDITIONAL_METRICS, TT_SIGNALS_REQUIRED, TT_RECHECKS,
+  TT_ADDITIONAL_METRICS, TT_RECHECKS, TT_SIGNALS_REQUIRED, TT_STRATEGY_SIGNALS_SECTION,
+  TT_ENTRY_SIGNALS_FIRED, TT_ENTRY_SIGNALS_TABLE,
   TT_EXIT_SIGNALS, TT_STOP_LOSS_ADJUSTMENTS,
   TT_ANNUALIZED_RETURN, TT_MARGIN_OF_SAFETY, TT_AVG_TRADE_DURATION,
   TT_KELLY_CRITERION, TT_GROSS_PROFIT, TT_GROSS_LOSS,
@@ -840,6 +841,139 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, a
   const sparkRollingAvg = useMemo(() => buildRollingAvgTrade(allTrades), [allTrades]);
   const sparkCumPnl = useMemo(() => buildCumulativePnl(allTrades), [allTrades]);
 
+  // BTCAAAAA-66772: per-entry-signal diagnostics for the dedicated Strategy
+  // Signals grid. Trade.entrySignals is the only signal-level telemetry the
+  // engine currently emits (src/api/app.py normalization); win rate, total
+  // PnL, avg PnL and top co-fires per signal all derive from it. Per-trade
+  // confluence scores are NOT yet exposed (lives only in
+  // ValidationReport.confluenceScoring — validation context, not backtest
+  // results), so the section's tooltips state the co-fire proxy explicitly.
+  const entrySignalStats = useMemo<Array<{
+    signal: string;
+    fired: number;
+    wins: number;
+    losses: number;
+    winRate: number;
+    totalPnl: number;
+    avgPnl: number;
+    topCoFires: Array<{ signal: string; count: number }>;
+  }>>(() => {
+    type Row = {
+      signal: string;
+      fired: number;
+      wins: number;
+      losses: number;
+      winRate: number;
+      totalPnl: number;
+      avgPnl: number;
+      topCoFires: Array<{ signal: string; count: number }>;
+    };
+    const counts = new Map<string, number>();
+    const winsBySig = new Map<string, number>();
+    const pnlBySig = new Map<string, number>();
+    const coFire = new Map<string, Map<string, number>>();
+    for (const t of allTrades) {
+      const sigs = t.entrySignals ?? [];
+      if (sigs.length === 0) continue;
+      const win = t.pnl > 0;
+      for (const s of sigs) {
+        counts.set(s, (counts.get(s) ?? 0) + 1);
+        if (win) winsBySig.set(s, (winsBySig.get(s) ?? 0) + 1);
+        pnlBySig.set(s, (pnlBySig.get(s) ?? 0) + t.pnl);
+      }
+      const unique = Array.from(new Set(sigs)).sort();
+      for (let i = 0; i < unique.length; i++) {
+        for (let j = i + 1; j < unique.length; j++) {
+          const a = unique[i];
+          const b = unique[j];
+          let inner = coFire.get(a);
+          if (!inner) { inner = new Map(); coFire.set(a, inner); }
+          inner.set(b, (inner.get(b) ?? 0) + 1);
+        }
+      }
+    }
+    const rows: Row[] = [];
+    for (const [signal, fired] of counts) {
+      const wins = winsBySig.get(signal) ?? 0;
+      const totalPnl = pnlBySig.get(signal) ?? 0;
+      const losses = fired - wins;
+      const winRate = fired > 0 ? wins / fired : 0;
+      const avgPnl = fired > 0 ? totalPnl / fired : 0;
+      const inner = coFire.get(signal);
+      const topCoFires = inner
+        ? [...inner.entries()]
+            .map(([s, c]) => ({ signal: s, count: c }))
+            .sort((a, b) => b.count - a.count || a.signal.localeCompare(b.signal))
+            .slice(0, 3)
+        : [];
+      rows.push({ signal, fired, wins, losses, winRate, totalPnl, avgPnl, topCoFires });
+    }
+    rows.sort((a, b) => b.fired - a.fired || a.signal.localeCompare(b.signal));
+    return rows;
+  }, [allTrades]);
+
+  // BTCAAAAA-66772: derive the 4 building-block signal cards (Signals Required
+  // / Rechecks / Exit Signals / Stop-Loss Adjustments) from Trade data so they
+  // stop rendering as "—". All four are scalar summaries of the per-trade
+  // record — they sit at the top of the new Strategy Signals section so the
+  // missing-confluence/per-trade-rechecks caveats in the tooltips sit next
+  // to the live per-signal table the engine DOES expose.
+  //
+  //   Signals Required       → mean entry-signal count per trade (a multi-
+  //                             signal strategy should average > 1; mono-
+  //                             signal strategies render 1.0).
+  //   Rechecks               → Σ(max(0, len(entrySignals) - 1)) across trades
+  //                             — every signal after the first is treated as
+  //                             a confirmation/recheck. This is a proxy: true
+  //                             recheck events from the engine (BTC-37920 v3
+  //                             building block) would be a per-trade array,
+  //                             but the sum-of-extra-signals metric
+  //                             communicates the same idea at this layer.
+  //   Exit Signals           → # trades whose exitType looks signal-driven
+  //                             (SIGNAL_EXIT / EXIT_SIGNAL / SIGNAL /
+  //                             REVERSAL).
+  //   Stop-Loss Adjustments  → # trades whose exitType looks like a trailing
+  //                             or adaptive SL move (TRAILING_SL / TRAILING /
+  //                             ADAPTIVE_SL / ADAPTIVE). Distinct from raw
+  //                             SL exits — the engine names them differently
+  //                             when the stop was adjusted mid-trade.
+  const signalSummary = useMemo(() => {
+    const isSignalExit = (e?: string | null) => {
+      if (!e) return false;
+      const u = e.toUpperCase();
+      return u === 'SIGNAL_EXIT' || u === 'EXIT_SIGNAL' || u === 'SIGNAL'
+        || u === 'REVERSAL' || u.includes('SIGNAL_EXIT');
+    };
+    const isSlAdjust = (e?: string | null) => {
+      if (!e) return false;
+      const u = e.toUpperCase();
+      return u === 'TRAILING_SL' || u === 'TRAILING' || u === 'ADAPTIVE_SL'
+        || u === 'ADAPTIVE' || u.includes('TRAIL') || u.includes('ADAPTIVE');
+    };
+    let signalSum = 0;
+    let signalCount = 0;
+    let rechecks = 0;
+    let exitSignals = 0;
+    let slAdjustments = 0;
+    for (const t of allTrades) {
+      const sigs = t.entrySignals ?? [];
+      if (sigs.length > 0) {
+        signalSum += sigs.length;
+        signalCount += 1;
+        if (sigs.length > 1) rechecks += sigs.length - 1;
+      }
+      if (isSignalExit(t.exitType)) exitSignals += 1;
+      if (isSlAdjust(t.exitType)) slAdjustments += 1;
+    }
+    return {
+      signalsRequiredAvg: signalCount > 0 ? signalSum / signalCount : 0,
+      rechecksTotal: rechecks,
+      exitSignalCount: exitSignals,
+      slAdjustmentCount: slAdjustments,
+      hasTelemetry: signalCount > 0 || allTrades.length === 0,
+    };
+  }, [allTrades]);
+
   if (!result) {
     return (
       <div className="flex flex-col items-center justify-center py-12" style={{ color: 'var(--text-faint)' }}>
@@ -1302,19 +1436,14 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, a
     });
   }
 
-  /* Building-block signal diagnostics (BTC-37920 v3). Backend does not yet
-     expose per-trade signal telemetry, so values surface as "—" with a hint.
-     Tooltips explain what each metric will measure once telemetry lands. */
-  additionalRows.push(
-    { label: 'Signals Required', value: '—', tooltip: TT_SIGNALS_REQUIRED, icon: Activity, accent: 'blue',
-      baseline: 'requires per-trade signal telemetry' },
-    { label: 'Rechecks', value: '—', tooltip: TT_RECHECKS, icon: RotateCcw, accent: 'blue',
-      baseline: 'requires per-trade signal telemetry' },
-    { label: 'Exit Signals', value: '—', tooltip: TT_EXIT_SIGNALS, icon: AlertTriangle, accent: 'orange',
-      baseline: 'requires per-trade signal telemetry' },
-    { label: 'Stop-Loss Adjustments', value: '—', tooltip: TT_STOP_LOSS_ADJUSTMENTS, icon: Scale, accent: 'neutral',
-      baseline: 'requires per-trade signal telemetry' },
-  );
+  /* Building-block signal diagnostics moved out of Additional Metrics per
+     BTCAAAAA-66772: a dedicated "Strategy Signals" section now lives at the
+     bottom of the panel with REAL entry-signal telemetry (Trade.entrySignals
+     is already emitted by /api/backtest). The 4 building-block rows
+     (Signals Required / Rechecks / Exit Signals / Stop-Loss Adjustments) that
+     previously rendered as "—" here are surfaced under that new section
+     header instead, so the missing-telemetry hint is properly contextualized
+     against the live entry-signal table. */
 
 
   return (
@@ -1579,6 +1708,222 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, a
             {additionalRows.map(r => <MetricCard key={r.label} {...r} />)}
           </div>
         )}
+      </div>
+
+      {/* Strategy Signals (BTCAAAAA-66772). Sits at the very bottom of the
+          panel per the user's "seperate grid right at the bottom for all
+          strategy Signals not just Exit Strategies" ask. Two layers:
+
+          (1) Four building-block summary cards (Signals Required / Rechecks /
+              Exit Signals / Stop-Loss Adjustments) — these previously lived
+              inside the Additional Metrics expander as "—" because the
+              backend did not expose per-trade signal telemetry. They now
+              derive from the trade record (Trade.entrySignals +
+              Trade.exitType) and have real values.
+
+          (2) A per-entry-signal detail table sorted by firing count. This is
+              the meaningfulness upgrade the user asked for — every signal
+              name is a row, with firing count, win rate, total/avg PnL, and
+              the top co-fire signal as a confluence proxy (per-trade
+              confluence scores are not yet on the trade record, only in the
+              validation framework, so co-fire pair counts are the closest
+              available signal-clustering signal). */}
+      <div className="mt-6">
+        <RichTooltip content={TT_STRATEGY_SIGNALS_SECTION}>
+          <SectionHeader
+            title="Strategy Signals"
+            subtitle="Per-entry-signal telemetry: firing counts, win rate, PnL contribution, and co-fire pairs"
+          />
+        </RichTooltip>
+
+        {/* (1) Building-block summary cards — real values now */}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4" style={smallZoom}>
+          <MetricCard
+            label="Signals Required"
+            value={
+              signalSummary.hasTelemetry
+                ? signalSummary.signalsRequiredAvg.toFixed(2)
+                : '—'
+            }
+            tooltip={TT_SIGNALS_REQUIRED}
+            icon={Activity}
+            accent="blue"
+            baseline={
+              signalSummary.hasTelemetry
+                ? 'avg entry signals per trade'
+                : 'no per-trade signal telemetry'
+            }
+          />
+          <MetricCard
+            label="Rechecks"
+            value={
+              signalSummary.hasTelemetry
+                ? signalSummary.rechecksTotal.toLocaleString()
+                : '—'
+            }
+            tooltip={TT_RECHECKS}
+            icon={RotateCcw}
+            accent="blue"
+            baseline={
+              signalSummary.hasTelemetry
+                ? 'extra signals fired after the first'
+                : 'no per-trade signal telemetry'
+            }
+          />
+          <MetricCard
+            label="Exit Signals"
+            value={
+              signalSummary.hasTelemetry
+                ? signalSummary.exitSignalCount.toLocaleString()
+                : '—'
+            }
+            tooltip={TT_EXIT_SIGNALS}
+            icon={AlertTriangle}
+            accent="orange"
+            baseline={
+              signalSummary.hasTelemetry
+                ? `of ${allTrades.length.toLocaleString()} closed trades`
+                : 'no per-trade signal telemetry'
+            }
+          />
+          <MetricCard
+            label="Stop-Loss Adjustments"
+            value={
+              signalSummary.hasTelemetry
+                ? signalSummary.slAdjustmentCount.toLocaleString()
+                : '—'
+            }
+            tooltip={TT_STOP_LOSS_ADJUSTMENTS}
+            icon={Scale}
+            accent="neutral"
+            baseline={
+              signalSummary.hasTelemetry
+                ? 'trades closed by a trailing/adaptive SL'
+                : 'no per-trade signal telemetry'
+            }
+          />
+        </div>
+
+        {/* (2) Per-entry-signal detail table */}
+        <RichTooltip content={TT_ENTRY_SIGNALS_FIRED}>
+          <div
+            className="mt-4 rounded overflow-hidden"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+          >
+            <div
+              className="grid grid-cols-12 gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide"
+              style={{ color: 'var(--text-faint)', borderBottom: '1px solid var(--border)' }}
+            >
+              <div className="col-span-4">Signal</div>
+              <div className="col-span-2 text-right" title="Total trades where this signal fired">
+                Fired
+              </div>
+              <div className="col-span-2 text-right" title="Win rate of those trades">
+                Win Rate
+              </div>
+              <div className="col-span-2 text-right" title="Total $ PnL across those trades">
+                Total PnL
+              </div>
+              <div className="col-span-2 text-right" title="Mean $ PnL per trade for that signal">
+                Avg PnL
+              </div>
+            </div>
+            {entrySignalStats.length === 0 ? (
+              <div
+                className="px-3 py-4 text-[11px]"
+                style={{ color: 'var(--text-faint)' }}
+              >
+                No entry signal telemetry on this run — Trade.entrySignals[] is
+                empty or missing for every closed trade. Re-run the backtest
+                with the engine that emits per-trade entry signals (see
+                BTC-37920 v3 building blocks).
+              </div>
+            ) : (
+              entrySignalStats.map((row, i) => {
+                const winRatePct = (row.winRate * 100).toFixed(1);
+                const avgPnlVal = row.avgPnl;
+                const totalPnlVal = row.totalPnl;
+                const avgPnlColor =
+                  avgPnlVal > 0 ? 'var(--accent-green)'
+                  : avgPnlVal < 0 ? 'var(--accent-red)'
+                  : 'var(--text-muted)';
+                const totalPnlColor =
+                  totalPnlVal > 0 ? 'var(--accent-green)'
+                  : totalPnlVal < 0 ? 'var(--accent-red)'
+                  : 'var(--text-muted)';
+                const winRateColor =
+                  row.winRate >= 0.5 ? 'var(--accent-green)'
+                  : row.winRate >= 0.4 ? 'var(--accent-orange)'
+                  : 'var(--accent-red)';
+                const coFireLabel =
+                  row.topCoFires.length === 0
+                    ? '—'
+                    : row.topCoFires
+                        .map(c => `${c.signal} (${c.count})`)
+                        .join(', ');
+                return (
+                  <RichTooltip
+                    key={row.signal}
+                    content={TT_ENTRY_SIGNALS_TABLE}
+                  >
+                    <div
+                      className="grid grid-cols-12 gap-2 px-3 py-2 text-[11px] cursor-help"
+                      style={{
+                        borderBottom:
+                          i === entrySignalStats.length - 1
+                            ? 'none'
+                            : '1px solid var(--border)',
+                        background:
+                          i % 2 === 1
+                            ? 'color-mix(in srgb, var(--bg-card-hover) 35%, transparent)'
+                            : 'transparent',
+                      }}
+                    >
+                      <div className="col-span-4 truncate" title={row.signal} style={{ color: 'var(--text-secondary)' }}>
+                        {row.signal}
+                      </div>
+                      <div
+                        className="col-span-2 text-right tabular-nums"
+                        style={{ color: 'var(--text-secondary)' }}
+                        title={`${row.fired} trade${row.fired === 1 ? '' : 's'} — ${row.wins}W / ${row.losses}L`}
+                      >
+                        {row.fired}
+                      </div>
+                      <div
+                        className="col-span-2 text-right tabular-nums"
+                        style={{ color: winRateColor }}
+                      >
+                        {winRatePct}%
+                      </div>
+                      <div
+                        className="col-span-2 text-right tabular-nums"
+                        style={{ color: totalPnlColor }}
+                      >
+                        ${totalPnlVal.toLocaleString(undefined, {
+                          maximumFractionDigits: 0,
+                        })}
+                      </div>
+                      <div
+                        className="col-span-2 text-right tabular-nums"
+                        style={{ color: avgPnlColor }}
+                        title={
+                          row.topCoFires.length > 0
+                            ? `Co-fires: ${coFireLabel}`
+                            : 'No co-fire data'
+                        }
+                      >
+                        ${avgPnlVal.toLocaleString(undefined, {
+                          maximumFractionDigits: 2,
+                          minimumFractionDigits: 2,
+                        })}
+                      </div>
+                    </div>
+                  </RichTooltip>
+                );
+              })
+            )}
+          </div>
+        </RichTooltip>
       </div>
     </div>
   );

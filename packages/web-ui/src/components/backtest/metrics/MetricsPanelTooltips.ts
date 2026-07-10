@@ -1329,3 +1329,68 @@ export const TT_RECENT_RUN_DD: TooltipContent = {
   title: 'Max Drawdown — this run',
   body: 'Largest peak-to-trough equity decline for this saved run, as a percent of the peak. Weigh each run\'s worst-case pain against its return before applying its configuration.',
 };
+
+// ── Strategy Signals section (BTCAAAAA-66772) ─────────────────────────────────
+
+export const TT_STRATEGY_SIGNALS_SECTION: TooltipContent = {
+  title: 'Strategy Signals',
+  body: 'Dedicated section for signal-level telemetry. Entry Signals Fired is real per-trade data (from the trade record); Rechecks, Exit Signals, and Stop-Loss Adjustments stay telemetry-pending until the engine exposes per-trade rechecks/exit_signals/sl_adjustments arrays (BTC-37920 v3 building blocks).',
+  sections: [
+    {
+      header: 'How to use this section:',
+      items: [
+        'Entry Signals Fired gives the unique entry signal name list and a detail table sorted by firing count',
+        'Per-signal win rate / total PnL / avg PnL is computed over the trades that signal fired on — high-count signals drive the bulk of results',
+        'Compare firing counts to win rate to spot "anchors" (high count, high win rate) versus "noise" (high count, low win rate)',
+      ],
+    },
+    {
+      header: 'Confluence:',
+      items: [
+        'Per-trade confluence scores are not yet available on the backtest Trade record (BTC-37920 v3) — the framework Validation Report exposes confluenceScoring for the static strategy config but not per-trade',
+        'Until per-trade confluence lands, use Signal Co-fire Counts (count of trades where each pair of signals both fired) as a proxy for which signals cluster together',
+      ],
+    },
+  ],
+};
+
+export const TT_ENTRY_SIGNALS_FIRED: TooltipContent = {
+  title: 'Entry Signals — fired',
+  body: 'Count of unique entry signal names that fired at least once across the closed trades in this backtest. Each unique signal also gets a row in the detail table below with firing count, win rate, total PnL, avg PnL, and co-fire pairs.',
+  sections: [
+    {
+      header: 'Interpretation:',
+      items: [
+        'Single dominant signal (one row in the table with most fires): strategy is essentially mono-signal — diversifying entries from a different detector may help',
+        'Even mix of signals: strategy has multiple independent entry sources — review whether each entry signal has a positive expectation on its own',
+        'Many unique signals with low counts each: dilution — small-count signals may not have enough sample to evaluate',
+      ],
+    },
+  ],
+};
+
+export const TT_ENTRY_SIGNALS_TABLE: TooltipContent = {
+  title: 'Entry Signal Detail Table',
+  body: 'Per-signal breakdown of every entry signal name that fired in this backtest. Sorted by firing count (descending) so the most-used signals surface first.',
+  sections: [
+    {
+      header: 'Columns:',
+      items: [
+        'Signal: name as emitted by the engine',
+        'Fired: total number of trades where this signal appeared in Trade.entrySignals[]',
+        'Win Rate: % of those trades that closed positive',
+        'Total PnL: sum of $ PnL across those trades',
+        'Avg PnL: mean $ PnL per trade for that signal',
+        'Co-fires (top): the signals that appeared alongside this one most often — a proxy for confluence until per-trade confluence scores ship',
+      ],
+    },
+    {
+      header: 'Interpretation:',
+      items: [
+        'High count + high win rate + positive avg PnL: anchor signal — keep',
+        'High count + low win rate + negative avg PnL: drag signal — consider tightening or removing',
+        'Low count, any win rate: insufficient sample — needs more trades before drawing conclusions',
+      ],
+    },
+  ],
+};
