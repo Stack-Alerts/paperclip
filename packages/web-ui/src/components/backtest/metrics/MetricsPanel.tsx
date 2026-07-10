@@ -1322,10 +1322,12 @@ export function MetricsPanel({ result, trades = [], strategyId, onApplyConfig, a
       {/* BTCAAAAA-66757 — liquidated banner: visible at the very top of the
           panel so the operator sees the configuration-failure flag before any
           KPI. Rendered only when the worst drawdown exceeded the ~1/leverage
-          liquidation threshold; the strategy is then non-publishable. */}
+          liquidation threshold; the strategy is then non-publishable.
+          `mt-5` gives the same blank-row separation above the banner that
+          the Overview wrapper uses below it (board comment 684e2da4). */}
       {isLiquidated && (
         <div
-          className="liquidated-banner mb-3"
+          className="liquidated-banner mt-5 mb-3"
           role="alert"
           aria-live="polite"
         >
