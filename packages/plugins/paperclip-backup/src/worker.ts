@@ -624,6 +624,13 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
     // ---------------------------------------------------------------------
     // Actions: regular backup / restore / prune (shell-script delegation)
     // ---------------------------------------------------------------------
+
+    // run-backup: spawn the DB-dump script and the worktree script
+    // detached and return immediately. The 30s RPC timeout would
+    // otherwise fire while a normal backup takes 30-60s. The UI reads
+    // the "backup-running" plugin_state row to display "Working…"
+    // and the new self-heal lifecycle handlers (see below) clear the
+    // marker when the child exits.
     ctx.actions.register(ACTION_KEYS.runBackup, async (params: unknown) => {
       const companyId = resolveCompanyId(params as Record<string, unknown>);
       if (!companyId) {
@@ -634,33 +641,56 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         };
       }
       const cfg = readInstanceConfig();
-      // Run the main DB-dump upload first. If that fails we abort so the
-      // user sees the failure (don't silently upload only the worktree).
-      const main = await runScript(cfg.backupScript, [companyId], {
+      const startedAt = new Date().toISOString();
+      const childEnv = {
+        ...process.env,
         PAPERCLIP_COMPANY_ID: companyId,
+      };
+      const main = spawn(cfg.backupScript, [companyId], {
+        detached: true,
+        stdio: "ignore",
+        env: childEnv as NodeJS.ProcessEnv,
       });
-      if (!main.ok) return main;
-      // Then run the worktree snapshot upload (separate script, same
-      // gdrive prefix so the prune-offsite action trims them together
-      // under the same retention budget).
-      const extras: Array<{ ok: boolean; exitCode: number | null; stdout: string; stderr: string; durationMs: number; message: string }> = [];
+      main.unref();
+      // Track the main DB-dump run so the UI can show "Working…"
+      await ctx.state
+        .set({ scopeKind: "instance", stateKey: STATE_KEYS.backupRunning }, {
+          pid: main.pid,
+          startedAt,
+          script: cfg.backupScript,
+          args: [companyId],
+          companyId,
+          isForced: false,
+          recovery: false,
+        })
+        .catch(() => null);
+      // Fire the worktree snapshot upload in parallel (best effort —
+      // doesn't affect the main DB-dump's success state). The prune-offsite
+      // action trims everything under the same retention budget.
       if (cfg.worktreeBackupScript && existsSync(cfg.worktreeBackupScript)) {
-        extras.push(
-          await runScript(cfg.worktreeBackupScript, [], {
-            PAPERCLIP_COMPANY_ID: companyId,
-          }),
-        );
+        const wt = spawn(cfg.worktreeBackupScript, [], {
+          detached: true,
+          stdio: "ignore",
+          env: childEnv as NodeJS.ProcessEnv,
+        });
+        wt.unref();
       }
-      const allOk = extras.every((r) => r.ok);
+      const clearRunning = () => {
+        void ctx.state
+          .delete({ scopeKind: "instance", stateKey: STATE_KEYS.backupRunning })
+          .catch(() => null);
+      };
+      main.once("exit", clearRunning);
+      main.once("error", clearRunning);
+      main.once("close", clearRunning);
       return {
-        ok: allOk,
-        exitCode: allOk ? 0 : 1,
-        stdout: [main.stdout, ...extras.map((e) => e.stdout)].join("\n"),
-        stderr: [main.stderr, ...extras.map((e) => e.stderr)].join("\n"),
-        durationMs: main.durationMs + extras.reduce((s, e) => s + e.durationMs, 0),
-        message: allOk
-          ? `Backup ok (main ${main.durationMs}ms${extras.length ? `, worktree ${extras[0].durationMs}ms` : ""})`
-          : `Backup partially failed (main=${main.ok ? "ok" : "fail"} extras=${extras.map((e) => (e.ok ? "ok" : "fail")).join(",")})`,
+        ok: true,
+        exitCode: 0,
+        message: `Backup started (pid=${main.pid})`,
+        pid: main.pid,
+        startedAt,
+        async: true,
+        forced: false,
       };
     });
 
@@ -1036,7 +1066,8 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
       RECOVERY_ACTION_KEYS.uploadDailyBackup,
       async () => {
         const scriptPath =
-          "/home/sirrus/.paperclip/scripts/gdrive-tiered-upload.sh";
+          (process.env.PAPERCLIP_GDRIVE_TIERED_SCRIPT as string) ||
+          "/home/sirrus/paperclip-btcaaaaa-main/scripts/gdrive-tiered-upload.sh";
         if (!existsSync(scriptPath)) {
           return { ok: false, message: `tiered upload script not found: ${scriptPath}` };
         }
@@ -1058,7 +1089,8 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
       RECOVERY_ACTION_KEYS.uploadHourlyBackup,
       async () => {
         const scriptPath =
-          "/home/sirrus/.paperclip/scripts/gdrive-tiered-upload.sh";
+          (process.env.PAPERCLIP_GDRIVE_TIERED_SCRIPT as string) ||
+          "/home/sirrus/paperclip-btcaaaaa-main/scripts/gdrive-tiered-upload.sh";
         if (!existsSync(scriptPath)) {
           return { ok: false, message: `tiered upload script not found: ${scriptPath}` };
         }

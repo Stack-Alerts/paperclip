@@ -10924,26 +10924,48 @@ var pluginInstance = definePlugin({
         };
       }
       const cfg = readInstanceConfig();
-      const main = await runScript(cfg.backupScript, [companyId], {
+      const startedAt = (/* @__PURE__ */ new Date()).toISOString();
+      const childEnv = {
+        ...process.env,
         PAPERCLIP_COMPANY_ID: companyId
+      };
+      const main = spawn(cfg.backupScript, [companyId], {
+        detached: true,
+        stdio: "ignore",
+        env: childEnv
       });
-      if (!main.ok) return main;
-      const extras = [];
+      main.unref();
+      await ctx.state.set({ scopeKind: "instance", stateKey: STATE_KEYS.backupRunning }, {
+        pid: main.pid,
+        startedAt,
+        script: cfg.backupScript,
+        args: [companyId],
+        companyId,
+        isForced: false,
+        recovery: false
+      }).catch(() => null);
       if (cfg.worktreeBackupScript && existsSync(cfg.worktreeBackupScript)) {
-        extras.push(
-          await runScript(cfg.worktreeBackupScript, [], {
-            PAPERCLIP_COMPANY_ID: companyId
-          })
-        );
+        const wt = spawn(cfg.worktreeBackupScript, [], {
+          detached: true,
+          stdio: "ignore",
+          env: childEnv
+        });
+        wt.unref();
       }
-      const allOk = extras.every((r) => r.ok);
+      const clearRunning = () => {
+        void ctx.state.delete({ scopeKind: "instance", stateKey: STATE_KEYS.backupRunning }).catch(() => null);
+      };
+      main.once("exit", clearRunning);
+      main.once("error", clearRunning);
+      main.once("close", clearRunning);
       return {
-        ok: allOk,
-        exitCode: allOk ? 0 : 1,
-        stdout: [main.stdout, ...extras.map((e) => e.stdout)].join("\n"),
-        stderr: [main.stderr, ...extras.map((e) => e.stderr)].join("\n"),
-        durationMs: main.durationMs + extras.reduce((s, e) => s + e.durationMs, 0),
-        message: allOk ? `Backup ok (main ${main.durationMs}ms${extras.length ? `, worktree ${extras[0].durationMs}ms` : ""})` : `Backup partially failed (main=${main.ok ? "ok" : "fail"} extras=${extras.map((e) => e.ok ? "ok" : "fail").join(",")})`
+        ok: true,
+        exitCode: 0,
+        message: `Backup started (pid=${main.pid})`,
+        pid: main.pid,
+        startedAt,
+        async: true,
+        forced: false
       };
     });
     ctx.actions.register(ACTION_KEYS.pruneLocal, async (params) => {
@@ -11237,7 +11259,7 @@ var pluginInstance = definePlugin({
     ctx.actions.register(
       RECOVERY_ACTION_KEYS.uploadDailyBackup,
       async () => {
-        const scriptPath = "/home/sirrus/.paperclip/scripts/gdrive-tiered-upload.sh";
+        const scriptPath = process.env.PAPERCLIP_GDRIVE_TIERED_SCRIPT || "/home/sirrus/paperclip-btcaaaaa-main/scripts/gdrive-tiered-upload.sh";
         if (!existsSync(scriptPath)) {
           return { ok: false, message: `tiered upload script not found: ${scriptPath}` };
         }
@@ -11257,7 +11279,7 @@ var pluginInstance = definePlugin({
     ctx.actions.register(
       RECOVERY_ACTION_KEYS.uploadHourlyBackup,
       async () => {
-        const scriptPath = "/home/sirrus/.paperclip/scripts/gdrive-tiered-upload.sh";
+        const scriptPath = process.env.PAPERCLIP_GDRIVE_TIERED_SCRIPT || "/home/sirrus/paperclip-btcaaaaa-main/scripts/gdrive-tiered-upload.sh";
         if (!existsSync(scriptPath)) {
           return { ok: false, message: `tiered upload script not found: ${scriptPath}` };
         }
