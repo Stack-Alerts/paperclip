@@ -133,7 +133,11 @@ function resolveCompanyId(params: Record<string, unknown> | undefined) {
   return (
     (params?.companyId as string | undefined) ??
     process.env.PAPERCLIP_COMPANY_ID ??
-    null
+    // Fallback: the canonical BTC-Trade-Engine Paperclip companyId.
+    // The plugin's host company is always this; hardcoding lets the
+    // auto-offsite-backup job run without requiring the env var to
+    // be set in the worker process.
+    "73419cf3-bd37-4a7c-8782-311ccb47fced"
   );
 }
 
@@ -630,9 +634,34 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         };
       }
       const cfg = readInstanceConfig();
-      return await runScript(cfg.backupScript, [companyId], {
+      // Run the main DB-dump upload first. If that fails we abort so the
+      // user sees the failure (don't silently upload only the worktree).
+      const main = await runScript(cfg.backupScript, [companyId], {
         PAPERCLIP_COMPANY_ID: companyId,
       });
+      if (!main.ok) return main;
+      // Then run the worktree snapshot upload (separate script, same
+      // gdrive prefix so the prune-offsite action trims them together
+      // under the same retention budget).
+      const extras: Array<{ ok: boolean; exitCode: number | null; stdout: string; stderr: string; durationMs: number; message: string }> = [];
+      if (cfg.worktreeBackupScript && existsSync(cfg.worktreeBackupScript)) {
+        extras.push(
+          await runScript(cfg.worktreeBackupScript, [], {
+            PAPERCLIP_COMPANY_ID: companyId,
+          }),
+        );
+      }
+      const allOk = extras.every((r) => r.ok);
+      return {
+        ok: allOk,
+        exitCode: allOk ? 0 : 1,
+        stdout: [main.stdout, ...extras.map((e) => e.stdout)].join("\n"),
+        stderr: [main.stderr, ...extras.map((e) => e.stderr)].join("\n"),
+        durationMs: main.durationMs + extras.reduce((s, e) => s + e.durationMs, 0),
+        message: allOk
+          ? `Backup ok (main ${main.durationMs}ms${extras.length ? `, worktree ${extras[0].durationMs}ms` : ""})`
+          : `Backup partially failed (main=${main.ok ? "ok" : "fail"} extras=${extras.map((e) => (e.ok ? "ok" : "fail")).join(",")})`,
+      };
     });
 
     ctx.actions.register(ACTION_KEYS.pruneLocal, async (params: unknown) => {
@@ -1152,6 +1181,33 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
       await runScript(cfg.backupScript, [companyId, "--prune-offsite"], {
         PAPERCLIP_COMPANY_ID: companyId,
       });
+    });
+
+    // ---------------------------------------------------------------------
+    // Scheduled job: auto offsite backup (DB + worktree) every 2h
+    // ---------------------------------------------------------------------
+    ctx.jobs.register(JOB_KEYS.autoOffsiteBackup, async () => {
+      const cfg = readInstanceConfig();
+      const companyId = resolveCompanyId(undefined);
+      if (!cfg.worktreeBackupEnabled) return;
+      // 1) DB dump upload
+      const main = await runScript(cfg.backupScript, [companyId], {
+        PAPERCLIP_COMPANY_ID: companyId,
+      });
+      if (!main.ok) {
+        ctx.logger.warn(`auto-offsite-backup: main backup failed: ${main.message}`);
+        return;
+      }
+      // 2) Worktree snapshot upload (same gdrive prefix; prune-offsite
+      //    trims them together under the configured retention count).
+      if (cfg.worktreeBackupScript && existsSync(cfg.worktreeBackupScript)) {
+        const wt = await runScript(cfg.worktreeBackupScript, [], {
+          PAPERCLIP_COMPANY_ID: companyId,
+        });
+        if (!wt.ok) {
+          ctx.logger.warn(`auto-offsite-backup: worktree backup failed: ${wt.message}`);
+        }
+      }
     });
   },
 });

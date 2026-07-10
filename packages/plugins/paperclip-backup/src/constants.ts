@@ -23,7 +23,7 @@ export const DEFAULT_CONFIG = {
   defaultKeep: 10,
   backupsSubdir: "instances/default/data/backups",
   offsiteKeep: 30,
-  offsiteSchedule: "every 168h",
+  offsiteSchedule: "every 2h",
   recoveryScript:
     process.env.PAPERCLIP_RECOVERY_SCRIPT ??
     "/home/sirrus/paperclip-btcaaaaa-main/scripts/recovery.sh",
@@ -33,6 +33,11 @@ export const DEFAULT_CONFIG = {
   gdriveTierDailyKeep: 3,
   gdriveTierHourlyKeep: 2,
   gdriveTierRoot: "Paperclip-Backups",
+  worktreeBackupScript:
+    process.env.PAPERCLIP_WORKTREE_BACKUP_SCRIPT ??
+    "/home/sirrus/paperclip-btcaaaaa-main/scripts/worktree-offsite.sh",
+  worktreeBackupEnabled: true,
+  worktreeBackupScheduleMs: 2 * 60 * 60 * 1000, // every 2 hours
 };
 
 export const DATA_KEYS = {
@@ -61,6 +66,7 @@ export const ACTION_KEYS = {
 
 export const JOB_KEYS = {
   autoPruneOffsite: "auto-prune-offsite",
+  autoOffsiteBackup: "auto-offsite-backup",
 };
 
 export const STATE_KEYS = {

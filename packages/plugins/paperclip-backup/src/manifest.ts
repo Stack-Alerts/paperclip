@@ -143,6 +143,12 @@ const manifest: PaperclipPluginManifestV1 = {
       description:
         "Periodically deletes the oldest offsite backups beyond the configured retention count.",
     },
+    {
+      jobKey: "auto-offsite-backup",
+      displayName: "Auto offsite backup (DB + worktree) every 2h",
+      description:
+        "Uploads the latest DB dump and a worktree snapshot to gdrive under the same per-company prefix. Retention is then controlled by the prune-offsite action which honors the configured keep counts.",
+    },
   ],
 };
 

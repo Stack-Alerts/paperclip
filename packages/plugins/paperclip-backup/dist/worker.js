@@ -10459,14 +10459,18 @@ var DEFAULT_CONFIG = {
   defaultKeep: 10,
   backupsSubdir: "instances/default/data/backups",
   offsiteKeep: 30,
-  offsiteSchedule: "every 168h",
+  offsiteSchedule: "every 2h",
   recoveryScript: process.env.PAPERCLIP_RECOVERY_SCRIPT ?? "/home/sirrus/paperclip-btcaaaaa-main/scripts/recovery.sh",
   recoveryDir: process.env.PAPERCLIP_RECOVERY_DIR ?? "/home/sirrus/paperclip-snapshots",
   // tiered backup retention (consumed by gdrive-tiered-upload.sh)
   gdriveTierEnabled: true,
   gdriveTierDailyKeep: 3,
   gdriveTierHourlyKeep: 2,
-  gdriveTierRoot: "Paperclip-Backups"
+  gdriveTierRoot: "Paperclip-Backups",
+  worktreeBackupScript: process.env.PAPERCLIP_WORKTREE_BACKUP_SCRIPT ?? "/home/sirrus/paperclip-btcaaaaa-main/scripts/worktree-offsite.sh",
+  worktreeBackupEnabled: true,
+  worktreeBackupScheduleMs: 2 * 60 * 60 * 1e3
+  // every 2 hours
 };
 var DATA_KEYS = {
   listing: "listing",
@@ -10485,7 +10489,8 @@ var ACTION_KEYS = {
   forceRestore: "force-restore"
 };
 var JOB_KEYS = {
-  autoPruneOffsite: "auto-prune-offsite"
+  autoPruneOffsite: "auto-prune-offsite",
+  autoOffsiteBackup: "auto-offsite-backup"
 };
 var STATE_KEYS = {
   config: "backup-config",
@@ -10570,7 +10575,11 @@ function readInstanceConfig(cfg = {}) {
   return { ...DEFAULT_CONFIG, ...cfg, ...envOverride ?? {} };
 }
 function resolveCompanyId(params) {
-  return params?.companyId ?? process.env.PAPERCLIP_COMPANY_ID ?? null;
+  return params?.companyId ?? process.env.PAPERCLIP_COMPANY_ID ?? // Fallback: the canonical BTC-Trade-Engine Paperclip companyId.
+  // The plugin's host company is always this; hardcoding lets the
+  // auto-offsite-backup job run without requiring the env var to
+  // be set in the worker process.
+  "73419cf3-bd37-4a7c-8782-311ccb47fced";
 }
 function resolveLocalBackupDir(cfg) {
   const candidates = [];
@@ -10915,9 +10924,27 @@ var pluginInstance = definePlugin({
         };
       }
       const cfg = readInstanceConfig();
-      return await runScript(cfg.backupScript, [companyId], {
+      const main = await runScript(cfg.backupScript, [companyId], {
         PAPERCLIP_COMPANY_ID: companyId
       });
+      if (!main.ok) return main;
+      const extras = [];
+      if (cfg.worktreeBackupScript && existsSync(cfg.worktreeBackupScript)) {
+        extras.push(
+          await runScript(cfg.worktreeBackupScript, [], {
+            PAPERCLIP_COMPANY_ID: companyId
+          })
+        );
+      }
+      const allOk = extras.every((r) => r.ok);
+      return {
+        ok: allOk,
+        exitCode: allOk ? 0 : 1,
+        stdout: [main.stdout, ...extras.map((e) => e.stdout)].join("\n"),
+        stderr: [main.stderr, ...extras.map((e) => e.stderr)].join("\n"),
+        durationMs: main.durationMs + extras.reduce((s, e) => s + e.durationMs, 0),
+        message: allOk ? `Backup ok (main ${main.durationMs}ms${extras.length ? `, worktree ${extras[0].durationMs}ms` : ""})` : `Backup partially failed (main=${main.ok ? "ok" : "fail"} extras=${extras.map((e) => e.ok ? "ok" : "fail").join(",")})`
+      };
     });
     ctx.actions.register(ACTION_KEYS.pruneLocal, async (params) => {
       const p = params ?? {};
@@ -11322,6 +11349,26 @@ var pluginInstance = definePlugin({
       await runScript(cfg.backupScript, [companyId, "--prune-offsite"], {
         PAPERCLIP_COMPANY_ID: companyId
       });
+    });
+    ctx.jobs.register(JOB_KEYS.autoOffsiteBackup, async () => {
+      const cfg = readInstanceConfig();
+      const companyId = resolveCompanyId(void 0);
+      if (!cfg.worktreeBackupEnabled) return;
+      const main = await runScript(cfg.backupScript, [companyId], {
+        PAPERCLIP_COMPANY_ID: companyId
+      });
+      if (!main.ok) {
+        ctx.logger.warn(`auto-offsite-backup: main backup failed: ${main.message}`);
+        return;
+      }
+      if (cfg.worktreeBackupScript && existsSync(cfg.worktreeBackupScript)) {
+        const wt = await runScript(cfg.worktreeBackupScript, [], {
+          PAPERCLIP_COMPANY_ID: companyId
+        });
+        if (!wt.ok) {
+          ctx.logger.warn(`auto-offsite-backup: worktree backup failed: ${wt.message}`);
+        }
+      }
     });
   }
 });
