@@ -866,6 +866,19 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
           recovery: true,
         })
         .catch(() => null);
+      // Self-heal: if the child process dies (exit, error, signal) and
+      // nobody updates the state, the UI will get stuck showing
+      // "Working…" forever. Clear the marker on every terminal event so
+      // the next status poll sees an empty `running` and the UI
+      // recomputes the elapsed/working state.
+      const clearRunning = () => {
+        void ctx.state
+          .delete({ scopeKind: "instance", stateKey: STATE_KEYS.backupRunning })
+          .catch(() => null);
+      };
+      child.once("exit", clearRunning);
+      child.once("error", clearRunning);
+      child.once("close", clearRunning);
       return {
         ok: true,
         exitCode: 0,

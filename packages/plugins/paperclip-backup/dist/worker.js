@@ -11114,6 +11114,12 @@ var pluginInstance = definePlugin({
         isForced: true,
         recovery: true
       }).catch(() => null);
+      const clearRunning = () => {
+        void ctx.state.delete({ scopeKind: "instance", stateKey: STATE_KEYS.backupRunning }).catch(() => null);
+      };
+      child.once("exit", clearRunning);
+      child.once("error", clearRunning);
+      child.once("close", clearRunning);
       return {
         ok: true,
         exitCode: 0,
