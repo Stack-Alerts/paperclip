@@ -641,9 +641,11 @@ function RefreshButton({
  * but the *action dispatch* should be near-instant; the scan runs
  * in the background) so the button can always recover.
  *
- * We also disable the button while `running` is true (driven by the
- * snapshot's status.running) so the user doesn't double-fire the
- * action while a scan is in flight.
+ * We do NOT disable the button while `running` is true — the worker
+ * already accepts `force: true` from the action handler, so a manual
+ * click is the user's escape hatch when `status.running` gets stuck
+ * (e.g. after a previous worker crash). We only guard against
+ * double-firing the same click via the `submitting` flag.
  */
 function RunScanButton({
   runScanAction,
@@ -667,7 +669,7 @@ function RunScanButton({
   );
 
   async function handleClick() {
-    if (submitting || running) return;
+    if (submitting) return;
     setSubmitting(true);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
@@ -688,15 +690,27 @@ function RunScanButton({
     }
   }
 
-  const showBusy = submitting || running;
+  // `running` only changes the label so the user can see the override
+  // will fire against an in-flight scan. The button stays clickable.
+  const showBusy = submitting;
+  const label = submitting
+    ? "Scanning…"
+    : running
+      ? "Run scan now (force)"
+      : "Run scan now";
   return (
     <button
       type="button"
       style={showBusy ? disabledButtonStyle : primaryButtonStyle}
       disabled={showBusy}
       onClick={handleClick}
+      title={
+        running
+          ? "A scan is in flight. Click to start a fresh scan now."
+          : "Start a fresh scan immediately."
+      }
     >
-      {showBusy ? "Scanning…" : "Run scan now"}
+      {label}
     </button>
   );
 }

@@ -372,14 +372,32 @@ const plugin = definePlugin({
       { scopeKind: "instance", stateKey: CONFIG_STATE_KEY },
       merged,
     );
-    if (
-      (await ctx.state.get({ scopeKind: "instance", stateKey: STATUS_STATE_KEY })) ==
-      null
-    ) {
+    // On every worker startup, clear a leaked `running: true` flag from a
+    // previous worker process that died before its try/finally could reset
+    // it. We can't rely on the snapshot data handler's polling-based
+    // self-heal here because nobody may poll while the worker is offline.
+    const existingStatus = await ctx.state.get({
+      scopeKind: "instance",
+      stateKey: STATUS_STATE_KEY,
+    });
+    if (existingStatus == null) {
       await ctx.state.set(
         { scopeKind: "instance", stateKey: STATUS_STATE_KEY },
         makeBlankStatus(),
       );
+    } else {
+      const status = coerceStatus(existingStatus);
+      if (status.running) {
+        ctx.logger.warn(
+          "Git Merges: clearing leaked running flag from previous worker",
+          { lastAttemptAt: status.lastAttemptAt },
+        );
+        status.running = false;
+        await ctx.state.set(
+          { scopeKind: "instance", stateKey: STATUS_STATE_KEY },
+          status,
+        );
+      }
     }
 
     // ---- Data: config --------------------------------------------------
@@ -522,6 +540,11 @@ const plugin = definePlugin({
           stateKey: STATUS_STATE_KEY,
         }),
       );
+      // Force-reset the running flag too. If a previous scan crashed
+      // without going through its try/finally, this is the user's manual
+      // escape hatch — they clicked "Clear output" precisely because the
+      // UI was stuck on "Scanning…".
+      status.running = false;
       status.lastRunAt = null;
       status.lastExitCode = null;
       status.lastSkipped = false;
