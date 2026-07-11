@@ -5,6 +5,7 @@
   "strategy_type": "Bearish",
   "validation_status": "passed",
   "generation_status": "success",
+  "confluence_threshold": 25,
   "blocks": [
     {
       "name": "stochastic_rsi",
