@@ -142,12 +142,34 @@ const manifest: PaperclipPluginManifestV1 = {
       displayName: "Auto-prune offsite (GDrive) backups",
       description:
         "Periodically deletes the oldest offsite backups beyond the configured retention count.",
+      // Daily at 04:13 local (after the daily snapshot/upload at 04:00 finishes
+      // and before the 4h offsite cycle at 0/4/8/12/16/20).
+      schedule: "13 4 * * *",
     },
     {
       jobKey: "auto-offsite-backup",
       displayName: "Auto offsite backup (DB + worktree) every 2h",
       description:
         "Uploads the latest DB dump and a worktree snapshot to gdrive under the same per-company prefix. Retention is then controlled by the prune-offsite action which honors the configured keep counts.",
+      // Every 2 hours on the hour.
+      schedule: "0 */2 * * *",
+    },
+    {
+      jobKey: "tiered-hourly-upload",
+      displayName: "Tiered hourly backup upload (gdrive)",
+      description:
+        "Promotes the latest recovery snapshot into the gdrive 'hourly' tier so the last 6h of state stays recoverable at short retention.",
+      // Every 6 hours: 00:00, 06:00, 12:00, 18:00.
+      schedule: "0 */6 * * *",
+    },
+    {
+      jobKey: "tiered-daily-upload",
+      displayName: "Tiered daily backup upload (gdrive)",
+      description:
+        "Promotes the latest recovery snapshot into the gdrive 'daily' tier so the last 3 days of state stays recoverable at medium retention.",
+      // Daily at 04:05 local — runs just after auto-prune-offsite so the
+      // daily promotion sees the same snapshot pruned moments earlier.
+      schedule: "5 4 * * *",
     },
   ],
 };

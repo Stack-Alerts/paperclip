@@ -113,10 +113,18 @@ async function runScript(
 }
 
 // ---------------------------------------------------------------------------
-// lsjsonDir — top-level helper that spawns `rclone lsjson --dirs-only`
-// for a single remote path and returns the parsed entries. Exposed at
-// module scope so the data providers (listing, gdrive-tier-status, …)
-// can call it without re-implementing the rclone invocation each time.
+// lsjsonDir — top-level helper that spawns `rclone lsjson` for a single
+// remote path and returns the parsed entries. Exposed at module scope so
+// the data providers (listing, gdrive-tier-status, …) can call it
+// without re-implementing the rclone invocation each time.
+//
+// Two flavors:
+//   - dirsOnly: true → adds `--dirs-only --no-modtime` for cheap enumeration
+//     of directory names only (no real size / modtime). Used for the
+//     year → month → day → HHMM walk.
+//   - dirsOnly: false → no flags, returns real file entries with Size and
+//     ModTime populated. Used for the per-leaf follow-up that gets the
+//     actual backup payload size and timestamp.
 // ---------------------------------------------------------------------------
 type LsjsonEntry = {
   Path: string;
@@ -130,10 +138,16 @@ async function lsjsonDir(
   remotePath: string,
   rcloneConfig: string,
   rclonePass: string,
+  opts: { dirsOnly?: boolean } = {},
 ): Promise<Array<LsjsonEntry>> {
+  const args = ["lsjson"];
+  if (opts.dirsOnly ?? true) {
+    args.push("--dirs-only", "--no-modtime");
+  }
+  args.push(remotePath);
   const child = spawn(
     "rclone",
-    ["lsjson", "--dirs-only", "--no-modtime", remotePath],
+    args,
     {
       env: {
         ...process.env,
@@ -341,18 +355,26 @@ async function readLocalDumps(dir: string): Promise<LocalDump[]> {
   }
 }
 
+type OffsiteKind = "perCompany" | "hourly" | "daily";
+
 type OffsiteBackup = {
   path: string;
   modified?: string;
   sizeBytes: number;
+  kind?: OffsiteKind;
 };
 
 async function readOffsiteBackups(
   cfg: ReturnType<typeof readInstanceConfig>,
   companyId: string,
-): Promise<{ remote: string; prefix: string; backups: OffsiteBackup[]; _error?: string }> {
+): Promise<{
+  remote: string;
+  prefix: string;
+  backups: OffsiteBackup[];
+  roots: Array<{ kind: OffsiteKind; remote: string; prefix: string; count: number; totalBytes: number }>;
+  _error?: string;
+}> {
   const remote = cfg.rcloneRemote;
-  const prefix = `Paperclip-Backups/${companyId}`;
   // rclone needs RCLONE_CONFIG + RCLONE_CONFIG_PASS in its env. The plugin
   // worker is spawned by the paperclip server with very few env vars set,
   // so process.env.HOME is often empty. Look up the rclone pass file in
@@ -373,71 +395,26 @@ async function readOffsiteBackups(
       }
     }
   }
-  // The offsite tree is gdrive:Paperclip-Backups/<companyId>/<YYYY>/<MM>/<DD>/<HHMM>/.
+  // Three offsite trees to walk:
+  //   1. per-company: gdrive:Paperclip-Backups/<companyId>/<YYYY>/<MM>/<DD>/<HHMM>/
+  //   2. hourly tier: gdrive:Paperclip-Backups/hourly/                (YYYY-MM-DD-HHMM leaves)
+  //   3. daily tier:  gdrive:Paperclip-Backups/daily/                 (YYYY-MM-DD-HHMM leaves)
+  //
+  // The per-company tree is 4 levels deep; the tier trees are 1 level.
   // Each rclone lsjson call against the encrypted gdrive remote takes 1-3s
-  // (first call ~30s due to crypto setup). To bound the listing latency
-  // for the UI, walk only the most recent year → month → day → leaf
-  // branches, capped at MAX_LEAVES total. Older days / hours are not
-  // enumerated; the on-disk script (recovery.sh → gdrive-tiered-upload)
-  // prunes aggressively so most users only have the last ~30 leaves on
-  // gdrive anyway.
-  const MAX_MONTHS_PER_YEAR = 3; // newest first
+  // (first call ~30s due to crypto setup). Capped at MAX_LEAVES total
+  // across all roots so the UI latency stays bounded.
+  const MAX_MONTHS_PER_YEAR = 3;
   const MAX_DAYS_PER_MONTH = 7;
   const MAX_HOURS_PER_DAY = 6;
-  const MAX_LEAVES = 80;
-
-  // The plugin worker is spawned by the paperclip server, which sets
-  // very few env vars. process.env.HOME is often empty, so we can't use
-  // it to find ~/.config/rclone/rclone-pass. The pass-read loop above
-  // already tries multiple locations; just proceed to the listing walk.
-
-  async function lsjsonDir(remotePath: string): Promise<Array<{ Path: string; Name: string; Size: number; IsDir: boolean; ModTime?: string }>> {
-    const child = spawn(
-      "rclone",
-      ["lsjson", "--dirs-only", "--no-modtime", remotePath],
-      {
-        env: {
-          ...process.env,
-          RCLONE_CONFIG: cfg.rcloneConfig,
-          ...(pass ? { RCLONE_CONFIG_PASS: pass } : {}),
-        },
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (b) => (stdout += b.toString()));
-    child.stderr.on("data", (b) => (stderr += b.toString()));
-    const code: number = await new Promise((res) => child.on("exit", (c) => res(c ?? 0)));
-    if (code !== 0) return [];
-    const out: Array<{ Path: string; Name: string; Size: number; IsDir: boolean; ModTime?: string }> = [];
-    for (const line of stdout.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      try {
-        const obj = JSON.parse(trimmed) as { Path?: string; Name?: string; Size?: number; IsDir?: boolean; ModTime?: string };
-        if (!obj.Path) continue;
-        out.push({
-          Path: obj.Path,
-          Name: obj.Name ?? obj.Path.split("/").pop() ?? obj.Path,
-          Size: obj.Size ?? 0,
-          IsDir: !!obj.IsDir,
-          ModTime: obj.ModTime,
-        });
-      } catch {
-        /* skip */
-      }
-    }
-    return out;
-  }
+  const MAX_TIER_LEAVES = 40;
+  const MAX_LEAVES = 120;
 
   // Newest first (alphabetical sort matches YYYY > MM > DD > HHMM)
   function newestFirst<T extends { Path: string }>(arr: T[]): T[] {
     return arr.slice().sort((a, b) => (a.Path < b.Path ? 1 : a.Path > b.Path ? -1 : 0));
   }
 
-  const backups: OffsiteBackup[] = [];
-  const years = newestFirst(await lsjsonDir(`${remote}:${prefix}/`));
   const PARALLEL = 4;
   async function runWithCap<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
     const out: R[] = [];
@@ -451,39 +428,120 @@ async function readOffsiteBackups(
     await Promise.all(workers);
     return out;
   }
-  for (const y of years) {
-    if (backups.length >= MAX_LEAVES) break;
-    if (!y.IsDir) continue;
-    const monthsRaw = newestFirst(await lsjsonDir(`${remote}:${prefix}/${y.Path}/`)).slice(0, MAX_MONTHS_PER_YEAR);
-    const monthPaths = monthsRaw.filter((m) => m.IsDir).map((m) => ({ y: y.Path, m }));
-    const dayLists = await runWithCap(monthPaths, PARALLEL, async ({ y, m }) =>
-      newestFirst(await lsjsonDir(`${remote}:${prefix}/${y}/${m.Path}/`)).slice(0, MAX_DAYS_PER_MONTH),
-    );
-    const dayPaths: Array<{ y: string; m: string; d: typeof dayLists[0][0] }> = [];
-    for (let i = 0; i < dayLists.length; i += 1) {
-      for (const d of dayLists[i] ?? []) {
-        if (d.IsDir) dayPaths.push({ y: monthPaths[i].y, m: monthPaths[i].m.Path, d });
+
+  type Leaf = { remotePath: string; relPath: string; kind: OffsiteKind };
+  const leaves: Leaf[] = [];
+  const roots: Array<{ kind: OffsiteKind; remote: string; prefix: string; count: number; totalBytes: number }> = [];
+
+  async function walkPerCompany(): Promise<void> {
+    const prefix = `Paperclip-Backups/${companyId}`;
+    const years = newestFirst(await lsjsonDir(`${remote}:${prefix}/`, cfg.rcloneConfig, pass));
+    for (const y of years) {
+      if (leaves.length >= MAX_LEAVES) break;
+      if (!y.IsDir) continue;
+      const monthsRaw = newestFirst(
+        await lsjsonDir(`${remote}:${prefix}/${y.Path}/`, cfg.rcloneConfig, pass),
+      ).slice(0, MAX_MONTHS_PER_YEAR);
+      const monthPaths = monthsRaw.filter((m) => m.IsDir).map((m) => ({ y: y.Path, m }));
+      const dayLists = await runWithCap(monthPaths, PARALLEL, async ({ y, m }) =>
+        newestFirst(
+          await lsjsonDir(`${remote}:${prefix}/${y}/${m.Path}/`, cfg.rcloneConfig, pass),
+        ).slice(0, MAX_DAYS_PER_MONTH),
+      );
+      const dayPaths: Array<{ y: string; m: string; d: { Path: string; Name: string; IsDir: boolean } }> = [];
+      for (let i = 0; i < dayLists.length; i += 1) {
+        for (const d of dayLists[i] ?? []) {
+          if (d.IsDir) dayPaths.push({ y: monthPaths[i].y, m: monthPaths[i].m.Path, d });
+        }
+      }
+      const hourLists = await runWithCap(dayPaths, PARALLEL, async ({ y, m, d }) =>
+        newestFirst(
+          await lsjsonDir(`${remote}:${prefix}/${y}/${m}/${d.Path}/`, cfg.rcloneConfig, pass),
+        ).slice(0, MAX_HOURS_PER_DAY),
+      );
+      for (let i = 0; i < hourLists.length; i += 1) {
+        if (leaves.length >= MAX_LEAVES) break;
+        for (const h of hourLists[i] ?? []) {
+          if (leaves.length >= MAX_LEAVES) break;
+          if (!h.IsDir) continue;
+          if (!/^\d{4}$/.test(h.Name ?? h.Path)) continue;
+          const rel = `${dayPaths[i].y}/${dayPaths[i].m}/${dayPaths[i].d.Path}/${h.Name ?? h.Path}`;
+          leaves.push({
+            remotePath: `${remote}:${prefix}/${rel}`,
+            relPath: `${prefix}/${rel}`,
+            kind: "perCompany",
+          });
+        }
       }
     }
-    const hourLists = await runWithCap(dayPaths, PARALLEL, async ({ y, m, d }) =>
-      newestFirst(await lsjsonDir(`${remote}:${prefix}/${y}/${m}/${d.Path}/`)).slice(0, MAX_HOURS_PER_DAY),
-    );
-    for (let i = 0; i < hourLists.length; i += 1) {
-      if (backups.length >= MAX_LEAVES) break;
-      for (const h of hourLists[i] ?? []) {
-        if (backups.length >= MAX_LEAVES) break;
-        if (!h.IsDir) continue;
-        if (!/^\d{4}$/.test(h.Name ?? h.Path)) continue;
-        const fullPath = `${dayPaths[i].y}/${dayPaths[i].m}/${dayPaths[i].d.Path}/${h.Name ?? h.Path}`;
-        backups.push({
-          path: `${prefix}/${fullPath}`,
-          modified: h.ModTime,
-          sizeBytes: h.Size ?? 0,
-        });
+    roots.push({ kind: "perCompany", remote: `${remote}:${prefix}`, prefix, count: 0, totalBytes: 0 });
+  }
+
+  async function walkTier(tier: "hourly" | "daily"): Promise<void> {
+    const prefix = `Paperclip-Backups/${tier}`;
+    const entries = newestFirst(
+      await lsjsonDir(`${remote}:${prefix}/`, cfg.rcloneConfig, pass),
+    )
+      .filter((e) => e.IsDir)
+      .slice(0, MAX_TIER_LEAVES);
+    for (const e of entries) {
+      if (leaves.length >= MAX_LEAVES) break;
+      leaves.push({
+        remotePath: `${remote}:${prefix}/${e.Path}`,
+        relPath: `${prefix}/${e.Path}`,
+        kind: tier,
+      });
+    }
+    roots.push({ kind: tier, remote: `${remote}:${prefix}`, prefix, count: 0, totalBytes: 0 });
+  }
+
+  await walkPerCompany();
+  await walkTier("hourly");
+  await walkTier("daily");
+
+  // For each leaf, do a follow-up rclone lsjson WITHOUT --dirs-only so
+  // we get the real file metadata: Size (sum across files in the leaf
+  // = backup payload size) and ModTime (newest file mtime = leaf's
+  // effective modified time). The first pass uses --dirs-only to keep
+  // the walk fast; this second pass is per-leaf so total cost is
+  // MAX_LEAVES × ~2s ≈ 4 min worst case (cached for LISTING_TTL_MS).
+  const backups: OffsiteBackup[] = [];
+  const leafDetails = await runWithCap(leaves, PARALLEL, async (leaf) => {
+    const files = await lsjsonDir(leaf.remotePath, cfg.rcloneConfig, pass, { dirsOnly: false });
+    let totalBytes = 0;
+    let newestMtime = "";
+    for (const f of files) {
+      totalBytes += f.Size ?? 0;
+      if (f.ModTime && (!newestMtime || f.ModTime > newestMtime)) {
+        newestMtime = f.ModTime;
       }
+    }
+    return { leaf, totalBytes, modified: newestMtime };
+  });
+  for (const { leaf, totalBytes, modified } of leafDetails) {
+    backups.push({
+      path: leaf.relPath,
+      modified: modified || undefined,
+      sizeBytes: totalBytes,
+      kind: leaf.kind,
+    });
+    const root = roots.find((r) => r.kind === leaf.kind);
+    if (root) {
+      root.count += 1;
+      root.totalBytes += totalBytes;
     }
   }
-  return { remote: `${remote}:${prefix}`, prefix, backups };
+  // Sort newest first by modified time (or path when modified is missing)
+  backups.sort((a, b) => {
+    const am = a.modified ?? a.path;
+    const bm = b.modified ?? b.path;
+    return am < bm ? 1 : am > bm ? -1 : 0;
+  });
+
+  // Pick the "primary" prefix for backwards-compat with consumers that
+  // expected a single (remote, prefix) pair.
+  const primaryPrefix = `Paperclip-Backups/${companyId}`;
+  return { remote: `${remote}:${primaryPrefix}`, prefix: primaryPrefix, backups, roots };
 }
 
 // ---------------------------------------------------------------------------
@@ -564,7 +622,12 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
 
     ctx.data.register(DATA_KEYS.listing, async (params: unknown) => {
       const p = (params ?? {}) as Record<string, unknown>;
-      const companyId = (p.companyId as string) || "default";
+      // Use resolveCompanyId so callers that don't pass companyId still
+      // walk the right gdrive root. Falls back to PAPERCLIP_COMPANY_ID
+      // env var, then the canonical BTC-Trade-Engine Paperclip companyId.
+      // Without this, the UI gets `gdrive:Paperclip-Backups/default` which
+      // does not exist and every offsite listing returns empty.
+      const companyId = resolveCompanyId(p);
       const cfg = readInstanceConfig();
       const cached = listingCache.get(companyId);
       if (cached && Date.now() - cached.at < LISTING_TTL_MS) {
@@ -584,9 +647,15 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         remote: `${cfg.rcloneRemote}:Paperclip-Backups/${companyId}`,
         prefix: `Paperclip-Backups/${companyId}`,
         backups: [],
+        roots: [],
         count: 0,
         totalBytes: 0,
         loading: true,
+      };
+      const spaceUsage = {
+        local: { count: localDumps.length, totalBytes: localBytes },
+        offsite: { count: 0, totalBytes: 0, perKind: {} as Record<string, { count: number; totalBytes: number }> },
+        grandTotalBytes: localBytes,
       };
       const listing = {
         local: {
@@ -606,6 +675,7 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
           candidates: 0,
           totalBytes: 0,
         },
+        spaceUsage,
         config: cfg,
         loading: false,
         requestedCompanyId: companyId,
@@ -625,6 +695,20 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         try {
           const offsite = await readOffsiteBackups(cfg, companyId);
           const offsiteBytes = offsite.backups.reduce((s, b) => s + b.sizeBytes, 0);
+          const perKind: Record<string, { count: number; totalBytes: number }> = {};
+          for (const r of offsite.roots) {
+            perKind[r.kind] = { count: r.count, totalBytes: r.totalBytes };
+          }
+          const nextSpaceUsage = {
+            local: { count: localDumps.length, totalBytes: localBytes },
+            offsite: {
+              count: offsite.backups.length,
+              totalBytes: offsiteBytes,
+              perKind,
+              roots: offsite.roots,
+            },
+            grandTotalBytes: localBytes + offsiteBytes,
+          };
           listingCache.set(companyId, {
             at: Date.now(),
             listing: {
@@ -635,6 +719,7 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
                 candidates: Math.max(0, offsite.backups.length - cfg.offsiteKeep),
                 totalBytes: offsiteBytes,
               },
+              spaceUsage: nextSpaceUsage,
               listingFresh: true,
             },
             refreshing: false,
@@ -1208,6 +1293,32 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
     );
 
     // upload-daily-backup / upload-hourly-backup — kick gdrive-tiered-upload.sh
+    // with the proper --tier and --keep args. The script rejects any unknown
+    // positional arg, so callers must use the canonical flag form.
+    const resolveTierKeep = async (
+      tier: "daily" | "hourly",
+    ): Promise<number> => {
+      const stateKey =
+        tier === "daily"
+          ? "backup-tier-daily-keep"
+          : "backup-tier-hourly-keep";
+      const cfg = readInstanceConfig();
+      const fallback = tier === "daily" ? cfg.gdriveTierDailyKeep : cfg.gdriveTierHourlyKeep;
+      try {
+        const raw = await ctx.state.get({
+          scopeKind: "instance",
+          stateKey,
+        });
+        if (raw && typeof raw === "object" && "keep" in raw) {
+          const k = Number((raw as { keep: unknown }).keep);
+          if (Number.isFinite(k) && k >= 1) return Math.floor(k);
+        }
+      } catch {
+        /* fall through to config default */
+      }
+      return fallback && fallback >= 1 ? Math.floor(fallback) : tier === "daily" ? 3 : 2;
+    };
+
     ctx.actions.register(
       RECOVERY_ACTION_KEYS.uploadDailyBackup,
       async () => {
@@ -1217,7 +1328,8 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         if (!existsSync(scriptPath)) {
           return { ok: false, message: `tiered upload script not found: ${scriptPath}` };
         }
-        const child = spawn(scriptPath, ["upload-daily"], {
+        const keep = await resolveTierKeep("daily");
+        const child = spawn(scriptPath, ["--tier", "daily", "--keep", String(keep)], {
           detached: true,
           stdio: "ignore",
         });
@@ -1226,7 +1338,7 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
           ok: true,
           pid: child.pid,
           async: true,
-          message: `Daily upload started (pid=${child.pid})`,
+          message: `Daily upload started (pid=${child.pid}, keep=${keep})`,
         };
       },
     );
@@ -1240,7 +1352,8 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         if (!existsSync(scriptPath)) {
           return { ok: false, message: `tiered upload script not found: ${scriptPath}` };
         }
-        const child = spawn(scriptPath, ["upload-hourly"], {
+        const keep = await resolveTierKeep("hourly");
+        const child = spawn(scriptPath, ["--tier", "hourly", "--keep", String(keep)], {
           detached: true,
           stdio: "ignore",
         });
@@ -1249,7 +1362,7 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
           ok: true,
           pid: child.pid,
           async: true,
-          message: `Hourly upload started (pid=${child.pid})`,
+          message: `Hourly upload started (pid=${child.pid}, keep=${keep})`,
         };
       },
     );
@@ -1393,6 +1506,8 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
     // ---------------------------------------------------------------------
     // Scheduled job: auto-prune offsite backups
     // ---------------------------------------------------------------------
+    // Fire-and-forget the prune script so the 5-min runJob RPC timeout
+    // doesn't kill an in-flight prune of a large offsite set.
     ctx.jobs.register(JOB_KEYS.autoPruneOffsite, async () => {
       const cfg = readInstanceConfig();
       const keep = cfg.offsiteKeep;
@@ -1400,41 +1515,125 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         // job handlers must return void
         return;
       }
-      const companyId = process.env.PAPERCLIP_COMPANY_ID;
-      if (!companyId) {
-        ctx.logger.warn("auto-prune-offsite: PAPERCLIP_COMPANY_ID not set");
-        return;
-      }
-      await runScript(cfg.backupScript, [companyId, "--prune-offsite"], {
-        PAPERCLIP_COMPANY_ID: companyId,
-      });
+      const companyId = resolveCompanyId(undefined);
+      const child = spawn(
+        cfg.backupScript,
+        [companyId, "--prune-offsite"],
+        {
+          detached: true,
+          stdio: "ignore",
+          env: {
+            ...process.env,
+            PAPERCLIP_COMPANY_ID: companyId,
+          } as NodeJS.ProcessEnv,
+        },
+      );
+      child.unref();
+      ctx.logger.info(
+        `auto-prune-offsite: spawned offsite prune pid=${child.pid} companyId=${companyId} keep=${keep} script=${cfg.backupScript}`,
+      );
     });
 
     // ---------------------------------------------------------------------
     // Scheduled job: auto offsite backup (DB + worktree) every 2h
     // ---------------------------------------------------------------------
+    // Fire-and-forget the heavy DB-dump + worktree snapshot scripts so the
+    // 5-minute runJob RPC timeout doesn't kill an upload that legitimately
+    // takes longer than that (1.5GB+ at home-Wi-Fi speeds). The run-backup
+    // action tracks the running PID via plugin_state so the UI / status
+    // endpoint can reflect it. The RPC resolves as soon as the spawn
+    // returns; the actual backup runs detached in the background.
     ctx.jobs.register(JOB_KEYS.autoOffsiteBackup, async () => {
       const cfg = readInstanceConfig();
       const companyId = resolveCompanyId(undefined);
       if (!cfg.worktreeBackupEnabled) return;
-      // 1) DB dump upload
-      const main = await runScript(cfg.backupScript, [companyId], {
-        PAPERCLIP_COMPANY_ID: companyId,
+      const env = { PAPERCLIP_COMPANY_ID: companyId };
+      const main = spawn(cfg.backupScript, [companyId], {
+        detached: true,
+        stdio: "ignore",
+        env: { ...process.env, ...env } as NodeJS.ProcessEnv,
       });
-      if (!main.ok) {
-        ctx.logger.warn(`auto-offsite-backup: main backup failed: ${main.message}`);
-        return;
-      }
+      main.unref();
+      ctx.logger.info(
+        `auto-offsite-backup: spawned main DB-dump upload pid=${main.pid} companyId=${companyId} script=${cfg.backupScript}`,
+      );
       // 2) Worktree snapshot upload (same gdrive prefix; prune-offsite
       //    trims them together under the configured retention count).
       if (cfg.worktreeBackupScript && existsSync(cfg.worktreeBackupScript)) {
-        const wt = await runScript(cfg.worktreeBackupScript, [], {
-          PAPERCLIP_COMPANY_ID: companyId,
+        const wt = spawn(cfg.worktreeBackupScript, [], {
+          detached: true,
+          stdio: "ignore",
+          env: { ...process.env, ...env } as NodeJS.ProcessEnv,
         });
-        if (!wt.ok) {
-          ctx.logger.warn(`auto-offsite-backup: worktree backup failed: ${wt.message}`);
-        }
+        wt.unref();
+ctx.logger.info(
+        `auto-offsite-backup: spawned worktree snapshot upload pid=${wt.pid} companyId=${companyId} script=${cfg.worktreeBackupScript}`,
+      );
       }
+    });
+
+    // ---------------------------------------------------------------------
+    // Scheduled job: tiered-hourly-upload
+    // Promote the latest recovery snapshot into the gdrive 'hourly' tier
+    // so the last ~6h of state stays recoverable at short retention.
+    // Invokes gdrive-tiered-upload.sh with --tier hourly --keep N (where
+    // N comes from the configured gdriveTierHourlyKeep, fallback 2).
+    // ---------------------------------------------------------------------
+    ctx.jobs.register(JOB_KEYS.tieredHourlyUpload, async () => {
+      const cfg = readInstanceConfig();
+      const tierScriptPath =
+        (process.env.PAPERCLIP_GDRIVE_TIERED_SCRIPT as string) ||
+        "/home/sirrus/paperclip-btcaaaaa-main/scripts/gdrive-tiered-upload.sh";
+      if (!existsSync(tierScriptPath)) {
+        ctx.logger.warn(`tiered-hourly-upload: script not found: ${tierScriptPath}`);
+        return;
+      }
+      const keep = cfg.gdriveTierHourlyKeep && cfg.gdriveTierHourlyKeep >= 1
+        ? Math.floor(cfg.gdriveTierHourlyKeep)
+        : 2;
+      const child = spawn(
+        tierScriptPath,
+        ["--tier", "hourly", "--keep", String(keep)],
+        {
+          detached: true,
+          stdio: "ignore",
+        },
+      );
+      child.unref();
+      ctx.logger.info(
+        `tiered-hourly-upload: spawned tier promotion pid=${child.pid} keep=${keep} tier=hourly`,
+      );
+    });
+
+    // ---------------------------------------------------------------------
+    // Scheduled job: tiered-daily-upload
+    // Promote the latest recovery snapshot into the gdrive 'daily' tier
+    // so the last ~3 days of state stays recoverable at medium retention.
+    // ---------------------------------------------------------------------
+    ctx.jobs.register(JOB_KEYS.tieredDailyUpload, async () => {
+      const cfg = readInstanceConfig();
+      const tierScriptPath =
+        (process.env.PAPERCLIP_GDRIVE_TIERED_SCRIPT as string) ||
+        "/home/sirrus/paperclip-btcaaaaa-main/scripts/gdrive-tiered-upload.sh";
+      if (!existsSync(tierScriptPath)) {
+        ctx.logger.warn(`tiered-daily-upload: script not found: ${tierScriptPath}`);
+        return;
+      }
+      const keep = cfg.gdriveTierDailyKeep && cfg.gdriveTierDailyKeep >= 1
+        ? Math.floor(cfg.gdriveTierDailyKeep)
+        : 3;
+      const child = spawn(
+        tierScriptPath,
+        ["--tier", "daily", "--keep", String(keep)],
+        {
+          detached: true,
+          stdio: "ignore",
+        },
+      );
+      child.unref();
+      ctx.logger.info(
+        `tiered-daily-upload: spawned tier promotion pid=${child.pid} keep=${keep} tier=daily`,
+      );
     });
   },
 });

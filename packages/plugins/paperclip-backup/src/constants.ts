@@ -68,6 +68,8 @@ export const ACTION_KEYS = {
 export const JOB_KEYS = {
   autoPruneOffsite: "auto-prune-offsite",
   autoOffsiteBackup: "auto-offsite-backup",
+  tieredHourlyUpload: "tiered-hourly-upload",
+  tieredDailyUpload: "tiered-daily-upload",
 };
 
 export const STATE_KEYS = {
