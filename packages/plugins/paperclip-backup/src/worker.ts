@@ -713,7 +713,12 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
             at: Date.now(),
             listing: {
               ...listing,
-              offsite: { ...offsite, loading: false },
+              offsite: {
+                ...offsite,
+                count: offsite.backups.length,
+                totalBytes: offsiteBytes,
+                loading: false,
+              },
               offsiteRetention: {
                 keep: cfg.offsiteKeep,
                 candidates: Math.max(0, offsite.backups.length - cfg.offsiteKeep),
@@ -746,7 +751,14 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
       return listing;
     });
 
-    ctx.data.register(DATA_KEYS.status, async () => {
+    ctx.data.register(DATA_KEYS.status, async (params: unknown) => {
+      const p = (params ?? {}) as Record<string, unknown>;
+      // The Backup Manager dashboard widget reads status?.local.count /
+      // status?.local.totalBytes / status?.offsite.count / status?.local.newest,
+      // so the status handler has to compute the same local+offsite totals
+      // the listing handler exposes. We resolve companyId via the same
+      // fallback chain the listing handler uses.
+      const companyId = resolveCompanyId(p);
       const [lastRun, running, offsiteLast, offsiteRunning] =
         await Promise.all([
           ctx.state
@@ -762,11 +774,48 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
             .get({ scopeKind: "instance", stateKey: STATE_KEYS.offsiteRunning })
             .catch(() => null),
         ]);
+      // Local: read from the resolved backup dir (cheap fs walk).
+      const cfg = readInstanceConfig();
+      const resolved = resolveLocalBackupDir(cfg);
+      const localDumps = await readLocalDumps(resolved.dir);
+      const localBytes = localDumps.reduce((s, d) => s + d.sizeBytes, 0);
+      const localNewest = localDumps[0] ?? null;
+      // Offsite: try the listing cache first (it has the precomputed
+      // walk result). If absent, surface zeros — the next listing poll
+      // will populate the cache and a subsequent status poll will see
+      // real numbers.
+      const cached = listingCache.get(companyId);
+      const cachedOffsite =
+        cached && cached.listing && typeof cached.listing === "object"
+          ? (cached.listing as { offsite?: { count?: number; totalBytes?: number; backups?: Array<{ modified?: string }> } })
+              .offsite
+          : null;
+      const offsiteCount = cachedOffsite?.count ?? 0;
+      const offsiteBytes = cachedOffsite?.totalBytes ?? 0;
+      const newest =
+        cachedOffsite?.backups && cachedOffsite.backups.length > 0
+          ? cachedOffsite.backups
+              .slice()
+              .sort((a, b) => (a.modified ?? "") < (b.modified ?? "") ? 1 : -1)[0]
+          : null;
       return {
         backupLastRun: lastRun,
         backupRunning: running,
         offsiteLastRun: offsiteLast,
         offsiteRunning,
+        local: {
+          count: localDumps.length,
+          totalBytes: localBytes,
+          newest: localNewest
+            ? { filename: localNewest.filename, mtime: localNewest.mtime }
+            : null,
+          dir: resolved.dir,
+        },
+        offsite: {
+          count: offsiteCount,
+          totalBytes: offsiteBytes,
+          newest,
+        },
       };
     });
 
