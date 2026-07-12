@@ -634,28 +634,52 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         return cached.listing;
       }
       const resolved = resolveLocalBackupDir(cfg);
-      // Local read is fast (~50ms). The offsite walk against the encrypted
-      // gdrive takes 30s+ on the first call (crypto setup). To keep the UI
-      // responsive we run the offsite walk ASYNCHRONOUSLY: read local now,
-      // return immediately with a "loading" marker for offsite. The first
-      // call returns the local listing + an empty/loading offsite listing;
-      // the offsite walk continues in the background and the next call
-      // sees the populated cache.
+      // Local read is fast (~50ms). Block on the offsite walk so the UI
+      // receives a populated listing in a single round trip. The first
+      // call after a worker restart may exceed the 30s host→worker RPC
+      // timeout (rclone crypto setup is ~30s on the encrypted gdrive);
+      // the SDK retries on TIMEOUT so a second request after the walk
+      // completes will hit the populated cache and return instantly.
+      // LISTING_TTL_MS=5min keeps the slow walk from running every poll.
       const localDumps = await readLocalDumps(resolved.dir);
       const localBytes = localDumps.reduce((s, d) => s + d.sizeBytes, 0);
-      const placeholderOffsite = {
-        remote: `${cfg.rcloneRemote}:Paperclip-Backups/${companyId}`,
-        prefix: `Paperclip-Backups/${companyId}`,
-        backups: [],
-        roots: [],
-        count: 0,
-        totalBytes: 0,
-        loading: true,
-      };
+      let offsite: Awaited<ReturnType<typeof readOffsiteBackups>>;
+      let offsiteError: string | null = null;
+      try {
+        offsite = await readOffsiteBackups(cfg, companyId);
+      } catch (err) {
+        offsiteError = err instanceof Error ? err.message : String(err);
+        ctx.logger.warn(
+          `paperclip-backup: offsite listing walk failed: companyId=${companyId} err=${offsiteError}`,
+        );
+        offsite = {
+          remote: `${cfg.rcloneRemote}:Paperclip-Backups/${companyId}`,
+          prefix: `Paperclip-Backups/${companyId}`,
+          backups: [],
+          roots: [],
+        };
+      }
+      const offsiteBytes = offsite.backups.reduce((s, b) => s + b.sizeBytes, 0);
+      const perKind: Record<string, { count: number; totalBytes: number }> = {};
+      for (const r of offsite.roots) {
+        perKind[r.kind] = { count: r.count, totalBytes: r.totalBytes };
+      }
       const spaceUsage = {
         local: { count: localDumps.length, totalBytes: localBytes },
-        offsite: { count: 0, totalBytes: 0, perKind: {} as Record<string, { count: number; totalBytes: number }> },
-        grandTotalBytes: localBytes,
+        offsite: {
+          count: offsite.backups.length,
+          totalBytes: offsiteBytes,
+          perKind,
+          roots: offsite.roots,
+        },
+        grandTotalBytes: localBytes + offsiteBytes,
+      };
+      const offsiteSection = {
+        ...offsite,
+        count: offsite.backups.length,
+        totalBytes: offsiteBytes,
+        loading: false,
+        ...(offsiteError ? { _error: offsiteError } : {}),
       };
       const listing = {
         local: {
@@ -665,89 +689,28 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
           count: localDumps.length,
           totalBytes: localBytes,
         },
-        offsite: placeholderOffsite,
+        offsite: offsiteSection,
         retention: {
           keep: cfg.defaultKeep,
           candidates: Math.max(0, localDumps.length - cfg.defaultKeep),
         },
         offsiteRetention: {
           keep: cfg.offsiteKeep,
-          candidates: 0,
-          totalBytes: 0,
+          candidates: Math.max(0, offsite.backups.length - cfg.offsiteKeep),
+          totalBytes: offsiteBytes,
         },
         spaceUsage,
         config: cfg,
         loading: false,
         requestedCompanyId: companyId,
         listingAt: Date.now(),
-        listingFresh: false,
+        listingFresh: true,
       };
-      // Mark as refreshing in the cache so the next call doesn't
-      // re-fire while the background walk is in flight.
       listingCache.set(companyId, {
         at: Date.now(),
         listing,
-        refreshing: true,
+        refreshing: false,
       });
-      // Fire the offsite walk in the background. Use void (not await)
-      // so the RPC returns immediately.
-      void (async () => {
-        try {
-          const offsite = await readOffsiteBackups(cfg, companyId);
-          const offsiteBytes = offsite.backups.reduce((s, b) => s + b.sizeBytes, 0);
-          const perKind: Record<string, { count: number; totalBytes: number }> = {};
-          for (const r of offsite.roots) {
-            perKind[r.kind] = { count: r.count, totalBytes: r.totalBytes };
-          }
-          const nextSpaceUsage = {
-            local: { count: localDumps.length, totalBytes: localBytes },
-            offsite: {
-              count: offsite.backups.length,
-              totalBytes: offsiteBytes,
-              perKind,
-              roots: offsite.roots,
-            },
-            grandTotalBytes: localBytes + offsiteBytes,
-          };
-          listingCache.set(companyId, {
-            at: Date.now(),
-            listing: {
-              ...listing,
-              offsite: {
-                ...offsite,
-                count: offsite.backups.length,
-                totalBytes: offsiteBytes,
-                loading: false,
-              },
-              offsiteRetention: {
-                keep: cfg.offsiteKeep,
-                candidates: Math.max(0, offsite.backups.length - cfg.offsiteKeep),
-                totalBytes: offsiteBytes,
-              },
-              spaceUsage: nextSpaceUsage,
-              listingFresh: true,
-            },
-            refreshing: false,
-          });
-        } catch (err) {
-          ctx.logger.warn(
-            `paperclip-backup: offsite listing walk failed: companyId=${companyId} err=${err instanceof Error ? err.message : String(err)}`,
-          );
-          listingCache.set(companyId, {
-            at: Date.now(),
-            listing: {
-              ...listing,
-              offsite: {
-                ...placeholderOffsite,
-                loading: false,
-                _error: err instanceof Error ? err.message : String(err),
-              },
-              listingFresh: true,
-            },
-            refreshing: false,
-          });
-        }
-      })();
       return listing;
     });
 
