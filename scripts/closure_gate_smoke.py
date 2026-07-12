@@ -11,10 +11,14 @@ Two modes:
         Smoke the current working tree, write JSON verdict to stdout.
 
     python scripts/closure_gate_smoke.py --at-sha <SHA>
-        Create a temporary git worktree at SHA, install the requirements there
-        if a fresh venv is requested via --fresh-venv, then run the in-tree
-        smoke and emit the same JSON verdict. Used by the closure-gate routine
-        before flipping an issue to `done`.
+        Smoke `origin/main` HEAD (NOT <SHA>) in a temporary worktree, then emit
+        the JSON verdict. Used by the closure-gate routine before flipping an
+        issue to `done`. <SHA> is the historical Fix-SHA — it is recorded as
+        `requested_fix_sha` for traceability but is NOT the code that gets
+        smoked. The gate's job is to confirm the *current* tree is healthy;
+        re-running the runner as it existed at an old Fix-SHA reintroduced
+        stale bugs and caused false reopens (BTCAAAAA-38997 — see `_run_at_sha`).
+        `--fresh-venv` installs requirements.txt at origin/main HEAD first.
 
 Exit codes:
     0  all endpoints inside allow_status (smoke PASS)
@@ -53,6 +57,13 @@ def _endpoint_ok(status_code: int, allow: set[int]) -> bool:
     un-allow-listed 5xx crash, fails. (BTCAAAAA-38714: a prior
     `in_allow and not is_5xx` guard overrode the allow list and turned tolerated
     503s into false closure-gate reopens.)
+
+    Note (BTCAAAAA-38997): fixing this classifier is necessary but not
+    sufficient. When the gate re-ran the runner *as it existed at a historical
+    Fix-SHA*, it resurrected the pre-38714 version of this function and produced
+    false `closure-gate-smoke-failed` reopens on old, long-merged issues. The
+    `--at-sha` path (`_run_at_sha`) now smokes `origin/main` HEAD so the current
+    classifier — this one — is always the code that runs.
     """
     return status_code in allow
 
@@ -164,19 +175,77 @@ def _smoke_in_process(endpoints_doc: dict[str, Any]) -> dict[str, Any]:
     return verdict
 
 
-def _run_at_sha(sha: str, fresh_venv: bool) -> dict[str, Any]:
-    """Create a git worktree at SHA and run the smoke from there.
+def _resolve_origin_main_sha() -> str | None:
+    """Return the concrete `origin/main` HEAD SHA, or None if unresolvable.
+
+    Validates the output is exactly 40 lowercase hex chars so a corrupt or
+    empty stdout never leaks into the worktree checkout or the verdict.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "origin/main"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except Exception:  # noqa: BLE001 — treated as unresolvable
+        return None
+    if result.returncode != 0:
+        return None
+    sha = result.stdout.strip()
+    if len(sha) == 40 and all(c in "0123456789abcdef" for c in sha):
+        return sha
+    return None
+
+
+def _run_at_sha(requested_fix_sha: str, fresh_venv: bool) -> dict[str, Any]:
+    """Smoke `origin/main` HEAD; `requested_fix_sha` is kept only for traceability.
+
+    BTCAAAAA-38997: this function used to create a worktree AT `requested_fix_sha`
+    and run the smoke runner *as it existed at that SHA*. When an issue's Fix-SHA
+    merged before a later runner/allow-list fix, the gate ran the stale runner and
+    produced false `closure-gate-smoke-failed` reopens. Concrete incident: BTC-38578
+    looped in_review⇄reopen for ~12h because its 2026-06-27 Fix-SHA (07f6a87f…)
+    predated the BTCAAAAA-38714 allow-listed-503 fix (ab122afe…); the pre-38714
+    runner treated tolerated 503 canaries as failures even though origin/main tip
+    passed cleanly.
+
+    The gate's purpose is to confirm the *current* tree is healthy before closing,
+    so we now smoke `origin/main` HEAD. Ancestry of `requested_fix_sha` is verified
+    separately by the routine (`verify_sha_on_main`); this runner no longer executes
+    historical test code. `at_sha` in the verdict is the SHA actually smoked
+    (origin/main HEAD); the historical Fix-SHA is echoed as `requested_fix_sha`.
 
     The worktree is removed before returning. When `fresh_venv` is true we
     install requirements.txt into a throwaway venv first (slow — only used
     when the operator explicitly asks for it). The default re-uses the
     current interpreter, which is the typical CI configuration.
     """
+    head_sha = _resolve_origin_main_sha()
+    if head_sha is None:
+        # origin/main unresolvable (missing remote-tracking ref, git failure).
+        # Smoke the current in-process tree as the best available proxy for
+        # "current" rather than resurrecting the stale historical SHA.
+        verdict: dict[str, Any] = {
+            "schema": "closure_gate_smoke.v1",
+            "requested_fix_sha": requested_fix_sha,
+            "smoked_ref": "working-tree",
+            "at_sha": None,
+            "origin_main_unresolved": True,
+            "ok": False,
+        }
+        verdict.update(_smoke_in_process(_load_endpoints(SMOKE_ENDPOINTS_PATH)))
+        return verdict
+
+    sha = head_sha
     work_root = Path(tempfile.mkdtemp(prefix=f"closure_gate_sha_{sha[:8]}_"))
     work_tree = work_root / "tree"
-    verdict: dict[str, Any] = {
+    verdict = {
         "schema": "closure_gate_smoke.v1",
         "at_sha": sha,
+        "requested_fix_sha": requested_fix_sha,
+        "smoked_ref": "origin/main",
         "ok": False,
     }
     try:
@@ -206,8 +275,8 @@ def _run_at_sha(sha: str, fresh_venv: bool) -> dict[str, Any]:
                     timeout=600,
                 )
 
-        # Run the smoke from inside the worktree so the routine evaluates the
-        # exact code at SHA (not the current main checkout).
+        # Run the smoke from inside the origin/main HEAD worktree so the runner,
+        # endpoint config, and app code are all the *current* tree (BTCAAAAA-38997).
         smoke_script = work_tree / "scripts" / "closure_gate_smoke.py"
         if not smoke_script.exists():
             smoke_script = Path(__file__).resolve()

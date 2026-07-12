@@ -131,11 +131,13 @@ def test_allowlisted_503_passes():
 def test_pr_118_replay_runs_end_to_end():
     """Acceptance #4 (replay harness): the --at-sha worktree path executes.
 
-    Runs the smoke against the actual PR #118 SHA and asserts the runner
-    completes end-to-end with a parseable verdict carrying `at_sha`. The
-    seed-strategy precondition needed to reach PR #118's broken code path
-    is tracked as a follow-up; this guards the worktree harness from
-    bit-rotting in the meantime.
+    Runs the smoke with a historical Fix-SHA and asserts the runner completes
+    end-to-end with a parseable verdict. Per BTCAAAAA-38997 the `--at-sha` path
+    now smokes `origin/main` HEAD (not the passed SHA) so a Fix-SHA whose merge
+    predates a later runner fix can no longer resurrect stale runner code and
+    trigger a false reopen. The passed SHA is echoed as `requested_fix_sha`;
+    the SHA actually smoked (`at_sha`) is origin/main HEAD. This guards the
+    worktree harness from bit-rotting in the meantime.
     """
     sha = _resolve_full_sha(PR_118_SHA_PREFIX)
     assert sha, "skipif guard failed"
@@ -149,6 +151,17 @@ def test_pr_118_replay_runs_end_to_end():
     )
     assert res.stdout.strip(), f"smoke produced no stdout; stderr={res.stderr[-400:]}"
     verdict = json.loads(res.stdout)
-    assert verdict.get("at_sha") == sha
     assert verdict.get("schema") == "closure_gate_smoke.v1"
+    # New semantics (BTCAAAAA-38997): the historical Fix-SHA is echoed, but the
+    # code smoked is origin/main HEAD — NOT the historical SHA.
+    assert verdict.get("requested_fix_sha") == sha
+    head_sha = _resolve_full_sha("origin/main")
+    if head_sha is not None:
+        assert verdict.get("at_sha") == head_sha
+        assert verdict.get("smoked_ref") == "origin/main"
+    else:
+        # origin/main unresolvable in this checkout — runner falls back to the
+        # working tree rather than the stale historical SHA.
+        assert verdict.get("origin_main_unresolved") is True
+        assert verdict.get("smoked_ref") == "working-tree"
     assert "results" in verdict or "import_error" in verdict or "error" in verdict

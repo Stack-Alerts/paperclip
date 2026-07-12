@@ -1239,12 +1239,18 @@ def verify_sha_on_main(sha: str, skip_fetch: bool = False) -> bool:
 
 
 def _run_smoke_for_sha(sha: str) -> dict[str, Any]:
-    """Invoke the closure-gate smoke runner against a commit SHA.
+    """Invoke the closure-gate smoke runner, passing the Fix-SHA for traceability.
 
     Returns the parsed JSON verdict from scripts/closure_gate_smoke.py, or a
     synthetic `{"ok": False, "error": "..."}` dict if the runner could not be
     executed. The routine treats any non-ok verdict as a smoke failure and
     reopens the parent issue.
+
+    BTCAAAAA-38997: `sha` is the historical Fix-SHA and is used ONLY for the
+    ancestry check (verify_sha_on_main, already run before we get here). The
+    smoke runner itself now smokes `origin/main` HEAD, not this SHA, so an old
+    Fix-SHA whose merge predates a later runner fix can no longer resurrect
+    stale runner code and produce a false `closure-gate-smoke-failed` reopen.
     """
     if not SMOKE_ENABLED:
         return {"ok": True, "skipped": "CLOSURE_GATE_SMOKE=0"}
