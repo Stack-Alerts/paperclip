@@ -2016,7 +2016,7 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
     // guard below. Selecting the full row detoasts heavy TOAST columns (contextSnapshot, resultJson,
     // logStore, usageJson, ...) for every running row on every scan. The heavy columns are re-fetched
     // by id only for candidates that survive the guard and are actually evaluated.
-    const candidates = await db
+    let candidates = await db
       .select({ id: heartbeatRuns.id, companyId: heartbeatRuns.companyId })
       .from(heartbeatRuns)
       .where(
