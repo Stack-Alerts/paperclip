@@ -1500,7 +1500,9 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
           );
           return items
             .map((i: LsjsonEntry) => ({ id: i.Name, path: i.Path }))
-            .sort((a: { id: string }, b: { id: string }) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+            .sort((a: { id: string }, b: { id: string }) =>
+              a.id < b.id ? 1 : a.id > b.id ? -1 : 0,
+            );
         } catch {
           return [];
         }
@@ -1509,9 +1511,28 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         listTier("daily"),
         listTier("hourly"),
       ]);
+      // The prebuilt UI bundle reads this payload in `TierPanel` /
+      // `Tier` and expects the fields at the top level (not nested
+      // under each tier). Specifically it reads:
+      //   tierStatus.daily / tierStatus.hourly — raw items arrays
+      //   tierStatus.keep.daily / .hourly — keep counts
+      //   tierStatus.counts.daily / .hourly — current counts
+      //   tierStatus.lastUpload.daily / .hourly — most recent timestamp
+      //   tierStatus.errors.daily / .hourly — per-tier error strings
+      //   tierStatus.tierRoot — displayed as "root: <tierRoot>"
+      //   tierStatus.enabled — gates the "Tiered backup is disabled" notice
+      // Returning the items inline at the top level (so `tierStatus.daily`
+      // is the items array the UI maps over) while keeping the per-tier
+      // counts and keep values in sibling top-level fields.
       return {
-        daily: { keep: dailyKeep, count: dailyItems.length, items: dailyItems },
-        hourly: { keep: hourlyKeep, count: hourlyItems.length, items: hourlyItems },
+        enabled: true,
+        tierRoot,
+        keep: { daily: dailyKeep, hourly: hourlyKeep },
+        counts: { daily: dailyItems.length, hourly: hourlyItems.length },
+        lastUpload: { daily: null, hourly: null },
+        errors: { daily: null, hourly: null },
+        daily: dailyItems,
+        hourly: hourlyItems,
       };
     });
 
