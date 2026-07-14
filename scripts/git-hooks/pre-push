@@ -1,0 +1,58 @@
+#!/bin/bash
+# paperclip-btcaaaaa-main pre-push hook
+#
+# Refuses any push that targets the merge-queue branch (fork/btcaaaaa-main
+# or fork/main) unless the agent has passed ./scripts/agent-premerge-check.sh
+# first. The pre-push gate covers the merge-queue push only; pushes to other
+# refs (feature branches, PR heads, golden branches) still succeed so agents
+# can stage and share work without running the full quality gate.
+
+set -euo pipefail
+
+REPO="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+[ -n "$REPO" ] || exit 0
+case "$REPO" in
+  *paperclip-btcaaaaa-main*) ;;
+  *) exit 0 ;;
+esac
+
+PUSH_REMOTE="${1:?pre-push requires a remote name}"
+PUSH_URL="${2:-}"
+
+REMOTE_URL_FOR_PUSH() {
+  git remote get-url "$PUSH_REMOTE" 2>/dev/null || true
+}
+
+IS_MERGE_QUEUE_PUSH=0
+if [[ "$PUSH_REMOTE" == "fork" ]]; then
+  while read -r local_ref local_sha remote_ref remote_sha; do
+    case "$remote_ref" in
+      refs/heads/btcaaaaa-main|main)
+        IS_MERGE_QUEUE_PUSH=1
+        ;;
+    esac
+  done < <(git for-each-ref --format='%(refname:short) %(objectname) %(upstream:short) %(upstream:objectname)' refs/heads 2>/dev/null || true)
+fi
+
+if [[ "$IS_MERGE_QUEUE_PUSH" -ne 1 ]]; then
+  exit 0
+fi
+
+GIT_DIR="$(git rev-parse --git-dir)"
+PREMERGE_RECEIPT="$GIT_DIR/paperclip-premerge.receipt"
+if [[ ! -f "$PREMERGE_RECEIPT" ]]; then
+  echo "pre-push: refusing push to $PUSH_REMOTE (merge-queue target) without a premerge receipt." >&2
+  echo "  Run: ./scripts/agent-premerge-check.sh" >&2
+  exit 1
+fi
+
+PUSH_HEAD="$(git rev-parse HEAD)"
+REC_HEAD="$(sed -n 's/^head=//p' "$PREMERGE_RECEIPT" | tail -n 1)"
+if [[ -z "$REC_HEAD" || "$PUSH_HEAD" != "$REC_HEAD" ]]; then
+  echo "pre-push: refusing push — HEAD ($PUSH_HEAD) does not match the premerge receipt ($REC_HEAD)." >&2
+  echo "  Rerun: ./scripts/agent-premerge-check.sh" >&2
+  exit 1
+fi
+
+echo "pre-push: premerge receipt for $REC_HEAD OK; allowing push to $PUSH_REMOTE."
+exit 0

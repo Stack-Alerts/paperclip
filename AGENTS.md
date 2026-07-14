@@ -354,3 +354,155 @@ The DB is not in the git branch. To restore the database:
 - `/home/sirrus/.paperclip/scripts/restore-from-drive.sh list` for offsite gdrive
 
 See `GOLDEN-SNAPSHOT.md` on any golden branch for the full restore procedure.
+
+## 13. Safe Development Process (BTC Trade Engine)
+
+Per-paperclip-mods work — every code change in `paperclip-btcaaaaa-main`
+must flow through this gate chain. The scripts enforce it; this section
+documents what each step guarantees.
+
+### 13.1 Lifecycle (single agent, single issue)
+
+```
+  ┌───────────────────────┐   ┌──────────────────────────┐   ┌────────────────────┐
+  │ 1. safedev preflight  │ → │ 2. implement + commit    │ → │ 3. premerge gate   │
+  │    scripts/agent-     │   │    pre/post-merge hooks  │   │    scripts/agent-  │
+  │    safedev.sh         │   │    auto-snapshot         │   │    premerge-check  │
+  └───────────────────────┘   └──────────────────────────┘   └────────────────────┘
+                                                                      │
+                                                                      ▼
+                                                            ┌────────────────────┐
+                                                            │ 4. push to merge   │
+                                                            │    queue (gate     │
+                                                            │    pre-push hook)  │
+                                                            └────────────────────┘
+```
+
+### 13.2 Step 1 — `scripts/agent-safedev.sh`
+
+Run BEFORE touching any code. The script:
+
+1. Verifies the worktree is `paperclip-btcaaaaa-main`.
+2. Refuses to run if the working tree is dirty (commit or stash first).
+3. Fetches the latest from `$REMOTE` (default `fork`).
+4. Verifies `HEAD` contains the latest `$REMOTE/btcaaaaa-main`
+   (override with `--base <remote/ref>` or `PAPERCLIP_SAFEDEV_BASE_REF`).
+5. Calls `scripts/recovery.sh snapshot --no-upload` and parses the
+   snapshot ID from the output.
+6. Verifies the snapshot directory exists at
+   `/home/sirrus/paperclip-snapshots/$SNAPSHOT_ID/`.
+7. Writes a receipt to `$GIT_DIR/paperclip-safedev.receipt` capturing:
+   `head`, `base_ref`, `base_sha`, `branch`, `snapshot_id`, `issue_ref`,
+   `completed_at`.
+
+```bash
+./scripts/agent-safedev.sh                       # full preflight
+./scripts/agent-safedev.sh --remote <name>       # override remote (default: fork)
+./scripts/agent-safedev.sh --base <remote/ref>   # override base
+./scripts/agent-safedev.sh --issue <ref>         # stamp issue ref in receipt
+```
+
+Exit codes: `0` ok · `1` invalid/wrong worktree · `2` dirty tree ·
+`3` fetch/base resolution · `4` snapshot failed · `5` branch behind base.
+
+Paste the resulting status block into the Paperclip issue comment so the
+board can see the pre-implementation recovery point.
+
+### 13.3 Step 2 — implement and commit
+
+- Work in the Paperclip-provisioned worktree (already isolated per agent).
+- Each `git commit` and `git merge` fires the `pre-commit` / `post-merge`
+  hooks, which background-snapshot via `recovery.sh snapshot --no-upload`.
+- Snapshots are non-blocking and hardlinked into
+  `/home/sirrus/paperclip-snapshots/` so disk cost stays flat.
+- Keep the working tree clean at the end of each commit cycle
+  (`git status --short` empty) so the premerge gate can run.
+
+### 13.4 Step 3 — `scripts/agent-premerge-check.sh`
+
+Run BEFORE pushing to the merge queue. The script:
+
+1. Verifies the worktree is `paperclip-btcaaaaa-main`.
+2. Refuses to run if the working tree is dirty.
+3. Re-fetches `$REMOTE` and re-checks the base-ref ancestor invariant.
+4. Reads `$GIT_DIR/paperclip-safedev.receipt` and rejects if the receipt
+   is missing, incomplete, or points at a base ref / SHA that no longer
+   matches the live state.
+5. Verifies the recovery snapshot directory still exists.
+6. Runs, in order, with all output captured to
+   `$GIT_DIR/paperclip-premerge/<short-head>-<stamp>.log`:
+   - `git diff --check $BASE_REF...HEAD` (whitespace audit)
+   - `pnpm test` (iteration 1 of 2)
+   - `pnpm test` (iteration 2 of 2) — **required**, per the
+     "iterate tests at least twice" mandate.
+   - `pnpm -r typecheck`
+   - `pnpm build`
+7. Verifies HEAD and the working tree are unchanged after the checks.
+8. Writes `$GIT_DIR/paperclip-premerge.receipt` capturing `head`,
+   `base_ref`, `base_sha`, `snapshot_id`, `test_iterations=2`,
+   `typecheck=passed`, `build=passed`, `log`, `completed_at`.
+
+```bash
+./scripts/agent-premerge-check.sh
+./scripts/agent-premerge-check.sh --remote <name>      # override remote
+./scripts/agent-premerge-check.sh --base <remote/ref>  # override base
+```
+
+Exit codes: `0` ok · `1` invalid · `2` dirty tree · `3` fetch/base ·
+`4` base not ancestor · `5` safedev receipt / snapshot invalid ·
+`6` HEAD or tree drifted while checks were running.
+
+If any check fails, the receipt is NOT written. Fix the issue, commit
+the fix, and re-run the gate.
+
+### 13.5 Step 4 — push to the merge queue
+
+`scripts/git-hooks/pre-push` is a `git` hook installed by
+`scripts/git-hooks/install.sh`. For any push to `fork/btcaaaaa-main` or
+`fork/main`:
+
+1. Refuses to push unless `$GIT_DIR/paperclip-premerge.receipt` exists.
+2. Refuses unless the receipt's `head=` matches `git rev-parse HEAD`.
+
+Pushes to **other refs** (feature branches, PR heads, golden branches)
+are unaffected — only the merge queue is gated.
+
+```bash
+# install hooks once per worktree:
+./scripts/git-hooks/install.sh
+
+# verify hooks are wired:
+ls -l "$(git rev-parse --git-dir)/hooks/" | grep -E 'pre-(commit|push)|post-merge'
+```
+
+If the hook refuses the push, run the premerge gate first:
+```bash
+./scripts/agent-premerge-check.sh
+git push fork <branch>:<target>
+```
+
+### 13.6 Receipt chain invariants
+
+- The safedev receipt must predate the implementation (snapshot ID
+  matches a directory under `/home/sirrus/paperclip-snapshots/`).
+- The premerge receipt must descend from the safedev HEAD
+  (`git merge-base --is-ancestor safedev.head HEAD`).
+- Re-running `agent-safedev.sh` overwrites the safedev receipt; re-run
+  the premerge gate too so both receipts agree on HEAD.
+- Both receipts are stored in `$(git rev-parse --git-dir)/` and are
+  intentionally **not** tracked in git. They are per-worktree state,
+  not source code.
+
+### 13.7 Recovering from a failed gate
+
+- If `pnpm test` fails twice: fix the underlying issue, recommit, rerun.
+- If `pnpm -r typecheck` fails: same.
+- If `pnpm build` fails: same.
+- If the safedev receipt is missing: re-run `scripts/agent-safedev.sh`.
+- If the premerge hook rejects the push and the safedev receipt is
+  stale: re-run `scripts/agent-safedev.sh`, recommit (so the snapshot
+  captures the new HEAD), then re-run `scripts/agent-premerge-check.sh`.
+- If disk space is tight: `scripts/recovery.sh prune` removes snapshots
+  older than the configured retention window; do not delete snapshot
+  directories by hand — the directory name encodes the recovery ID the
+  gate verifies against.
