@@ -57,7 +57,7 @@ import redis.asyncio as aioredis
 from redis.exceptions import RedisError
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .auth import require_jwt, ws_require_jwt
 from .models import (
@@ -970,7 +970,7 @@ def _build_sb_strategy(strategy_id: str, version: dict, tests: list) -> dict:
 # ── Request bodies ────────────────────────────────────────────────────────────
 
 class _CreateSBStrategyRequest(BaseModel):
-    name: str
+    name: str = Field(min_length=1)
     description: Optional[str] = ""
 
 
@@ -999,7 +999,7 @@ class _UpdateSBStrategyRequest(BaseModel):
     for converting the UI block contract to the DB shape before calling this
     endpoint; no normalization is performed here.
     """
-    name: str
+    name: str = Field(min_length=1)
     description: Optional[str] = None
     strategyType: Optional[str] = None
     tags: Optional[list] = None
