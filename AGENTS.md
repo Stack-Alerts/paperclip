@@ -220,7 +220,7 @@ A change is done when all are true:
 4. Docs updated when behavior or commands change
 5. PR description follows the [PR template](.github/PULL_REQUEST_TEMPLATE.md) with all sections filled in (including Model Used)
 
-## 11. Fork-Specific: HenkDz/paperclip
+## 11a. Fork-Specific: HenkDz/paperclip
 
 This is a fork of `paperclipai/paperclip` with QoL patches and a **built-in** Hermes adapter story on branch `feat/externalize-hermes-adapter` ([tree](https://github.com/HenkDz/paperclip/tree/feat/externalize-hermes-adapter)).
 
@@ -261,3 +261,96 @@ PR #2218 (`feat/external-adapter-phase1`) adds external adapter support. See roo
 - `createServerAdapter()` must include ALL optional fields (especially `detectModel`)
 - Built-in UI adapters can shadow external plugin parsers; external override pause/resume should restore the built-in parser.
 - Reference external adapters: Droid (npm); Hermes can also be tested as an override package.
+
+## 12. Golden Snapshot Branch Workflow (BTC Trade Engine)
+
+The worktree `~/paperclip-btcaaaaa-main` is snapshotted into
+`Stack-Alerts/PaperClip_Mods` (the private paperclip-mods fork) on
+`golden-{UTC}` branches for emergency recovery.
+
+### Branch types
+- `golden-YYYY-MM-DD-HHMM`            — mutable; auto-updated by a
+  github-actions bot that propagates backup-plugin fixes from this worktree.
+- `golden-frozen-YYYY-MM-DD-HHMM`     — immutable; branch protection enforced
+  (see below) so even the bot cannot push.
+
+UTC timestamp is captured at the moment the rsync finishes. The Z prefix is
+implied (not literal in the branch name).
+
+### Snapshot contents (per branch)
+- Full rsync of `~/paperclip-btcaaaaa-main` rooted at the branch root.
+- Includes: source code, `dist/`, `pnpm-lock.yaml`, `AGENTS.md`,
+  `.paperclip/config.json`, all `packages/plugins/*`.
+- Excludes: `node_modules/`, `secrets/master.key`, `secrets/.env`,
+  `.paperclip/.env` (contains `PAPERCLIP_AGENT_JWT_SECRET`), `data/`,
+  `logs/`, `.paperclip-wip-backup-*/`, `err.txt`, `pnpm-lock.yaml.bak`,
+  `pr.json`, `report/`, `screenshots/`, `releases/`.
+- A `GOLDEN-SNAPSHOT.md` sits at the branch root with: source commit +
+  timestamp, build procedure, plugin reference (versions and what each does),
+  scheduled jobs, restore options, update procedure.
+
+### Updating an existing golden branch
+**Never automatic.** Only the user requests. Use:
+
+```bash
+cd /home/sirrus/paperclip-mods
+git checkout <branch>
+find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+rsync -a --exclude='node_modules' --exclude='.git' \
+    --exclude='.paperclip-wip-backup-*' --exclude='err.txt' \
+    --exclude='pnpm-lock.yaml.bak' \
+    /home/sirrus/paperclip-btcaaaaa-main/ ./
+# Update GOLDEN-SNAPSHOT.md with new commit SHA + timestamp
+git add -A
+git add -f dist/ packages/*/dist/ server/dist/ cli/dist/ ui/dist/   # force-add if .gitignore excludes
+git commit -m "golden snapshot: paperclip-btcaaaaa-main @ <sha> (<UTC>)"
+git push -u origin <branch>
+```
+
+### Branch protection (for `golden-frozen-*` only)
+Apply once per new frozen branch via `gh` CLI as `Stack-Alerts` (token in keyring):
+
+```bash
+gh api -X PUT \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  repos/Stack-Alerts/PaperClip_Mods/branches/<BRANCH>/protection \
+  --input <(echo '{
+    "required_status_checks": null,
+    "enforce_admins": true,
+    "required_pull_request_reviews": {
+      "dismiss_stale_reviews": true,
+      "require_code_owner_reviews": false,
+      "required_approving_review_count": 1
+    },
+    "restrictions": null,
+    "required_linear_history": true,
+    "allow_force_pushes": false,
+    "allow_deletions": false,
+    "block_creations": false,
+    "required_conversation_resolution": false,
+    "lock_branch": false,
+    "allow_fork_syncing": false
+  }')
+```
+
+Then verify by attempting `git push origin <branch>` as admin — must be
+rejected with `GH006: Protected branch hook declined`. Revert any test commit
+with `git reset --hard HEAD~1`.
+
+The github-actions bot's direct push will fail with the same error, so the
+frozen branch stays at its committed state.
+
+### Restoring from a golden branch
+1. `git clone -b <branch> git@github.com:Stack-Alerts/PaperClip_Mods.git paperclip-btcaaaaa-main`
+2. `pnpm install --frozen-lockfile`
+3. `pnpm --filter @paperclipai/{shared,plugin-sdk,server,ui} build`
+4. Generate fresh secrets: `export PAPERCLIP_AGENT_JWT_SECRET=$(openssl rand -hex 32)`
+5. `./start.sh`
+
+The DB is not in the git branch. To restore the database:
+- `./scripts/recovery.sh doctor` for smart flow
+- `./scripts/recovery.sh restore <id>` from `/home/sirrus/paperclip-snapshots/`
+- `/home/sirrus/.paperclip/scripts/restore-from-drive.sh list` for offsite gdrive
+
+See `GOLDEN-SNAPSHOT.md` on any golden branch for the full restore procedure.
