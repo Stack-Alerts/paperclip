@@ -29,6 +29,155 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
+# _http_alive <port> [path]
+# Returns 0 if an HTTP server is bound on <port> and responds to GET <path>.
+# ANY HTTP response counts (200, 401, 403, 404, 5xx) — the server is "alive" if
+# it accepted the connection, not if it served a specific status code.
+# BTCAAAAA-39162: /health returns 401 because auth is required; a probe that
+# demands 200 (curl -sf) falsely reports "not ready" while uvicorn is happily
+# serving. Treat connection-refused / timeout as the only "not alive" signals.
+_http_alive() {
+  local port="${1:-8765}"
+  local path="${2:-/health}"
+  local _code
+  _code=$(curl -s -o /dev/null -w '%{http_code}' -m 2 "http://127.0.0.1:${port}${path}" 2>/dev/null || true)
+  [[ "$_code" =~ ^[1-5][0-9]{2}$ ]]
+}
+
+# _wait_for_backend_ready <port> <log_path> [timeout_s]
+# Polls _http_alive every second up to <timeout_s>; logs progress and returns 0
+# when the server is bound, returns 1 on timeout.
+_wait_for_backend_ready() {
+  local port="${1:-8765}"
+  local log_path="${2:-}"
+  local timeout="${3:-15}"
+  local _i
+  for ((_i=1; _i<=timeout; _i++)); do
+    if _http_alive "$port"; then
+      echo "[start-dev] ✓ backend ready on :${port} (after ${_i}s${log_path:+, log: $log_path})"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "ERROR: backend did not bind :${port} within ${timeout}s${log_path:+. See $log_path}" >&2
+  return 1
+}
+
+# _gate_blocked_interactive <gate_type> <blocker_detail> <recovery_hint>
+# BTCAAAAA-39162: when a safety gate would hard-exit, give the operator a
+# recoverable menu instead — stash/push to clear the gate, [b] to bypass
+# with a local uvicorn on :8765, [t] to pivot to start-test.sh (:3000).
+# Gate types: dirty | unpushed | no-upstream
+_gate_blocked_interactive() {
+  local gate_type="$1"
+  local blocker_detail="$2"
+  local recovery_hint="$3"
+  local _branch
+  _branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+
+  echo "" >&2
+  echo "✗ Refusing to start: $blocker_detail" >&2
+  echo "  $recovery_hint" >&2
+  echo "" >&2
+
+  local _backend_alive=0
+  if _http_alive 8765; then
+    _backend_alive=1
+  fi
+
+  local _opts=()
+  case "$gate_type" in
+    dirty)       _opts=("s") ;;
+    unpushed)    _opts=("p") ;;
+    no-upstream) _opts=("u") ;;
+  esac
+  _opts+=("b" "t" "c")
+
+  echo "Recovery options:"
+  for opt in "${_opts[@]}"; do
+    case "$opt" in
+      s) echo "  [s] git stash push --include-untracked (saves dirty work), then re-run start-dev.sh" ;;
+      p) echo "  [p] git push (push unpushed commits to $GATE_UPSTREAM), then re-run start-dev.sh" ;;
+      u) echo "  [u] git push -u origin $_branch (push branch with upstream), then re-run start-dev.sh" ;;
+      b) echo "  [b] run uvicorn directly here on '$_branch' (bypasses gate; backend on :8765; frontend on :3010 still serves main)" ;;
+      t) echo "  [t] use ./start-test.sh instead (ephemeral :3000, no branch restriction)" ;;
+      c) echo "  [c] cancel startup" ;;
+    esac
+  done
+  echo ""
+
+  local action
+  if [[ -t 0 ]]; then
+    local _opt_str
+    _opt_str=$(IFS=/; echo "${_opts[*]}")
+    read -r -p "Action? [${_opt_str}] (default: b): " action
+    [[ -z "$action" ]] && action="b"
+  else
+    echo "Non-interactive: defaulting to [c] cancel." >&2
+    action="c"
+  fi
+
+  case "${action,,}" in
+    s)
+      [[ "$gate_type" == "dirty" ]] || { echo "ERROR: option 's' is only valid for dirty-tree gates." >&2; exit 1; }
+      echo "[start-dev] stashing dirty work..."
+      git stash push -m "start-dev auto-stash before recovery" --include-untracked 2>&1 \
+        || { echo "ERROR: git stash failed." >&2; exit 1; }
+      echo "[start-dev] ✓ stashed. Re-run start-dev.sh to continue."
+      exit 0
+      ;;
+    p)
+      [[ "$gate_type" == "unpushed" ]] || { echo "ERROR: option 'p' is only valid for unpushed-commits gates." >&2; exit 1; }
+      echo "[start-dev] pushing to $GATE_UPSTREAM..."
+      git push 2>&1 || { echo "ERROR: git push failed." >&2; exit 1; }
+      echo "[start-dev] ✓ pushed. Re-run start-dev.sh to continue."
+      exit 0
+      ;;
+    u)
+      [[ "$gate_type" == "no-upstream" ]] || { echo "ERROR: option 'u' is only valid for no-upstream gates." >&2; exit 1; }
+      echo "[start-dev] pushing '$_branch' with upstream..."
+      git push -u origin "$_branch" 2>&1 || { echo "ERROR: git push -u failed." >&2; exit 1; }
+      echo "[start-dev] ✓ pushed. Re-run start-dev.sh to continue."
+      exit 0
+      ;;
+    b)
+      # Run uvicorn directly here, bypassing the safety gate.
+      # btc-dev-server.service is hardcoded to the main worktree's :3010, so
+      # the frontend there still serves main. The local backend on :8765 WILL
+      # serve this worktree's code. For full local iteration use [t].
+      echo "[start-dev] starting uvicorn directly here on '$_branch' (bypasses gate)..."
+      local _uv_log _uv_pid
+      _uv_log="$REPO_ROOT/.btc-uvicorn-direct.log"
+      _uv_pid="$REPO_ROOT/.btc-uvicorn-direct.pid"
+      if [[ ! -x ./venv/bin/python ]]; then
+        echo "ERROR: ./venv/bin/python not executable — worktree may need bootstrap." >&2
+        exit 1
+      fi
+      setsid nohup ./venv/bin/python -m uvicorn src.api.app:app --host 127.0.0.1 --port 8765 \
+        >>"$_uv_log" 2>&1 &
+      echo $! >"$_uv_pid"
+      if ! _wait_for_backend_ready 8765 "$_uv_log"; then
+        exit 1
+      fi
+      echo "[start-dev] NOTE: this uvicorn runs in the foreground-orphaned lifecycle (no systemd auto-restart)."
+      if [[ "$_backend_alive" -eq 1 ]]; then
+        echo "[start-dev] NOTE: an existing backend on :8765 was replaced by this worktree's uvicorn."
+      fi
+      echo "[start-dev] supervised web UI on :3010 still serves main; use ./start-test.sh for full local iteration."
+      exit 0
+      ;;
+    t)
+      echo "[start-dev] use: ./start-test.sh"
+      echo "            (runs on :3000, auto-switches to main, no systemd branch gate)"
+      exit 0
+      ;;
+    c|*)
+      echo "[start-dev] cancelled." >&2
+      exit 1
+      ;;
+  esac
+}
+
 # ─── Code-safety gate (BTCAAAAA-38724) ───────────────────────────────────
 # The dev server always compiles the latest origin/main. To avoid losing
 # un-submitted local work when we sync/switch to main, refuse to start until
@@ -41,12 +190,14 @@ fi
 
 DIRTY_COUNT=$(git status --porcelain 2>/dev/null | grep -c '^.' || true)
 if [[ "$DIRTY_COUNT" -gt 0 ]]; then
+  _dirty_detail="$DIRTY_COUNT uncommitted change(s) present."
   echo "" >&2
-  echo "✗ Refusing to start: $DIRTY_COUNT uncommitted change(s) present." >&2
+  echo "✗ Refusing to start: $_dirty_detail" >&2
   echo "  Commit and push them before starting the dev server (code safety)." >&2
   echo "  Uncommitted paths:" >&2
   git status --porcelain 2>/dev/null | sed 's/^/    /' >&2
-  exit 1
+  _gate_blocked_interactive "dirty" "$_dirty_detail" "Commit and push, or pick a recovery option below."
+  exit 1  # helper handles its own exit; this is the unreachable fallback
 fi
 
 # Committed-but-unpushed work on the current branch.
@@ -55,20 +206,24 @@ GATE_UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>
 if [[ -n "$GATE_UPSTREAM" ]]; then
   UNPUSHED=$(git rev-list "$GATE_UPSTREAM"..HEAD --count 2>/dev/null || echo "0")
   if [[ "$UNPUSHED" -gt 0 ]]; then
+    _unpushed_detail="$UNPUSHED unpushed commit(s) on '$GATE_BRANCH' (upstream: $GATE_UPSTREAM)."
     echo "" >&2
-    echo "✗ Refusing to start: $UNPUSHED commit(s) on '$GATE_BRANCH' are not pushed to $GATE_UPSTREAM." >&2
+    echo "✗ Refusing to start: $_unpushed_detail" >&2
     echo "  Push them before starting the dev server (code safety):" >&2
     echo "    git push" >&2
-    exit 1
+    _gate_blocked_interactive "unpushed" "$_unpushed_detail" "Push the commits, or pick a recovery option below."
+    exit 1  # helper handles its own exit; this is the unreachable fallback
   fi
 elif [[ "$GATE_BRANCH" != "main" && "$GATE_BRANCH" != "master" ]]; then
   # No upstream tracking branch — verify HEAD is at least contained in origin/main.
   if ! git merge-base --is-ancestor HEAD origin/main 2>/dev/null; then
+    _no_up_detail="branch '$GATE_BRANCH' has no upstream and its commits are not on origin/main."
     echo "" >&2
-    echo "✗ Refusing to start: branch '$GATE_BRANCH' has no upstream and its commits are not on origin/main." >&2
+    echo "✗ Refusing to start: $_no_up_detail" >&2
     echo "  Push your branch to GitHub before starting (code safety):" >&2
     echo "    git push -u origin $GATE_BRANCH" >&2
-    exit 1
+    _gate_blocked_interactive "no-upstream" "$_no_up_detail" "Push the branch, or pick a recovery option below."
+    exit 1  # helper handles its own exit; this is the unreachable fallback
   fi
 fi
 echo "[start-dev] ✓ all local work is committed and pushed"
@@ -104,7 +259,7 @@ if [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
 
   # 2. Is the supervised backend already responding on :8765?
   BACKEND_ALIVE=0
-  if curl -sf -m 2 http://localhost:8765/health >/dev/null 2>&1; then
+  if _http_alive 8765; then
     BACKEND_ALIVE=1
   fi
 
@@ -201,18 +356,9 @@ if [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
           >>"$_uv_log" 2>&1 &
         echo $! >"$MAIN_HELD_BY/.btc-uvicorn.pid"
       ) || exit 1
-      # Wait for /health to respond.
-      _ready=0
-      for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-        if curl -sf -m 2 http://localhost:8765/health >/dev/null 2>&1; then
-          echo "[start-dev] ✓ uvicorn is up on :8765 (log: $_uv_log)"
-          _ready=1
-          break
-        fi
-        sleep 1
-      done
-      if [[ "$_ready" -ne 1 ]]; then
-        echo "ERROR: uvicorn did not respond on :8765 within 15s. See $_uv_log" >&2
+      # Wait for the port to bind (any HTTP response counts as ready — /health
+      # returns 401 when auth is required, see BTCAAAAA-39162).
+      if ! _wait_for_backend_ready 8765 "$_uv_log"; then
         exit 1
       fi
       echo "[start-dev] supervised web UI on :3010 should now connect to the backend."
@@ -246,20 +392,10 @@ if [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
       setsid nohup ./venv/bin/python -m uvicorn src.api.app:app --host 127.0.0.1 --port 8765 \
         >>"$_uv_log" 2>&1 &
       echo $! >"$_uv_pid"
-      _ready=0
-      for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-        if curl -sf -m 2 http://localhost:8765/health >/dev/null 2>&1; then
-          echo "[start-dev] ✓ uvicorn is up on :8765 (pid in $_uv_pid, log: $_uv_log)"
-          _ready=1
-          break
-        fi
-        sleep 1
-      done
-      if [[ "$_ready" -ne 1 ]]; then
-        echo "ERROR: uvicorn did not respond on :8765 within 15s. See $_uv_log" >&2
+      if ! _wait_for_backend_ready 8765 "$_uv_log"; then
         exit 1
       fi
-      echo "[start-dev] NOTE: btc-dev-backend.service is inactive; this uvicorn has no auto-restart."
+      echo "[start-dev] NOTE: this uvicorn runs in the foreground-orphaned lifecycle (no systemd auto-restart)."
       echo "[start-dev] supervised web UI on :3010 should now connect to the backend."
       ;;
     i)
