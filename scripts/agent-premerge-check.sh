@@ -87,6 +87,13 @@ if ! git merge-base --is-ancestor "$SAFE_HEAD" HEAD; then
   echo "agent-premerge-check: ERROR: current HEAD did not descend from the preflight HEAD." >&2
   exit 5
 fi
+# Defense in depth: SNAPSHOT_ID is parsed from a receipt that lives inside
+# the worktree's .git dir. Validate the format before splicing it into a
+# filesystem path so a malformed receipt cannot redirect the path check.
+if [[ ! "$SNAPSHOT_ID" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{4}$ ]]; then
+  echo "agent-premerge-check: ERROR: snapshot_id '$SNAPSHOT_ID' in safe-development receipt is malformed." >&2
+  exit 5
+fi
 if [[ ! -d "/home/sirrus/paperclip-snapshots/$SNAPSHOT_ID" ]]; then
   echo "agent-premerge-check: ERROR: recovery snapshot $SNAPSHOT_ID is missing." >&2
   exit 5
@@ -145,6 +152,10 @@ printf '%s\n' \
   "log=$LOG_FILE" \
   "completed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   > "$RECEIPT"
+# Lock the receipt to the current user. The pre-push hook verifies the
+# mode; any value other than 0600 (fresh) or 0444 (frozen) is treated as
+# tampered-with and blocks the push.
+chmod 0600 "$RECEIPT"
 
 cat <<EOF
 

@@ -114,7 +114,14 @@ if ! "$RECOVERY" snapshot --no-upload >"$SNAPSHOT_OUTPUT" 2>&1; then
 fi
 cat "$SNAPSHOT_OUTPUT"
 SNAPSHOT_ID="$(sed -n 's/.*snapshot \([0-9][0-9-]*\) complete.*/\1/p' "$SNAPSHOT_OUTPUT" | tail -n 1)"
-if [[ -z "$SNAPSHOT_ID" || ! -d "/home/sirrus/paperclip-snapshots/$SNAPSHOT_ID" ]]; then
+# Defense in depth: SNAPSHOT_ID is parsed from recovery.sh output. Validate
+# the format before splicing it into a filesystem path so a malformed or
+# hostile snapshot output cannot redirect the path check.
+if [[ ! "$SNAPSHOT_ID" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{4}$ ]]; then
+  echo "agent-safedev: ERROR: recovery snapshot id '$SNAPSHOT_ID' is malformed (expected YYYY-MM-DD-HHMM)." >&2
+  exit 4
+fi
+if [[ ! -d "/home/sirrus/paperclip-snapshots/$SNAPSHOT_ID" ]]; then
   echo "agent-safedev: ERROR: snapshot completed without a verifiable local restore point." >&2
   exit 4
 fi

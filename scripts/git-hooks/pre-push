@@ -23,16 +23,20 @@ REMOTE_URL_FOR_PUSH() {
   git remote get-url "$PUSH_REMOTE" 2>/dev/null || true
 }
 
+# git feeds the hook the push plan on stdin, one line per pushed ref:
+#   <local_ref> <local_sha> <remote_ref> <remote_sha>
+# Read THAT stdin rather than `git for-each-ref`, which would list every
+# upstream-tracked local branch regardless of what is actually being pushed.
+# Do NOT set IFS= here — the line must word-split on whitespace so each
+# column lands in its own variable.
 IS_MERGE_QUEUE_PUSH=0
-if [[ "$PUSH_REMOTE" == "fork" ]]; then
-  while read -r local_ref local_sha remote_ref remote_sha; do
-    case "$remote_ref" in
-      refs/heads/btcaaaaa-main|main)
-        IS_MERGE_QUEUE_PUSH=1
-        ;;
-    esac
-  done < <(git for-each-ref --format='%(refname:short) %(objectname) %(upstream:short) %(upstream:objectname)' refs/heads 2>/dev/null || true)
-fi
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/btcaaaaa-main|refs/heads/main)
+      IS_MERGE_QUEUE_PUSH=1
+      ;;
+  esac
+done
 
 if [[ "$IS_MERGE_QUEUE_PUSH" -ne 1 ]]; then
   exit 0
@@ -43,6 +47,24 @@ PREMERGE_RECEIPT="$GIT_DIR/paperclip-premerge.receipt"
 if [[ ! -f "$PREMERGE_RECEIPT" ]]; then
   echo "pre-push: refusing push to $PUSH_REMOTE (merge-queue target) without a premerge receipt." >&2
   echo "  Run: ./scripts/agent-premerge-check.sh" >&2
+  exit 1
+fi
+
+# Receipt must be owned by the current user and not be world- or group-
+# writable. agent-premerge-check.sh writes the receipt 0600; allow 0444
+# (frozen but still valid) as a safe terminal state. Anything else is
+# treated as tampered-with and forces a rerun.
+RECEIPT_OWNER="$(stat -c '%U' "$PREMERGE_RECEIPT" 2>/dev/null || echo unknown)"
+RECEIPT_MODE="$(stat -c '%a' "$PREMERGE_RECEIPT" 2>/dev/null || echo unknown)"
+EXPECTED_OWNER="$(id -un 2>/dev/null || echo unknown)"
+if [[ "$RECEIPT_OWNER" != "$EXPECTED_OWNER" ]]; then
+  echo "pre-push: refusing push — premerge receipt owner '$RECEIPT_OWNER' is not $EXPECTED_OWNER." >&2
+  echo "  Rerun: ./scripts/agent-premerge-check.sh" >&2
+  exit 1
+fi
+if [[ ! "$RECEIPT_MODE" =~ ^(0600|0444)$ ]]; then
+  echo "pre-push: refusing push — premerge receipt mode '$RECEIPT_MODE' is not 0600 or 0444." >&2
+  echo "  Rerun: ./scripts/agent-premerge-check.sh" >&2
   exit 1
 fi
 
