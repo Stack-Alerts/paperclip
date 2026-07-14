@@ -50,21 +50,86 @@ _http_alive() {
 
 # _wait_for_backend_ready <port> <log_path> [timeout_s]
 # Polls _http_alive every second up to <timeout_s>; logs progress and returns 0
-# when the server is bound, returns 1 on timeout.
+# when the server is bound, returns 1 on timeout. Final-error message names the
+# last HTTP status code we saw so the operator can tell EADDRINUSE (orphan from
+# an older worktree) apart from connection-refused (own uvicorn failed to start).
 _wait_for_backend_ready() {
   local port="${1:-8765}"
   local log_path="${2:-}"
   local timeout="${3:-15}"
-  local _i
+  local _i _last_code="000"
   for ((_i=1; _i<=timeout; _i++)); do
-    if _http_alive "$port"; then
+    _last_code=$(curl -s -o /dev/null -w '%{http_code}' -m 2 "http://127.0.0.1:${port}/healthz" 2>/dev/null || echo "000")
+    if [[ "$_last_code" =~ ^2[0-9]{2}$ ]]; then
       echo "[start-dev] ✓ backend ready on :${port} (after ${_i}s${log_path:+, log: $log_path})"
       return 0
     fi
     sleep 1
   done
-  echo "ERROR: backend did not bind :${port} within ${timeout}s${log_path:+. See $log_path}" >&2
+  echo "ERROR: backend did not bind :${port} within ${timeout}s (last probe: HTTP ${_last_code})." >&2
+  if [[ "$_last_code" == "000" ]]; then
+    echo "       No process is listening on :${port} — the new uvicorn likely exited on startup." >&2
+    echo "       Inspect the log: ${log_path:-<unset>}" >&2
+  elif [[ "$_last_code" == "404" ]]; then
+    echo "       A process IS bound to :${port} but does not serve /healthz." >&2
+    echo "       This is usually an orphan uvicorn from a prior session (before v3 squash 6fe12e069)." >&2
+    echo "       Find the listener: ss -tlnp 'sport = :${port}'  (or: lsof -i :${port})" >&2
+  else
+    echo "       HTTP ${_last_code} is not 2xx — see ${log_path:-<unset>} for the orphan's response." >&2
+  fi
   return 1
+}
+
+# _kill_port_listener <port> [pid_file]
+# BTCAAAAA-39162 v4: the [b] recovery path launches a direct uvicorn on :8765,
+# but if a stale uvicorn from an older worktree is already bound (especially
+# one started before v3, which lacks /healthz), the new uvicorn exits on
+# EADDRINUSE and the probe never sees a 2xx. Kill any listener on the port
+# before launching, and reconcile the .btc-uvicorn-direct.pid file.
+_kill_port_listener() {
+  local port="${1:-8765}"
+  local pid_file="${2:-}"
+  local pid cmd etime killed=0
+
+  # 1. Stale pid file: if the recorded PID is alive and bound to our port, kill it.
+  if [[ -n "$pid_file" && -f "$pid_file" ]]; then
+    pid=$(cat "$pid_file" 2>/dev/null || true)
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      cmd=$(ps -o args= -p "$pid" 2>/dev/null || echo "unknown")
+      if [[ "$cmd" == *uvicorn* ]] && [[ "$cmd" == *"--port $port"* || "$cmd" == *":$port"* ]]; then
+        echo "[start-dev] killing stale uvicorn from pid file $pid_file (PID $pid)..."
+        kill -TERM "$pid" 2>/dev/null || true
+        local _w=0
+        while kill -0 "$pid" 2>/dev/null && [[ $_w -lt 50 ]]; do sleep 0.1; _w=$((_w+1)); done
+        if kill -0 "$pid" 2>/dev/null; then
+          kill -KILL "$pid" 2>/dev/null || true
+        fi
+        killed=1
+      fi
+    fi
+    rm -f "$pid_file" 2>/dev/null || true
+  fi
+
+  # 2. Anything else bound to the port right now (ss first, lsof fallback).
+  pid=$(check_port_in_use "$port" 2>/dev/null || true)
+  if [[ -n "$pid" ]]; then
+    cmd=$(ps -o args= -p "$pid" 2>/dev/null || echo "unknown")
+    etime=$(ps -o etime= -p "$pid" 2>/dev/null || echo "unknown")
+    echo "[start-dev] port :$port held by PID $pid (cmd: $cmd, uptime: $etime)"
+    echo "[start-dev] killing orphan listener so [b] can bind a fresh uvicorn..."
+    kill -TERM "$pid" 2>/dev/null || true
+    local _w=0
+    while [[ -n "$(check_port_in_use "$port" 2>/dev/null || true)" ]] && [[ $_w -lt 50 ]]; do sleep 0.1; _w=$((_w+1)); done
+    if [[ -n "$(check_port_in_use "$port" 2>/dev/null || true)" ]]; then
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
+    killed=1
+  fi
+
+  if [[ $killed -eq 1 ]]; then
+    echo "[start-dev] ✓ port :$port is now free"
+  fi
+  return 0
 }
 
 # _gate_blocked_interactive <gate_type> <blocker_detail> <recovery_hint>
@@ -153,6 +218,9 @@ _gate_blocked_interactive() {
       local _uv_log _uv_pid
       _uv_log="$REPO_ROOT/.btc-uvicorn-direct.log"
       _uv_pid="$REPO_ROOT/.btc-uvicorn-direct.pid"
+      # v4: kill any orphan listener on :8765 (especially a pre-v3 uvicorn that
+      # lacks /healthz) so our new uvicorn can actually bind the port.
+      _kill_port_listener 8765 "$_uv_pid"
       if [[ ! -x ./venv/bin/python ]]; then
         echo "ERROR: ./venv/bin/python not executable — worktree may need bootstrap." >&2
         exit 1
@@ -389,6 +457,9 @@ if [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
       echo "[start-dev] starting uvicorn directly here on $CURRENT_BRANCH (bypasses branch gate)..."
       _uv_log="$REPO_ROOT/.btc-uvicorn-direct.log"
       _uv_pid="$REPO_ROOT/.btc-uvicorn-direct.pid"
+      # v4: kill any orphan listener on :8765 (especially a pre-v3 uvicorn that
+      # lacks /healthz) so our new uvicorn can actually bind the port.
+      _kill_port_listener 8765 "$_uv_pid"
       if [[ ! -x ./venv/bin/python ]]; then
         echo "ERROR: ./venv/bin/python not executable — worktree may need bootstrap." >&2
         exit 1
