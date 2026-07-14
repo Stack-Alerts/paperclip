@@ -62,6 +62,150 @@ class TestFixSHAPattern:
         assert match is None
 
 
+class TestFixSHACommentOrdering:
+    """Regression tests for BTCAAAAA-39402 / BTCAAAAA-39162.
+
+    Paperclip's ``/comments`` endpoint returns comments in *reverse*
+    chronological order (newest first). ``extract_fix_sha_from_comments``
+    must therefore walk the candidates in list order (which is
+    "latest first" under the live API contract), NOT via
+    ``reversed(candidates)`` which would surface a stale SHA older than
+    the branch the agent most recently pushed.
+    """
+
+    def _load(self):
+        import sys
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        sys.path.insert(0, str(repo_root / "scripts"))
+        import merge_dispatch_routine
+
+        return merge_dispatch_routine
+
+    def test_picks_latest_sha_on_descending_comments(self):
+        """When /comments returns newest-first, picks the newest reachable SHA.
+
+        Mirrors the BTC-39162 comment timeline: the agent posted v4 SHA
+        six times before v3 squash and v1 original — the dispatch routine
+        must pick v4 (latest, on branch), not v3 (older, only reachable
+        via the squash on main, which the OLD ``reversed()`` code would
+        surface first because it walks oldest-first).
+        """
+        mod = self._load()
+        v4_sha = "2f9021fb5304207c57ce9c780508805b5945ea96"
+        v3_squash_sha = "6fe12e069393ffcc253ebb2f43240c93db87b81e"
+        v1_sha = "231162eab096fe14f2fbc38e2f993f070313cdf0"
+
+        # Live API order: newest first
+        comments = [
+            {"body": f"Fix-SHA: {v4_sha}"},  # newest
+            {"body": f"Fix-SHA: {v4_sha}"},
+            {"body": f"Fix-SHA: {v4_sha}"},
+            {"body": f"Fix-SHA: {v4_sha}"},
+            {"body": f"Fix-SHA: {v4_sha}"},
+            {"body": f"Fix-SHA: {v4_sha}"},  # oldest v4 mention
+            {"body": f"Fix-SHA: {v3_squash_sha}"},
+            {"body": "PR opened for v3"},
+            {"body": "review path explanation"},
+            {"body": "orphan sweep comment"},
+            {"body": f"Fix-SHA: {v1_sha}"},  # oldest = first agent claim
+        ]
+
+        # v4 is on the fix branch (latest push). v3 squash is on main
+        # and ``find_branch_for_sha`` treats main-as-branch as reachable.
+        # v1 was force-pushed away — not reachable.
+        #
+        # OLD ``reversed()`` code walks candidates from oldest to newest
+        # and returns v3 (the first reachable hit). NEW code walks
+        # deduped candidates from newest to oldest and returns v4.
+        with patch.object(mod, "find_branch_for_sha") as mock_find:
+            mock_find.side_effect = lambda sha: {
+                v4_sha: "fix/BTCAAAAA-39162",
+                v3_squash_sha: "main",  # squash reachable via main
+            }.get(sha)
+            result = mod.extract_fix_sha_from_comments(comments)
+
+        assert result == v4_sha, (
+            f"Expected v4 ({v4_sha}) reachable on fix branch; got {result}"
+        )
+
+    def test_dedupes_repeated_sha_mentions(self):
+        """Repeated Fix-SHA mentions collapse to a single candidate entry.
+
+        Agents often re-post the same Fix-SHA in retry attempts. Iterating
+        deduped (preserving first occurrence) keeps the loop linear in
+        distinct SHAs and avoids ``re-checking the same branch 6×``.
+        """
+        mod = self._load()
+        v4_sha = "a" * 40
+
+        comments = [{"body": f"Fix-SHA: {v4_sha}"} for _ in range(6)]
+
+        with patch.object(mod, "find_branch_for_sha", return_value=None) as mock_find:
+            result = mod.extract_fix_sha_from_comments(comments)
+
+        # No SHA reachable → fall back to first mention
+        assert result == v4_sha
+        # Single distinct SHA → single branch lookup
+        assert mock_find.call_count == 1
+
+    def test_falls_back_to_first_when_no_sha_reachable(self):
+        """When no candidate SHA resolves to a branch, falls back to first mention.
+
+        The first comment in list order (newest under the live API) is
+        the "latest mention" — that is the legacy fallback semantics.
+        """
+        mod = self._load()
+        newest_sha = "b" * 40
+        older_sha = "c" * 40
+
+        # Newest-first order: newest_sha appears first
+        comments = [
+            {"body": f"Fix-SHA: {newest_sha}"},
+            {"body": f"Fix-SHA: {older_sha}"},
+        ]
+
+        with patch.object(mod, "find_branch_for_sha", return_value=None):
+            result = mod.extract_fix_sha_from_comments(comments)
+
+        assert result == newest_sha, (
+            "Falls back to the FIRST entry in list order, which under the "
+            "live API contract is the newest mention"
+        )
+
+    def test_picks_latest_reachable_over_earlier_unreachable(self):
+        """Within descending-order comments, finds the latest reachable SHA.
+
+        Picks the first occurrence (in list order) that resolves to a
+        remote branch — not the oldest reachable, and not just the oldest
+        candidate period (which would be the very last entry).
+        """
+        mod = self._load()
+        v4_sha = "d" * 40
+        orphan_sha = "e" * 40  # not on any branch
+        v1_sha = "f" * 40      # not on any branch
+
+        # Newest-first API order: v4 at index 0, v1 at index -1
+        comments = [
+            {"body": f"Fix-SHA: {v4_sha}"},  # newest, reachable
+            {"body": f"Fix-SHA: {orphan_sha}"},  # middle, not reachable
+            {"body": f"Fix-SHA: {v1_sha}"},  # oldest, not reachable
+        ]
+
+        with patch.object(mod, "find_branch_for_sha") as mock_find:
+            mock_find.side_effect = lambda sha: (
+                f"fix/BTCAAAAA-39162" if sha == v4_sha else None
+            )
+            result = mod.extract_fix_sha_from_comments(comments)
+
+        assert result == v4_sha
+        # Loop short-circuits at first reachable hit (v4 at index 0)
+        assert mock_find.call_count == 1
+        # The single lookup is for v4, not for the later orphan/v1 entries
+        assert mock_find.call_args.args[0] == v4_sha
+
+
 class TestMergeGate:
     """Test that the routine acts on Fix-SHA without an interaction gate."""
 

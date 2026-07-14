@@ -399,6 +399,16 @@ def extract_fix_sha_from_comments(comments: list[dict[str, Any]]) -> str | None:
     orphan commit that no remote branch contains. Prefer the LATEST
     Fix-SHA that resolves to a remote branch; fall back to the FIRST
     comment's SHA (original behavior) when no candidate is reachable.
+
+    BTC-39402 / BTC-39162 ordering bug: Paperclip's ``/comments`` endpoint
+    returns comments in *reverse* chronological order (newest first), so
+    the comment-list iteration order is already "latest first". Iterating
+    ``reversed(candidates)`` therefore walked oldest-first and surfaced a
+    stale SHA. The fix iterates the deduped candidates in list order
+    (which equals reverse-chronological under the live API contract),
+    preferring the FIRST occurrence of each SHA as the "latest mention".
+    Dedupe keeps the loop linear in distinct SHAs rather than re-checking
+    the same branch 6× when an agent posts the same SHA in every retry.
     """
     candidates: list[str] = []
     for comment in comments:
@@ -408,10 +418,16 @@ def extract_fix_sha_from_comments(comments: list[dict[str, Any]]) -> str | None:
             candidates.append(match.group(1))
     if not candidates:
         return None
-    for sha in reversed(candidates):
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for sha in candidates:
+        if sha not in seen:
+            seen.add(sha)
+            deduped.append(sha)
+    for sha in deduped:
         if find_branch_for_sha(sha):
             return sha
-    return candidates[0]
+    return deduped[0]
 
 
 # === Gap 5 (BTCAAAAA-38472) — wait-for-Fix-SHA at dispatch ===
