@@ -478,6 +478,16 @@ async def health(_: dict = Depends(require_jwt)) -> HealthResponse:
     )
 
 
+# BTCAAAAA-39162: auth-free liveness probe for orchestrators (start-dev.sh,
+# k8s liveness checks, system monitors) that must verify the process is
+# bound and serving WITHOUT a JWT. /health remains the auth-gated readiness
+# probe that returns commit_sha/branch and verifies Redis; /healthz only
+# confirms the uvicorn process is up and accepting requests.
+@app.get("/healthz", tags=["System"])
+async def healthz() -> dict:
+    return {"status": "ok"}
+
+
 # ---------------------------------------------------------------------------
 # REST: GET /state/snapshot
 # ---------------------------------------------------------------------------

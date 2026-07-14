@@ -30,18 +30,22 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
 # _http_alive <port> [path]
-# Returns 0 if an HTTP server is bound on <port> and responds to GET <path>.
-# ANY HTTP response counts (200, 401, 403, 404, 5xx) — the server is "alive" if
-# it accepted the connection, not if it served a specific status code.
-# BTCAAAAA-39162: /health returns 401 because auth is required; a probe that
-# demands 200 (curl -sf) falsely reports "not ready" while uvicorn is happily
-# serving. Treat connection-refused / timeout as the only "not alive" signals.
+# Returns 0 if an HTTP server is bound on <port> and responds to GET <path>
+# with HTTP 2xx. Used as the functional-readiness probe — the server is
+# "ready" only when it can actually serve traffic, not merely when the
+# port is bound.
+#
+# BTCAAAAA-39162 v3: prefer /healthz (auth-free, always-200 liveness probe
+# added in src/api/app.py). /health is auth-gated (Depends(require_jwt)) and
+# returns 401 to anonymous probes, which the v2 probe mis-classified as
+# "alive" — the UI banner still said "Backend offline" because the
+# functional read was failing. /healthz closes that gap.
 _http_alive() {
   local port="${1:-8765}"
-  local path="${2:-/health}"
+  local path="${2:-/healthz}"
   local _code
   _code=$(curl -s -o /dev/null -w '%{http_code}' -m 2 "http://127.0.0.1:${port}${path}" 2>/dev/null || true)
-  [[ "$_code" =~ ^[1-5][0-9]{2}$ ]]
+  [[ "$_code" =~ ^2[0-9]{2}$ ]]
 }
 
 # _wait_for_backend_ready <port> <log_path> [timeout_s]
