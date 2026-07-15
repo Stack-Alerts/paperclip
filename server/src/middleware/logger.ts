@@ -7,17 +7,19 @@ import { resolveDefaultLogsDir, resolveHomeAwarePath } from "../home-paths.js";
 import { shouldSilenceHttpSuccessLog } from "./http-log-policy.js";
 import { redactSensitive } from "./redact-sensitive.js";
 
+const config = readConfigFile();
+
 function resolveServerLogDir(): string {
   const envOverride = process.env.PAPERCLIP_LOG_DIR?.trim();
   if (envOverride) return resolveHomeAwarePath(envOverride);
 
-  const fileLogDir = readConfigFile()?.logging.logDir?.trim();
+  const fileLogDir = config?.logging.logDir?.trim();
   if (fileLogDir) return resolveHomeAwarePath(fileLogDir);
 
   return resolveDefaultLogsDir();
 }
 
-const loggingConfig = readConfigFile()?.logging;
+const loggingConfig = config?.logging;
 const logDir = resolveServerLogDir();
 fs.mkdirSync(logDir, { recursive: true });
 

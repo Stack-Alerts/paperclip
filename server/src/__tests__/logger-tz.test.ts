@@ -16,6 +16,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
  */
 
 const mockTransport = vi.hoisted(() => vi.fn(() => ({ write: vi.fn() })));
+const mockReadConfigFile = vi.hoisted(() => vi.fn(() => null));
 const mockPino = vi.hoisted(() => {
   const fn = vi.fn(() => ({
     info: vi.fn(),
@@ -41,7 +42,7 @@ vi.mock("pino-http", () => ({
   pinoHttp: vi.fn(() => vi.fn()),
 }));
 vi.mock("../config-file.js", () => ({
-  readConfigFile: vi.fn(() => null),
+  readConfigFile: mockReadConfigFile,
 }));
 vi.mock("../home-paths.js", () => ({
   resolveHomeAwarePath: vi.fn((p: string) => p),
@@ -75,6 +76,12 @@ describe("logger translateTime respects TZ environment variable", () => {
       if (target.target !== "pino-pretty") continue;
       expect(target.options?.translateTime).toBe("SYS:HH:MM:ss");
     }
+  });
+
+  it("reads the config file once during module initialization", async () => {
+    await import("../middleware/logger.js");
+
+    expect(mockReadConfigFile).toHaveBeenCalledOnce();
   });
 
   it("wires pino-roll for size-based rotation with sensible defaults", async () => {
