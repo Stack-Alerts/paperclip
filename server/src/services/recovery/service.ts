@@ -94,6 +94,14 @@ export const STRANDED_RECENT_PROGRESS_EXEMPTION_MS = Math.max(
   Number(process.env.STRANDED_RECENT_PROGRESS_EXEMPTION_MS) || 30 * 60 * 1000,
 );
 
+// BTCAAAAA-37094: perpetual registers (e.g. infra: dev-server health register,
+// impact-gate) are by-design indefinitely `in_progress` and post a heartbeat
+// comment on every cycle. The label exists in the DB but is not yet part of
+// the ISSUE_WORK_MODES enum, so we re-declare the magic string here rather
+// than expand the enum and risk breaking unrelated zod validators. If/when
+// the enum is widened, swap this constant for the shared type.
+const PERPETUAL_REGISTER_WORK_MODE = "perpetual_register";
+
 type RecoveryWakeupOptions = {
   source?: "timer" | "assignment" | "on_demand" | "automation";
   triggerDetail?: "manual" | "ping" | "callback" | "system";
@@ -2950,6 +2958,21 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
         }
 
         if (classification.kind === "non_retryable") {
+          // BTCAAAAA-37094: perpetual registers are by-design indefinitely
+          // in_progress, and any recent assignee comment is healthy-cycle
+          // evidence. Either signal exempts the false-block escalation.
+          if (
+            issue.workMode === PERPETUAL_REGISTER_WORK_MODE ||
+            (await hasRecentVisibleProgress(
+              issue.companyId,
+              issue.id,
+              agentId,
+              STRANDED_RECENT_PROGRESS_EXEMPTION_MS,
+            ))
+          ) {
+            result.recentProgressExempted += 1;
+            continue;
+          }
           const failureSummary = summarizeRunFailureForIssueComment(latestRun);
           const updated = await escalateStrandedAssignedIssue({
             issue,
@@ -2970,12 +2993,33 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
         }
 
         if (didAutomaticRecoveryFail(latestRun, "issue_continuation_needed")) {
+          // BTCAAAAA-37094: perpetual registers should never escalate for
+          // max-attempt exhaustion — see the matching exemption at the
+          // `non_retryable` branch above.
+          if (issue.workMode === PERPETUAL_REGISTER_WORK_MODE) {
+            result.recentProgressExempted += 1;
+            continue;
+          }
           const { consecutive, latestFinishedAt } = await summarizeRecentContinuationRetries(
             issue.companyId,
             issue.id,
             classification.errorCode,
           );
           if (consecutive >= classification.maxAttempts) {
+            // BTCAAAAA-37094 (defence in depth): if the assignee has shown
+            // visible progress within the GGU-809 window, treat the retry
+            // exhaustion as a false positive.
+            if (
+              await hasRecentVisibleProgress(
+                issue.companyId,
+                issue.id,
+                agentId,
+                STRANDED_RECENT_PROGRESS_EXEMPTION_MS,
+              )
+            ) {
+              result.recentProgressExempted += 1;
+              continue;
+            }
             const failureSummary = summarizeRunFailureForIssueComment(latestRun);
             const attemptCopy = consecutive <= 1 ? "" : ` (${consecutive}× attempts)`;
             const causeCopy = classification.errorCode
