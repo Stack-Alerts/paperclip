@@ -49,8 +49,9 @@ vi.mock("../home-paths.js", () => ({
 }));
 
 describe("logger translateTime respects TZ environment variable", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    vi.resetModules();
   });
 
   it("configures pino-pretty with SYS:HH:MM:ss so timestamps honour the TZ env var", async () => {
@@ -58,11 +59,47 @@ describe("logger translateTime respects TZ environment variable", () => {
 
     expect(mockTransport).toHaveBeenCalledOnce();
     const { targets } = mockTransport.mock.calls[0][0] as {
-      targets: Array<{ options: Record<string, unknown> }>;
+      targets: Array<{
+        target?: string;
+        options?: Record<string, unknown>;
+        pipeline?: Array<{ target?: string; options?: Record<string, unknown> }>;
+      }>;
     };
-    for (const target of targets) {
-      expect(target.options.translateTime).toBe("SYS:HH:MM:ss");
+
+    const flatten = (entries: typeof targets) =>
+      entries.flatMap((entry) =>
+        entry.pipeline ? entry.pipeline : [entry],
+      );
+
+    for (const target of flatten(targets)) {
+      if (target.target !== "pino-pretty") continue;
+      expect(target.options?.translateTime).toBe("SYS:HH:MM:ss");
     }
+  });
+
+  it("wires pino-roll for size-based rotation with sensible defaults", async () => {
+    await import("../middleware/logger.js");
+
+    expect(mockTransport).toHaveBeenCalledOnce();
+    const { targets } = mockTransport.mock.calls[0][0] as {
+      targets: Array<{
+        target?: string;
+        options?: Record<string, unknown>;
+        pipeline?: Array<{ target?: string; options?: Record<string, unknown> }>;
+      }>;
+    };
+
+    const flatten = (entries: typeof targets) =>
+      entries.flatMap((entry) =>
+        entry.pipeline ? entry.pipeline : [entry],
+      );
+
+    const roll = flatten(targets).find((target) => target.target === "pino-roll");
+    expect(roll).toBeDefined();
+    expect(roll?.options?.size).toBe(200);
+    expect((roll?.options?.limit as { count?: number } | undefined)?.count).toBe(10);
+    expect(roll?.options?.mkdir).toBe(true);
+    expect(roll?.options?.file).toContain("server.log");
   });
 
   it("SYS: prefix produces timezone-sensitive output: UTC epoch formats differently under UTC vs UTC+8", () => {

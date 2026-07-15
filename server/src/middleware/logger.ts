@@ -17,6 +17,7 @@ function resolveServerLogDir(): string {
   return resolveDefaultLogsDir();
 }
 
+const loggingConfig = readConfigFile()?.logging;
 const logDir = resolveServerLogDir();
 fs.mkdirSync(logDir, { recursive: true });
 
@@ -39,8 +40,21 @@ export const logger = pino({
       level: "info",
     },
     {
-      target: "pino-pretty",
-      options: { ...sharedOpts, colorize: false, destination: logFile, mkdir: true },
+      pipeline: [
+        {
+          target: "pino-pretty",
+          options: { ...sharedOpts, colorize: false },
+        },
+        {
+          target: "pino-roll",
+          options: {
+            file: logFile,
+            size: loggingConfig?.maxSizeMb ?? 200,
+            mkdir: true,
+            limit: { count: loggingConfig?.maxFiles ?? 10 },
+          },
+        },
+      ],
       level: "debug",
     },
   ],
