@@ -6,6 +6,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+WorkingDirectory=/home/sirrus/projects/BTC-Trade-Engine-PaperClip
 ExecStart=/home/sirrus/projects/BTC-Trade-Engine-PaperClip/scripts/branch-reaper.sh --post-comment
 StandardOutput=append:/home/sirrus/.paperclip/instances/default/logs/branch-reaper.log
 StandardError=append:/home/sirrus/.paperclip/instances/default/logs/branch-reaper.log

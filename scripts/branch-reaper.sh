@@ -68,7 +68,26 @@ echo "Timestamp: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 echo ""
 
 # --- Ensure we have a fresh view of origin ---
-git fetch --prune origin 2>/dev/null
+# Resolve the repository from this script's location so systemd's default
+# working directory cannot make Git operate outside the worktree.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd -- "${SCRIPT_DIR}/.."
+
+# systemd user services don't inherit SSH_AUTH_SOCK, so `git fetch origin`
+# over SSH fails even when the repository is otherwise healthy. When GH_TOKEN
+# is available, transparently rewrite the SSH remote URL to HTTPS+token via
+# per-process GIT_CONFIG_* env vars so fetch + push both work without an agent.
+# The override applies to the current process only — the user's repo retains
+# the original remote URL.
+if [[ -n "${GH_TOKEN:-}" ]]; then
+  export GIT_CONFIG_COUNT=1
+  export GIT_CONFIG_KEY_0="url.https://x-access-token:${GH_TOKEN}@github.com/.insteadOf"
+  export GIT_CONFIG_VALUE_0="git@github.com:"
+fi
+if ! git fetch --prune origin; then
+  echo "ERROR: git fetch origin failed from ${PWD}." >&2
+  exit 128
+fi
 
 MAIN_SHA=$(git rev-parse origin/main)
 NOW_EPOCH=$(date +%s)
@@ -381,11 +400,18 @@ if [[ "$DRY_RUN" == "false" ]]; then
     IFS='|' read -r br behind idleh last_push issue_id issue_status <<< "$entry"
     echo "  Commenting on $issue_id for branch $br"
     comment_body="Branch \`${br}\` is ${behind} commits behind origin/main and has been idle for ${idleh}h. CTO to decide: rebase or archive. (Branch reaper run: $(date -u '+%Y-%m-%dT%H:%M:%SZ'))"
-    curl -sf -X POST \
+    comment_json=$(jq -n --arg body "$comment_body" '{body: $body}')
+    comment_http_rc=$(curl -sS -o /dev/null -w '%{http_code}' \
+      -X POST \
       -H "Authorization: Bearer ${PAPERCLIP_API_KEY}" \
       -H "Content-Type: application/json" \
-      -d "{\"body\": \"$(echo "$comment_body" | sed 's/"/\\"/g')\"}" \
-      "${PAPERCLIP_API_URL}/api/issues/${issue_id}/comments" > /dev/null
+      -d "$comment_json" \
+      "${PAPERCLIP_API_URL}/api/issues/${issue_id}/comments" || echo "000")
+    if [[ "$comment_http_rc" =~ ^2 ]]; then
+      echo "  Comment POST HTTP ${comment_http_rc}"
+    else
+      echo "  WARNING: comment POST HTTP ${comment_http_rc} on ${issue_id}; continuing"
+    fi
   done
 
   echo ""
