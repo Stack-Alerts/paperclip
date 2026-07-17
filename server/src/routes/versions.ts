@@ -55,6 +55,7 @@ type VersionsResponse = {
 const PLUGIN_DISPLAY_NAMES: Record<string, string> = {
   "paperclip.backup": "Backup Plugin",
   "paperclip.git-merges": "Git Merges",
+  "paperclip.pause": "Pause / Run",
 };
 
 /**
@@ -62,11 +63,12 @@ const PLUGIN_DISPLAY_NAMES: Record<string, string> = {
  * in the response so the badge renders deterministically. Anything not
  * in this list is filtered out — the badge is the only consumer and
  * matches the operator-facing display contract (BTC-Paperclip + Paperclip
- * + Backup Plugin + Git Merges only).
+ * + Backup Plugin + Git Merges + Pause/Run only).
  */
 const SURFACED_PLUGIN_KEYS: readonly string[] = [
   "paperclip.backup",
   "paperclip.git-merges",
+  "paperclip.pause",
 ] as const;
 
 function readVersionFile(path: string): string | null {

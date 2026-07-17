@@ -16,6 +16,7 @@ import { Fragment, useMemo } from "react";
 import { PluginSlotOutlet, usePluginSlots } from "@/plugins/slots";
 import { PluginLauncherOutlet, usePluginLaunchers } from "@/plugins/launchers";
 import { VersionsBadge } from "./VersionsBadge";
+import { PluginPauseRunButton } from "./PluginPauseRunButton";
 
 type GlobalToolbarContext = { companyId: string | null; companyPrefix: string | null };
 
@@ -61,6 +62,7 @@ export function BreadcrumbBar() {
     return (
       <div className="border-b border-border px-4 md:px-6 h-12 shrink-0 flex items-center justify-end gap-2">
         <VersionsBadge />
+        <PluginPauseRunButton />
         {globalToolbarSlots}
       </div>
     );
@@ -96,6 +98,7 @@ export function BreadcrumbBar() {
           )}
         </div>
         <VersionsBadge />
+        <PluginPauseRunButton />
         {globalToolbarSlots}
       </div>
     );
@@ -143,6 +146,7 @@ export function BreadcrumbBar() {
         </Breadcrumb>
       </div>
       <VersionsBadge />
+      <PluginPauseRunButton />
       {globalToolbarSlots}
     </div>
   );
