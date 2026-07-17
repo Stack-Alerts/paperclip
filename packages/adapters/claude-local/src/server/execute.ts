@@ -273,6 +273,32 @@ async function buildClaudeRuntimeConfig(input: ClaudeExecutionInput): Promise<Cl
     env.PAPERCLIP_API_KEY = authToken;
   }
 
+  // Ensure the spawned child has a usable PATH even when adapterConfig.env
+  // omitted one. Falls back to process.env.PATH, then to a platform default
+  // (see ensurePathInEnv) so the Claude CLI can be located by
+  // ensureCommandResolvable / runChildProcess.
+  if (typeof env.PATH !== "string" || env.PATH.length === 0) {
+    if (typeof process.env.PATH === "string" && process.env.PATH.length > 0) {
+      env.PATH = process.env.PATH;
+    } else if (typeof process.env.Path === "string" && process.env.Path.length > 0) {
+      env.PATH = process.env.Path;
+    } else {
+      env.PATH = ensurePathInEnv(env).PATH ?? env.PATH;
+    }
+  }
+
+  // Force API-key mode whenever an Anthropic API key is present so the CLI
+  // does not fall through to a stale ~/.claude/ OAuth subscription when the
+  // org has disabled Claude Code subscription access.
+  if (
+    typeof env.ANTHROPIC_API_KEY === "string" &&
+    env.ANTHROPIC_API_KEY.length > 0 &&
+    (typeof env.CLAUDE_CODE_USE_ANTHROPIC_API_KEY !== "string" ||
+      env.CLAUDE_CODE_USE_ANTHROPIC_API_KEY.length === 0)
+  ) {
+    env.CLAUDE_CODE_USE_ANTHROPIC_API_KEY = "1";
+  }
+
   const runtimeEnv = Object.fromEntries(
     Object.entries(ensurePathInEnv({ ...process.env, ...env })).filter(
       (entry): entry is [string, string] => typeof entry[1] === "string",
