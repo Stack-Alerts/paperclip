@@ -225,6 +225,8 @@ docs/screenshots/BTCAAAAA-*.png
 .freeze-blocker-BTCAAAAA-*.md
 .e2e-test
 .claude/worktrees/
+.claude/
+.claude-flow/
 
 # Agent cruft (do not commit)
 .playwright-mcp/
