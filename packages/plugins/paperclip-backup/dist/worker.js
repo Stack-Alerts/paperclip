@@ -10491,7 +10491,9 @@ var ACTION_KEYS = {
 };
 var JOB_KEYS = {
   autoPruneOffsite: "auto-prune-offsite",
-  autoOffsiteBackup: "auto-offsite-backup"
+  autoOffsiteBackup: "auto-offsite-backup",
+  tieredHourlyUpload: "tiered-hourly-upload",
+  tieredDailyUpload: "tiered-daily-upload"
 };
 var STATE_KEYS = {
   config: "backup-config",
@@ -10563,10 +10565,15 @@ async function runScript(scriptPath, args, extraEnv = {}) {
     });
   });
 }
-async function lsjsonDir(remotePath, rcloneConfig, rclonePass) {
+async function lsjsonDir(remotePath, rcloneConfig, rclonePass, opts = {}) {
+  const args = ["lsjson"];
+  if (opts.dirsOnly ?? true) {
+    args.push("--dirs-only", "--no-modtime");
+  }
+  args.push(remotePath);
   const child = spawn(
     "rclone",
-    ["lsjson", "--dirs-only", "--no-modtime", remotePath],
+    args,
     {
       env: {
         ...process.env,
@@ -10614,7 +10621,9 @@ function readInstanceConfig(cfg = {}) {
   return { ...DEFAULT_CONFIG, ...cfg, ...envOverride ?? {} };
 }
 function resolveCompanyId(params) {
-  return params?.companyId ?? process.env.PAPERCLIP_COMPANY_ID ?? // Fallback: the canonical BTC-Trade-Engine Paperclip companyId.
+  const fromParams = params?.companyId;
+  const usable = fromParams && fromParams !== "default" ? fromParams : void 0;
+  return usable ?? process.env.PAPERCLIP_COMPANY_ID ?? // Fallback: the canonical BTC-Trade-Engine Paperclip companyId.
   // The plugin's host company is always this; hardcoding lets the
   // auto-offsite-backup job run without requiring the env var to
   // be set in the worker process.
@@ -10701,7 +10710,6 @@ async function readLocalDumps(dir) {
 }
 async function readOffsiteBackups(cfg, companyId) {
   const remote = cfg.rcloneRemote;
-  const prefix = `Paperclip-Backups/${companyId}`;
   let pass = "";
   for (const candidate of [
     process.env.HOME ? `${process.env.HOME}/.config/rclone/rclone-pass` : null,
@@ -10720,50 +10728,11 @@ async function readOffsiteBackups(cfg, companyId) {
   const MAX_MONTHS_PER_YEAR = 3;
   const MAX_DAYS_PER_MONTH = 7;
   const MAX_HOURS_PER_DAY = 6;
-  const MAX_LEAVES = 80;
-  async function lsjsonDir2(remotePath) {
-    const child = spawn(
-      "rclone",
-      ["lsjson", "--dirs-only", "--no-modtime", remotePath],
-      {
-        env: {
-          ...process.env,
-          RCLONE_CONFIG: cfg.rcloneConfig,
-          ...pass ? { RCLONE_CONFIG_PASS: pass } : {}
-        },
-        stdio: ["ignore", "pipe", "pipe"]
-      }
-    );
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (b) => stdout += b.toString());
-    child.stderr.on("data", (b) => stderr += b.toString());
-    const code = await new Promise((res) => child.on("exit", (c) => res(c ?? 0)));
-    if (code !== 0) return [];
-    const out = [];
-    for (const line of stdout.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      try {
-        const obj = JSON.parse(trimmed);
-        if (!obj.Path) continue;
-        out.push({
-          Path: obj.Path,
-          Name: obj.Name ?? obj.Path.split("/").pop() ?? obj.Path,
-          Size: obj.Size ?? 0,
-          IsDir: !!obj.IsDir,
-          ModTime: obj.ModTime
-        });
-      } catch {
-      }
-    }
-    return out;
-  }
+  const MAX_TIER_LEAVES = 40;
+  const MAX_LEAVES = 120;
   function newestFirst(arr) {
     return arr.slice().sort((a, b) => a.Path < b.Path ? 1 : a.Path > b.Path ? -1 : 0);
   }
-  const backups = [];
-  const years = newestFirst(await lsjsonDir2(`${remote}:${prefix}/`));
   const PARALLEL = 4;
   async function runWithCap(items, limit, fn) {
     const out = [];
@@ -10777,43 +10746,106 @@ async function readOffsiteBackups(cfg, companyId) {
     await Promise.all(workers);
     return out;
   }
-  for (const y of years) {
-    if (backups.length >= MAX_LEAVES) break;
-    if (!y.IsDir) continue;
-    const monthsRaw = newestFirst(await lsjsonDir2(`${remote}:${prefix}/${y.Path}/`)).slice(0, MAX_MONTHS_PER_YEAR);
-    const monthPaths = monthsRaw.filter((m) => m.IsDir).map((m) => ({ y: y.Path, m }));
-    const dayLists = await runWithCap(
-      monthPaths,
-      PARALLEL,
-      async ({ y: y2, m }) => newestFirst(await lsjsonDir2(`${remote}:${prefix}/${y2}/${m.Path}/`)).slice(0, MAX_DAYS_PER_MONTH)
-    );
-    const dayPaths = [];
-    for (let i = 0; i < dayLists.length; i += 1) {
-      for (const d of dayLists[i] ?? []) {
-        if (d.IsDir) dayPaths.push({ y: monthPaths[i].y, m: monthPaths[i].m.Path, d });
+  const leaves = [];
+  const roots = [];
+  async function walkPerCompany() {
+    const prefix = `Paperclip-Backups/${companyId}`;
+    const years = newestFirst(await lsjsonDir(`${remote}:${prefix}/`, cfg.rcloneConfig, pass));
+    for (const y of years) {
+      if (leaves.length >= MAX_LEAVES) break;
+      if (!y.IsDir) continue;
+      const monthsRaw = newestFirst(
+        await lsjsonDir(`${remote}:${prefix}/${y.Path}/`, cfg.rcloneConfig, pass)
+      ).slice(0, MAX_MONTHS_PER_YEAR);
+      const monthPaths = monthsRaw.filter((m) => m.IsDir).map((m) => ({ y: y.Path, m }));
+      const dayLists = await runWithCap(
+        monthPaths,
+        PARALLEL,
+        async ({ y: y2, m }) => newestFirst(
+          await lsjsonDir(`${remote}:${prefix}/${y2}/${m.Path}/`, cfg.rcloneConfig, pass)
+        ).slice(0, MAX_DAYS_PER_MONTH)
+      );
+      const dayPaths = [];
+      for (let i = 0; i < dayLists.length; i += 1) {
+        for (const d of dayLists[i] ?? []) {
+          if (d.IsDir) dayPaths.push({ y: monthPaths[i].y, m: monthPaths[i].m.Path, d });
+        }
+      }
+      const hourLists = await runWithCap(
+        dayPaths,
+        PARALLEL,
+        async ({ y: y2, m, d }) => newestFirst(
+          await lsjsonDir(`${remote}:${prefix}/${y2}/${m}/${d.Path}/`, cfg.rcloneConfig, pass)
+        ).slice(0, MAX_HOURS_PER_DAY)
+      );
+      for (let i = 0; i < hourLists.length; i += 1) {
+        if (leaves.length >= MAX_LEAVES) break;
+        for (const h of hourLists[i] ?? []) {
+          if (leaves.length >= MAX_LEAVES) break;
+          if (!h.IsDir) continue;
+          if (!/^\d{4}$/.test(h.Name ?? h.Path)) continue;
+          const rel = `${dayPaths[i].y}/${dayPaths[i].m}/${dayPaths[i].d.Path}/${h.Name ?? h.Path}`;
+          leaves.push({
+            remotePath: `${remote}:${prefix}/${rel}`,
+            relPath: `${prefix}/${rel}`,
+            kind: "perCompany"
+          });
+        }
       }
     }
-    const hourLists = await runWithCap(
-      dayPaths,
-      PARALLEL,
-      async ({ y: y2, m, d }) => newestFirst(await lsjsonDir2(`${remote}:${prefix}/${y2}/${m}/${d.Path}/`)).slice(0, MAX_HOURS_PER_DAY)
-    );
-    for (let i = 0; i < hourLists.length; i += 1) {
-      if (backups.length >= MAX_LEAVES) break;
-      for (const h of hourLists[i] ?? []) {
-        if (backups.length >= MAX_LEAVES) break;
-        if (!h.IsDir) continue;
-        if (!/^\d{4}$/.test(h.Name ?? h.Path)) continue;
-        const fullPath = `${dayPaths[i].y}/${dayPaths[i].m}/${dayPaths[i].d.Path}/${h.Name ?? h.Path}`;
-        backups.push({
-          path: `${prefix}/${fullPath}`,
-          modified: h.ModTime,
-          sizeBytes: h.Size ?? 0
-        });
+    roots.push({ kind: "perCompany", remote: `${remote}:${prefix}`, prefix, count: 0, totalBytes: 0 });
+  }
+  async function walkTier(tier) {
+    const prefix = `Paperclip-Backups/${tier}`;
+    const entries = newestFirst(
+      await lsjsonDir(`${remote}:${prefix}/`, cfg.rcloneConfig, pass)
+    ).filter((e) => e.IsDir).slice(0, MAX_TIER_LEAVES);
+    for (const e of entries) {
+      if (leaves.length >= MAX_LEAVES) break;
+      leaves.push({
+        remotePath: `${remote}:${prefix}/${e.Path}`,
+        relPath: `${prefix}/${e.Path}`,
+        kind: tier
+      });
+    }
+    roots.push({ kind: tier, remote: `${remote}:${prefix}`, prefix, count: 0, totalBytes: 0 });
+  }
+  await walkPerCompany();
+  await walkTier("hourly");
+  await walkTier("daily");
+  const backups = [];
+  const leafDetails = await runWithCap(leaves, PARALLEL, async (leaf) => {
+    const files = await lsjsonDir(leaf.remotePath, cfg.rcloneConfig, pass, { dirsOnly: false });
+    let totalBytes = 0;
+    let newestMtime = "";
+    for (const f of files) {
+      totalBytes += f.Size ?? 0;
+      if (f.ModTime && (!newestMtime || f.ModTime > newestMtime)) {
+        newestMtime = f.ModTime;
       }
+    }
+    return { leaf, totalBytes, modified: newestMtime };
+  });
+  for (const { leaf, totalBytes, modified } of leafDetails) {
+    backups.push({
+      path: leaf.relPath,
+      modified: modified || void 0,
+      sizeBytes: totalBytes,
+      kind: leaf.kind
+    });
+    const root = roots.find((r) => r.kind === leaf.kind);
+    if (root) {
+      root.count += 1;
+      root.totalBytes += totalBytes;
     }
   }
-  return { remote: `${remote}:${prefix}`, prefix, backups };
+  backups.sort((a, b) => {
+    const am = a.modified ?? a.path;
+    const bm = b.modified ?? b.path;
+    return am < bm ? 1 : am > bm ? -1 : 0;
+  });
+  const primaryPrefix = `Paperclip-Backups/${companyId}`;
+  return { remote: `${remote}:${primaryPrefix}`, prefix: primaryPrefix, backups, roots };
 }
 var LISTING_TTL_MS = 5 * 6e4;
 var listingCache = /* @__PURE__ */ new Map();
@@ -10849,12 +10881,42 @@ async function findRunningBackupProcs() {
 }
 var pluginInstance = definePlugin({
   async setup(ctx) {
+    const STUCK_BACKUP_THRESHOLD_MS = 30 * 6e4;
+    {
+      let killed = null;
+      const check = async () => {
+        try {
+          const entry = await ctx.state.get({ scopeKind: "instance", stateKey: "backup-running" }).catch(() => null);
+          if (entry && typeof entry.startedAt === "string" && typeof entry.pid === "number") {
+            const ageMs = Date.now() - new Date(entry.startedAt).getTime();
+            if (ageMs > STUCK_BACKUP_THRESHOLD_MS) {
+              try {
+                process.kill(entry.pid, 0);
+                try {
+                  process.kill(entry.pid, "SIGTERM");
+                  ctx.logger.warn("paperclip-backup: stuck-running watchdog SIGTERMed child pid=" + entry.pid + " ageMs=" + ageMs);
+                } catch (sendErr) {
+                  ctx.logger.warn("paperclip-backup: stuck-running watchdog could not signal child pid=" + entry.pid + " err=" + (sendErr instanceof Error ? sendErr.message : String(sendErr)));
+                }
+              } catch {
+              }
+              await ctx.state.delete({ scopeKind: "instance", stateKey: "backup-running" }).catch(() => null);
+            }
+          }
+        } catch (err) {
+          ctx.logger.warn("paperclip-backup: stuck-running watchdog error: " + (err instanceof Error ? err.message : String(err)));
+        }
+      };
+      killed = setInterval(check, 6e4);
+      void check();
+      if (typeof killed.unref === "function") killed.unref();
+    }
     ctx.data.register(DATA_KEYS.config, async () => {
       return readInstanceConfig();
     });
     ctx.data.register(DATA_KEYS.listing, async (params) => {
       const p = params ?? {};
-      const companyId = p.companyId || "default";
+      const companyId = resolveCompanyId(p);
       const cfg = readInstanceConfig();
       const cached = listingCache.get(companyId);
       if (cached && Date.now() - cached.at < LISTING_TTL_MS) {
@@ -10863,13 +10925,43 @@ var pluginInstance = definePlugin({
       const resolved = resolveLocalBackupDir(cfg);
       const localDumps = await readLocalDumps(resolved.dir);
       const localBytes = localDumps.reduce((s, d) => s + d.sizeBytes, 0);
-      const placeholderOffsite = {
-        remote: `${cfg.rcloneRemote}:Paperclip-Backups/${companyId}`,
-        prefix: `Paperclip-Backups/${companyId}`,
-        backups: [],
-        count: 0,
-        totalBytes: 0,
-        loading: true
+      let offsite;
+      let offsiteError = null;
+      try {
+        offsite = await readOffsiteBackups(cfg, companyId);
+      } catch (err) {
+        offsiteError = err instanceof Error ? err.message : String(err);
+        ctx.logger.warn(
+          `paperclip-backup: offsite listing walk failed: companyId=${companyId} err=${offsiteError}`
+        );
+        offsite = {
+          remote: `${cfg.rcloneRemote}:Paperclip-Backups/${companyId}`,
+          prefix: `Paperclip-Backups/${companyId}`,
+          backups: [],
+          roots: []
+        };
+      }
+      const offsiteBytes = offsite.backups.reduce((s, b) => s + b.sizeBytes, 0);
+      const perKind = {};
+      for (const r of offsite.roots) {
+        perKind[r.kind] = { count: r.count, totalBytes: r.totalBytes };
+      }
+      const spaceUsage = {
+        local: { count: localDumps.length, totalBytes: localBytes },
+        offsite: {
+          count: offsite.backups.length,
+          totalBytes: offsiteBytes,
+          perKind,
+          roots: offsite.roots
+        },
+        grandTotalBytes: localBytes + offsiteBytes
+      };
+      const offsiteSection = {
+        ...offsite,
+        count: offsite.backups.length,
+        totalBytes: offsiteBytes,
+        loading: false,
+        ...offsiteError ? { _error: offsiteError } : {}
       };
       const listing = {
         local: {
@@ -10879,78 +10971,65 @@ var pluginInstance = definePlugin({
           count: localDumps.length,
           totalBytes: localBytes
         },
-        offsite: placeholderOffsite,
+        offsite: offsiteSection,
         retention: {
           keep: cfg.defaultKeep,
           candidates: Math.max(0, localDumps.length - cfg.defaultKeep)
         },
         offsiteRetention: {
           keep: cfg.offsiteKeep,
-          candidates: 0,
-          totalBytes: 0
+          candidates: Math.max(0, offsite.backups.length - cfg.offsiteKeep),
+          totalBytes: offsiteBytes
         },
+        spaceUsage,
         config: cfg,
         loading: false,
         requestedCompanyId: companyId,
         listingAt: Date.now(),
-        listingFresh: false
+        listingFresh: true
       };
       listingCache.set(companyId, {
         at: Date.now(),
         listing,
-        refreshing: true
+        refreshing: false
       });
-      void (async () => {
-        try {
-          const offsite = await readOffsiteBackups(cfg, companyId);
-          const offsiteBytes = offsite.backups.reduce((s, b) => s + b.sizeBytes, 0);
-          listingCache.set(companyId, {
-            at: Date.now(),
-            listing: {
-              ...listing,
-              offsite: { ...offsite, loading: false },
-              offsiteRetention: {
-                keep: cfg.offsiteKeep,
-                candidates: Math.max(0, offsite.backups.length - cfg.offsiteKeep),
-                totalBytes: offsiteBytes
-              },
-              listingFresh: true
-            },
-            refreshing: false
-          });
-        } catch (err) {
-          ctx.logger.warn(
-            `paperclip-backup: offsite listing walk failed: companyId=${companyId} err=${err instanceof Error ? err.message : String(err)}`
-          );
-          listingCache.set(companyId, {
-            at: Date.now(),
-            listing: {
-              ...listing,
-              offsite: {
-                ...placeholderOffsite,
-                loading: false,
-                _error: err instanceof Error ? err.message : String(err)
-              },
-              listingFresh: true
-            },
-            refreshing: false
-          });
-        }
-      })();
       return listing;
     });
-    ctx.data.register(DATA_KEYS.status, async () => {
+    ctx.data.register(DATA_KEYS.status, async (params) => {
+      const p = params ?? {};
+      const companyId = resolveCompanyId(p);
       const [lastRun, running, offsiteLast, offsiteRunning] = await Promise.all([
         ctx.state.get({ scopeKind: "instance", stateKey: STATE_KEYS.backupLastRun }).catch(() => null),
         ctx.state.get({ scopeKind: "instance", stateKey: STATE_KEYS.backupRunning }).catch(() => null),
         ctx.state.get({ scopeKind: "instance", stateKey: STATE_KEYS.offsiteLastRun }).catch(() => null),
         ctx.state.get({ scopeKind: "instance", stateKey: STATE_KEYS.offsiteRunning }).catch(() => null)
       ]);
+      const cfg = readInstanceConfig();
+      const resolved = resolveLocalBackupDir(cfg);
+      const localDumps = await readLocalDumps(resolved.dir);
+      const localBytes = localDumps.reduce((s, d) => s + d.sizeBytes, 0);
+      const localNewest = localDumps[0] ?? null;
+      const cached = listingCache.get(companyId);
+      const cachedOffsite = cached && cached.listing && typeof cached.listing === "object" ? cached.listing.offsite : null;
+      const offsiteCount = cachedOffsite?.count ?? 0;
+      const offsiteBytes = cachedOffsite?.totalBytes ?? 0;
+      const newest = cachedOffsite?.backups && cachedOffsite.backups.length > 0 ? cachedOffsite.backups.slice().sort((a, b) => (a.modified ?? "") < (b.modified ?? "") ? 1 : -1)[0] : null;
       return {
         backupLastRun: lastRun,
         backupRunning: running,
         offsiteLastRun: offsiteLast,
-        offsiteRunning
+        offsiteRunning,
+        local: {
+          count: localDumps.length,
+          totalBytes: localBytes,
+          newest: localNewest ? { filename: localNewest.filename, mtime: localNewest.mtime } : null,
+          dir: resolved.dir
+        },
+        offsite: {
+          count: offsiteCount,
+          totalBytes: offsiteBytes,
+          newest
+        }
       };
     });
     ctx.actions.register(ACTION_KEYS.runBackup, async (params) => {
@@ -11366,6 +11445,23 @@ var pluginInstance = definePlugin({
         };
       }
     );
+    const resolveTierKeep = async (tier) => {
+      const stateKey = tier === "daily" ? "backup-tier-daily-keep" : "backup-tier-hourly-keep";
+      const cfg = readInstanceConfig();
+      const fallback = tier === "daily" ? cfg.gdriveTierDailyKeep : cfg.gdriveTierHourlyKeep;
+      try {
+        const raw = await ctx.state.get({
+          scopeKind: "instance",
+          stateKey
+        });
+        if (raw && typeof raw === "object" && "keep" in raw) {
+          const k = Number(raw.keep);
+          if (Number.isFinite(k) && k >= 1) return Math.floor(k);
+        }
+      } catch {
+      }
+      return fallback && fallback >= 1 ? Math.floor(fallback) : tier === "daily" ? 3 : 2;
+    };
     ctx.actions.register(
       RECOVERY_ACTION_KEYS.uploadDailyBackup,
       async () => {
@@ -11373,7 +11469,8 @@ var pluginInstance = definePlugin({
         if (!existsSync(scriptPath)) {
           return { ok: false, message: `tiered upload script not found: ${scriptPath}` };
         }
-        const child = spawn(scriptPath, ["upload-daily"], {
+        const keep = await resolveTierKeep("daily");
+        const child = spawn(scriptPath, ["--tier", "daily", "--keep", String(keep)], {
           detached: true,
           stdio: "ignore"
         });
@@ -11382,7 +11479,7 @@ var pluginInstance = definePlugin({
           ok: true,
           pid: child.pid,
           async: true,
-          message: `Daily upload started (pid=${child.pid})`
+          message: `Daily upload started (pid=${child.pid}, keep=${keep})`
         };
       }
     );
@@ -11393,7 +11490,8 @@ var pluginInstance = definePlugin({
         if (!existsSync(scriptPath)) {
           return { ok: false, message: `tiered upload script not found: ${scriptPath}` };
         }
-        const child = spawn(scriptPath, ["upload-hourly"], {
+        const keep = await resolveTierKeep("hourly");
+        const child = spawn(scriptPath, ["--tier", "hourly", "--keep", String(keep)], {
           detached: true,
           stdio: "ignore"
         });
@@ -11402,7 +11500,7 @@ var pluginInstance = definePlugin({
           ok: true,
           pid: child.pid,
           async: true,
-          message: `Hourly upload started (pid=${child.pid})`
+          message: `Hourly upload started (pid=${child.pid}, keep=${keep})`
         };
       }
     );
@@ -11486,7 +11584,9 @@ var pluginInstance = definePlugin({
             cfg.rcloneConfig,
             rclonePass
           );
-          return items.map((i) => ({ id: i.Name, path: i.Path })).sort((a, b) => a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
+          return items.map((i) => ({ id: i.Name, path: i.Path })).sort(
+            (a, b) => a.id < b.id ? 1 : a.id > b.id ? -1 : 0
+          );
         } catch {
           return [];
         }
@@ -11496,8 +11596,14 @@ var pluginInstance = definePlugin({
         listTier("hourly")
       ]);
       return {
-        daily: { keep: dailyKeep, count: dailyItems.length, items: dailyItems },
-        hourly: { keep: hourlyKeep, count: hourlyItems.length, items: hourlyItems }
+        enabled: true,
+        tierRoot,
+        keep: { daily: dailyKeep, hourly: hourlyKeep },
+        counts: { daily: dailyItems.length, hourly: hourlyItems.length },
+        lastUpload: { daily: null, hourly: null },
+        errors: { daily: null, hourly: null },
+        daily: dailyItems,
+        hourly: hourlyItems
       };
     });
     ctx.jobs.register(JOB_KEYS.autoPruneOffsite, async () => {
@@ -11506,34 +11612,91 @@ var pluginInstance = definePlugin({
       if (!keep || keep <= 0) {
         return;
       }
-      const companyId = process.env.PAPERCLIP_COMPANY_ID;
-      if (!companyId) {
-        ctx.logger.warn("auto-prune-offsite: PAPERCLIP_COMPANY_ID not set");
-        return;
-      }
-      await runScript(cfg.backupScript, [companyId, "--prune-offsite"], {
-        PAPERCLIP_COMPANY_ID: companyId
-      });
+      const companyId = resolveCompanyId(void 0);
+      const child = spawn(
+        cfg.backupScript,
+        [companyId, "--prune-offsite"],
+        {
+          detached: true,
+          stdio: "ignore",
+          env: {
+            ...process.env,
+            PAPERCLIP_COMPANY_ID: companyId
+          }
+        }
+      );
+      child.unref();
+      ctx.logger.info(
+        `auto-prune-offsite: spawned offsite prune pid=${child.pid} companyId=${companyId} keep=${keep} script=${cfg.backupScript}`
+      );
     });
     ctx.jobs.register(JOB_KEYS.autoOffsiteBackup, async () => {
       const cfg = readInstanceConfig();
       const companyId = resolveCompanyId(void 0);
       if (!cfg.worktreeBackupEnabled) return;
-      const main = await runScript(cfg.backupScript, [companyId], {
-        PAPERCLIP_COMPANY_ID: companyId
+      const env = { PAPERCLIP_COMPANY_ID: companyId };
+      const main = spawn(cfg.backupScript, [companyId], {
+        detached: true,
+        stdio: "ignore",
+        env: { ...process.env, ...env }
       });
-      if (!main.ok) {
-        ctx.logger.warn(`auto-offsite-backup: main backup failed: ${main.message}`);
+      main.unref();
+      ctx.logger.info(
+        `auto-offsite-backup: spawned main DB-dump upload pid=${main.pid} companyId=${companyId} script=${cfg.backupScript}`
+      );
+      if (cfg.worktreeBackupScript && existsSync(cfg.worktreeBackupScript)) {
+        const wt = spawn(cfg.worktreeBackupScript, [], {
+          detached: true,
+          stdio: "ignore",
+          env: { ...process.env, ...env }
+        });
+        wt.unref();
+        ctx.logger.info(
+          `auto-offsite-backup: spawned worktree snapshot upload pid=${wt.pid} companyId=${companyId} script=${cfg.worktreeBackupScript}`
+        );
+      }
+    });
+    ctx.jobs.register(JOB_KEYS.tieredHourlyUpload, async () => {
+      const cfg = readInstanceConfig();
+      const tierScriptPath = process.env.PAPERCLIP_GDRIVE_TIERED_SCRIPT || "/home/sirrus/paperclip-btcaaaaa-main/scripts/gdrive-tiered-upload.sh";
+      if (!existsSync(tierScriptPath)) {
+        ctx.logger.warn(`tiered-hourly-upload: script not found: ${tierScriptPath}`);
         return;
       }
-      if (cfg.worktreeBackupScript && existsSync(cfg.worktreeBackupScript)) {
-        const wt = await runScript(cfg.worktreeBackupScript, [], {
-          PAPERCLIP_COMPANY_ID: companyId
-        });
-        if (!wt.ok) {
-          ctx.logger.warn(`auto-offsite-backup: worktree backup failed: ${wt.message}`);
+      const keep = cfg.gdriveTierHourlyKeep && cfg.gdriveTierHourlyKeep >= 1 ? Math.floor(cfg.gdriveTierHourlyKeep) : 2;
+      const child = spawn(
+        tierScriptPath,
+        ["--tier", "hourly", "--keep", String(keep)],
+        {
+          detached: true,
+          stdio: "ignore"
         }
+      );
+      child.unref();
+      ctx.logger.info(
+        `tiered-hourly-upload: spawned tier promotion pid=${child.pid} keep=${keep} tier=hourly`
+      );
+    });
+    ctx.jobs.register(JOB_KEYS.tieredDailyUpload, async () => {
+      const cfg = readInstanceConfig();
+      const tierScriptPath = process.env.PAPERCLIP_GDRIVE_TIERED_SCRIPT || "/home/sirrus/paperclip-btcaaaaa-main/scripts/gdrive-tiered-upload.sh";
+      if (!existsSync(tierScriptPath)) {
+        ctx.logger.warn(`tiered-daily-upload: script not found: ${tierScriptPath}`);
+        return;
       }
+      const keep = cfg.gdriveTierDailyKeep && cfg.gdriveTierDailyKeep >= 1 ? Math.floor(cfg.gdriveTierDailyKeep) : 3;
+      const child = spawn(
+        tierScriptPath,
+        ["--tier", "daily", "--keep", String(keep)],
+        {
+          detached: true,
+          stdio: "ignore"
+        }
+      );
+      child.unref();
+      ctx.logger.info(
+        `tiered-daily-upload: spawned tier promotion pid=${child.pid} keep=${keep} tier=daily`
+      );
     });
   }
 });

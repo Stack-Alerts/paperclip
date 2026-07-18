@@ -621,6 +621,76 @@ async function findRunningBackupProcs() {
 export const pluginInstance: PaperclipPlugin = definePlugin({
   async setup(ctx) {
     // ---------------------------------------------------------------------
+    // Stuck-backup watchdog
+    //
+    // The lifecycle handlers below clear `backupRunning` when the spawned
+    // child process emits "exit"/"error"/"close" — but if the child is
+    // alive (waiting on rclone, etc.), none of those fire and the UI shows
+    // "Working…" forever. This watchdog periodically checks if the
+    // running child has been alive longer than the configured threshold,
+    // and if so, SIGTERMs the child (which triggers our exit handler
+    // and clears the marker). Threshold scales with the script's claimed
+    // duration, with an absolute cap.
+    // ---------------------------------------------------------------------
+    const STUCK_BACKUP_THRESHOLD_MS = 30 * 60_000;
+    {
+      let killed: ReturnType<typeof setTimeout> | null = null;
+      const check = async () => {
+        try {
+          const entry = (await ctx.state
+            .get({ scopeKind: "instance", stateKey: "backup-running" })
+            .catch(() => null)) as null | {
+            pid?: number;
+            startedAt?: string;
+            script?: string;
+            args?: unknown;
+          };
+          if (entry && typeof entry.startedAt === "string" && typeof entry.pid === "number") {
+            const ageMs = Date.now() - new Date(entry.startedAt).getTime();
+            if (ageMs > STUCK_BACKUP_THRESHOLD_MS) {
+              // Liveness check: does the PID still exist? If the kernel
+              // has reaped the zombie, process.kill throws ESRCH. Treat
+              // any failure (including ESRCH) as "the script is gone" and
+              // run the normal clear-handler path so the marker doesn't
+              // leak. If the script is alive but stuck, SIGTERM it; the
+              // child's `exit` handler will then clear the marker.
+              try {
+                process.kill(entry.pid, 0);
+                // Liveness probe succeeded — child is alive. If it's
+                // been stuck longer than the threshold, SIGTERM it. The
+                // child's "exit" handler will then clear the marker.
+                try {
+                  process.kill(entry.pid, "SIGTERM");
+                  ctx.logger.warn("paperclip-backup: stuck-running watchdog SIGTERMed child pid=" + entry.pid + " ageMs=" + ageMs);
+                } catch (sendErr) {
+                  ctx.logger.warn("paperclip-backup: stuck-running watchdog could not signal child pid=" + entry.pid + " err=" + (sendErr instanceof Error ? sendErr.message : String(sendErr)));
+                }
+              } catch {
+                // ESRCH or EPERM — process already gone, fall through to clear.
+              }
+              // Whether the script is gone or stuck, the next status poll
+              // should see an empty `running`. Clear the marker explicitly
+              // in case no exit handler will fire (the script might still be
+              // hung and waiting for rclone to notice the SIGTERM).
+              await ctx.state
+                .delete({ scopeKind: "instance", stateKey: "backup-running" })
+                .catch(() => null);
+            }
+          }
+        } catch (err) {
+          ctx.logger.warn("paperclip-backup: stuck-running watchdog error: " + (err instanceof Error ? err.message : String(err)));
+        }
+      };
+      killed = setInterval(check, 60_000);
+      // One immediate check on startup so a freshly-restarted worker
+      // cleans up state from a stuck previous run before the next 60s tick.
+      void check();
+      // Don't keep the worker alive solely for this interval — let Node
+      // exit naturally when the host closes stdin / the parent dies.
+      if (typeof killed.unref === "function") killed.unref();
+    }
+
+    // ---------------------------------------------------------------------
     // Data providers
     // ---------------------------------------------------------------------
     ctx.data.register(DATA_KEYS.config, async () => {
