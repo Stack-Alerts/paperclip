@@ -208,8 +208,15 @@ function readInstanceConfig(cfg: Record<string, unknown> = {}) {
 }
 
 function resolveCompanyId(params: Record<string, unknown> | undefined) {
+  // Accept the caller-provided companyId UNLESS it is the literal "default"
+  // sentinel (which the dashboard passes when the active company has no UI
+  // route of its own — the "default" Paperclip company). In that case we
+  // want to fall through to the host company's id (BTC-Trade-Engine) so
+  // /api/plugins/<backup>/data/listing can still find the right gdrive root.
+  const fromParams = params?.companyId as string | undefined;
+  const usable = fromParams && fromParams !== "default" ? fromParams : undefined;
   return (
-    (params?.companyId as string | undefined) ??
+    usable ??
     process.env.PAPERCLIP_COMPANY_ID ??
     // Fallback: the canonical BTC-Trade-Engine Paperclip companyId.
     // The plugin's host company is always this; hardcoding lets the
