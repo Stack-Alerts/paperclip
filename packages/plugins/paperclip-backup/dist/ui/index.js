@@ -682,8 +682,8 @@ function ForceRecoverySection({ forceBackup, forceRestore, deleteRecoverySnapsho
                 _jsx(Button, { label: busy === busyKey ? "Uploading\u2026" : ("Upload latest to " + name), busy: busy === busyKey, onClick: function () { onUpload(); } }),
             ] }),
             last ? _jsx("div", { style: { fontSize: 11, fontFamily: "ui-monospace, monospace", color: "var(--muted-foreground, #6b7280)", marginBottom: 6 }, children: "most recent: " + last }) : null,
-            items && items.length ? _jsx("div", { style: { fontSize: 11, fontFamily: "ui-monospace, monospace", maxHeight: 70, overflow: "auto", padding: 4, background: "var(--muted, #f9fafb)", border: "1px solid var(--border, #e5e7eb)", borderRadius: 4, marginBottom: 6 }, children: items.slice().sort().reverse().map(function (id) {
-                return _jsx("div", { style: { padding: "1px 0" }, children: id });
+            items && items.length ? _jsx("div", { style: { fontSize: 11, fontFamily: "ui-monospace, monospace", maxHeight: 70, overflow: "auto", padding: 4, background: "var(--muted, #f9fafb)", border: "1px solid var(--border, #e5e7eb)", borderRadius: 4, marginBottom: 6 }, children: items.slice().sort().reverse().map(function (item) {
+                return _jsx("div", { style: { padding: "1px 0" }, children: item.id });
             }) }) : null,
             error ? _jsx("div", { style: { fontSize: 11, color: "var(--destructive, #b91c1c)", marginBottom: 6 }, children: error }) : null,
             _jsxs("div", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12 }, children: [
