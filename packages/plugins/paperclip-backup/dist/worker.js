@@ -10587,24 +10587,37 @@ async function lsjsonDir(remotePath, rcloneConfig, rclonePass, opts = {}) {
   let stderr = "";
   child.stdout.on("data", (b) => stdout += b.toString());
   child.stderr.on("data", (b) => stderr += b.toString());
-  const code = await new Promise((res) => child.on("exit", (c) => res(c ?? 0)));
+  const code = await new Promise((res) => child.on("close", (c) => res(c ?? 0)));
   if (code !== 0) return [];
-  const out = [];
-  for (const line of stdout.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const obj = JSON.parse(trimmed);
-      if (!obj.Path) continue;
-      out.push({
-        Path: obj.Path,
-        Name: obj.Name ?? obj.Path.split("/").pop() ?? obj.Path,
-        Size: obj.Size ?? 0,
-        IsDir: !!obj.IsDir,
-        ModTime: obj.ModTime
-      });
-    } catch {
+  let entries;
+  try {
+    entries = JSON.parse(stdout);
+  } catch {
+    entries = [];
+    for (const line of stdout.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed === "[" || trimmed === "]") continue;
+      try {
+        const arr2 = JSON.parse(trimmed);
+        if (Array.isArray(arr2)) entries = entries.concat(arr2);
+        else entries.push(arr2);
+      } catch {
+      }
     }
+  }
+  const arr = Array.isArray(entries) ? entries : [];
+  const out = [];
+  for (const obj of arr) {
+    if (!obj || typeof obj !== "object") continue;
+    const e = obj;
+    if (!e.Path) continue;
+    out.push({
+      Path: e.Path,
+      Name: e.Name ?? e.Path.split("/").pop() ?? e.Path,
+      Size: e.Size ?? 0,
+      IsDir: !!e.IsDir,
+      ModTime: e.ModTime
+    });
   }
   return out;
 }
@@ -11379,7 +11392,12 @@ var pluginInstance = definePlugin({
         child.stdout.on("data", (b) => stdout += b.toString());
         child.stderr.on("data", (b) => stderr += b.toString());
         const code = await new Promise(
-          (res) => child.on("exit", (c) => res(c))
+          (res) => (
+            // "close" fires after "exit" once all stdio streams are
+            // fully drained; using "exit" can leave stdout truncated
+            // and the rclone JSON parse throws silently, returning [].
+            child.on("close", (c) => res(c))
+          )
         );
         return {
           ok: code === 0,

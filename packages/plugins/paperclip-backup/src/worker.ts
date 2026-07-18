@@ -161,31 +161,56 @@ async function lsjsonDir(
   let stderr = "";
   child.stdout.on("data", (b) => (stdout += b.toString()));
   child.stderr.on("data", (b) => (stderr += b.toString()));
-  const code: number = await new Promise((res) => child.on("exit", (c) => res(c ?? 0)));
+  // Wait for "close" not "exit" — "exit" can fire before the parent's
+  // stdout pipe has been fully drained, which causes JSON.parse on a
+  // truncated buffer to silently throw and the helper to return [].
+  // "close" is emitted only after both the child has exited AND all
+  // stdio streams have closed.
+  const code: number = await new Promise((res) => child.on("close", (c) => res(c ?? 0)));
   if (code !== 0) return [];
-  const out: Array<LsjsonEntry> = [];
-  for (const line of stdout.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const obj = JSON.parse(trimmed) as Partial<LsjsonEntry> & {
-        Path?: string;
-        Name?: string;
-        Size?: number;
-        IsDir?: boolean;
-        ModTime?: string;
-      };
-      if (!obj.Path) continue;
-      out.push({
-        Path: obj.Path,
-        Name: obj.Name ?? obj.Path.split("/").pop() ?? obj.Path,
-        Size: obj.Size ?? 0,
-        IsDir: !!obj.IsDir,
-        ModTime: obj.ModTime,
-      });
-    } catch {
-      /* skip */
+  // rclone lsjson emits a single JSON ARRAY (with the directory listing),
+  // not NDJSON. The line-by-line parser mis-identified the leading "["
+  // and trailing "]" as malformed lines and dropped everything but the
+  // single object line inside the array — that is why offsite listings
+  // were returning exactly 1 entry per root even though lsjson produced
+  // many. Parse the whole payload as one array; fall back to NDJSON-split
+  // for rclone versions that wrap each entry on its own line.
+  let entries: unknown;
+  try {
+    entries = JSON.parse(stdout) as unknown;
+  } catch {
+    entries = [];
+    for (const line of stdout.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed === "[" || trimmed === "]") continue;
+      try {
+        const arr = JSON.parse(trimmed);
+        if (Array.isArray(arr)) entries = (entries as unknown[]).concat(arr);
+        else (entries as unknown[]).push(arr);
+      } catch {
+        /* skip */
+      }
     }
+  }
+  const arr = Array.isArray(entries) ? entries : [];
+  const out: Array<LsjsonEntry> = [];
+  for (const obj of arr) {
+    if (!obj || typeof obj !== "object") continue;
+    const e = obj as Partial<LsjsonEntry> & {
+      Path?: string;
+      Name?: string;
+      Size?: number;
+      IsDir?: boolean;
+      ModTime?: string;
+    };
+    if (!e.Path) continue;
+    out.push({
+      Path: e.Path,
+      Name: e.Name ?? e.Path.split("/").pop() ?? e.Path,
+      Size: e.Size ?? 0,
+      IsDir: !!e.IsDir,
+      ModTime: e.ModTime,
+    });
   }
   return out;
 }
@@ -1300,7 +1325,10 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         child.stdout.on("data", (b: Buffer) => (stdout += b.toString()));
         child.stderr.on("data", (b: Buffer) => (stderr += b.toString()));
         const code = await new Promise<number | null>((res) =>
-          child.on("exit", (c) => res(c)),
+          // "close" fires after "exit" once all stdio streams are
+          // fully drained; using "exit" can leave stdout truncated
+          // and the rclone JSON parse throws silently, returning [].
+          child.on("close", (c) => res(c)),
         );
         return {
           ok: code === 0,
