@@ -756,6 +756,7 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         local: {
           count: localDumps.length,
           totalBytes: localBytes,
+          dumps: localDumps,
           newest: localDumps[0]
             ? { filename: localDumps[0].filename, mtime: localDumps[0].mtime }
             : null,

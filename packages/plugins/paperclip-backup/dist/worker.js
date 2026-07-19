@@ -10946,6 +10946,7 @@ var pluginInstance = definePlugin({
         local: {
           count: localDumps.length,
           totalBytes: localBytes,
+          dumps: localDumps,
           newest: localDumps[0] ? { filename: localDumps[0].filename, mtime: localDumps[0].mtime } : null,
           dir: resolved.dir,
           source: resolved.source,
