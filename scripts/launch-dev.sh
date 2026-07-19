@@ -58,7 +58,7 @@ if [[ -n "$NODE_BIN" ]]; then
   # server depends on `node:sqlite` which only exists in v22.5+ (we use
   # v24.16.0 here); falling back to the system v22.12.0 produces the
   # "ERR_UNKNOWN_BUILTIN_MODULE: node:sqlite" crash on first boot.
-  ENV_PREFIX+="PATH='$NODE_BIN:$PATH' "
+  ENV_PREFIX+="PATH='$NODE_BIN:/home/sirrus/.npm-global/bin:$PATH' "
 fi
 ENV_PREFIX+="PAPERCLIP_HOME='/home/sirrus/.paperclip-worktrees' "
 
@@ -93,7 +93,7 @@ export PAPERCLIP_DEV_SERVER_STATUS_FILE="$REPO_ROOT/.paperclip/dev-server-status
 # children (including the dev-runner, which reads PORT to compute its
 # health-polling URL).
 if [[ -n "$NODE_BIN" ]]; then
-  EXPORT_PATH="export PATH='$NODE_BIN':\$PATH"
+  EXPORT_PATH="export PATH='$NODE_BIN:/home/sirrus/.npm-global/bin':\$PATH"
 else
   EXPORT_PATH=""
 fi
