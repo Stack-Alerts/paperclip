@@ -53,6 +53,20 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+# Load .env into the process environment as early as possible so module-level
+# reads (auth, Postgres/Redis config, etc.) see the same values whether uvicorn
+# was started from start.sh or invoked directly. python-dotenv parses values
+# like `KEY=[1.618, 2.618, 3.618]` as literal strings, so we deliberately do
+# NOT rely on the shell to `source .env` — that path is fragile under `set -e`.
+try:
+    from dotenv import load_dotenv
+
+    _ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
+    if _ENV_PATH.is_file():
+        load_dotenv(_ENV_PATH, override=False)
+except ImportError:
+    pass
+
 import redis.asyncio as aioredis
 from redis.exceptions import RedisError
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect, status
