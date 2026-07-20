@@ -55,7 +55,7 @@ import { createPluginWorkerManager } from "./services/plugin-worker-manager.js";
 import { createStorageServiceFromConfig } from "./storage/index.js";
 import { printStartupBanner } from "./startup-banner.js";
 import { getBoardClaimWarningUrl, initializeBoardClaimChallenge } from "./board-claim.js";
-import { maybePersistWorktreeRuntimePorts } from "./worktree-config.js";
+import { maybePersistWorktreeRuntimePorts, resolveWorktreeContextCompanyId } from "./worktree-config.js";
 import { initTelemetry, getTelemetryClient } from "./telemetry.js";
 import { conflict } from "./errors.js";
 import type {
@@ -777,6 +777,24 @@ export async function startServer(): Promise<StartedServer> {
     const heartbeat = heartbeatService(db as any, { pluginWorkerManager });
     const routines = routineService(db as any, { pluginWorkerManager });
 
+    // Restrict the heartbeat tick to the worktree's bound company (declared
+    // in context.json). When context.json has no `currentProfile.companyId`
+    // the helper returns null and tickTimers falls back to the existing
+    // "every active company" behavior, so multi-tenant deployments are
+    // unaffected. Resolved once at startup — restart to pick up edits to
+    // context.json.
+    const boundCompanyId = resolveWorktreeContextCompanyId();
+    if (boundCompanyId) {
+      logger.info(
+        { companyId: boundCompanyId, source: "context.json" },
+        "heartbeat scheduler bound to worktree's declared company",
+      );
+    } else {
+      logger.info(
+        "heartbeat scheduler running in multi-tenant mode (no worktree context.json companyId)",
+      );
+    }
+
     // Reap orphaned runs before timer ticks start so wakeups cannot coalesce
     // into a dead "running" row during startup recovery.
     await (async () => {
@@ -861,7 +879,7 @@ export async function startServer(): Promise<StartedServer> {
       }
 
       void heartbeat
-        .tickTimers(new Date())
+        .tickTimers(new Date(), { companyId: boundCompanyId })
         .then((result) => {
           if (result.enqueued > 0) {
             logger.info({ ...result }, "heartbeat timer tick enqueued runs");

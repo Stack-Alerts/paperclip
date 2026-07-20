@@ -12498,12 +12498,26 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
 
     buildRunOutputSilence,
 
-    tickTimers: async (now = new Date()) => {
+    tickTimers: async (now = new Date(), options?: { companyId?: string | null }) => {
+      // Single-tenant worktrees declare a bound companyId in `context.json`
+      // (per the dev-runner contract). When the caller passes that id here,
+      // we restrict the heartbeat tick to that company only. When no id is
+      // passed (default, multi-tenant deployments, or pre-context setups),
+      // the existing behavior is preserved: every active company is ticked.
+      // This is the safety gate that prevents a "Pause all" on company A
+      // from being ignored because the server is also waking agents in
+      // companies B/C/D.
+      const companyId = options?.companyId ?? null;
       const allAgents = await db
         .select({ ...getTableColumns(agents) })
         .from(agents)
         .innerJoin(companies, eq(companies.id, agents.companyId))
-        .where(eq(companies.status, "active"));
+        .where(
+          and(
+            eq(companies.status, "active"),
+            companyId ? eq(agents.companyId, companyId) : sql`true`,
+          ),
+        );
       const agentsByCompany = groupAgentOrgRowsByCompany(allAgents.map(toAgentOrgRow));
       let checked = 0;
       let enqueued = 0;

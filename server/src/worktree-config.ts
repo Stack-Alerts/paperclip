@@ -475,3 +475,47 @@ export function maybePersistWorktreeRuntimePorts(input: {
     writeConfigFile(context.configPath, config);
   }
 }
+
+/**
+ * Resolve the worktree's bound `companyId` from `context.json`, if any.
+ *
+ * `context.json` (per the dev-runner contract) lets a worktree declare which
+ * company it serves — typically a single company. When the file exists and
+ * specifies a non-empty `companyId` in the current profile, this helper returns
+ * it. Otherwise (no context file, malformed JSON, empty/missing profile) it
+ * returns `null` and the caller should fall back to its existing behavior
+ * (i.e., the all-active-companies default).
+ *
+ * The returned id is read once at process start. The caller is expected to
+ * treat it as a static, server-lifetime constant; if the operator edits
+ * `context.json` they must restart the server for the change to take effect.
+ */
+export function resolveWorktreeContextCompanyId(
+  env: NodeJS.ProcessEnv = process.env,
+): string | null {
+  const contextPath = env.PAPERCLIP_CONTEXT?.trim();
+  if (!contextPath) return null;
+  if (!fs.existsSync(contextPath)) return null;
+  let raw: string;
+  try {
+    raw = fs.readFileSync(contextPath, "utf8");
+  } catch {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const root = parsed as {
+    currentProfile?: unknown;
+    profiles?: unknown;
+  };
+  if (typeof root.currentProfile !== "string" || !root.profiles) return null;
+  const profile = (root.profiles as Record<string, unknown>)[root.currentProfile];
+  if (!profile || typeof profile !== "object") return null;
+  const companyId = (profile as { companyId?: unknown }).companyId;
+  return typeof companyId === "string" && companyId.length > 0 ? companyId : null;
+}
