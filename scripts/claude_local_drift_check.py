@@ -23,6 +23,7 @@ import argparse
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 
 SKILL_ID = "a2bab736-d451-4a5a-82e2-30e49a984907"
@@ -88,6 +89,18 @@ def list_claude_local_agents():
 
 def fetch_agent(agent_id):
     return _request("GET", f"/api/agents/{agent_id}")
+
+
+def assert_configuration_access(agent_id):
+    try:
+        _request("GET", f"/api/agents/{agent_id}/configuration")
+    except urllib.error.HTTPError as exc:
+        if exc.code == 403:
+            raise RuntimeError(
+                "Drift detector cannot read agent configurations; "
+                "grant configuration-read access or run it as an authorized agent"
+            ) from exc
+        raise
 
 
 def _unwrap(env_value):
@@ -269,6 +282,13 @@ def main():
     print("[drift-check] listing claude_local agents", file=sys.stderr)
     agents = list_claude_local_agents()
     print(f"[drift-check] {len(agents)} claude_local agents", file=sys.stderr)
+
+    probe_agent = next(
+        (agent for agent in agents if agent["id"] != os.environ.get("PAPERCLIP_AGENT_ID")),
+        None,
+    )
+    if probe_agent:
+        assert_configuration_access(probe_agent["id"])
 
     drifted, clean = [], []
     for a in agents:
