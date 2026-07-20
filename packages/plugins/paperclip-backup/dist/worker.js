@@ -10829,6 +10829,9 @@ async function readOffsiteBackups(cfg, companyId) {
   const backups = [];
   const leafDetails = await runWithCap(leaves, PARALLEL, async (leaf) => {
     const files = await lsjsonDir(leaf.remotePath, cfg.rcloneConfig, pass, { dirsOnly: false });
+    if (!files || files.length === 0) {
+      return null;
+    }
     let totalBytes = 0;
     let newestMtime = "";
     for (const f of files) {
@@ -10840,6 +10843,7 @@ async function readOffsiteBackups(cfg, companyId) {
     return { leaf, totalBytes, modified: newestMtime };
   });
   for (const { leaf, totalBytes, modified } of leafDetails) {
+    if (!leaf) continue;
     backups.push({
       path: leaf.relPath,
       modified: modified || void 0,

@@ -336,6 +336,18 @@ export function BackupManagerPage({ context }) {
         const t = setInterval(() => setRefreshTick((n) => n + 1), 30 * 1000);
         return () => clearInterval(t);
     }, [busy, runningNow?.pid, runningNow?.startedAt]);
+    // Auto-refresh while the offsite listing walk is in flight. The worker
+    // returns a placeholder (offsite.backups = []) and kicks off the rclone
+    // walk in the background; without polling, the user sees "No offsite
+    // backups listed." for ~60-90s until the cache is populated. Poll every
+    // 4s while loading so the freshly-populated cache is picked up promptly
+    // without hammering the worker once the data is in.
+    useEffect(() => {
+        if (!listing || !listing.loading)
+            return;
+        const t = setInterval(() => setRefreshTick((n) => n + 1), 4 * 1000);
+        return () => clearInterval(t);
+    }, [listing && listing.loading, listing && listing.listingAt]);
     const triggerBackup = async () => {
         if (busy)
             return;
@@ -549,7 +561,7 @@ export function BackupManagerPage({ context }) {
                                                     borderTop: "1px solid var(--border, #e5e7eb)",
                                                     background: restorePath === b.path ? "var(--accent, #f3f4f6)" : undefined,
                                                     cursor: "pointer",
-                                                }, onClick: () => setRestorePath(b.path), children: [_jsx("td", { style: { padding: "4px 6px", fontFamily: "ui-monospace, monospace" }, children: b.path.split("/").slice(-2).join("/") }), _jsx("td", { style: { padding: "4px 6px" }, children: formatDate(b.modified) }), _jsx("td", { style: { padding: "4px 6px", textAlign: "right" }, children: b.sizeBytes ? formatBytes(b.sizeBytes) : "—" })] }, b.path))) })] })) : (_jsx("div", { style: { color: "var(--muted-foreground, #6b7280)" }, children: "No offsite backups listed." })) }), _jsxs("div", { style: { display: "flex", gap: 8, alignItems: "end", marginTop: 12, flexWrap: "wrap" }, children: [_jsxs("label", { style: { display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }, children: ["Keep newest", _jsx("input", { type: "number", min: 0, max: 10000, value: offsiteKeep ?? listing?.offsiteRetention?.keep ?? listing?.config?.offsiteKeep ?? 30, onChange: (e) => setOffsiteKeep(Math.max(0, Math.min(10000, Number(e.target.value) || 0))), style: {
+                                                }, onClick: () => setRestorePath(b.path), children: [_jsx("td", { style: { padding: "4px 6px", fontFamily: "ui-monospace, monospace" }, children: b.path.split("/").slice(-2).join("/") }), _jsx("td", { style: { padding: "4px 6px" }, children: formatDate(b.modified) }), _jsx("td", { style: { padding: "4px 6px", textAlign: "right" }, children: b.sizeBytes ? formatBytes(b.sizeBytes) : "—" })] }, b.path))) })] })) : (_jsx("div", { style: { color: "var(--muted-foreground, #6b7280)", display: "flex", alignItems: "center", gap: 8 }, children: listing && listing.loading ? _jsxs("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [_jsx("span", { style: { display: "inline-block", width: 10, height: 10, borderRadius: "50%", border: "2px solid var(--muted-foreground, #6b7280)", borderTopColor: "transparent", animation: "spin 1s linear infinite" } }), _jsx("span", { children: "Loading offsite listing\u2026" })] }) : _jsx("span", { children: "No offsite backups listed." }) })) }), _jsxs("div", { style: { display: "flex", gap: 8, alignItems: "end", marginTop: 12, flexWrap: "wrap" }, children: [_jsxs("label", { style: { display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }, children: ["Keep newest", _jsx("input", { type: "number", min: 0, max: 10000, value: offsiteKeep ?? listing?.offsiteRetention?.keep ?? listing?.config?.offsiteKeep ?? 30, onChange: (e) => setOffsiteKeep(Math.max(0, Math.min(10000, Number(e.target.value) || 0))), style: {
                                                     padding: "4px 8px",
                                                     border: "1px solid var(--border, #e5e7eb)",
                                                     borderRadius: 4,

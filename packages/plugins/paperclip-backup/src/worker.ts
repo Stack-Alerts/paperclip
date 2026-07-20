@@ -540,6 +540,15 @@ async function readOffsiteBackups(
   const backups: OffsiteBackup[] = [];
   const leafDetails = await runWithCap(leaves, PARALLEL, async (leaf) => {
     const files = await lsjsonDir(leaf.remotePath, cfg.rcloneConfig, pass, { dirsOnly: false });
+    // If the per-leaf follow-up returned empty, the leaf was either deleted
+    // between the directory walk and the follow-up, or the rclone call hit
+    // a transient error. Either way, surfacing a row with sizeBytes=0 and
+    // modified=null is misleading — the operator sees a "no offsite
+    // backups" placeholder while the table also shows bogus 0-byte rows.
+    // Skip these so the UI only reflects leaves that actually exist on disk.
+    if (!files || files.length === 0) {
+      return null;
+    }
     let totalBytes = 0;
     let newestMtime = "";
     for (const f of files) {
@@ -551,6 +560,10 @@ async function readOffsiteBackups(
     return { leaf, totalBytes, modified: newestMtime };
   });
   for (const { leaf, totalBytes, modified } of leafDetails) {
+    // Skip leaves whose per-leaf follow-up returned empty (see comment in
+    // the per-leaf closure above). These are deleted/stale directories
+    // that should not appear in the UI with sizeBytes=0 / modified=null.
+    if (!leaf) continue;
     backups.push({
       path: leaf.relPath,
       modified: modified || undefined,
