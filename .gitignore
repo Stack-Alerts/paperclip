@@ -64,3 +64,4 @@ tests/release-smoke/playwright-report/
 .claude/
 patch[0-9]*.json
 verify.json
+scripts/__pycache__/

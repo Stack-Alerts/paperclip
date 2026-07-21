@@ -11,6 +11,7 @@ import {
   executionWorkspaces,
   goals,
   heartbeatRuns,
+  issueComments,
   issueInboxArchives,
   issueReadStates,
   issues,
@@ -2860,7 +2861,10 @@ export function routineService(
             and(
               eq(routineTriggers.id, row.trigger.id),
               eq(routineTriggers.enabled, true),
-              eq(routineTriggers.nextRunAt, row.trigger.nextRunAt),
+              // Truncate both sides to milliseconds so the CAS comparison
+              // matches even when the persisted value has microsecond
+              // precision (the JS `Date` object only carries ms).
+              sql`date_trunc('milliseconds', ${routineTriggers.nextRunAt}) = date_trunc('milliseconds', ${row.trigger.nextRunAt})`,
             ),
           )
           .returning({ id: routineTriggers.id })
@@ -2875,6 +2879,28 @@ export function routineService(
             nextRunAt: claimedNextRunAt,
           });
           continue;
+        }
+
+        // No-op suppression: if the previous run of this routine was a no-op
+        // (linked issue moved to `cancelled` by the agent), skip creating a
+        // fresh execution issue this tick. The suppression window covers one
+        // cron interval — after that, the next tick fires fresh so any new
+        // real work (a newly-broken workspace, a newly-orphaned ticket)
+        // gets picked up within at most 2 cron intervals. We log this as a
+        // `skipped` run with `failure_reason='silent_no_op_recent'` so the
+        // audit trail shows the suppression happened.
+        if (row.routine.lastNoOpAt && row.trigger.nextRunAt && claimedNextRunAt) {
+          const nextIntervalMs = claimedNextRunAt.getTime() - row.trigger.nextRunAt.getTime();
+          const suppressionAgeMs = now.getTime() - row.routine.lastNoOpAt.getTime();
+          if (suppressionAgeMs < nextIntervalMs) {
+            await recordSuppressedScheduleRun({
+              routine: row.routine,
+              trigger: row.trigger,
+              reason: "silent_no_op_recent",
+              nextRunAt: claimedNextRunAt,
+            });
+            continue;
+          }
         }
 
         for (let i = 0; i < runCount; i += 1) {
@@ -2894,26 +2920,80 @@ export function routineService(
       const issue = await db
         .select({
           id: issues.id,
-          status: issues.status,
           originKind: issues.originKind,
           originRunId: issues.originRunId,
+          status: issues.status,
+          routineId: issues.originId,
         })
         .from(issues)
         .where(eq(issues.id, issueId))
         .then((rows) => rows[0] ?? null);
       if (!issue || issue.originKind !== "routine_execution" || !issue.originRunId) return null;
+      const routineId = issue.routineId;
+      if (!routineId) return null;
+
+      // Heuristic: many of the bundled routines (e.g. Workspace validation
+      // self-heal, Orphan ticket sweep) follow the "Silent no-op when
+      // nothing is broken / flagged" guardrail by marking the issue
+      // `done` and leaving an explicit "no-op" / "Silent no-op" comment,
+      // rather than `cancelled`. To avoid spawning a fresh execution
+      // issue on the next cron tick we treat both `cancelled` and a
+      // `done` issue whose most recent agent comment mentions "no-op"
+      // as a no-op run, and refresh `routines.last_no_op_at` accordingly.
+      let detectedNoOp = false;
+      if (issue.status === "cancelled") {
+        detectedNoOp = true;
+      } else if (issue.status === "done") {
+        const recent = await db
+          .select({ body: issueComments.body })
+          .from(issueComments)
+          .where(eq(issueComments.issueId, issueId))
+          .orderBy(desc(issueComments.createdAt))
+          .limit(1)
+          .then((rows) => rows[0]?.body ?? "");
+        const body = (recent ?? "").toLowerCase();
+        if (body.includes("silent no-op") || body.includes("no-op disposition") || /\bno[\s_-]?op\b/.test(body)) {
+          detectedNoOp = true;
+        }
+      }
+
       if (issue.status === "done") {
-        return finalizeRun(issue.originRunId, {
+        await finalizeRun(issue.originRunId, {
           status: "completed",
           completedAt: new Date(),
-        });
+          noOp: detectedNoOp,
+        }, db);
+        if (detectedNoOp) {
+          // Silent no-op: extend the suppression window so the next cron tick
+          // doesn't immediately re-create another cancelled/empty issue.
+          await db
+            .update(routines)
+            .set({ lastNoOpAt: new Date(), updatedAt: new Date() })
+            .where(eq(routines.id, routineId));
+        } else {
+          // Genuine successful run resets the no-op cooldown so the next tick
+          // can fire fresh.
+          await db
+            .update(routines)
+            .set({ lastNoOpAt: null, updatedAt: new Date() })
+            .where(eq(routines.id, routineId));
+        }
+        return null;
       }
       if (issue.status === "blocked" || issue.status === "cancelled") {
-        return finalizeRun(issue.originRunId, {
+        await finalizeRun(issue.originRunId, {
           status: "failed",
           failureReason: `Execution issue moved to ${issue.status}`,
           completedAt: new Date(),
-        });
+          noOp: detectedNoOp,
+        }, db);
+        // No-op or blocked: extend the suppression window so the next
+        // scheduled tick doesn't immediately re-fire on the same blocker.
+        await db
+          .update(routines)
+          .set({ lastNoOpAt: new Date(), updatedAt: new Date() })
+          .where(eq(routines.id, routineId));
+        return null;
       }
       return null;
     },

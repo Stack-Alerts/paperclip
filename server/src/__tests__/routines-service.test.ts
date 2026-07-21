@@ -1780,4 +1780,115 @@ describeEmbeddedPostgres("routine service live-execution coalescing", () => {
     expect(runsAfterResume).toHaveLength(2);
     expect(runsAfterResume.some((run) => run.status === "issue_created")).toBe(true);
   });
+
+  it("suppresses scheduled ticks after a no-op run, then resumes after one cron interval", async () => {
+    // Reproduces the BTCAAAAA-40760 spam: a routine that runs every 5
+    // minutes but always finds nothing to do. With no suppression, the
+    // scheduler mints a fresh cancelled issue per cron tick. With
+    // no-op suppression, the second tick after a no-op is skipped and
+    // a routine_run with `failure_reason='silent_no_op_recent'` records
+    // the suppression for audit. The third tick (after one full cron
+    // interval has elapsed) fires normally so any new real work is
+    // picked up promptly.
+    const { companyId, routine, svc } = await seedFixture();
+    const { trigger } = await svc.createTrigger(
+      routine.id,
+      {
+        kind: "schedule",
+        label: "every-5-min",
+        cronExpression: "*/5 * * * *",
+        timezone: "UTC",
+      },
+      {},
+    );
+
+    // Fire 1: routine runs, agent finds nothing, issue moves to cancelled.
+    // We simulate that by setting the linked issue status to cancelled
+    // and calling syncRunStatusForIssue to record the no-op on the run.
+    const pastDue = new Date("2020-01-01T00:00:00.000Z");
+    await db
+      .update(routineTriggers)
+      .set({ nextRunAt: pastDue })
+      .where(eq(routineTriggers.id, trigger.id));
+
+    const firstResult = await svc.tickScheduledTriggers(new Date());
+    expect(firstResult.triggered).toBe(1);
+
+    const firstIssue = await db
+      .select()
+      .from(issues)
+      .where(eq(issues.companyId, companyId));
+    expect(firstIssue).toHaveLength(1);
+
+    // Simulate the agent marking the issue cancelled and finalizing the run
+    // as a no-op. This is exactly what syncRunStatusForIssue does in
+    // production when an issue is moved to `cancelled`.
+    await db
+      .update(issues)
+      .set({ status: "cancelled" })
+      .where(eq(issues.id, firstIssue[0]!.id));
+    await svc.syncRunStatusForIssue(firstIssue[0]!.id);
+
+    // Verify the routine's last_no_op_at was set.
+    const routineAfterFirst = await db
+      .select()
+      .from(routines)
+      .where(eq(routines.id, routine.id))
+      .then((rows) => rows[0]!);
+    expect(routineAfterFirst.lastNoOpAt).not.toBeNull();
+
+    const runsAfterFirst = await db
+      .select()
+      .from(routineRuns)
+      .where(eq(routineRuns.routineId, routine.id));
+    expect(runsAfterFirst).toHaveLength(2); // 1 dispatched + 1 finalized
+    expect(runsAfterFirst.some((run) => run.noOp === true && run.status === "failed")).toBe(true);
+
+    // Fire 2 (within one cron interval of the no-op): should be SUPPRESSED.
+    // Move nextRunAt back into the past so the tick fires again.
+    await db
+      .update(routineTriggers)
+      .set({ nextRunAt: pastDue })
+      .where(eq(routineTriggers.id, trigger.id));
+
+    const secondResult = await svc.tickScheduledTriggers(new Date());
+    expect(secondResult.triggered).toBe(0);
+
+    // No new issue should be created — only the audit run from tick 1.
+    const issuesAfterSecond = await db
+      .select()
+      .from(issues)
+      .where(eq(issues.companyId, companyId));
+    expect(issuesAfterSecond).toHaveLength(1);
+
+    // A skipped run with reason 'silent_no_op_recent' should be recorded.
+    const runsAfterSecond = await db
+      .select()
+      .from(routineRuns)
+      .where(eq(routineRuns.routineId, routine.id));
+    const skippedForNoOp = runsAfterSecond.filter(
+      (run) => run.status === "skipped" && run.failureReason === "silent_no_op_recent",
+    );
+    expect(skippedForNoOp.length).toBe(1);
+
+    // Fire 3 (after the suppression window has elapsed): should fire normally.
+    // Set last_no_op_at to >1 cron interval ago so the suppression drops.
+    await db
+      .update(routines)
+      .set({ lastNoOpAt: new Date(Date.now() - 6 * 60 * 1000) }) // 6 minutes ago
+      .where(eq(routines.id, routine.id));
+    await db
+      .update(routineTriggers)
+      .set({ nextRunAt: pastDue })
+      .where(eq(routineTriggers.id, trigger.id));
+
+    const thirdResult = await svc.tickScheduledTriggers(new Date());
+    expect(thirdResult.triggered).toBe(1);
+
+    const issuesAfterThird = await db
+      .select()
+      .from(issues)
+      .where(eq(issues.companyId, companyId));
+    expect(issuesAfterThird).toHaveLength(2); // original + the new tick
+  });
 });
