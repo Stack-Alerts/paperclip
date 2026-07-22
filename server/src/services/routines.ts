@@ -14,6 +14,7 @@ import {
   issueComments,
   issueInboxArchives,
   issueReadStates,
+  issueRecoveryActions,
   issues,
   pluginManagedResources,
   plugins,
@@ -646,6 +647,71 @@ export function routineService(
   const heartbeat = deps.heartbeat ?? heartbeatService(db, {
     pluginWorkerManager: deps.pluginWorkerManager,
   });
+
+  /**
+   * Cheap pre-flight count for known routines. The scheduler invokes
+   * this *before* dispatching an agent run; if there is genuinely no
+   * work to do, the routine tick is recorded as a silent-noop
+   * (`failure_reason = 'silent_noop_preflight'`) without spinning
+   * up an agent run, a heartbeat lease, or an execution issue.
+   *
+   * Heuristics per known routine title — no schema change required:
+   *   - "Orphan ticket sweep": count issues that look like real
+   *     orphans (todo/in_progress/in_review, no assignee, not created
+   *     by a routine — routine-created issues are skipped by the sweep
+   *     anyway via the agent-side scan).
+   *   - "Workspace validation self-heal": count active
+   *     `workspace_validation_failed` recovery actions.
+   *   - everything else: no pre-flight (preserve existing behavior).
+   *
+   * Returns true if there *might* be work to do (the agent should run
+   * and double-check), false if there's definitely nothing to do.
+   */
+  async function routineHasWorkToDo(
+    companyId: string,
+    routineTitle: string,
+  ): Promise<boolean> {
+    const title = routineTitle.toLowerCase();
+    if (title.includes("orphan")) {
+      // Orphan sweep — count non-routine-created issues with no
+      // assignee in active buckets. The sweep excludes routine-created
+      // issues and issues with pending interactions / approvals, so
+      // a positive count is a necessary (not sufficient) signal.
+      const rows = await db
+        .select({ id: issues.id })
+        .from(issues)
+        .where(
+          and(
+            eq(issues.companyId, companyId),
+            isNull(issues.hiddenAt),
+            inArray(issues.status, ["todo", "in_progress", "in_review"]),
+            isNull(issues.assigneeAgentId),
+            isNull(issues.assigneeUserId),
+            ne(issues.originKind, "routine_execution"),
+          ),
+        )
+        .limit(1);
+      return rows.length > 0;
+    }
+    if (title.includes("workspace") && title.includes("validation")) {
+      // Workspace validation self-heal — count active recovery
+      // actions whose cause is workspace_validation_failed.
+      const rows = await db
+        .select({ id: issueRecoveryActions.id })
+        .from(issueRecoveryActions)
+        .where(
+          and(
+            eq(issueRecoveryActions.companyId, companyId),
+            eq(issueRecoveryActions.status, "active"),
+            eq(issueRecoveryActions.cause, "workspace_validation_failed"),
+          ),
+        )
+        .limit(1);
+      return rows.length > 0;
+    }
+    // Unknown routine — don't pre-flight; let the agent decide.
+    return true;
+  }
 
   async function getRoutineById(id: string) {
     return db
@@ -2854,17 +2920,20 @@ export function routineService(
         const claimed = await db
           .update(routineTriggers)
           .set({
-            nextRunAt: claimedNextRunAt,
+            // Persist the new tick at millisecond precision so future
+            // CAS comparisons (which compare via JS Date / eq()) work
+            // cleanly. The cron advance itself is computed at ms
+            // precision by nextCronTickInTimeZone; we strip sub-ms here.
+            nextRunAt: claimedNextRunAt
+              ? new Date(Math.floor(claimedNextRunAt.getTime() / 1000) * 1000)
+              : claimedNextRunAt,
             updatedAt: new Date(),
           })
           .where(
             and(
               eq(routineTriggers.id, row.trigger.id),
               eq(routineTriggers.enabled, true),
-              // Truncate both sides to milliseconds so the CAS comparison
-              // matches even when the persisted value has microsecond
-              // precision (the JS `Date` object only carries ms).
-              sql`date_trunc('milliseconds', ${routineTriggers.nextRunAt}) = date_trunc('milliseconds', ${row.trigger.nextRunAt})`,
+              eq(routineTriggers.nextRunAt, row.trigger.nextRunAt),
             ),
           )
           .returning({ id: routineTriggers.id })
@@ -2876,6 +2945,32 @@ export function routineService(
             routine: row.routine,
             trigger: row.trigger,
             reason: "paused",
+            nextRunAt: claimedNextRunAt,
+          });
+          continue;
+        }
+
+        // Pre-flight silent-no-op check: skip dispatching an agent run
+        // entirely when the routine's underlying work set is empty.
+        // Heuristic per known routine title:
+        //   - "Orphan ticket sweep": count issues that look like real
+        //     orphans (todo/in_progress/in_review, no assignee, not
+        //     created by a routine — routine-created issues are skipped
+        //     by the sweep anyway via the agent-side scan).
+        //   - "Workspace validation self-heal": count active
+        //     workspace_validation_failed recovery actions.
+        //   - everything else: no pre-flight (preserve existing behavior).
+        // The trigger is still advanced to the next cron boundary so
+        // we don't backfill missed runs.
+        const preflightHasWork = await routineHasWorkToDo(
+          row.routine.companyId,
+          row.routine.title,
+        );
+        if (!preflightHasWork) {
+          await recordSuppressedScheduleRun({
+            routine: row.routine,
+            trigger: row.trigger,
+            reason: "silent_noop_preflight",
             nextRunAt: claimedNextRunAt,
           });
           continue;
