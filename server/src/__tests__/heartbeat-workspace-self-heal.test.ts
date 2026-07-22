@@ -20,6 +20,11 @@ vi.mock("node:util", () => ({
   promisify: (fn: unknown) => fn,
 }));
 
+vi.mock("../home-paths.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../home-paths.ts")>();
+  return { ...actual, resolvePaperclipInstanceRoot: () => "/tmp" };
+});
+
 vi.mock("../middleware/logger.js", () => ({
   logger: {
     info: vi.fn(),
@@ -116,6 +121,69 @@ describe("attemptWorkspaceCwdRepair", () => {
     expect(result).toEqual({ ok: false, reason: "missing_cwd" });
     expect(mockExecFile).not.toHaveBeenCalled();
     expect(mockFs.rm).not.toHaveBeenCalled();
+  });
+
+  it("rejects a broken cwd outside the Paperclip instance root", async () => {
+    mockFs.lstat.mockImplementation(() =>
+      Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" })),
+    );
+    const result = await attemptWorkspaceCwdRepair({
+      cwd: "/etc/paperclip-workspace",
+      repoUrl: "https://example.com/repo.git",
+    });
+    expect(result).toEqual({ ok: false, reason: "unsafe_path" });
+    expect(mockExecFile).not.toHaveBeenCalled();
+    expect(mockFs.mkdir).not.toHaveBeenCalled();
+  });
+
+  it("rejects a healthy cwd outside the Paperclip instance root", async () => {
+    mockFs.lstat.mockImplementation(() => dirStat());
+    mockFs.stat.mockImplementation(() => okStat());
+    const result = await attemptWorkspaceCwdRepair({
+      cwd: "/etc/paperclip-workspace",
+      repoUrl: "https://example.com/repo.git",
+    });
+    expect(result).toEqual({ ok: false, reason: "unsafe_path" });
+    expect(mockExecFile).not.toHaveBeenCalled();
+  });
+
+  it("rejects the Paperclip instance root itself", async () => {
+    mockFs.lstat.mockImplementation(() =>
+      Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" })),
+    );
+    const result = await attemptWorkspaceCwdRepair({
+      cwd: "/tmp",
+      repoUrl: "https://example.com/repo.git",
+    });
+    expect(result).toEqual({ ok: false, reason: "unsafe_path" });
+    expect(mockExecFile).not.toHaveBeenCalled();
+  });
+
+  it("refuses to replace an existing unhealthy directory with a symlink", async () => {
+    mockFs.stat.mockImplementation((path: string) => {
+      if (path === "/tmp/managed" || path === "/tmp/cwd") return okStat();
+      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    });
+    mockFs.lstat.mockImplementation((path: string) => {
+      if (path === "/tmp/managed/.git") return dirStat();
+      if (path === "/tmp/cwd") {
+        return Promise.resolve({
+          isSymbolicLink: () => false,
+          isDirectory: () => true,
+          isFile: () => false,
+        } as unknown as import("node:fs").Stats);
+      }
+      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    });
+
+    const result = await attemptWorkspaceCwdRepair({
+      cwd: "/tmp/cwd",
+      repoUrl: "https://example.com/repo.git",
+      managedFolder: "/tmp/managed",
+    });
+
+    expect(result).toEqual({ ok: false, reason: "unsafe_existing_path" });
+    expect(mockExecFile).not.toHaveBeenCalled();
   });
 
   it("returns noop_existing when the cwd already has .git metadata", async () => {
@@ -235,7 +303,7 @@ describe("attemptWorkspaceCwdRepair", () => {
     expect(mockExecFile).toHaveBeenCalledTimes(1);
     const callArgs = mockExecFile.mock.calls[0];
     expect(callArgs[0]).toBe("git");
-    expect(callArgs[1]).toEqual(["clone", "git@example.com:repo.git", "/tmp/corrupted"]);
+    expect(callArgs[1]).toEqual(["clone", "--", "git@example.com:repo.git", "/tmp/corrupted"]);
   });
 
   it("returns git_repair_failed when the git subprocess throws", async () => {

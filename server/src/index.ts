@@ -843,6 +843,14 @@ export async function startServer(): Promise<StartedServer> {
         );
       }
 
+      const workspaceValidationReconciled = await heartbeat.reconcileWorkspaceValidationFailures();
+      if (workspaceValidationReconciled.repaired > 0 || workspaceValidationReconciled.failed > 0) {
+        logger.warn(
+          { ...workspaceValidationReconciled },
+          "startup workspace-validation self-heal changed issue state",
+        );
+      }
+
       const taskWatchdogsReconciled = await heartbeat.reconcileTaskWatchdogs();
       if (taskWatchdogsReconciled.triggered > 0) {
         logger.warn(
@@ -926,6 +934,15 @@ export async function startServer(): Promise<StartedServer> {
           const reconciled = await heartbeat.reconcileIssueGraphLiveness();
           if (reconciled.escalationsCreated > 0) {
             logger.warn({ ...reconciled }, "periodic issue-graph liveness reconciliation created escalations");
+          }
+        })
+        .then(async () => {
+          const workspaceValidationReconciled = await heartbeat.reconcileWorkspaceValidationFailures();
+          if (workspaceValidationReconciled.repaired > 0 || workspaceValidationReconciled.failed > 0) {
+            logger.warn(
+              { ...workspaceValidationReconciled },
+              "periodic workspace-validation self-heal changed issue state",
+            );
           }
         })
         .then(async () => {

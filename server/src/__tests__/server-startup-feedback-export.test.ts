@@ -14,6 +14,7 @@ const {
   deriveAuthTrustedOriginsMock,
   feedbackExportServiceMock,
   feedbackServiceFactoryMock,
+  heartbeatServiceMock,
   fakeServer,
   loadConfigMock,
 } = vi.hoisted(() => {
@@ -26,6 +27,34 @@ const {
     flushPendingFeedbackTraces: vi.fn(async () => ({ attempted: 0, sent: 0, failed: 0 })),
   };
   const feedbackServiceFactoryMock = vi.fn(() => feedbackExportServiceMock);
+  const heartbeatServiceMock = {
+    reapOrphanedRuns: vi.fn(async () => undefined),
+    promoteDueScheduledRetries: vi.fn(async () => ({ promoted: 0, runIds: [] })),
+    resumeQueuedRuns: vi.fn(async () => undefined),
+    reconcileStrandedAssignedIssues: vi.fn(async () => ({
+      dispatchRequeued: 0,
+      continuationRequeued: 0,
+      successfulRunHandoffEscalated: 0,
+      escalated: 0,
+      skipped: 0,
+      issueIds: [],
+    })),
+    reconcileWorkspaceValidationFailures: vi.fn(async () => ({
+      scanned: 0,
+      repaired: 0,
+      skipped: 0,
+      failed: 0,
+      repairedIssueIds: [],
+      skippedIssueIds: [],
+      failedIssueIds: [],
+    })),
+    reconcileIssueGraphLiveness: vi.fn(async () => ({ escalationsCreated: 0 })),
+    reconcileTaskWatchdogs: vi.fn(async () => ({ triggered: 0 })),
+    scanSilentActiveRuns: vi.fn(async () => ({ created: 0, escalated: 0 })),
+    sweepStaleIssueLocks: vi.fn(async () => ({ cleared: 0 })),
+    reconcileProductivityReviews: vi.fn(async () => ({ created: 0, updated: 0, failed: 0 })),
+    tickTimers: vi.fn(async () => ({ enqueued: 0 })),
+  };
   const fakeServer = {
     once: vi.fn().mockReturnThis(),
     off: vi.fn().mockReturnThis(),
@@ -45,6 +74,7 @@ const {
     deriveAuthTrustedOriginsMock,
     feedbackExportServiceMock,
     feedbackServiceFactoryMock,
+    heartbeatServiceMock,
     fakeServer,
     loadConfigMock,
   };
@@ -144,20 +174,7 @@ vi.mock("../services/index.js", () => ({
   })),
   feedbackService: feedbackServiceFactoryMock,
   bootstrapExecutionPolicyFromEnv: vi.fn(async () => null),
-  heartbeatService: vi.fn(() => ({
-    reapOrphanedRuns: vi.fn(async () => undefined),
-    promoteDueScheduledRetries: vi.fn(async () => ({ promoted: 0, runIds: [] })),
-    resumeQueuedRuns: vi.fn(async () => undefined),
-    reconcileStrandedAssignedIssues: vi.fn(async () => ({
-      dispatchRequeued: 0,
-      continuationRequeued: 0,
-      successfulRunHandoffEscalated: 0,
-      escalated: 0,
-      skipped: 0,
-      issueIds: [],
-    })),
-    tickTimers: vi.fn(async () => ({ enqueued: 0 })),
-  })),
+  heartbeatService: vi.fn(() => heartbeatServiceMock),
   instanceSettingsService: vi.fn(() => ({
     getGeneral: vi.fn(async () => ({
       backupRetention: {
@@ -221,10 +238,14 @@ describe("startServer feedback export wiring", () => {
   });
 
   it("passes the feedback export service into createApp so pending traces flush in runtime", async () => {
+    loadConfigMock.mockReturnValue(buildTestConfig({ heartbeatSchedulerEnabled: true }));
     const started = await startServer();
 
     expect(started.server).toBe(fakeServer);
     expect(feedbackServiceFactoryMock).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(heartbeatServiceMock.reconcileWorkspaceValidationFailures).toHaveBeenCalledTimes(1);
+    });
     expect(createAppMock).toHaveBeenCalledTimes(1);
     expect(createAppMock.mock.calls[0]?.[1]).toMatchObject({
       feedbackExportService: feedbackExportServiceMock,

@@ -43,6 +43,7 @@ import {
   issueApprovals,
   issueComments,
   issuePlanDecompositions,
+  issueRecoveryActions,
   issueRelations,
   issueThreadInteractions,
   issues,
@@ -50,6 +51,7 @@ import {
   projects,
   projectWorkspaces,
   routineRevisions,
+  executionWorkspaces,
   routineRuns,
   routines,
   workspaceOperations,
@@ -74,7 +76,11 @@ import { getTelemetryClient } from "../telemetry.js";
 import { companySkillService } from "./company-skills.js";
 import { budgetService, type BudgetEnforcementScope } from "./budgets.js";
 import { secretService, type MissingRuntimeBinding } from "./secrets.js";
-import { resolveDefaultAgentWorkspaceDir, resolveManagedProjectWorkspaceDir } from "../home-paths.js";
+import {
+  resolveDefaultAgentWorkspaceDir,
+  resolveManagedProjectWorkspaceDir,
+  resolvePaperclipInstanceRoot,
+} from "../home-paths.js";
 import {
   buildHeartbeatRunIssueComment,
   HEARTBEAT_RUN_RESULT_OUTPUT_MAX_CHARS,
@@ -1252,6 +1258,130 @@ async function hasGitMetadata(cwd: string | null | undefined) {
     .lstat(path.resolve(normalized, ".git"))
     .then((entry) => entry.isDirectory() || entry.isFile())
     .catch(() => false);
+}
+
+export async function probeWorkspaceCwdHealthy(cwd: string | null | undefined): Promise<boolean> {
+  const normalized = readNonEmptyString(cwd);
+  if (!normalized) return false;
+  const resolved = path.resolve(normalized);
+  try {
+    const gitEntry = await fs.lstat(path.resolve(resolved, ".git"));
+    if (!gitEntry.isDirectory() && !gitEntry.isFile()) return false;
+  } catch {
+    return false;
+  }
+  try {
+    const cwdStat = await fs.stat(resolved);
+    return cwdStat.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+type WorkspaceRepairInput = {
+  cwd: string | null | undefined;
+  repoUrl: string | null | undefined;
+  managedFolder?: string | null;
+};
+
+export type WorkspaceRepairResult =
+  | { ok: true; cwd: string; mode: "noop_existing" | "symlink" | "git_fetch" | "git_clone" }
+  | {
+      ok: false;
+      reason:
+        | "missing_cwd"
+        | "unsafe_path"
+        | "unsafe_existing_path"
+        | "no_repo_url"
+        | `git_repair_failed:${string}`;
+    };
+
+function resolveSafeWorkspacePath(value: string | null | undefined): string | null {
+  const normalized = readNonEmptyString(value);
+  if (!normalized) return null;
+  const resolved = path.resolve(normalized);
+  const root = path.resolve(resolvePaperclipInstanceRoot());
+  const relative = path.relative(root, resolved);
+  return relative !== "" && !relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative)
+    ? resolved
+    : null;
+}
+
+export async function attemptWorkspaceCwdRepair(input: WorkspaceRepairInput): Promise<WorkspaceRepairResult> {
+  const cwd = readNonEmptyString(input.cwd);
+  if (!cwd) return { ok: false, reason: "missing_cwd" };
+
+  const safeCwd = resolveSafeWorkspacePath(cwd);
+  if (!safeCwd) return { ok: false, reason: "unsafe_path" };
+
+  if (await probeWorkspaceCwdHealthy(safeCwd)) {
+    return { ok: true, cwd: safeCwd, mode: "noop_existing" };
+  }
+
+  const managedFolder = readNonEmptyString(input.managedFolder);
+  const safeManagedFolder = managedFolder ? resolveSafeWorkspacePath(managedFolder) : null;
+  if (managedFolder && !safeManagedFolder) return { ok: false, reason: "unsafe_path" };
+  if (safeManagedFolder && (await probeWorkspaceCwdHealthy(safeManagedFolder))) {
+    const existingDestination = await fs.lstat(safeCwd).catch(() => null);
+    if (existingDestination && !existingDestination.isSymbolicLink()) {
+      return { ok: false, reason: "unsafe_existing_path" };
+    }
+    try {
+      await execFile("ln", ["-snf", safeManagedFolder, safeCwd]);
+      return { ok: true, cwd: safeManagedFolder, mode: "symlink" };
+    } catch (error) {
+      return {
+        ok: false,
+        reason: `git_repair_failed:${(error as { message?: string } | null)?.message ?? "ln symlink failed"}`,
+      };
+    }
+  }
+
+  try {
+    await fs.mkdir(path.dirname(safeCwd), { recursive: true });
+  } catch {
+    // best-effort; subsequent probes surface whether repair succeeded
+  }
+
+  if (await probeWorkspaceCwdHealthy(safeCwd)) {
+    try {
+      await execFile("git", ["-C", safeCwd, "fetch"]);
+      return { ok: true, cwd: safeCwd, mode: "git_fetch" };
+    } catch (error) {
+      return {
+        ok: false,
+        reason: `git_repair_failed:${(error as { message?: string } | null)?.message ?? "git fetch failed"}`,
+      };
+    }
+  }
+
+  const repoUrl = readNonEmptyString(input.repoUrl);
+  if (!repoUrl) return { ok: false, reason: "no_repo_url" };
+
+  try {
+    await execFile("git", ["clone", "--", repoUrl, safeCwd]);
+    return { ok: true, cwd: safeCwd, mode: "git_clone" };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `git_repair_failed:${(error as { message?: string } | null)?.message ?? "git clone failed"}`,
+    };
+  }
+}
+
+function deriveRepoNameFromUrl(repoUrl: string | null | undefined): string | null {
+  const normalized = readNonEmptyString(repoUrl);
+  if (!normalized) return null;
+  let pathname = normalized;
+  try {
+    pathname = new URL(normalized).pathname;
+  } catch {
+    // not a parseable URL; treat the whole string as a path-like value
+  }
+  const segments = pathname.split("/").filter(Boolean);
+  const last = segments[segments.length - 1];
+  if (!last) return null;
+  return last.replace(/\.git$/i, "");
 }
 
 function sameResolvedPath(left: string | null | undefined, right: string | null | undefined) {
@@ -3038,7 +3168,7 @@ export async function buildPaperclipWakePayload(input: {
       })))
     : [];
 
-  return {
+  const payload = {
     reason: readNonEmptyString(input.contextSnapshot.wakeReason),
     issue: issueSummary
       ? {
@@ -3092,10 +3222,10 @@ export async function buildPaperclipWakePayload(input: {
           key: safeContinuationSummary.key,
           title: safeContinuationSummary.title,
           body:
-            safeContinuationSummary.body.length > 4_000
-              ? safeContinuationSummary.body.slice(0, 4_000)
+            safeContinuationSummary.body.length > resolveMaxInlineContinuationSummaryChars()
+              ? safeContinuationSummary.body.slice(0, resolveMaxInlineContinuationSummaryChars())
               : safeContinuationSummary.body,
-          bodyTruncated: safeContinuationSummary.body.length > 4_000,
+          bodyTruncated: safeContinuationSummary.body.length > resolveMaxInlineContinuationSummaryChars(),
           sourceTrust: safeContinuationSummary.sourceTrust ?? null,
           updatedAt: safeContinuationSummary.updatedAt.toISOString(),
         }
@@ -3113,17 +3243,18 @@ export async function buildPaperclipWakePayload(input: {
     fallbackFetchNeeded: truncated || missingCommentCount > 0,
   };
 
-  if (initialContinuationSummary) {
+  if (safeContinuationSummary) {
     const compressThreshold = resolveWakePayloadCompressThresholdChars();
     const serialized = JSON.stringify(payload);
     if (serialized.length > compressThreshold) {
-      const compressed = buildCompressedContinuationSummaryHeadline(initialContinuationSummary.body);
+      const compressed = buildCompressedContinuationSummaryHeadline(safeContinuationSummary.body);
       payload.continuationSummary = {
-        key: initialContinuationSummary.key,
-        title: initialContinuationSummary.title,
+        key: safeContinuationSummary.key,
+        title: safeContinuationSummary.title,
         body: compressed.body,
-        bodyTruncated: compressed.truncated || initialContinuationSummary.bodyTruncated,
-        updatedAt: initialContinuationSummary.updatedAt,
+        bodyTruncated: true,
+        sourceTrust: safeContinuationSummary.sourceTrust ?? null,
+        updatedAt: safeContinuationSummary.updatedAt.toISOString(),
       };
     }
   }
@@ -8388,6 +8519,394 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
     return recovery.reconcileIssueGraphLiveness(opts);
   }
 
+  type WorkspaceValidationReconcileSummary = {
+    scanned: number;
+    repaired: number;
+    skipped: number;
+    failed: number;
+    repairedIssueIds: string[];
+    skippedIssueIds: string[];
+    failedIssueIds: string[];
+  };
+
+  async function postWorkspaceSelfHealComment(input: {
+    issueId: string;
+    companyId: string;
+    body: string;
+  }): Promise<void> {
+    await db.insert(issueComments).values({
+      companyId: input.companyId,
+      issueId: input.issueId,
+      body: input.body,
+      authorType: "system",
+    });
+  }
+
+  async function markWorkspaceSelfHealBlocked(input: {
+    action: typeof issueRecoveryActions.$inferSelect;
+    reason: string;
+  }): Promise<void> {
+    const now = new Date();
+    const [resolved] = await db
+      .update(issueRecoveryActions)
+      .set({
+        status: "resolved",
+        outcome: "blocked",
+        resolutionNote: `workspace self-heal blocked: ${input.reason}`,
+        resolvedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(issueRecoveryActions.id, input.action.id),
+          eq(issueRecoveryActions.companyId, input.action.companyId),
+          inArray(issueRecoveryActions.status, ["active", "escalated"]),
+        ),
+      )
+      .returning({ id: issueRecoveryActions.id });
+
+    if (!resolved) return;
+
+    await postWorkspaceSelfHealComment({
+      issueId: input.action.sourceIssueId,
+      companyId: input.action.companyId,
+      body: `## Workspace self-heal: blocked\n\nThe heartbeat could not restore the workspace.\n\n- Failure: ${input.reason}\n- Manual intervention required.\n- The recovery action was resolved with outcome \`blocked\`; a future validation failure may create a new action.`,
+    });
+  }
+
+  async function clearAgentErrorState(agentId: string, companyId: string): Promise<void> {
+    await db
+      .update(agents)
+      .set({ status: "idle", errorReason: null, updatedAt: new Date() })
+      .where(and(eq(agents.id, agentId), eq(agents.companyId, companyId)));
+  }
+
+  async function reconcileWorkspaceValidationFailures(): Promise<WorkspaceValidationReconcileSummary> {
+    const summary: WorkspaceValidationReconcileSummary = {
+      scanned: 0,
+      repaired: 0,
+      skipped: 0,
+      failed: 0,
+      repairedIssueIds: [],
+      skippedIssueIds: [],
+      failedIssueIds: [],
+    };
+
+    const candidates = await db
+      .select()
+      .from(issueRecoveryActions)
+      .where(
+        and(
+          eq(issueRecoveryActions.cause, WORKSPACE_VALIDATION_RECOVERY_CAUSE),
+          inArray(issueRecoveryActions.status, ["active", "escalated"]),
+        ),
+      );
+
+    summary.scanned = candidates.length;
+
+    for (const action of candidates) {
+      const evidence = parseObject(action.evidence);
+      const issue = await db
+        .select()
+        .from(issues)
+        .where(
+          and(
+            eq(issues.id, action.sourceIssueId),
+            eq(issues.companyId, action.companyId),
+          ),
+        )
+        .then((rows) => rows[0] ?? null);
+      if (!issue) {
+        summary.failed += 1;
+        summary.failedIssueIds.push(action.sourceIssueId);
+        continue;
+      }
+
+      const projectWorkspaceId =
+        readNonEmptyString(issue.projectWorkspaceId) ??
+        readNonEmptyString(evidence.resolvedProjectWorkspaceId);
+      if (!projectWorkspaceId) {
+        summary.failed += 1;
+        summary.failedIssueIds.push(action.sourceIssueId);
+        await markWorkspaceSelfHealBlocked({
+          action,
+          reason: "the issue has no project workspace binding",
+        });
+        continue;
+      }
+
+      const projectWorkspace = await db
+        .select()
+        .from(projectWorkspaces)
+        .where(
+          and(
+            eq(projectWorkspaces.id, projectWorkspaceId),
+            eq(projectWorkspaces.companyId, action.companyId),
+          ),
+        )
+        .then((rows) => rows[0] ?? null);
+      if (!projectWorkspace) {
+        summary.failed += 1;
+        summary.failedIssueIds.push(action.sourceIssueId);
+        await markWorkspaceSelfHealBlocked({
+          action,
+          reason: "the project workspace record was missing",
+        });
+        continue;
+      }
+
+      const executionWorkspaceId = readNonEmptyString(issue.executionWorkspaceId);
+      const executionWorkspace = executionWorkspaceId
+        ? await db
+            .select()
+            .from(executionWorkspaces)
+            .where(
+              and(
+                eq(executionWorkspaces.id, executionWorkspaceId),
+                eq(executionWorkspaces.companyId, action.companyId),
+              ),
+            )
+            .then((rows) => rows[0] ?? null)
+        : await db
+            .select()
+            .from(executionWorkspaces)
+            .where(
+              and(
+                eq(executionWorkspaces.companyId, action.companyId),
+                eq(executionWorkspaces.sourceIssueId, action.sourceIssueId),
+              ),
+            )
+            .orderBy(desc(executionWorkspaces.lastUsedAt))
+            .limit(1)
+            .then((rows) => rows[0] ?? null);
+
+      const projectCwd = readNonEmptyString(projectWorkspace.cwd);
+      const executionCwd =
+        readNonEmptyString(executionWorkspace?.cwd) ??
+        readNonEmptyString(evidence.executionWorkspaceCwd);
+
+      const repoUrl =
+        readNonEmptyString(projectWorkspace.repoUrl) ??
+        readNonEmptyString(evidence.repoUrl);
+
+      let managedFolder: string | null = null;
+      try {
+        managedFolder = resolveManagedProjectWorkspaceDir({
+          companyId: action.companyId,
+          projectId: projectWorkspace.projectId,
+          repoName: deriveRepoNameFromUrl(repoUrl),
+        });
+      } catch {
+        managedFolder = null;
+      }
+
+      const projectHealthy = projectCwd ? await probeWorkspaceCwdHealthy(projectCwd) : false;
+      const executionHealthy = executionCwd ? await probeWorkspaceCwdHealthy(executionCwd) : false;
+
+      if (projectHealthy && (!executionCwd || executionHealthy)) {
+        const now = new Date();
+        const [resolved] = await db
+          .update(issueRecoveryActions)
+          .set({
+            status: "resolved",
+            outcome: "restored",
+            resolutionNote: "workspace self-heal (already healthy)",
+            resolvedAt: now,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(issueRecoveryActions.id, action.id),
+              eq(issueRecoveryActions.companyId, action.companyId),
+              inArray(issueRecoveryActions.status, ["active", "escalated"]),
+            ),
+          )
+          .returning({ id: issueRecoveryActions.id });
+        if (!resolved) continue;
+
+        if (issue.status !== "todo") {
+          await db
+            .update(issues)
+            .set({ status: "todo", updatedAt: now })
+            .where(and(eq(issues.id, issue.id), eq(issues.companyId, action.companyId)));
+        }
+
+        const agentIdsToClear = new Set<string>();
+        if (action.ownerAgentId) agentIdsToClear.add(action.ownerAgentId);
+        const previousOwnerAgentId =
+          readNonEmptyString(action.previousOwnerAgentId) ??
+          readNonEmptyString(evidence.previousOwnerAgentId);
+        if (previousOwnerAgentId) agentIdsToClear.add(previousOwnerAgentId);
+        for (const agentId of agentIdsToClear) {
+          await clearAgentErrorState(agentId, action.companyId);
+        }
+
+        summary.skipped += 1;
+        summary.skippedIssueIds.push(action.sourceIssueId);
+        continue;
+      }
+
+      let projectRepairResult: WorkspaceRepairResult | null = null;
+      if (!projectHealthy) {
+        projectRepairResult = await attemptWorkspaceCwdRepair({
+          cwd: projectCwd,
+          repoUrl,
+          managedFolder,
+        });
+        if (!projectRepairResult.ok) {
+          summary.failed += 1;
+          summary.failedIssueIds.push(action.sourceIssueId);
+          logger.warn(
+            { issueId: action.sourceIssueId, reason: projectRepairResult.reason },
+            "workspace self-heal could not restore project cwd",
+          );
+          await markWorkspaceSelfHealBlocked({
+            action,
+            reason: `could not restore project cwd \`${projectCwd ?? "<missing>"}\`: ${projectRepairResult.reason}`,
+          });
+          continue;
+        }
+      }
+
+      let executionRepairResult: WorkspaceRepairResult | null = null;
+      if (executionCwd && !executionHealthy) {
+        executionRepairResult = await attemptWorkspaceCwdRepair({
+          cwd: executionCwd,
+          repoUrl,
+          managedFolder,
+        });
+        if (!executionRepairResult.ok) {
+          summary.failed += 1;
+          summary.failedIssueIds.push(action.sourceIssueId);
+          logger.warn(
+            { issueId: action.sourceIssueId, reason: executionRepairResult.reason },
+            "workspace self-heal could not restore execution cwd",
+          );
+          await markWorkspaceSelfHealBlocked({
+            action,
+            reason: `could not restore execution cwd \`${executionCwd}\`: ${executionRepairResult.reason}`,
+          });
+          continue;
+        }
+      }
+
+      const finalProjectCwd =
+        projectRepairResult && projectRepairResult.ok ? projectRepairResult.cwd : projectCwd;
+      const finalExecutionCwd =
+        executionRepairResult && executionRepairResult.ok ? executionRepairResult.cwd : executionCwd;
+      const projectRestored = Boolean(finalProjectCwd && await probeWorkspaceCwdHealthy(finalProjectCwd));
+      const executionRestored = !finalExecutionCwd || await probeWorkspaceCwdHealthy(finalExecutionCwd);
+      if (!projectRestored || !executionRestored) {
+        summary.failed += 1;
+        summary.failedIssueIds.push(action.sourceIssueId);
+        await markWorkspaceSelfHealBlocked({
+          action,
+          reason: "the final workspace probe did not confirm every path",
+        });
+        continue;
+      }
+
+      const repairMode =
+        projectRepairResult?.mode === "symlink" || executionRepairResult?.mode === "symlink"
+          ? "symlink"
+          : projectRepairResult?.mode ??
+            executionRepairResult?.mode ??
+            "noop_existing";
+
+      const resolvedAt = new Date();
+      const [claimed] = await db
+        .update(issueRecoveryActions)
+        .set({
+          status: "resolved",
+          outcome: "restored",
+          resolutionNote: `workspace self-heal (${repairMode})`,
+          resolvedAt,
+          updatedAt: resolvedAt,
+        })
+        .where(
+          and(
+            eq(issueRecoveryActions.id, action.id),
+            eq(issueRecoveryActions.companyId, action.companyId),
+            inArray(issueRecoveryActions.status, ["active", "escalated"]),
+          ),
+        )
+        .returning({ id: issueRecoveryActions.id });
+      if (!claimed) continue;
+
+      if (finalProjectCwd && projectRepairResult?.ok) {
+        await db
+          .update(projectWorkspaces)
+          .set({ cwd: finalProjectCwd, updatedAt: resolvedAt })
+          .where(
+            and(
+              eq(projectWorkspaces.id, projectWorkspaceId),
+              eq(projectWorkspaces.companyId, action.companyId),
+            ),
+          );
+      }
+
+      if (executionWorkspace && finalExecutionCwd && executionRepairResult?.ok) {
+        const existingMetadata = parseObject(executionWorkspace.metadata);
+        const existingRealization = parseObject(existingMetadata.workspaceRealization);
+        const restoredAt = resolvedAt.toISOString();
+        const nextRealization = {
+          ...existingRealization,
+          local: {
+            ...(parseObject(existingRealization.local)),
+            strategy: "project_primary",
+            projectId: projectWorkspace.projectId,
+            projectWorkspaceId,
+            repoUrl: readNonEmptyString(repoUrl) ?? null,
+            restoredVia: repairMode === "symlink" ? "symlink" : repairMode,
+            restoredAt,
+          },
+        };
+        await db
+          .update(executionWorkspaces)
+          .set({
+            cwd: finalExecutionCwd,
+            metadata: { ...existingMetadata, workspaceRealization: nextRealization },
+            updatedAt: resolvedAt,
+          })
+          .where(
+            and(
+              eq(executionWorkspaces.id, executionWorkspace.id),
+              eq(executionWorkspaces.companyId, action.companyId),
+            ),
+          );
+      }
+
+      if (issue.status !== "todo") {
+        await db
+          .update(issues)
+          .set({ status: "todo", updatedAt: resolvedAt })
+          .where(and(eq(issues.id, issue.id), eq(issues.companyId, action.companyId)));
+      }
+
+      const agentIdsToClear = new Set<string>();
+      if (action.ownerAgentId) agentIdsToClear.add(action.ownerAgentId);
+      const previousOwnerAgentId =
+        readNonEmptyString(action.previousOwnerAgentId) ??
+        readNonEmptyString(evidence.previousOwnerAgentId);
+      if (previousOwnerAgentId) agentIdsToClear.add(previousOwnerAgentId);
+
+      for (const agentId of agentIdsToClear) {
+        await clearAgentErrorState(agentId, action.companyId);
+      }
+
+      await postWorkspaceSelfHealComment({
+        issueId: action.sourceIssueId,
+        companyId: action.companyId,
+        body: `## Workspace self-heal\n\nRestored via \`${repairMode}\` to \`${managedFolder ?? finalProjectCwd ?? finalExecutionCwd}\`. Agents reset to \`idle\`; recovery action marked resolved.`,
+      });
+
+      summary.repaired += 1;
+      summary.repairedIssueIds.push(action.sourceIssueId);
+    }
+
+    return summary;
+  }
+
   async function updateRuntimeState(
     agent: typeof agents.$inferSelect,
     run: typeof heartbeatRuns.$inferSelect,
@@ -12489,6 +13008,8 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
     buildIssueGraphLivenessAutoRecoveryPreview,
 
     reconcileIssueGraphLiveness,
+
+    reconcileWorkspaceValidationFailures,
 
     scanSilentActiveRuns,
 

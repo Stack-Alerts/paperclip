@@ -46,6 +46,7 @@ vi.mock("../home-paths.ts", async (importOriginal) => {
       repoName?: string | null;
     }) =>
       `/tmp/paperclip-test/projects/${input.companyId}/${input.projectId}/${input.repoName ?? "_default"}`,
+    resolvePaperclipInstanceRoot: () => "/tmp/paperclip-test",
   };
 });
 
@@ -245,7 +246,7 @@ describeEmbeddedPostgres("heartbeat reconcileWorkspaceValidationFailures orchest
     expect(mockFs.rm).not.toHaveBeenCalled();
   });
 
-  it("skips issues whose cwd already has .git and writes nothing", async () => {
+  it("silently resolves an action when the workspace is already healthy", async () => {
     const seeded = await seedCompanyAndIssue({ companyIndex: 1 });
     await db.insert(issueRecoveryActions).values({
       companyId: seeded.companyId,
@@ -282,8 +283,11 @@ describeEmbeddedPostgres("heartbeat reconcileWorkspaceValidationFailures orchest
       .from(issueRecoveryActions)
       .where(eq(issueRecoveryActions.sourceIssueId, seeded.issueId))
       .then((rows) => rows[0]);
-    expect(recoveryRow?.status).toBe("active");
-    expect(recoveryRow?.outcome).toBeNull();
+    expect(recoveryRow?.status).toBe("resolved");
+    expect(recoveryRow?.outcome).toBe("restored");
+
+    const retry = await heartbeat.reconcileWorkspaceValidationFailures();
+    expect(retry.scanned).toBe(0);
 
     const comments = await db
       .select()
@@ -431,12 +435,13 @@ describeEmbeddedPostgres("heartbeat reconcileWorkspaceValidationFailures orchest
       .from(issueComments)
       .where(eq(issueComments.issueId, seeded.issueId));
     expect(comments).toHaveLength(1);
+    expect(comments[0]?.authorType).toBe("system");
     expect(comments[0]?.body).toContain("Workspace self-heal");
     expect(comments[0]?.body).toContain("symlink");
     expect(comments[0]?.body).toContain(managed);
   });
 
-  it("posts a blocked comment and leaves the action active when repair fails", async () => {
+  it("posts one blocked comment and does not retry after repair fails", async () => {
     const seeded = await seedCompanyAndIssue({ companyIndex: 3 });
     await db.insert(issueRecoveryActions).values({
       companyId: seeded.companyId,
@@ -481,8 +486,9 @@ describeEmbeddedPostgres("heartbeat reconcileWorkspaceValidationFailures orchest
       .from(issueRecoveryActions)
       .where(eq(issueRecoveryActions.sourceIssueId, seeded.issueId))
       .then((rows) => rows[0]);
-    expect(recoveryRow?.status).toBe("active");
-    expect(recoveryRow?.outcome).toBeNull();
+    expect(recoveryRow?.status).toBe("resolved");
+    expect(recoveryRow?.outcome).toBe("blocked");
+    expect(recoveryRow?.resolutionNote).toContain("workspace self-heal blocked");
 
     const projectRow = await db
       .select({ cwd: projectWorkspaces.cwd })
@@ -503,8 +509,171 @@ describeEmbeddedPostgres("heartbeat reconcileWorkspaceValidationFailures orchest
       .from(issueComments)
       .where(eq(issueComments.issueId, seeded.issueId));
     expect(comments).toHaveLength(1);
-    expect(comments[0]?.body).toContain("could not restore the cwd");
+    expect(comments[0]?.authorType).toBe("system");
+    expect(comments[0]?.body).toContain("could not restore the workspace");
     expect(comments[0]?.body).toContain("Manual intervention required");
+
+    const retry = await heartbeat.reconcileWorkspaceValidationFailures();
+    expect(retry).toEqual({
+      scanned: 0,
+      repaired: 0,
+      skipped: 0,
+      failed: 0,
+      repairedIssueIds: [],
+      skippedIssueIds: [],
+      failedIssueIds: [],
+    });
+
+    const commentsAfterRetry = await db
+      .select()
+      .from(issueComments)
+      .where(eq(issueComments.issueId, seeded.issueId));
+    expect(commentsAfterRetry).toHaveLength(1);
+  });
+
+  it("does not mutate workspace, issue, or agent rows when the recovery action is resolved concurrently", async () => {
+    const previousOwnerAgentId = randomUUID();
+    const seeded = await seedCompanyAndIssue({
+      companyIndex: 6,
+      assigneeAgentStatus: "error",
+      previousOwnerAgentId,
+    });
+    const recoveryActionId = randomUUID();
+    await db.insert(issueRecoveryActions).values({
+      id: recoveryActionId,
+      companyId: seeded.companyId,
+      sourceIssueId: seeded.issueId,
+      kind: "workspace_validation",
+      status: "active",
+      cause: "workspace_validation_failed",
+      fingerprint: `fp-${seeded.issueId}`,
+      evidence: {
+        executionWorkspaceCwd: seeded.executionCwd,
+        resolvedProjectWorkspaceId: seeded.projectWorkspaceId,
+        previousOwnerAgentId,
+      },
+      ownerAgentId: seeded.assigneeAgentId,
+      nextAction: "restore cwd",
+      attemptCount: 1,
+    });
+
+    const managed = `/tmp/paperclip-test/projects/${seeded.companyId}/${seeded.projectId}/repo`;
+    const symlinkedCwds = new Set<string>();
+    const resolveMockPath = (p: string) => {
+      for (const symlinked of symlinkedCwds) {
+        if (p === symlinked) return managed;
+        if (p.startsWith(`${symlinked}/`)) return `${managed}${p.slice(symlinked.length)}`;
+      }
+      return p;
+    };
+    mockFs.stat.mockImplementation((p: string) => {
+      if (resolveMockPath(p) === managed) return okStat();
+      return enoent();
+    });
+    mockFs.lstat.mockImplementation((p: string) => {
+      if (symlinkedCwds.has(p)) {
+        return Promise.resolve({
+          isSymbolicLink: () => true,
+          isDirectory: () => false,
+          isFile: () => false,
+        } as unknown as import("node:fs").Stats);
+      }
+      if (resolveMockPath(p) === `${managed}/.git`) return dirStat();
+      return enoent();
+    });
+    mockFs.readdir.mockImplementation((p: string) =>
+      resolveMockPath(p) === managed
+        ? Promise.resolve([".git"] as unknown as string[])
+        : Promise.resolve([] as unknown as string[]),
+    );
+    mockFs.mkdir.mockImplementation(() => Promise.resolve());
+    mockExecFile.mockImplementation(async (_cmd: string, args: string[]) => {
+      const target = args[args.length - 1];
+      if (typeof target === "string") {
+        symlinkedCwds.add(target);
+        // Simulate a concurrent resolver that wins the race: between the
+        // filesystem repair and the guarded action UPDATE, another writer
+        // flips the recovery action to a terminal state.
+        await db
+          .update(issueRecoveryActions)
+          .set({
+            status: "resolved",
+            outcome: "manual",
+            resolutionNote: "resolved by operator",
+            resolvedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(issueRecoveryActions.id, recoveryActionId));
+      }
+      return { stdout: "", stderr: "" };
+    });
+
+    const heartbeat = heartbeatService(db);
+    const result = await heartbeat.reconcileWorkspaceValidationFailures();
+
+    expect(result.scanned).toBe(1);
+    expect(result.repaired).toBe(0);
+    expect(result.skipped).toBe(0);
+    expect(result.failed).toBe(0);
+
+    const projectRow = await db
+      .select({ cwd: projectWorkspaces.cwd })
+      .from(projectWorkspaces)
+      .where(eq(projectWorkspaces.id, seeded.projectWorkspaceId))
+      .then((rows) => rows[0]);
+    expect(projectRow?.cwd).toBe(seeded.projectCwd);
+
+    const execRows = await db
+      .select()
+      .from(executionWorkspaces)
+      .where(
+        and(
+          eq(executionWorkspaces.companyId, seeded.companyId),
+          eq(executionWorkspaces.sourceIssueId, seeded.issueId),
+        ),
+      );
+    expect(execRows).toHaveLength(1);
+    const exec = execRows[0]!;
+    expect(exec.cwd).toBe(seeded.executionCwd);
+    expect(exec.metadata).toEqual({});
+
+    const issueRow = await db
+      .select({ status: issues.status })
+      .from(issues)
+      .where(eq(issues.id, seeded.issueId))
+      .then((rows) => rows[0]);
+    expect(issueRow?.status).toBe("blocked");
+
+    const assignee = await db
+      .select({ status: agents.status, errorReason: agents.errorReason })
+      .from(agents)
+      .where(eq(agents.id, seeded.assigneeAgentId))
+      .then((rows) => rows[0]);
+    expect(assignee?.status).toBe("error");
+    expect(assignee?.errorReason).toBe("previous failure");
+
+    const previous = await db
+      .select({ status: agents.status, errorReason: agents.errorReason })
+      .from(agents)
+      .where(eq(agents.id, previousOwnerAgentId))
+      .then((rows) => rows[0]);
+    expect(previous?.status).toBe("error");
+    expect(previous?.errorReason).toBe("previous owner failure");
+
+    const recoveryRow = await db
+      .select()
+      .from(issueRecoveryActions)
+      .where(eq(issueRecoveryActions.id, recoveryActionId))
+      .then((rows) => rows[0]);
+    expect(recoveryRow?.status).toBe("resolved");
+    expect(recoveryRow?.outcome).toBe("manual");
+    expect(recoveryRow?.resolutionNote).toBe("resolved by operator");
+
+    const comments = await db
+      .select()
+      .from(issueComments)
+      .where(eq(issueComments.issueId, seeded.issueId));
+    expect(comments).toHaveLength(0);
   });
 
   it("repairs two companies independently and stamps each projectId in workspaceRealization", async () => {
