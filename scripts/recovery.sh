@@ -263,7 +263,8 @@ do_snapshot() {
     "zcat db/$sql_name into the new paperclip db",
     "rsync data/ to $DATA_DIR/",
     "in the worktree, git checkout $short to restore the source code",
-    "pnpm install --frozen-lockfile + pnpm --filter @paperclipai/server build + pnpm --filter @paperclipai/ui build",
+    "re-apply latest paperclip-backup plugin source on top of restored tree (so a buggy plugin in the snapshot does not break the next backup cycle)",
+    "pnpm install --frozen-lockfile + pnpm --filter @paperclipai/server build + pnpm --filter @paperclipai/ui build + pnpm --filter paperclip-backup build",
     "restart paperclip via ./scripts/launch-dev.sh"
   ],
   "previousSnapshot": "${prev_dir:-none}",
@@ -603,6 +604,14 @@ do_restore() {
   # 5) restore worktree from git ref
   local commit
   commit="$(jq -r '.gitShort // empty' "$staging/manifest.json" 2>/dev/null)"
+  # Capture the worktree's pre-restore HEAD so step 5b can re-apply the
+  # LATEST paperclip-backup plugin source on top of the snapshot. Without
+  # this overlay, a snapshot taken with a buggy version of the backup
+  # plugin would restore the buggy plugin (step 5 checks out the entire
+  # worktree, including the plugin), and the restored system could not
+  # take a fresh backup until somebody manually reinstalls.
+  local plugin_ref
+  plugin_ref="$(git -C "$WORKTREE_PATH" rev-parse --verify HEAD 2>/dev/null || true)"
   if [[ -n "$commit" && "$commit" != "empty" && ("$WORKTREE_PATH/.git" || -f "$WORKTREE_PATH/.git") ]]; then
     log "  restoring worktree to git ref $commit"
     (cd "$WORKTREE_PATH" && \
@@ -612,11 +621,31 @@ do_restore() {
       }
   fi
 
+  # 5b) re-apply the latest paperclip-backup plugin source on top of the
+  # restored tree. See BTCAAAAA-41515 for the board's concern: a snapshot
+  # taken with a buggy backup plugin would otherwise restore the buggy
+  # plugin code and break the next backup cycle. We pin the plugin dir
+  # to whatever the worktree's HEAD was before step 5's checkout (i.e.
+  # the operator's current branch tip), then rebuild it in step 6.
+  if [[ -n "$plugin_ref" && -d "$WORKTREE_PATH/packages/plugins/paperclip-backup" ]]; then
+    log "  re-applying latest paperclip-backup plugin from $plugin_ref..."
+    (cd "$WORKTREE_PATH" && \
+      git checkout "$plugin_ref" -- packages/plugins/paperclip-backup/ 2>&1 | tail -3) || {
+        log "WARN: plugin re-apply failed — backups may be broken until manually reinstalled"
+      }
+  fi
+
   # 6) reinstall + rebuild
   log "  (re)installing + rebuilding..."
   (cd "$WORKTREE_PATH" && pnpm install --frozen-lockfile 2>&1 | tail -3) || true
   (cd "$WORKTREE_PATH" && pnpm --filter @paperclipai/server build 2>&1 | tail -2) || true
   (cd "$WORKTREE_PATH" && pnpm --filter @paperclipai/ui build 2>&1 | tail -2) || true
+  # Rebuild the backup plugin so its dist/ (worker.js, manifest.js, ui/)
+  # matches the source we re-applied in step 5b. The plugin's package.json
+  # runs esbuild + tsc emit, which is what the plugin worker/UI load.
+  (cd "$WORKTREE_PATH" && pnpm --filter paperclip-backup build 2>&1 | tail -3) || {
+    log "WARN: paperclip-backup build failed — plugin may be stale until manually rebuilt"
+  }
 
   # 7) restart paperclip
   log "  restarting paperclip via launch-dev.sh"

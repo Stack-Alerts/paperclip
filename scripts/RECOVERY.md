@@ -75,8 +75,34 @@ snapshot (only the files that changed) regardless of snapshot count.
    via `pg_restore`. This is a sanity check that the SQL dump is
    well-formed; the live data dir has the snapshot's base from step 3.
 5. `git checkout` the worktree to the snapshot's recorded ref.
-6. `pnpm install --frozen-lockfile && pnpm --filter @paperclipai/server build && pnpm --filter @paperclipai/ui build`
-7. Restarts `./scripts/launch-dev.sh` and waits for `/api/health` to come up.
+6. Re-applies the **latest** `paperclip-backup` plugin source on top of
+   the restored tree (see [Post-recovery backup plugin overlay](#post-recovery-backup-plugin-overlay) below).
+7. `pnpm install --frozen-lockfile && pnpm --filter @paperclipai/server build && pnpm --filter @paperclipai/ui build && pnpm --filter paperclip-backup build`
+8. Restarts `./scripts/launch-dev.sh` and waits for `/api/health` to come up.
+
+## Post-recovery backup plugin overlay
+
+A snapshot is just a frozen view of the worktree at some past commit —
+including `packages/plugins/paperclip-backup/`. If the snapshot was taken
+when the backup plugin had a bug, step 5's `git checkout` would restore
+the buggy plugin code, and the restored system could not take a fresh
+backup until somebody manually reinstalled it.
+
+To close that gap, `do_restore` always re-applies the latest backup
+plugin source on top of the restored tree and rebuilds it:
+
+- **5b**: `git checkout <pre-restore HEAD> -- packages/plugins/paperclip-backup/`
+  pulls the plugin dir from the operator's current branch tip (the SHA
+  captured before step 5 detaches HEAD).
+- **6 (extended)**: `pnpm --filter paperclip-backup build` regenerates
+  `dist/worker.js`, `dist/manifest.js`, and `dist/ui/` against the new
+  source. `pnpm install --frozen-lockfile` at the top of step 6 already
+  re-resolves the plugin's workspace deps, so no separate install step
+  is needed.
+
+If either step fails the script logs a `WARN` and continues — backups may
+be broken until the operator manually runs `pnpm --filter paperclip-backup
+build`, but the rest of the restore still succeeds.
 
 ## Why this is safe to run on a live paperclip
 
