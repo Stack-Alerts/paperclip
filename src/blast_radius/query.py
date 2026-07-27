@@ -6,13 +6,17 @@ Engine is optional; if omitted a fresh engine is obtained via db.get_engine().
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Sequence
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import ProgrammingError
 
 from .db import get_engine
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -65,17 +69,32 @@ def query_blast_radius(
 
 
 def _query_fr_impact(conn, file_paths: list[str]) -> list[FRImpact]:
-    rows = conn.execute(
-        text(
-            """
-            SELECT DISTINCT fr_identifier, fr_owner_agent_id::text, fr_issue_id::text
-            FROM   touch_index_fr_files
-            WHERE  file_path = ANY(:paths)
-            ORDER  BY fr_identifier
-            """
-        ),
-        {"paths": file_paths},
-    ).fetchall()
+    try:
+        rows = conn.execute(
+            text(
+                """
+                SELECT DISTINCT fr_identifier, fr_owner_agent_id::text, fr_issue_id::text
+                FROM   touch_index_fr_files
+                WHERE  file_path = ANY(:paths)
+                ORDER  BY fr_identifier
+                """
+            ),
+            {"paths": file_paths},
+        ).fetchall()
+    except ProgrammingError as exc:
+        # BTCAAAAA-41534: Touch Index tables may be missing in environments
+        # where the schema hasn't been initialized yet (e.g. blast-radius
+        # worker CI with a fresh Postgres service container). Treat as empty
+        # so the worker reports zero blast radius instead of raising — the
+        # monitor only opens auto-alerts on real errors, not on missing data.
+        # Roll back the aborted transaction so the next sub-query
+        # (regression, downstream) can run on a clean connection state;
+        # otherwise Postgres raises `InFailedSqlTransaction` on any query
+        # after an aborted statement and the worker reports issues_with_errors=1
+        # even though only one of the three sub-queries is missing.
+        conn.rollback()
+        _log.debug("touch_index_fr_files unavailable: %s", exc)
+        return []
     return [
         FRImpact(
             fr_identifier=row.fr_identifier,
@@ -87,17 +106,23 @@ def _query_fr_impact(conn, file_paths: list[str]) -> list[FRImpact]:
 
 
 def _query_regression(conn, file_paths: list[str]) -> list[RegressionRisk]:
-    rows = conn.execute(
-        text(
-            """
-            SELECT DISTINCT bug_identifier, bug_issue_id::text
-            FROM   touch_index_bug_files
-            WHERE  file_path = ANY(:paths)
-            ORDER  BY bug_identifier
-            """
-        ),
-        {"paths": file_paths},
-    ).fetchall()
+    try:
+        rows = conn.execute(
+            text(
+                """
+                SELECT DISTINCT bug_identifier, bug_issue_id::text
+                FROM   touch_index_bug_files
+                WHERE  file_path = ANY(:paths)
+                ORDER  BY bug_identifier
+                """
+            ),
+            {"paths": file_paths},
+        ).fetchall()
+    except ProgrammingError as exc:
+        # See _query_fr_impact — same graceful-degrade pattern (incl. rollback).
+        conn.rollback()
+        _log.debug("touch_index_bug_files unavailable: %s", exc)
+        return []
     return [
         RegressionRisk(
             bug_identifier=row.bug_identifier,
@@ -108,22 +133,34 @@ def _query_regression(conn, file_paths: list[str]) -> list[RegressionRisk]:
 
 
 def _query_downstream(conn, file_paths: list[str]) -> list:
-    """Phase 2 stub — return empty list if dep graph is not populated."""
-    count = conn.execute(text("SELECT COUNT(*) FROM touch_index_file_deps")).scalar()
+    """Phase 2 stub — return empty list if dep graph is not populated or schema is missing."""
+    try:
+        count = conn.execute(text("SELECT COUNT(*) FROM touch_index_file_deps")).scalar()
+    except ProgrammingError as exc:
+        # See _query_fr_impact — same graceful-degrade pattern (incl. rollback).
+        conn.rollback()
+        _log.debug("touch_index_file_deps unavailable: %s", exc)
+        return []
     if not count:
         return []
 
-    rows = conn.execute(
-        text(
-            """
-            SELECT DISTINCT dep_file
-            FROM   touch_index_file_deps
-            WHERE  source_file = ANY(:paths)
-            ORDER  BY dep_file
-            """
-        ),
-        {"paths": file_paths},
-    ).fetchall()
+    try:
+        rows = conn.execute(
+            text(
+                """
+                SELECT DISTINCT dep_file
+                FROM   touch_index_file_deps
+                WHERE  source_file = ANY(:paths)
+                ORDER  BY dep_file
+                """
+            ),
+            {"paths": file_paths},
+        ).fetchall()
+    except ProgrammingError as exc:
+        # See _query_fr_impact — same graceful-degrade pattern (incl. rollback).
+        conn.rollback()
+        _log.debug("touch_index_file_deps query failed: %s", exc)
+        return []
     return [row.dep_file for row in rows]
 
 

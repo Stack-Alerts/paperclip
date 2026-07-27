@@ -30,6 +30,37 @@ jobs:
     name: Run Impact Gate on in_review fix issues
     runs-on: self-hosted
 
+    # BTCAAAAA-41534: provide a Postgres service so the SCAN target's
+    # SQLAlchemy/psycopg2 imports (src/optimizer_v3, src/ai_consultant,
+    # src/itm/state) can actually open a connection. Without this, the
+    # runner's local 5432 is unbound and the impact-gate worker fails with
+    # `(psycopg2.OperationalError) localhost:5432 connection refused`,
+    # which the blast-radius monitor then flags as a critical alert.
+    # Mirrors the proven services:postgres pattern in .github/workflows/test.yml.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: optimizer_v3
+          POSTGRES_USER: optimizer_admin
+          POSTGRES_PASSWORD: secure_password_change_me
+          # BTCAAAAA-39048 (v3): pg_isready is built on libpq and honors
+          # libpq client env vars. Setting PGUSER here means a bare
+          # `pg_isready` health-cmd connects as optimizer_admin instead of
+          # defaulting to the unix user (root inside the runner container).
+          PGUSER: optimizer_admin
+        ports:
+          # Random host port (no fixed mapping) — multiple self-hosted
+          # runners can run this workflow concurrently without "port already
+          # allocated" conflicts (BTCAAAAA-38523).
+          - 5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --tmpfs /var/lib/postgresql/data:size=512m,mode=1777
+
     env:
       PAPERCLIP_API_URL: ${{ secrets.PAPERCLIP_API_URL }}
       PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
@@ -78,6 +109,18 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
           PYTHONPATH: src
+          # BTCAAAAA-41534: Postgres connection env for the SCAN target.
+          # These must live on the step (not the job env:) because
+          # `job.services.*` only resolves inside a step's env / run block —
+          # GitHub Actions rejects `job.services.postgres.ports['5432']` at
+          # job scope with HTTP 422 on workflow_dispatch parse.
+          POSTGRES_HOST: localhost
+          # BTCAAAAA-38523: pick up the dynamic host port that GitHub
+          # assigned to the postgres service container.
+          POSTGRES_PORT: ${{ job.services.postgres.ports['5432'] }}
+          POSTGRES_DB: optimizer_v3
+          POSTGRES_USER: optimizer_admin
+          POSTGRES_PASSWORD: secure_password_change_me
         run: |
           FLAGS=""
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then

@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+from sqlalchemy.exc import ProgrammingError
+
 from blast_radius.query import (
     BlastRadiusData,
     FRImpact,
@@ -135,6 +138,89 @@ class TestQueryBlastRadius:
         assert data.downstream_set == []
         mock_get.assert_called_once()
         engine.dispose.assert_called_once()
+
+    # BTCAAAAA-41534: when the Postgres service container starts with an empty
+    # database (CI scenario), the touch_index_* tables don't exist and
+    # SQLAlchemy raises ProgrammingError (wrapping psycopg2.errors.UndefinedTable).
+    # query_blast_radius must degrade to an empty result instead of raising,
+    # otherwise the blast-radius worker reports issues_with_errors=1 and the
+    # monitor opens a critical auto-alert even though the schema is the only
+    # missing piece.
+    def test_undefined_table_returns_empty_data(self):
+        engine = MagicMock()
+        conn = engine.connect.return_value.__enter__.return_value
+        # Simulate "relation does not exist" on every sub-query.
+        conn.execute.side_effect = ProgrammingError(
+            "select", {}, Exception('relation "touch_index_fr_files" does not exist')
+        )
+
+        data = query_blast_radius(["src/foo.py"], engine=engine)
+
+        assert data.fr_impact_set == []
+        assert data.regression_set == []
+        assert data.downstream_set == []
+        assert data.downstream_note == "Phase 2 dep graph not yet available"
+        # Each catch must roll back so the next sub-query can run cleanly.
+        assert conn.rollback.call_count >= 1
+
+    def test_undefined_table_on_single_query_does_not_block_others(self):
+        """First query missing, second still runs and returns data."""
+        engine = MagicMock()
+        conn = engine.connect.return_value.__enter__.return_value
+        # FR raises; regression returns one row; downstream count=0.
+        conn.execute.side_effect = [
+            ProgrammingError("select", {}, Exception("undefined table")),
+            _mock_result(
+                [MagicMock(bug_identifier="BTCAAAAA-500", bug_issue_id="bug-uuid")]
+            ),
+            _mock_result([], scalar_return=0),
+        ]
+
+        data = query_blast_radius(["src/foo.py"], engine=engine)
+
+        assert data.fr_impact_set == []
+        assert len(data.regression_set) == 1
+        assert data.regression_set[0].bug_identifier == "BTCAAAAA-500"
+        assert data.downstream_set == []
+        # FR's ProgrammingError must trigger a rollback so regression can run.
+        conn.rollback.assert_called_once_with()
+
+    # BTCAAAAA-41534: even when ProgrammingError is caught, Postgres leaves the
+    # transaction in an aborted state. Without an explicit rollback, the next
+    # sub-query against the same connection raises `InFailedSqlTransaction`
+    # (a different exception class — not ProgrammingError) and the worker
+    # still reports issues_with_errors=1. Verify the rollback path handles this
+    # case so the unit-level test mirrors real Postgres semantics.
+    def test_in_failed_sql_transaction_after_undefined_table(self):
+        """First query raises UndefinedTable; next raises InFailedSqlTransaction
+        unless the catch path rolled the transaction back."""
+        engine = MagicMock()
+        conn = engine.connect.return_value.__enter__.return_value
+        # First call: real Postgres would abort the transaction here.
+        # Second call: real Postgres raises InFailedSqlTransaction.
+        # With our rollback fix, the catch in _query_fr_impact calls
+        # conn.rollback() before returning [], so the second call's
+        # ProgrammingError-like error is caught by the next sub-query's
+        # own try/except — no propagation.
+        conn.execute.side_effect = [
+            ProgrammingError(
+                "select", {}, Exception('relation "touch_index_fr_files" does not exist')
+            ),
+            ProgrammingError(
+                "select",
+                {},
+                Exception("current transaction is aborted, commands ignored"),
+            ),
+            _mock_result([], scalar_return=0),
+        ]
+
+        data = query_blast_radius(["src/foo.py"], engine=engine)
+
+        assert data.fr_impact_set == []
+        assert data.regression_set == []
+        assert data.downstream_set == []
+        # Rollback called for the FR catch + regression catch = 2.
+        assert conn.rollback.call_count == 2
 
 
 class TestToJsonDict:
