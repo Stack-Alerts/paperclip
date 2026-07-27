@@ -243,6 +243,22 @@ describe("successful run handoff decision", () => {
     expect(isSuccessfulRunHandoffValidPathSkip(decide({ budgetBlocked: true }))).toBe(false);
   });
 
+  it("does not queue a corrective handoff wake for perpetual-register issues", () => {
+    expect(decide({ issue: { ...issue, workMode: "perpetual_register" } as any })).toEqual({
+      kind: "skip",
+      reason: "perpetual register owns its own continuation path",
+    });
+    expect(
+      isSuccessfulRunHandoffValidPathSkip(
+        decide({ issue: { ...issue, workMode: "perpetual_register" } as any }),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not skip ordinary standard in_progress issues (regression preservation)", () => {
+    expect(decide({ issue: { ...issue, workMode: "standard" } as any }).kind).toBe("enqueue");
+  });
+
   it("does not treat killed background-task evidence as a missing live path when a durable monitor owns the wait", () => {
     expect(decide({
       detectedProgressSummary: UNMANAGED_BACKGROUND_TASK_LIVENESS_REASON,

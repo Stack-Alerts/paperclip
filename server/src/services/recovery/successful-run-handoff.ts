@@ -51,6 +51,7 @@ type IssueRow = Pick<
   | "title"
   | "description"
   | "status"
+  | "workMode"
   | "assigneeAgentId"
   | "assigneeUserId"
   | "executionState"
@@ -107,6 +108,7 @@ const SUCCESSFUL_RUN_HANDOFF_VALID_PATH_SKIP_REASONS = new Set([
   "open recovery issue owns the ambiguity",
   "issue is under an active pause hold",
   "corrective handoff wake already exists for this source run",
+  "perpetual register owns its own continuation path",
 ]);
 
 export function isSuccessfulRunHandoffValidPathSkip(
@@ -483,6 +485,9 @@ export function decideSuccessfulRunHandoff(input: {
   }
   if (issue.assigneeUserId) return { kind: "skip", reason: "issue is human-owned" };
   if (issue.status !== "in_progress") return { kind: "skip", reason: `issue status ${issue.status} is a valid disposition` };
+  if (issue.workMode === "perpetual_register") {
+    return { kind: "skip", reason: "perpetual register owns its own continuation path" };
+  }
   if (issue.executionState) return { kind: "skip", reason: "issue has execution policy state" };
   if (agent.status === "paused" || agent.status === "terminated" || agent.status === "pending_approval") {
     return { kind: "skip", reason: `agent status ${agent.status} is not invokable` };
