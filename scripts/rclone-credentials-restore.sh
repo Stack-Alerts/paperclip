@@ -82,6 +82,7 @@ fi
 KEY_FILE="${PAPERCLIP_RCLONE_BOOTSTRAP_KEY_FILE:-$HOME/.paperclip/rclone-creds-bootstrap.key}"
 
 command -v openssl >/dev/null 2>&1 || die "missing dependency: openssl" 1
+command -v python3 >/dev/null 2>&1 || die "missing dependency: python3" 1
 
 if [[ ! -s "$KEY_FILE" ]]; then
   die "bootstrap key missing at $KEY_FILE — install from offline backup or re-bootstrap (scripts/rclone-credentials-bootstrap.sh --reset)" 1
@@ -91,10 +92,48 @@ if [[ ! -d "$SRC_DIR" ]]; then
   die "snapshot has no config/rclone/ at $SRC_DIR — not a credentials-bearing snapshot, or wrong path" 1
 fi
 
-if [[ -f "$SRC_DIR/MANIFEST.json" ]]; then
-  log "manifest:"
-  sed 's/^/  /' "$SRC_DIR/MANIFEST.json" | head -20 || true
+MANIFEST="$SRC_DIR/MANIFEST.json"
+if [[ ! -s "$MANIFEST" ]]; then
+  die "snapshot has no authenticated MANIFEST.json at $MANIFEST" 2
 fi
+
+python3 - "$MANIFEST" <<'PY'
+import json, sys
+m = json.load(open(sys.argv[1]))
+assert m.get("schema") == "rclone-credentials-package-v1"
+assert m.get("cipher") == "aes-256-cbc"
+assert m.get("kdf") == "pbkdf2-hmac-sha256"
+assert m.get("kdfIterations") == 200000
+assert isinstance(m.get("files"), list) and m["files"]
+for item in m["files"]:
+    assert set(item) == {"name", "sizeBytes", "sha256", "mac"}
+    assert isinstance(item["name"], str) and item["name"].endswith(".enc")
+    assert isinstance(item["sizeBytes"], int) and item["sizeBytes"] >= 0
+    assert isinstance(item["sha256"], str) and len(item["sha256"]) == 64
+    assert isinstance(item["mac"], str) and len(item["mac"]) == 64
+PY
+
+log "manifest: authenticated metadata verified"
+MAC_KEY="$(printf '%s' 'paperclip:rclone-credentials:manifest-v1' | \
+  openssl mac -digest SHA256 -macopt "key:file:$KEY_FILE" HMAC)"
+mac_file() {
+  local name="$1" size="$2" sha="$3" file="$4"
+  {
+    printf '%s\0%s\0%s\0' "$name" "$size" "$sha"
+    cat "$file"
+  } | openssl mac -digest SHA256 -macopt "hexkey:$MAC_KEY" HMAC
+}
+manifest_record() {
+  python3 - "$MANIFEST" "$1" <<'PY'
+import json, sys
+m = json.load(open(sys.argv[1]))
+for item in m["files"]:
+    if item["name"] == sys.argv[2]:
+        print(f'{item["sizeBytes"]}\t{item["sha256"]}\t{item["mac"]}')
+        raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
 
 decrypt_one() {
   local label="$1" src="$2" dst="$3"
@@ -107,7 +146,18 @@ decrypt_one() {
 
   size_ct="$(stat -c '%s' "$src" 2>/dev/null || echo 0)"
   sha_ct="$(sha256sum "$src" | awk '{print $1}')"
-  log "  decrypting $label: ${size_ct}B ciphertext (sha256=${sha_ct:0:16}...)"
+  local expected_size expected_sha expected_mac actual_mac
+  if ! IFS=$'\t' read -r expected_size expected_sha expected_mac < <(manifest_record "$(basename "$src")"); then
+    die "manifest has no authenticated record for $(basename "$src")" 2
+  fi
+  if [[ "$size_ct" != "$expected_size" || "$sha_ct" != "$expected_sha" ]]; then
+    die "ciphertext integrity check failed for $label" 2
+  fi
+  actual_mac="$(mac_file "$(basename "$src")" "$size_ct" "$sha_ct" "$src")"
+  if [[ "$actual_mac" != "$expected_mac" ]]; then
+    die "ciphertext authentication failed for $label" 2
+  fi
+  log "  authenticated $label: ${size_ct}B ciphertext (sha256=${sha_ct:0:16}...)"
 
   if [[ -f "$dst" && $force -eq 0 ]]; then
     die "destination $dst already exists — refusing to overwrite without --force (refusing protects a host that already has working credentials from being clobbered by a stale snapshot)" 3

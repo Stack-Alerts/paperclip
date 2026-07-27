@@ -9,7 +9,7 @@ extras/config/rclone/
 └── rclone-pass.enc
 ```
 
-The files are encrypted with AES-256-CBC and PBKDF2-HMAC-SHA256 (200,000 iterations). The per-host bootstrap key is independent of the rclone credentials, so it can be used before GDrive access is available. The backup archive and manifest never contain plaintext credential values.
+The files are encrypted with AES-256-CBC and PBKDF2-HMAC-SHA256 (200,000 iterations). Each ciphertext and its identifying metadata also carries a bootstrap-derived HMAC, which restore verifies before decrypting or replacing a destination. The per-host bootstrap key is independent of the rclone credentials, so it can be used before GDrive access is available. The backup archive and manifest never contain plaintext credential values.
 
 ## Before the first backup
 

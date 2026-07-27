@@ -120,6 +120,18 @@ log "packaging rclone credentials into $DEST_DIR"
 encrypt_one "rclone.conf" "$RCLONE_CONFIG_SRC" "$DEST_DIR/rclone.conf.enc"
 encrypt_one "rclone-pass" "$RCLONE_PASS_SRC"   "$DEST_DIR/rclone-pass.enc"
 
+# Derive a separate MAC key from the bootstrap key so CBC ciphertext and its
+# metadata are authenticated without putting the bootstrap key in argv.
+MAC_KEY="$(printf '%s' 'paperclip:rclone-credentials:manifest-v1' | \
+  openssl mac -digest SHA256 -macopt "key:file:$KEY_FILE" HMAC)"
+mac_file() {
+  local name="$1" size="$2" sha="$3" file="$4"
+  {
+    printf '%s\0%s\0%s\0' "$name" "$size" "$sha"
+    cat "$file"
+  } | openssl mac -digest SHA256 -macopt "hexkey:$MAC_KEY" HMAC
+}
+
 # ---- Manifest ----
 ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 key_fp="$(sha256sum "$KEY_FILE" | awk '{print substr($1,1,16)}')"
@@ -150,10 +162,11 @@ json_array() {
     name="$(basename "$f")"
     size="$(stat -c '%s' "$f" 2>/dev/null || echo 0)"
     sha="$(sha256sum "$f" | awk '{print $1}')"
+    mac="$(mac_file "$name" "$size" "$sha" "$f")"
     if [[ $first -eq 0 ]]; then printf ',\n'; fi
     first=0
-    printf '    {"name": "%s", "sizeBytes": %d, "sha256": "%s"}' \
-      "$name" "$size" "$sha"
+    printf '    {"name": "%s", "sizeBytes": %d, "sha256": "%s", "mac": "%s"}' \
+      "$name" "$size" "$sha" "$mac"
   done
   printf '\n  ],\n'
   printf '  "packaged": '
