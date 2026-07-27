@@ -9,6 +9,7 @@ import { spawn } from "node:child_process";
 import {
   existsSync,
   readFileSync,
+  readdirSync,
   promises as fs2
 } from "node:fs";
 import nodePath from "node:path";
@@ -10517,6 +10518,22 @@ var RECOVERY_DATA_KEYS = {
   recoveryStatus: "recovery-status",
   tierStatus: "gdrive-tier-status"
 };
+var CLEANUP_DATA_KEYS = {
+  listing: "gdrive-cleanup-listing",
+  // shape matches `listing` plus
+  // per-leaf golden flag + goldenBytes
+  preview: "gdrive-cleanup-preview"
+  // safe preview of what a
+  // cleanup-stale call WOULD delete.
+  // Always a dry-run.
+};
+var TIER_UPLOAD_PROGRESS_KEY = "tier-upload-progress";
+var CLEANUP_ACTION_KEYS = {
+  markGolden: "mark-golden",
+  cleanupStale: "cleanup-stale",
+  setGoldenThreshold: "set-golden-cleanup-threshold"
+};
+var CLEANUP_TEST_PREFIX = "Paperclip-Backups/test-cleanup-panel";
 
 // src/worker.ts
 async function runScript(scriptPath, args, extraEnv = {}) {
@@ -10565,7 +10582,19 @@ async function runScript(scriptPath, args, extraEnv = {}) {
     });
   });
 }
+function rcloneConfigPresent(rcloneConfig) {
+  if (!rcloneConfig || typeof rcloneConfig !== "string") return false;
+  try {
+    return existsSync(rcloneConfig);
+  } catch {
+    return false;
+  }
+}
+var MISSING_CONFIG_ERROR_PREFIX = "rclone config not found at ";
 async function lsjsonDir(remotePath, rcloneConfig, rclonePass, opts = {}) {
+  if (!rcloneConfigPresent(rcloneConfig)) {
+    return [];
+  }
   const args = ["lsjson"];
   if (opts.dirsOnly ?? true) {
     args.push("--dirs-only", "--no-modtime");
@@ -10585,9 +10614,28 @@ async function lsjsonDir(remotePath, rcloneConfig, rclonePass, opts = {}) {
   );
   let stdout = "";
   let stderr = "";
+  let settled = false;
   child.stdout.on("data", (b) => stdout += b.toString());
   child.stderr.on("data", (b) => stderr += b.toString());
-  const code = await new Promise((res) => child.on("close", (c) => res(c ?? 0)));
+  const code = await new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try {
+        child.kill("SIGKILL");
+      } catch {
+      }
+      stdout = "";
+      stderr = `rclone timed out after ${RCLONE_HARD_TIMEOUT_MS}ms`;
+      resolve(124);
+    }, RCLONE_HARD_TIMEOUT_MS);
+    child.on("close", (c) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(c ?? 0);
+    });
+  });
   if (code !== 0) return [];
   let entries;
   try {
@@ -10620,6 +10668,98 @@ async function lsjsonDir(remotePath, rcloneConfig, rclonePass, opts = {}) {
     });
   }
   return out;
+}
+var RCLONE_HARD_TIMEOUT_MS = 15e3;
+function rcloneRun(args, cfg, pass, timeoutMs = RCLONE_HARD_TIMEOUT_MS) {
+  return new Promise((resolve) => {
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    const settle = (payload) => {
+      if (settled) return;
+      settled = true;
+      resolve(payload);
+    };
+    if (!rcloneConfigPresent(cfg.rcloneConfig)) {
+      settle({
+        code: 127,
+        stdout: "",
+        stderr: MISSING_CONFIG_ERROR_PREFIX + (cfg.rcloneConfig || "<unset>"),
+        timedOut: false
+      });
+      return;
+    }
+    try {
+      const child = spawn("rclone", args, {
+        env: {
+          ...process.env,
+          RCLONE_CONFIG: cfg.rcloneConfig,
+          ...pass ? { RCLONE_CONFIG_PASS: pass } : {}
+        },
+        stdio: ["ignore", "pipe", "pipe"]
+      });
+      const timer = setTimeout(() => {
+        try {
+          child.kill("SIGKILL");
+        } catch {
+        }
+        settle({
+          code: 124,
+          // conventional "timed out" code, distinct from rclone's own codes
+          stdout,
+          stderr: stderr + (stderr ? "\n" : "") + `rclone timed out after ${timeoutMs}ms`,
+          timedOut: true
+        });
+      }, timeoutMs);
+      if (child.stdout) child.stdout.on("data", (b) => stdout += b.toString());
+      if (child.stderr) child.stderr.on("data", (b) => stderr += b.toString());
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        settle({ code: code ?? 0, stdout, stderr, timedOut: false });
+      });
+      child.on("error", (err) => {
+        clearTimeout(timer);
+        settle({ code: -1, stdout, stderr: stderr + (stderr ? "\n" : "") + err.message, timedOut: false });
+      });
+    } catch (err) {
+      settle({ code: -1, stdout, stderr: err.message, timedOut: false });
+    }
+  });
+}
+async function rcloneRcatStdin(remote, contents, cfg, pass) {
+  if (!rcloneConfigPresent(cfg.rcloneConfig)) {
+    return { code: 127, stderr: MISSING_CONFIG_ERROR_PREFIX + (cfg.rcloneConfig || "<unset>") };
+  }
+  return await new Promise((resolve) => {
+    try {
+      const child = spawn("rclone", ["rcat", remote], {
+        env: {
+          ...process.env,
+          RCLONE_CONFIG: cfg.rcloneConfig,
+          ...pass ? { RCLONE_CONFIG_PASS: pass } : {}
+        },
+        stdio: ["pipe", "ignore", "pipe"]
+      });
+      let stderr = "";
+      if (child.stderr) child.stderr.on("data", (b) => stderr += b.toString());
+      child.on("close", (code) => resolve({ code: code ?? 0, stderr }));
+      child.on("error", (err) => resolve({ code: -1, stderr: stderr + (stderr ? "\n" : "") + err.message }));
+      child.stdin?.write(contents);
+      child.stdin?.end();
+    } catch (err) {
+      resolve({ code: -1, stderr: err.message });
+    }
+  });
+}
+async function rcloneDeleteDir(remote, cfg, pass) {
+  const { code, stderr } = await rcloneRun(["purge", remote], cfg, pass);
+  return { code, stderr };
+}
+function isValidCleanupLeafPath(path3) {
+  if (typeof path3 !== "string" || path3.length === 0) return false;
+  const stripped = path3.replace(/^[a-zA-Z0-9_-]+[:/]/, "");
+  if (/^Paperclip-Backups-evil(\/|$)/.test(stripped)) return false;
+  return /^Paperclip-Backups\/[^/]+\//.test(stripped) || /^Paperclip-Backups\/hourly(\/|$)/.test(stripped) || /^Paperclip-Backups\/daily(\/|$)/.test(stripped) || /^Paperclip-Backups\/test-cleanup-panel(\/|$)/.test(stripped);
 }
 function readInstanceConfig(cfg = {}) {
   const env = process.env.PAPERCLIP_BACKUP_CONFIG;
@@ -10842,8 +10982,9 @@ async function readOffsiteBackups(cfg, companyId) {
     }
     return { leaf, totalBytes, modified: newestMtime };
   });
-  for (const { leaf, totalBytes, modified } of leafDetails) {
-    if (!leaf) continue;
+  for (const detail of leafDetails) {
+    if (!detail) continue;
+    const { leaf, totalBytes, modified } = detail;
     backups.push({
       path: leaf.relPath,
       modified: modified || void 0,
@@ -11472,45 +11613,120 @@ var pluginInstance = definePlugin({
       }
       return fallback && fallback >= 1 ? Math.floor(fallback) : tier === "daily" ? 3 : 2;
     };
+    let tierUploadProgress = {
+      tier: null,
+      pid: null,
+      startedAt: null,
+      finishedAt: null,
+      lines: [],
+      exitCode: null
+    };
+    const TIER_UPLOAD_MAX_LINES = 6;
+    const appendTierLine = (line) => {
+      const trimmed = line.replace(/\x1b\[[0-9;]*m/g, "").trimEnd();
+      if (!trimmed) return;
+      tierUploadProgress = {
+        ...tierUploadProgress,
+        lines: [...tierUploadProgress.lines, trimmed].slice(-TIER_UPLOAD_MAX_LINES)
+      };
+    };
+    ctx.data.register(TIER_UPLOAD_PROGRESS_KEY, async () => tierUploadProgress);
+    const startTierUpload = (tier, snapshotId, keep) => {
+      const scriptPath = process.env.PAPERCLIP_GDRIVE_TIERED_SCRIPT || "/home/sirrus/paperclip-btcaaaaa-main/scripts/gdrive-tiered-upload.sh";
+      if (!existsSync(scriptPath)) {
+        return { ok: false, message: `tiered upload script not found: ${scriptPath}` };
+      }
+      const startedAt = Date.now();
+      const child = spawn(
+        scriptPath,
+        ["--tier", tier, "--keep", String(keep), "--snapshot-id", snapshotId],
+        {
+          detached: true,
+          stdio: ["ignore", "pipe", "pipe"]
+        }
+      );
+      child.unref();
+      tierUploadProgress = {
+        tier,
+        pid: child.pid ?? null,
+        startedAt,
+        finishedAt: null,
+        lines: [
+          `Started ${tier} upload of ${snapshotId} (pid=${child.pid}, keep=${keep})`
+        ],
+        exitCode: null
+      };
+      const captureStream = (stream) => {
+        if (!stream) return;
+        let buf = "";
+        stream.on("data", (chunk) => {
+          buf += chunk.toString("utf8");
+          let nl = buf.indexOf("\n");
+          while (nl >= 0) {
+            appendTierLine(buf.slice(0, nl));
+            buf = buf.slice(nl + 1);
+            nl = buf.indexOf("\n");
+          }
+        });
+        stream.on("end", () => {
+          if (buf.length > 0) appendTierLine(buf);
+        });
+      };
+      captureStream(child.stderr);
+      captureStream(child.stdout);
+      child.on("exit", (code) => {
+        tierUploadProgress = {
+          ...tierUploadProgress,
+          finishedAt: Date.now(),
+          exitCode: code ?? null
+        };
+        const tag = code === 0 ? "done" : `exit ${code}`;
+        appendTierLine(`${tag} after ${Math.round((Date.now() - startedAt) / 1e3)}s`);
+      });
+      return { ok: true, pid: child.pid, async: true };
+    };
+    const resolveLatestSnapshotId = () => {
+      const dir = process.env.PAPERCLIP_HOME ? `${process.env.PAPERCLIP_HOME}/paperclip-snapshots` : "/home/sirrus/paperclip-snapshots";
+      try {
+        const names = readdirSync(dir);
+        return names.filter((n) => /^\d{4}-\d{2}-\d{2}-\d{4}$/.test(n)).sort().pop() ?? null;
+      } catch {
+        return null;
+      }
+    };
     ctx.actions.register(
       RECOVERY_ACTION_KEYS.uploadDailyBackup,
       async () => {
-        const scriptPath = process.env.PAPERCLIP_GDRIVE_TIERED_SCRIPT || "/home/sirrus/paperclip-btcaaaaa-main/scripts/gdrive-tiered-upload.sh";
-        if (!existsSync(scriptPath)) {
-          return { ok: false, message: `tiered upload script not found: ${scriptPath}` };
+        const snapshotId = resolveLatestSnapshotId();
+        if (!snapshotId) {
+          return { ok: false, message: "no local snapshot found to upload" };
         }
         const keep = await resolveTierKeep("daily");
-        const child = spawn(scriptPath, ["--tier", "daily", "--keep", String(keep)], {
-          detached: true,
-          stdio: "ignore"
-        });
-        child.unref();
+        const r = startTierUpload("daily", snapshotId, keep);
+        if (!r.ok) return r;
         return {
           ok: true,
-          pid: child.pid,
+          pid: r.pid,
           async: true,
-          message: `Daily upload started (pid=${child.pid}, keep=${keep})`
+          message: `Daily upload started (pid=${r.pid}, snapshot=${snapshotId}, keep=${keep}) \u2014 check on this`
         };
       }
     );
     ctx.actions.register(
       RECOVERY_ACTION_KEYS.uploadHourlyBackup,
       async () => {
-        const scriptPath = process.env.PAPERCLIP_GDRIVE_TIERED_SCRIPT || "/home/sirrus/paperclip-btcaaaaa-main/scripts/gdrive-tiered-upload.sh";
-        if (!existsSync(scriptPath)) {
-          return { ok: false, message: `tiered upload script not found: ${scriptPath}` };
+        const snapshotId = resolveLatestSnapshotId();
+        if (!snapshotId) {
+          return { ok: false, message: "no local snapshot found to upload" };
         }
         const keep = await resolveTierKeep("hourly");
-        const child = spawn(scriptPath, ["--tier", "hourly", "--keep", String(keep)], {
-          detached: true,
-          stdio: "ignore"
-        });
-        child.unref();
+        const r = startTierUpload("hourly", snapshotId, keep);
+        if (!r.ok) return r;
         return {
           ok: true,
-          pid: child.pid,
+          pid: r.pid,
           async: true,
-          message: `Hourly upload started (pid=${child.pid}, keep=${keep})`
+          message: `Hourly upload started (pid=${r.pid}, snapshot=${snapshotId}, keep=${keep}) \u2014 check on this`
         };
       }
     );
@@ -11524,6 +11740,144 @@ var pluginInstance = definePlugin({
       }
       await ctx.state.set({ scopeKind: "instance", stateKey }, { keep, updatedAt: (/* @__PURE__ */ new Date()).toISOString() }).catch(() => null);
       return { ok: true, tier, keep, message: `Set ${tier} keep = ${keep}` };
+    });
+    ctx.actions.register(CLEANUP_ACTION_KEYS.markGolden, async (params) => {
+      const p = params ?? {};
+      const leaf = typeof p.leaf === "string" ? p.leaf.trim() : "";
+      const golden = p.golden === true;
+      const setBy = typeof p.setBy === "string" ? p.setBy : "operator";
+      const reason = typeof p.reason === "string" ? p.reason : "";
+      if (!leaf) {
+        return { ok: false, message: "leaf path required", sidecarPath: "" };
+      }
+      if (!isValidCleanupLeafPath(leaf)) {
+        return {
+          ok: false,
+          message: `refusing to write sidecar outside known tier roots: ${leaf}`,
+          sidecarPath: ""
+        };
+      }
+      const cfg = readInstanceConfig();
+      const pass = getRclonePass();
+      const stripped = leaf.replace(/^[a-zA-Z0-9_-]+[:/]/, "");
+      const remote = `${cfg.rcloneRemote}:${stripped}`;
+      const sidecarRemote = remote.endsWith("/") ? `${remote}.golden.json` : `${remote}/.golden.json`;
+      const sidecarPath = sidecarRemote.slice(`${cfg.rcloneRemote}:`.length);
+      if (golden) {
+        const payload = JSON.stringify({
+          golden: true,
+          setBy,
+          reason,
+          setAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+        ctx.logger.warn(
+          `cleanup-panel: writing golden sidecar=${sidecarPath} setBy=${setBy} reason=${reason}`
+        );
+        const { code: code2, stderr: stderr2 } = await rcloneRcatStdin(sidecarRemote, payload, cfg, pass);
+        if (code2 !== 0) {
+          return {
+            ok: false,
+            message: `rclone rcat failed (${code2}): ${stderr2.slice(0, 200)}`,
+            sidecarPath
+          };
+        }
+        return { ok: true, sidecarPath, message: `Marked ${sidecarPath} as golden` };
+      }
+      ctx.logger.warn(`cleanup-panel: removing golden sidecar=${sidecarPath} setBy=${setBy}`);
+      const { code, stderr } = await rcloneRun(["deletefile", sidecarRemote], cfg, pass);
+      if (code !== 0 && !/not found/i.test(stderr)) {
+        return {
+          ok: false,
+          message: `rclone deletefile failed (${code}): ${stderr.slice(0, 200)}`,
+          sidecarPath
+        };
+      }
+      return { ok: true, sidecarPath, message: `Removed golden flag from ${sidecarPath}` };
+    });
+    ctx.actions.register(CLEANUP_ACTION_KEYS.cleanupStale, async (params) => {
+      const p = params ?? {};
+      const scopeRaw = typeof p.scope === "string" ? p.scope : "testOnly";
+      const scope = scopeRaw === "perCompany" || scopeRaw === "hourly" || scopeRaw === "daily" || scopeRaw === "testOnly" || scopeRaw === "all" ? scopeRaw : "testOnly";
+      const dryRun = p.dryRun !== false;
+      const confirmDelete = p.confirmDelete === true;
+      const allowActiveBtcCompany = p.allowActiveBtcCompany === true;
+      const thresholdDays = Math.max(1, Math.min(365, Number(p.thresholdDays) || 14));
+      const errors = [];
+      if (scope !== "testOnly" && !confirmDelete) {
+        errors.push(
+          `refusing cleanup-stale for scope=${scope}: confirmDelete:true is required for any production scope`
+        );
+        return { ok: false, scope, dryRun, thresholdDays, deleted: 0, errors };
+      }
+      if ((scope === "perCompany" || scope === "all") && !allowActiveBtcCompany) {
+        errors.push(
+          `refusing cleanup-stale for scope=${scope}: allowActiveBtcCompany:true is required (the per-company tier is the only one with real production backups)`
+        );
+        return { ok: false, scope, dryRun, thresholdDays, deleted: 0, errors };
+      }
+      const cfg = readInstanceConfig();
+      const companyId = resolveCompanyId(p);
+      const roots = await listCleanupRoots(cfg, companyId);
+      const decision = decideCleanupTargets(roots, { scope, thresholdDays });
+      const { wouldDelete } = decision;
+      const wouldDeleteBytes = wouldDelete.reduce(
+        (s, l) => s + (l.coreBytes ?? 0),
+        0
+      );
+      const goldenSkipped = decision.goldenSkipped;
+      const ageKept = decision.ageKept;
+      if (dryRun) {
+        return {
+          ok: true,
+          scope,
+          dryRun: true,
+          thresholdDays,
+          deleted: 0,
+          wouldDelete,
+          wouldDeleteBytes,
+          goldenSkipped,
+          ageKept,
+          errors
+        };
+      }
+      const pass = getRclonePass();
+      let deleted = 0;
+      for (const leaf of wouldDelete) {
+        if (leaf.golden) {
+          errors.push(`refusing to delete golden leaf: ${leaf.path}`);
+          continue;
+        }
+        ctx.logger.warn(
+          `cleanup-stale: deleting leaf path=${leaf.path} scope=${scope} thresholdDays=${thresholdDays}`
+        );
+        const { code, stderr } = await rcloneDeleteDir(leaf.path, cfg, pass);
+        if (code === 0) {
+          deleted += 1;
+        } else {
+          errors.push(`rclone purge ${leaf.path} failed (${code}): ${stderr.slice(0, 200)}`);
+        }
+      }
+      cleanupListingCache = null;
+      return {
+        ok: errors.length === 0,
+        scope,
+        dryRun: false,
+        thresholdDays,
+        deleted,
+        wouldDeleteBytes,
+        goldenSkipped,
+        ageKept,
+        errors
+      };
+    });
+    ctx.actions.register(CLEANUP_ACTION_KEYS.setGoldenThreshold, async (params) => {
+      const p = params ?? {};
+      const thresholdDays = Math.max(1, Math.min(365, Number(p.thresholdDays) || 14));
+      await ctx.state.set(
+        { scopeKind: "instance", stateKey: "cleanup-default-threshold-days" },
+        { thresholdDays, updatedAt: (/* @__PURE__ */ new Date()).toISOString() }
+      ).catch(() => null);
+      return { ok: true, thresholdDays, message: `Set default cleanup threshold = ${thresholdDays}d` };
     });
     ctx.data.register(RECOVERY_DATA_KEYS.snapshots, async () => {
       const dir = process.env.PAPERCLIP_RECOVERY_DIR || "/home/sirrus/paperclip-snapshots";
@@ -11616,6 +11970,321 @@ var pluginInstance = definePlugin({
         hourly: hourlyItems
       };
     });
+    function emptyTierSummary(tier) {
+      return {
+        kind: tier.kind,
+        remote: `${tier.remote}/${tier.prefix}`,
+        prefix: tier.prefix,
+        count: 0,
+        totalBytes: 0,
+        goldenCount: 0,
+        goldenBytes: 0,
+        leaves: []
+      };
+    }
+    async function populateManifestSizes(leaves, cfg, pass, tier) {
+      if (leaves.length === 0) return;
+      const settled = await Promise.all(
+        leaves.map(
+          (leaf) => new Promise((resolve) => {
+            try {
+              if (!rcloneConfigPresent(cfg.rcloneConfig)) {
+                resolve(leaf);
+                return;
+              }
+              const manifestPath = leaf.path.endsWith("/") ? `${leaf.path}manifest.json` : `${leaf.path}/manifest.json`;
+              const c = spawn("rclone", ["cat", manifestPath], {
+                env: {
+                  ...process.env,
+                  RCLONE_CONFIG: cfg.rcloneConfig,
+                  ...pass ? { RCLONE_CONFIG_PASS: pass } : {}
+                },
+                stdio: ["ignore", "pipe", "pipe"]
+              });
+              let stdout = "";
+              if (c.stdout)
+                c.stdout.on("data", (b) => stdout += b.toString());
+              const finish = () => {
+                try {
+                  const m = JSON.parse(stdout);
+                  const totalBytes = typeof m.totalBytes === "number" && m.totalBytes > 0 ? m.totalBytes : void 0;
+                  const deltaBytes = tier.kind === "hourly" && typeof m.deltaBytes === "number" && m.deltaBytes > 0 ? m.deltaBytes : void 0;
+                  resolve({
+                    ...leaf,
+                    coreBytes: totalBytes,
+                    changesBytes: deltaBytes
+                  });
+                } catch {
+                  resolve(leaf);
+                }
+              };
+              c.on("close", finish);
+              c.on("error", () => resolve(leaf));
+            } catch {
+              resolve(leaf);
+            }
+          })
+        )
+      );
+      for (let i = 0; i < leaves.length; i++) leaves[i] = settled[i];
+    }
+    function leafHasGoldenSidecar(leaf, cfg, pass) {
+      const remote = leaf.path.endsWith("/") ? `${leaf.path}.golden.json` : `${leaf.path}/.golden.json`;
+      return new Promise((resolve) => {
+        try {
+          if (!rcloneConfigPresent(cfg.rcloneConfig)) {
+            resolve(false);
+            return;
+          }
+          const c = spawn("rclone", ["stat", remote], {
+            env: {
+              ...process.env,
+              RCLONE_CONFIG: cfg.rcloneConfig,
+              ...pass ? { RCLONE_CONFIG_PASS: pass } : {}
+            },
+            stdio: ["ignore", "ignore", "ignore"]
+          });
+          c.on("close", (code) => resolve(code === 0));
+          c.on("error", () => resolve(false));
+        } catch {
+          resolve(false);
+        }
+      });
+    }
+    async function walkCleanupTier(cfg, tier) {
+      const MAX_MONTHS = tier.kind === "perCompany" ? 1 : 12;
+      const MAX_DAYS = tier.kind === "perCompany" ? 7 : 1;
+      const pass = getRclonePass();
+      const leaves = [];
+      try {
+        if (tier.kind === "perCompany") {
+          const year = (await lsjsonDir(`${tier.remote}:${tier.prefix}/`, cfg.rcloneConfig, pass)).filter((y) => y.IsDir && /^\d{4}$/.test(y.Name))[0];
+          if (!year) {
+            return emptyTierSummary(tier);
+          }
+          const months = (await lsjsonDir(
+            `${tier.remote}:${tier.prefix}/${year.Name}/`,
+            cfg.rcloneConfig,
+            pass
+          )).filter((m) => m.IsDir && /^\d{2}$/.test(m.Name)).slice(0, MAX_MONTHS);
+          for (const m of months) {
+            const days = (await lsjsonDir(
+              `${tier.remote}:${tier.prefix}/${year.Name}/${m.Name}/`,
+              cfg.rcloneConfig,
+              pass
+            )).filter((d) => d.IsDir && /^\d{2}$/.test(d.Name)).slice(0, MAX_DAYS);
+            if (days.length === 0) {
+              leaves.push({
+                path: `${tier.remote}:${tier.prefix}/${year.Name}/${m.Name}`,
+                modified: m.ModTime ?? year.ModTime ?? "",
+                sizeBytes: 0,
+                kind: tier.kind,
+                golden: false
+              });
+              continue;
+            }
+            for (const d of days) {
+              leaves.push({
+                path: `${tier.remote}:${tier.prefix}/${year.Name}/${m.Name}/${d.Name}`,
+                modified: d.ModTime ?? "",
+                sizeBytes: 0,
+                kind: tier.kind,
+                golden: false
+              });
+            }
+          }
+        } else {
+          const entries = (await lsjsonDir(`${tier.remote}:${tier.prefix}/`, cfg.rcloneConfig, pass)).filter((e) => e.IsDir).slice(0, 40);
+          for (const e of entries) {
+            leaves.push({
+              path: `${tier.remote}:${tier.prefix}/${e.Name}`,
+              modified: e.ModTime ?? "",
+              sizeBytes: 0,
+              kind: tier.kind,
+              golden: false
+            });
+          }
+        }
+      } catch {
+      }
+      await populateManifestSizes(leaves, cfg, pass, tier);
+      if (leaves.length > 0) {
+        const goldenFlags = await Promise.all(
+          leaves.map((leaf) => leafHasGoldenSidecar(leaf, cfg, pass))
+        );
+        for (let i = 0; i < leaves.length; i++) {
+          if (goldenFlags[i]) {
+            leaves[i] = { ...leaves[i], golden: true };
+          }
+        }
+      }
+      const totalBytes = leaves.reduce((s, l) => s + (l.coreBytes ?? 0), 0);
+      const goldenCount = leaves.filter((l) => l.golden).length;
+      const goldenBytes = leaves.filter((l) => l.golden).reduce((s, l) => s + (l.coreBytes ?? 0), 0);
+      return {
+        kind: tier.kind,
+        remote: `${tier.remote}/${tier.prefix}`,
+        prefix: tier.prefix,
+        count: leaves.length,
+        totalBytes,
+        goldenCount,
+        goldenBytes,
+        leaves: leaves.sort((a, b) => a.path < b.path ? 1 : a.path > b.path ? -1 : 0)
+      };
+    }
+    async function listCleanupRoots(cfg, companyId) {
+      const results = [];
+      try {
+        results.push(
+          await walkCleanupTier(cfg, {
+            kind: "perCompany",
+            remote: cfg.rcloneRemote,
+            prefix: `Paperclip-Backups/${companyId}`
+          })
+        );
+      } catch {
+        results.push(emptyTierSummary({
+          kind: "perCompany",
+          remote: cfg.rcloneRemote,
+          prefix: `Paperclip-Backups/${companyId}`
+        }));
+      }
+      results.push(
+        await walkCleanupTier(cfg, {
+          kind: "hourly",
+          remote: cfg.rcloneRemote,
+          prefix: "Paperclip-Backups/hourly"
+        })
+      );
+      results.push(
+        await walkCleanupTier(cfg, {
+          kind: "daily",
+          remote: cfg.rcloneRemote,
+          prefix: "Paperclip-Backups/daily"
+        })
+      );
+      results.push(
+        await walkCleanupTier(cfg, {
+          kind: "perCompany",
+          remote: cfg.rcloneRemote,
+          prefix: CLEANUP_TEST_PREFIX
+        })
+      );
+      return results;
+    }
+    function decideCleanupTargets(roots, opts) {
+      const thresholdMs = opts.thresholdDays * 864e5;
+      const cutoff = Date.now() - thresholdMs;
+      const wouldDelete = [];
+      const goldenSkipped = [];
+      const ageKept = [];
+      const scopeErrors = [];
+      if ((opts.scope === "perCompany" || opts.scope === "all") && opts.allowActiveBtcCompany !== true) {
+        scopeErrors.push(
+          `refusing cleanup-preview for scope=${opts.scope}: allowActiveBtcCompany:true is required (the per-company tier is the only one with real production backups)`
+        );
+      }
+      for (const root of roots) {
+        if (opts.scope === "perCompany" && root.kind !== "perCompany") continue;
+        if (opts.scope === "hourly" && root.kind !== "hourly") continue;
+        if (opts.scope === "daily" && root.kind !== "daily") continue;
+        if (opts.scope === "testOnly" && !root.prefix.startsWith(CLEANUP_TEST_PREFIX)) continue;
+        for (const leaf of root.leaves) {
+          if (leaf.golden) {
+            goldenSkipped.push(leaf);
+            continue;
+          }
+          const mtime = leaf.modified ? Date.parse(leaf.modified) : NaN;
+          if (Number.isFinite(mtime) && mtime < cutoff) {
+            wouldDelete.push(leaf);
+          } else {
+            ageKept.push(leaf);
+          }
+        }
+      }
+      return { wouldDelete, goldenSkipped, ageKept, scopeErrors };
+    }
+    let cleanupListingCache = null;
+    const CLEANUP_LISTING_TTL_MS = 6e4;
+    ctx.data.register(CLEANUP_DATA_KEYS.listing, async (params) => {
+      const p = params ?? {};
+      const forceRefresh = p._forceRefresh === true;
+      const now = Date.now();
+      if (!forceRefresh && cleanupListingCache && cleanupListingCache.expiresAt > now) {
+        return cleanupListingCache.payload;
+      }
+      const cfg = readInstanceConfig();
+      const companyId = resolveCompanyId(p);
+      const roots = await listCleanupRoots(cfg, companyId);
+      const totals = roots.reduce(
+        (acc, r) => {
+          acc.count += r.count;
+          acc.totalBytes += r.totalBytes;
+          acc.goldenCount += r.goldenCount;
+          acc.goldenBytes += r.goldenBytes;
+          return acc;
+        },
+        { count: 0, totalBytes: 0, goldenCount: 0, goldenBytes: 0 }
+      );
+      const payload = {
+        roots,
+        totals,
+        config: cfg,
+        cleanupPath: `${cfg.rcloneRemote}/Paperclip-Backups/`,
+        testPrefix: CLEANUP_TEST_PREFIX
+      };
+      cleanupListingCache = { payload, expiresAt: now + CLEANUP_LISTING_TTL_MS };
+      return payload;
+    });
+    ctx.data.register(CLEANUP_DATA_KEYS.preview, async (params) => {
+      const p = params ?? {};
+      const cfg = readInstanceConfig();
+      const thresholdDays = Math.max(
+        1,
+        Math.min(365, Number(p.thresholdDays) || 14)
+      );
+      const scopeRaw = typeof p.scope === "string" ? p.scope : "testOnly";
+      const scope = scopeRaw === "perCompany" || scopeRaw === "hourly" || scopeRaw === "daily" || scopeRaw === "testOnly" || scopeRaw === "all" ? scopeRaw : "testOnly";
+      const allowActiveBtcCompany = p.allowActiveBtcCompany === true;
+      const companyId = resolveCompanyId(p);
+      const roots = await listCleanupRoots(cfg, companyId);
+      const decision = decideCleanupTargets(roots, { scope, thresholdDays, allowActiveBtcCompany });
+      const wouldDeleteCount = decision.scopeErrors.length > 0 ? 0 : decision.wouldDelete.length;
+      const wouldDeleteBytes = decision.scopeErrors.length > 0 ? 0 : decision.wouldDelete.reduce((s, l) => s + l.sizeBytes, 0);
+      return {
+        scope,
+        thresholdDays,
+        dryRun: true,
+        wouldDelete: decision.wouldDelete.map((leaf) => ({
+          path: leaf.path,
+          modified: leaf.modified,
+          sizeBytes: leaf.sizeBytes,
+          kind: leaf.kind
+        })),
+        wouldDeleteCount,
+        wouldDeleteBytes,
+        goldenSkippedCount: decision.goldenSkipped.length,
+        ageKeptCount: decision.ageKept.length,
+        scopeErrors: decision.scopeErrors
+      };
+    });
+    function getRclonePass() {
+      for (const candidate of [
+        process.env.HOME ? `${process.env.HOME}/.config/rclone/rclone-pass` : null,
+        "/home/sirrus/.config/rclone/rclone-pass",
+        "/root/.config/rclone/rclone-pass"
+      ]) {
+        if (!candidate) continue;
+        if (existsSync(candidate)) {
+          try {
+            const v = readFileSync(candidate, "utf8").trim();
+            if (v) return v;
+          } catch {
+          }
+        }
+      }
+      return "";
+    }
     ctx.jobs.register(JOB_KEYS.autoPruneOffsite, async () => {
       const cfg = readInstanceConfig();
       const keep = cfg.offsiteKeep;
@@ -11716,5 +12385,7 @@ if (process.argv[1] && process.argv[1].endsWith("worker.js")) {
 }
 export {
   worker_default as default,
+  isValidCleanupLeafPath,
   pluginInstance
 };
+//# sourceMappingURL=worker.js.map

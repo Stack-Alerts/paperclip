@@ -103,6 +103,38 @@ export const RECOVERY_DATA_KEYS = {
   tierStatus: "gdrive-tier-status",
 };
 
+// GDrive cleanup panel keys. The cleanup panel walks every backup leaf
+// in the gdrive `Paperclip-Backups/` tree and lets the operator flag
+// a leaf as 'golden' (protected from cleanup-stale) by creating a
+// sidecar `.golden.json` next to it. We never touch existing backup
+// files — the golden flag is a brand-new sidecar, and the cleanup-stale
+// action only deletes leaves without that sidecar (and that are older
+// than the configured retention threshold).
+export const CLEANUP_DATA_KEYS = {
+  listing: "gdrive-cleanup-listing", // shape matches `listing` plus
+                                     // per-leaf golden flag + goldenBytes
+  preview: "gdrive-cleanup-preview", // safe preview of what a
+                                     // cleanup-stale call WOULD delete.
+                                     // Always a dry-run.
+};
+
+// Tier upload progress data — last few lines of rclone stderr from the
+// most recent `gdrive-tiered-upload.sh --tier {daily,hourly}` invocation.
+// Surfaced in the UI as a simple ticker (no fancy progress bar needed).
+export const TIER_UPLOAD_PROGRESS_KEY = "tier-upload-progress";
+
+export const CLEANUP_ACTION_KEYS = {
+  markGolden: "mark-golden",
+  cleanupStale: "cleanup-stale",
+  setGoldenThreshold: "set-golden-cleanup-threshold",
+};
+
+// Test-only prefix. Real backups live under `Paperclip-Backups/...`.
+// The cleanup panel can be tested safely by writing only into a
+// `<prefix>test-cleanup/...` subtree — the test reads the same sidecar
+// protocol but never sees real backups.
+export const CLEANUP_TEST_PREFIX = "Paperclip-Backups/test-cleanup-panel";
+
 export const DASHBOARD_WIDGET_SLOT_ID = "backup-dashboard-widget";
 export const SIDEBAR_SLOT_ID = "backup-sidebar-nav";
 export const PAGE_SLOT_ID = "backup-page";

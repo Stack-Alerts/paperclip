@@ -21,8 +21,11 @@
   "license": "MIT",
   "scripts": {
     "prebuild": "pnpm --filter @paperclipai/plugin-sdk ensure-build-deps",
-    "build": "pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && pnpm exec esbuild src/worker.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/worker.js --external:electron --external:fsevents && tsc --emitDeclarationOnly --outDir dist && node ./scripts/build-ui.mjs",
+    "build": "pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && node ./esbuild.config.mjs && tsc --emitDeclarationOnly --outDir dist",
+    "build:ui": "pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && node ./esbuild.config.mjs",
+    "dev": "node ./esbuild.config.mjs --watch",
     "clean": "rm -rf dist",
+    "test": "vitest run --config ./vitest.config.ts",
     "typecheck": "pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && tsc --noEmit"
   },
   "devDependencies": {
@@ -32,7 +35,8 @@
     "@types/react-dom": "^19.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.0"
   },
   "dependencies": {
     "@paperclipai/plugin-sdk": "workspace:*"
