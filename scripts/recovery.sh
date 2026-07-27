@@ -229,6 +229,26 @@ do_snapshot() {
   rsync -a --delete \
     ${prev_dir:+"--link-dest=$prev_dir/config/"} \
     "$HOME/.paperclip/instances/default/.env" "$snap_dir/config/instances-default.env" 2>&1 | tail -1 || true
+  # 2c. rclone credentials (Google Drive OAuth tokens + encryption password).
+  # Without these, encrypted gdrive backups become unreadable after restore
+  # and a fresh host cannot re-auth without manual OAuth flow. Pinned to the
+  # paths declared at lines 46/48. Missing files emit a WARN instead of
+  # silently dropping, so the operator sees the gap.
+  #
+  # BTCAAAAA-41517: credentials are encrypted into config/rclone/ via the
+  # rclone-credentials-package.sh helper. The package is keyed by a
+  # per-host bootstrap key at $PAPERCLIP_RCLONE_BOOTSTRAP_KEY_FILE
+  # (default ~/.paperclip/rclone-creds-bootstrap.key), so a stolen
+  # snapshot alone cannot decrypt the credentials, and the bootstrap
+  # key is independent of the credentials (no chicken-and-egg loop).
+  if "$SCRIPT_DIR/rclone-credentials-package.sh" "$snap_dir" 2>&1 | sed 's/^/  /'; then
+    if [[ -f "$snap_dir/config/rclone/MANIFEST.json" ]]; then
+      note "  rclone credentials encrypted under config/rclone/ (see MANIFEST.json for sha256s)"
+    fi
+  else
+    local pkg_rc=$?
+    note "  WARN: rclone-credentials-package.sh exited $pkg_rc — snapshot has no decryptable credentials; restore will require manual OAuth"
+  fi
 
   # ---- 3. manifest ----
   log "  writing manifest..."
@@ -646,6 +666,23 @@ do_restore() {
   (cd "$WORKTREE_PATH" && pnpm --filter paperclip-backup build 2>&1 | tail -3) || {
     log "WARN: paperclip-backup build failed — plugin may be stale until manually rebuilt"
   }
+
+  # 6b) restore encrypted rclone credentials, if present in the snapshot.
+  # BTCAAAAA-41517: a fresh host cannot reach GDrive without these. Decrypt
+  # is gated by the per-host bootstrap key (see rclone-credentials-bootstrap.sh).
+  # --force is intentional here: this is a full-restore path, the operator
+  # already confirmed with "restore yes" or --yes at the top of do_restore.
+  if [[ -f "$staging/config/rclone/MANIFEST.json" ]]; then
+    log "  restoring encrypted rclone credentials from snapshot..."
+    if "$SCRIPT_DIR/rclone-credentials-restore.sh" "$staging" --force 2>&1 | sed 's/^/    /'; then
+      :
+    else
+      local rcr_rc=$?
+      note "  WARN: rclone-credentials-restore.sh exited $rcr_rc — GDrive access will require manual OAuth on this host"
+    fi
+  else
+    note "  (snapshot has no encrypted rclone credentials — host will need manual OAuth)"
+  fi
 
   # 7) restart paperclip
   log "  restarting paperclip via launch-dev.sh"
