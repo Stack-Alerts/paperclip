@@ -253,12 +253,49 @@ def post_summary_comment(drifted, run_id):
             f"[claude-local-config-template](/BTCAAAAA/skills/{SKILL_ID}).",
         ])
         body = "\n".join(lines)
-    return _request(
-        "POST",
-        f"/api/issues/{UMBRELLA_ID}/comments",
-        {"body": body},
-        run_id=run_id,
-    )
+    status = {
+        "umbrella_posted": False,
+        "fallback_posted": False,
+        "skipped_reason": None,
+        "errors": [],
+    }
+    try:
+        _request(
+            "POST",
+            f"/api/issues/{UMBRELLA_ID}/comments",
+            {"body": body},
+            run_id=run_id,
+        )
+        status["umbrella_posted"] = True
+        return status
+    except urllib.error.HTTPError as exc:
+        if exc.code not in (401, 403):
+            raise
+        status["errors"].append({
+            "attempt": "umbrella",
+            "status": exc.code,
+            "error": str(exc),
+        })
+    execution_issue_id = os.environ.get("PAPERCLIP_TASK_ID") or None
+    if not execution_issue_id:
+        status["skipped_reason"] = "execution_issue_id_missing"
+        return status
+    try:
+        _request(
+            "POST",
+            f"/api/issues/{execution_issue_id}/comments",
+            {"body": body},
+            run_id=run_id,
+        )
+        status["fallback_posted"] = True
+        return status
+    except urllib.error.HTTPError as exc:
+        status["errors"].append({
+            "attempt": "execution_issue",
+            "status": exc.code,
+            "error": str(exc),
+        })
+        return status
 
 
 def main():
@@ -336,7 +373,7 @@ def main():
                 record["incident_id"] = inc.get("identifier", inc.get("id", "ERROR"))
             except Exception as e:
                 record["incident_id"] = f"ERROR:{e}"
-        post_summary_comment(drifted, run_id)
+        report["umbrella_comment"] = post_summary_comment(drifted, run_id)
         report["drifted"] = drifted
 
     print(json.dumps(report, indent=2))
