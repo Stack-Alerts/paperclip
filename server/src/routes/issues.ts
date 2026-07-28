@@ -6045,12 +6045,43 @@ export function issueRoutes(
           return null;
         }
       };
+      const resolveLocalRepoCwd = async () => {
+        if (!existing.executionWorkspaceId) return null;
+        try {
+          const ws = await executionWorkspacesSvc.getById(existing.executionWorkspaceId);
+          const localPath = ws?.providerRef ?? ws?.cwd ?? null;
+          return typeof localPath === "string" && localPath.length > 0 ? localPath : null;
+        } catch (err) {
+          logger.warn(
+            { err, issueId: existing.id, executionWorkspaceId: existing.executionWorkspaceId },
+            "closure-gate: failed to load execution workspace for local repo path",
+          );
+          return null;
+        }
+      };
+      const hasApprovedBoardOverride = async () => {
+        try {
+          const approvals = await issueApprovalsSvc.listApprovalsForIssue(existing.id);
+          return approvals.some(
+            (approval) =>
+              approval.type === "request_board_approval" && approval.status === "approved",
+          );
+        } catch (err) {
+          logger.warn(
+            { err, issueId: existing.id },
+            "closure-gate: failed to load approvals for CTO-Override board check",
+          );
+          return false;
+        }
+      };
       const gateOutcome = await closureGateSvc.assertAllowed({
         companyMode,
         actor: { actorType: actor.actorType, agentId: actor.agentId ?? null },
         commentBody: typeof commentBody === "string" ? commentBody : null,
         fallbackCommentBody: gateFallbackCommentBody,
         resolveRepoUrl,
+        resolveLocalRepoCwd,
+        hasApprovedBoardOverride,
       });
       throwIfClosureGateRejected(gateOutcome);
     }

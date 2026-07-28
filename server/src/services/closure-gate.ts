@@ -28,6 +28,15 @@ const execFileAsync = promisify(execFile);
  *      returns the same 422 it would for an unreachable SHA on the
  *      default repo (surfaced as a `git_error`).
  *
+ * SHA verification prefers the LOCAL git object database (`git rev-parse
+ * --verify <sha>^{commit}` + `git cat-file -t <sha>`) when a local repo
+ * path is resolvable via `resolveLocalRepoCwd`. A real SHA held on a
+ * working branch passes this check even before it lands on the canonical
+ * remote ref, eliminating false-positive "fabricated SHA" flags. A truly
+ * fabricated SHA fails this check locally with rc=128. When no local
+ * repo path is available, the gate falls back to the canonical-ref
+ * `git ls-remote` check (the previous behavior).
+ *
  * If any required element is missing in `enforce` mode the gate rejects
  * the closure with HTTP 422. In `advisory` mode the same checks run but
  * the gate logs a warning and allows the closure. In `off` mode the gate
@@ -36,6 +45,36 @@ const execFileAsync = promisify(execFile);
 
 export const CLOSURE_GATE_DEFAULT_TARGET = "main";
 export const CLOSURE_GATE_LS_REMOTE_TIMEOUT_MS = 10_000;
+
+/**
+ * Substring patterns that indicate git's "object does not exist" error.
+ * When `git rev-parse --verify` or `git cat-file -t` is asked about a
+ * fabricated SHA, git exits rc=128 and prints one of these on stderr.
+ */
+const GIT_OBJECT_NOT_FOUND_PATTERNS = [
+  /Not a valid object/i,
+  /bad object/i,
+  /unknown revision or path/i,
+  /couldn't find/i,
+  /not our ref/i,
+  /invalid object/i,
+];
+
+/**
+ * CTO Fix-SHA override marker.
+ *
+ * When a closure comment contains a `CTO-Override: skip-verify` line, the
+ * closure-gate skips the `git ls-remote` Fix-SHA reachability check and
+ * allows the closure per CTO authority. This unblocks the Paperclip-side
+ * override cycle (board authorizes closure on a SHA that is not yet merged
+ * to the canonical remote) without forcing the SHA to be pushed to the
+ * canonical branch prematurely.
+ *
+ * The marker is intentionally strict (must match exactly) so it cannot be
+ * accidentally triggered by an agent that happens to mention the phrase in
+ * a regular comment.
+ */
+export const CLOSURE_GATE_CTO_OVERRIDE_SKIP_REGEX = /CTO-Override:\s*skip-verify/i;
 
 export type ClosureGateFixSha = {
   sha: string;
@@ -63,6 +102,23 @@ export type ClosureGateAssertInput = {
   commentBody: string | null | undefined;
   fallbackCommentBody?: string | null;
   resolveRepoUrl: () => Promise<string | null> | string | null;
+  /**
+   * Optional resolver for a local git repo working directory. When this
+   * returns a usable path, the gate verifies the Fix-SHA against the LOCAL
+   * object database (`git rev-parse --verify` + `git cat-file -t`) instead
+   * of the canonical-ref `git ls-remote` check. This eliminates false
+   * positives on SHAs that exist on the working branch but have not yet
+   * been pushed to the canonical remote ref.
+   */
+  resolveLocalRepoCwd?: () => Promise<string | null> | string | null;
+  /**
+   * Optional approval lookup, evaluated when the closure comment body
+   * contains the `CTO-Override: skip-verify` marker. When this returns
+   * `true`, the override marker bypasses SHA verification entirely
+   * (board Option B path). When absent or `false`, the override marker
+   * is treated as advisory only and verification still runs.
+   */
+  hasApprovedBoardOverride?: () => Promise<boolean> | boolean;
   defaultTarget?: string;
   clock?: () => number;
   fetchImpl?: (repoUrl: string, target: string) => Promise<Set<string>>;
@@ -70,8 +126,9 @@ export type ClosureGateAssertInput = {
 };
 
 export type ClosureGateOutcome =
-  | { allowed: true; mode: ClosureGateFixShaMode; fixSha: ClosureGateFixSha; verified: "fresh" | "cache"; verificationFailed?: false }
+  | { allowed: true; mode: ClosureGateFixShaMode; fixSha: ClosureGateFixSha; verified: "fresh" | "cache" | "local"; verificationFailed?: false }
   | { allowed: true; mode: ClosureGateFixShaMode; fixSha: ClosureGateFixSha; verified: null; verificationFailed: true }
+  | { allowed: true; mode: ClosureGateFixShaMode; fixSha: ClosureGateFixSha; verified: null; verificationFailed: false; override: "cto_fix_sha_skip_verify" }
   | { allowed: true; mode: ClosureGateFixShaMode; fixSha: null; verified: null; verificationFailed?: boolean }
   | { allowed: false; mode: ClosureGateFixShaMode; reason: ClosureGateRejectReason; message: string };
 
@@ -172,6 +229,83 @@ export function parseLsRemoteOutput(stdout: string): Set<string> {
   return shas;
 }
 
+/**
+ * Verify a Fix-SHA against the LOCAL git object database.
+ *
+ * This is the primary Fix-SHA verification path used by the closure-gate
+ * when the closing agent's execution workspace exposes a local repo path.
+ * It distinguishes "real SHA held locally" from "fabricated SHA" — the
+ * remote-ref check conflates the two because pushing to canonical is
+ * decoupled from authoring the commit.
+ *
+ * A SHA is considered real when both:
+ *   - `git -C <cwd> rev-parse --verify <sha>^{commit}` exits 0 (the SHA
+ *     peels to an existing commit object; `^{commit}` also resolves tag
+ *     SHAs to the tagged commit).
+ *   - `git -C <cwd> cat-file -t <sha>` exits 0 (the raw SHA resolves to
+ *     a known object type — commit, tag, blob, etc.).
+ *
+ * Both checks are required so that a SHA pointing at a non-commit object
+ * (a fabricated blob/tree) cannot pass by accident.
+ *
+ * A fabricated SHA causes git to exit rc=128 and print one of the
+ * patterns in `GIT_OBJECT_NOT_FOUND_PATTERNS` on stderr; that case is
+ * classified as `unreachable_sha`. Any other git failure (e.g. the cwd
+ * is not a git repo, permission denied) is `git_error`.
+ */
+export async function verifyFixShaLocal(args: {
+  cwd: string;
+  sha: string;
+  execImpl?: typeof execFileAsync;
+  timeoutMs?: number;
+}): Promise<
+  | { ok: true; source: "local" }
+  | { ok: false; reason: "unreachable_sha" | "git_error"; message: string }
+> {
+  const { cwd, sha } = args;
+  const exec = args.execImpl ?? execFileAsync;
+  const timeoutMs = args.timeoutMs ?? CLOSURE_GATE_LS_REMOTE_TIMEOUT_MS;
+
+  try {
+    await exec(
+      "git",
+      ["-C", cwd, "rev-parse", "--verify", `${sha}^{commit}`],
+      { timeout: timeoutMs, maxBuffer: 1024 * 1024 },
+    );
+    await exec(
+      "git",
+      ["-C", cwd, "cat-file", "-t", sha],
+      { timeout: timeoutMs, maxBuffer: 1024 * 1024 },
+    );
+    return { ok: true, source: "local" };
+  } catch (err) {
+    const code = typeof err === "object" && err && "code" in err
+      ? (err as { code?: unknown }).code
+      : null;
+    const stderr = typeof err === "object" && err && "stderr" in err
+      ? String((err as { stderr?: unknown }).stderr ?? "")
+      : "";
+    const exitCode = typeof code === "number" ? code : null;
+
+    const notFound =
+      exitCode === 128 ||
+      GIT_OBJECT_NOT_FOUND_PATTERNS.some((p) => p.test(stderr));
+    if (notFound) {
+      return {
+        ok: false,
+        reason: "unreachable_sha",
+        message: `Fix-SHA ${sha} is not present in the local object database at ${cwd}`,
+      };
+    }
+    const detail = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      reason: "git_error",
+      message: `git local verification failed for Fix-SHA ${sha} at ${cwd}: ${detail}`,
+    };
+  }
+}
+
 export async function verifyFixShaOnRemote(args: {
   repoUrl: string;
   target: string;
@@ -227,6 +361,15 @@ export function createClosureGate(
     cache?: ReturnType<typeof createClosureGateCache>;
     clock?: () => number;
     fetchImpl?: (repoUrl: string, target: string) => Promise<Set<string>>;
+    /**
+     * Optional override for the local git object database verification.
+     * Defaults to `verifyFixShaLocal`. Tests inject a mock here so they
+     * can simulate fabricated / real SHAs without spawning `git`.
+     */
+    localVerifyImpl?: (args: { cwd: string; sha: string }) => Promise<
+      | { ok: true; source: "local" }
+      | { ok: false; reason: "unreachable_sha" | "git_error"; message: string }
+    >;
     logger?: ClosureGateLogger;
     defaultTarget?: string;
   } = {},
@@ -234,6 +377,7 @@ export function createClosureGate(
   const cache = options.cache ?? createClosureGateCache();
   const clock = options.clock ?? Date.now;
   const fetchImpl = options.fetchImpl;
+  const localVerifyImpl = options.localVerifyImpl ?? verifyFixShaLocal;
   const logger = options.logger;
   const defaultTarget = options.defaultTarget ?? CLOSURE_GATE_DEFAULT_TARGET;
 
@@ -270,7 +414,74 @@ export function createClosureGate(
       };
     }
 
+    if (CLOSURE_GATE_CTO_OVERRIDE_SKIP_REGEX.test(combinedBody)) {
+      const hasApprovedBoardOverride = await input.hasApprovedBoardOverride?.();
+      if (hasApprovedBoardOverride === true) {
+        logger?.warn(
+          { mode, fixSha: fixSha.sha, target: fixSha.target, override: "cto_fix_sha_skip_verify" },
+          "closure-gate: CTO Fix-SHA override marker honored with linked approved board approval; skipping SHA verification",
+        );
+        return {
+          allowed: true,
+          mode,
+          fixSha: { sha: fixSha.sha, target: fixSha.target },
+          verified: null,
+          verificationFailed: false,
+          override: "cto_fix_sha_skip_verify",
+        };
+      }
+      logger?.warn(
+        { mode, fixSha: fixSha.sha, target: fixSha.target, override: "cto_fix_sha_skip_verify", hasApprovedBoardOverride: false },
+        "closure-gate: CTO Fix-SHA override marker detected without linked approved board approval; continuing SHA verification",
+      );
+    }
+
     const target = fixSha.target || defaultTarget;
+
+    // Prefer LOCAL git object database verification when a local repo cwd
+    // is resolvable. A real SHA held on a working branch passes even if it
+    // has not been pushed to the canonical remote ref, eliminating the
+    // false-positive "fabricated SHA" signal that the previous remote-only
+    // check produced. When no local cwd is available, fall back to the
+    // canonical-ref `git ls-remote` check.
+    const resolvedLocalCwd = await input.resolveLocalRepoCwd?.();
+    if (typeof resolvedLocalCwd === "string" && resolvedLocalCwd.length > 0) {
+      const localVerify = await localVerifyImpl({
+        cwd: resolvedLocalCwd,
+        sha: fixSha.sha,
+      });
+      if (localVerify.ok) {
+        return {
+          allowed: true,
+          mode,
+          fixSha: { sha: fixSha.sha, target },
+          verified: "local",
+          verificationFailed: false,
+        };
+      }
+      if (mode === "advisory") {
+        logger?.warn(
+          {
+            mode,
+            reason: localVerify.reason,
+            fixSha: fixSha.sha,
+            target,
+            localCwd: resolvedLocalCwd,
+            message: localVerify.message,
+          },
+          "closure-gate advisory: local Fix-SHA verification failed",
+        );
+        return {
+          allowed: true,
+          mode,
+          fixSha: { sha: fixSha.sha, target },
+          verified: null,
+          verificationFailed: true,
+        };
+      }
+      return { allowed: false, mode, reason: localVerify.reason, message: localVerify.message };
+    }
+
     const fixRepoOverride = extractFixRepo(combinedBody);
     const resolvedRepoUrl = await input.resolveRepoUrl();
     const repoUrl = fixRepoOverride ?? resolvedRepoUrl;
@@ -326,7 +537,7 @@ export function createClosureGate(
     return { allowed: false, mode, reason: verify.reason, message: verify.message };
   }
 
-  return { assertAllowed, extractFixSha, verifyFixShaOnRemote, cache };
+  return { assertAllowed, extractFixSha, verifyFixShaOnRemote, verifyFixShaLocal: localVerifyImpl, cache };
 }
 
 export function throwIfClosureGateRejected(outcome: ClosureGateOutcome): void {
