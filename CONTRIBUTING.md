@@ -4,6 +4,10 @@ Thanks for wanting to contribute!
 
 We really appreciate both small fixes and thoughtful larger changes.
 
+## Database migration hooks
+
+Enable the version-controlled migration guard in each worktree with `git config core.hooksPath .githooks`.
+
 ## Before You Start: Search First
 
 Before you start work, **search GitHub** for existing PRs and issues that touch the same area:

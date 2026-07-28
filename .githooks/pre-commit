@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+[ -n "$REPO" ] || exit 0
+
+needs_check=0
+while IFS= read -r path; do
+  case "$path" in
+    packages/db/src/migrations/*.sql|packages/db/src/migrations/meta/_journal.json)
+      needs_check=1
+      break
+      ;;
+  esac
+done < <(git -C "$REPO" diff --cached --name-only --diff-filter=ACMR)
+
+[ "$needs_check" -eq 1 ] || exit 0
+
+cd "$REPO"
+if pnpm --filter @paperclipai/db exec tsx src/check-migration-numbering.ts; then
+  exit 0
+fi
+
+exec node "$REPO/.githooks/pre-commit-classify.mjs" "$REPO"
