@@ -18,6 +18,9 @@ import {
 
 // Keep these values local so the dev runner can boot from the server package's
 // tsx context without requiring workspace package resolution first.
+// In non-production, PAPERCLIP_REPAIR_JOURNAL=1 enables the append-only
+// migration journal repair check before migration status and apply steps.
+// Production always uses the strict migration numbering check.
 const BIND_MODES = ["loopback", "lan", "tailnet", "custom"] as const;
 type BindMode = (typeof BIND_MODES)[number];
 
@@ -136,6 +139,12 @@ const env: NodeJS.ProcessEnv = {
   ...process.env,
   PAPERCLIP_UI_DEV_MIDDLEWARE: "true",
 };
+
+const repairMigrationJournal =
+  env.NODE_ENV !== "production" && env.PAPERCLIP_REPAIR_JOURNAL === "1";
+const migrationCheckScript = repairMigrationJournal
+  ? "check:migrations:repair"
+  : "check:migrations";
 
 if (mode === "dev") {
   env.PAPERCLIP_DEV_SERVER_STATUS_FILE = devServerStatusFilePath;
@@ -375,6 +384,21 @@ async function runPnpm(args: string[], options: {
   });
 }
 
+async function runMigrationNumberingCheck() {
+  const result = await runPnpm(["--filter", "@paperclipai/db", migrationCheckScript], {
+    stdio: "inherit",
+    env,
+    cwd: repoRoot,
+  });
+  if (result.signal) {
+    exitForSignal(result.signal);
+    return;
+  }
+  if (result.code !== 0) {
+    process.exit(result.code);
+  }
+}
+
 async function getMigrationStatusPayload() {
   const status = await runPnpm(
     ["--filter", "@paperclipai/db", "exec", "tsx", "src/migration-status.ts", "--json"],
@@ -412,6 +436,8 @@ async function refreshPendingMigrations() {
 }
 
 async function maybePreflightMigrations(options: { interactive?: boolean; autoApply?: boolean; exitOnDecline?: boolean } = {}) {
+  await runMigrationNumberingCheck();
+
   const interactive = options.interactive ?? mode === "watch";
   const autoApply = options.autoApply ?? env.PAPERCLIP_MIGRATION_AUTO_APPLY === "true";
   const exitOnDecline = options.exitOnDecline ?? mode === "watch";

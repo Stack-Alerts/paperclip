@@ -258,6 +258,14 @@ export async function main(input: MainInput = {}): Promise<void> {
     journalPath: input.journalPath ?? journalPath,
   };
   const selectedMode = input.mode ?? resolveMode(input.argv, input.env);
+  const env = input.env ?? process.env;
+
+  if (selectedMode === "repair" && env.NODE_ENV === "production") {
+    throw new Error(
+      "Migration journal repair mode is disabled when NODE_ENV=production: refusing to mutate the journal even if DB_MIGRATION_CHECK_MODE=repair or --repair is set",
+    );
+  }
+
   await assertJournalReadable(checkInput.journalPath);
 
   if (selectedMode === "repair") {

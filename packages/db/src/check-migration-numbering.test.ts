@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   ORPHAN_FILE_SANITY_LIMIT,
+  main,
   resolveMode,
   runCheck,
   runRepairOnce,
@@ -183,6 +184,39 @@ describe("migration numbering check modes", () => {
         },
       }),
     ).rejects.toThrow(new RegExp(`>\\s*${ORPHAN_FILE_SANITY_LIMIT}`));
+    expect(repairCalls).toBe(0);
+  });
+
+  it("refuses repair mode when NODE_ENV=production even if DB_MIGRATION_CHECK_MODE=repair is set", async () => {
+    const tree = createMigrationTree(["0000_alpha.sql", "0001_beta.sql"], ["0000_alpha"]);
+    let repairCalls = 0;
+
+    await expect(
+      main({
+        ...tree,
+        env: { NODE_ENV: "production", DB_MIGRATION_CHECK_MODE: "repair" },
+        execRepair: () => {
+          repairCalls += 1;
+        },
+      }),
+    ).rejects.toThrow(/production/i);
+    expect(repairCalls).toBe(0);
+  });
+
+  it("refuses repair mode when NODE_ENV=production even with explicit mode:repair", async () => {
+    const tree = createMigrationTree(["0000_alpha.sql", "0001_beta.sql"], ["0000_alpha"]);
+    let repairCalls = 0;
+
+    await expect(
+      main({
+        ...tree,
+        mode: "repair",
+        env: { NODE_ENV: "production" },
+        execRepair: () => {
+          repairCalls += 1;
+        },
+      }),
+    ).rejects.toThrow(/production/i);
     expect(repairCalls).toBe(0);
   });
 });
