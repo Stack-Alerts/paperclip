@@ -36,6 +36,10 @@
   ],
   "scripts": {
     "check:migrations": "tsx src/check-migration-numbering.ts",
+    "check:migrations:repair": "tsx src/check-migration-numbering.ts --repair",
+    "repair:journal:check": "bash ../../scripts/db-repair-journal.sh --check",
+    "repair:journal:apply": "bash ../../scripts/db-repair-journal.sh --apply",
+    "db:check:precommit": "bash ../../scripts/check-db-migration-staging.sh --ci \"${PAPERCLIP_MIGRATION_BASE_REF:-main}\"",
     "build": "pnpm run check:migrations && tsc && cp -r src/migrations dist/migrations",
     "clean": "rm -rf dist",
     "typecheck": "pnpm run check:migrations && tsc --noEmit",
