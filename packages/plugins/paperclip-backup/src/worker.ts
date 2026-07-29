@@ -50,6 +50,7 @@ import {
   SCRIPT_KEYS,
   STATE_KEYS,
 } from "./constants.js";
+import { formatError } from "./formatError.js";
 
 // ---------------------------------------------------------------------------
 // runScript — wraps a shell script call so actions can return the same
@@ -191,11 +192,11 @@ function rcloneConfigPresent(rcloneConfig: string | undefined | null): boolean {
 // callers/tests can pattern-match.
 const MISSING_CONFIG_ERROR_PREFIX = "rclone config not found at ";
 
-async function lsjsonDir(
+async function listDir(
   remotePath: string,
   rcloneConfig: string,
   rclonePass: string,
-  opts: { dirsOnly?: boolean } = {},
+  opts: { dirsOnly?: boolean; strict?: boolean } = {},
 ): Promise<Array<LsjsonEntry>> {
   if (!rcloneConfigPresent(rcloneConfig)) {
     // Missing config — return [] (same shape rclone would emit on a
@@ -249,7 +250,12 @@ async function lsjsonDir(
       resolve(c ?? 0);
     });
   });
-  if (code !== 0) return [];
+  if (code !== 0) {
+    if (opts.strict) {
+      throw new Error(stderr.trim() || `rclone lsjson failed with exit code ${code}`);
+    }
+    return [];
+  }
   // rclone lsjson emits a single JSON ARRAY (with the directory listing),
   // not NDJSON. The line-by-line parser mis-identified the leading "["
   // and trailing "]" as malformed lines and dropped everything but the
@@ -408,8 +414,15 @@ async function rcloneRcatStdin(
     return { code: 127, stderr: MISSING_CONFIG_ERROR_PREFIX + (cfg.rcloneConfig || "<unset>") };
   }
   return await new Promise((resolve) => {
+    let settled = false;
+    const settle = (payload: { code: number; stderr: string }) => {
+      if (settled) return;
+      settled = true;
+      resolve(payload);
+    };
+    let child: ReturnType<typeof spawn>;
     try {
-      const child = spawn("rclone", ["rcat", remote], {
+      child = spawn("rclone", ["rcat", remote], {
         env: {
           ...process.env,
           RCLONE_CONFIG: cfg.rcloneConfig,
@@ -417,14 +430,40 @@ async function rcloneRcatStdin(
         },
         stdio: ["pipe", "ignore", "pipe"],
       });
-      let stderr = "";
-      if (child.stderr) child.stderr.on("data", (b: Buffer) => (stderr += b.toString()));
-      child.on("close", (code) => resolve({ code: code ?? 0, stderr }));
-      child.on("error", (err) => resolve({ code: -1, stderr: stderr + (stderr ? "\n" : "") + err.message }));
+    } catch (err) {
+      settle({ code: -1, stderr: (err as Error).message });
+      return;
+    }
+    let stderr = "";
+    if (child.stderr) child.stderr.on("data", (b: Buffer) => (stderr += b.toString()));
+    // Hard timeout — same shape as rcloneRun. Without SIGKILL, a hung
+    // rclone invocation (e.g. stuck G Drive server response) pins the
+    // mark-golden action handler forever; the framework's 30s actor RPC
+    // timer then fires and the UI shows "RPC call 'getPrefixActor'
+    // timed out after 30000ms", making it look like marking is broken.
+    const timer = setTimeout(() => {
+      try {
+        child.kill("SIGKILL");
+      } catch {}
+      settle({
+        code: 124,
+        stderr: stderr + (stderr ? "\n" : "") + `rclone rcat timed out after ${RCLONE_HARD_TIMEOUT_MS}ms`,
+      });
+    }, RCLONE_HARD_TIMEOUT_MS);
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      settle({ code: code ?? 0, stderr });
+    });
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      settle({ code: -1, stderr: stderr + (stderr ? "\n" : "") + err.message });
+    });
+    try {
       child.stdin?.write(contents);
       child.stdin?.end();
     } catch (err) {
-      resolve({ code: -1, stderr: (err as Error).message });
+      clearTimeout(timer);
+      settle({ code: -1, stderr: stderr + (stderr ? "\n" : "") + (err as Error).message });
     }
   });
 }
@@ -446,10 +485,15 @@ async function rcloneDeleteDir(
 // `^Paperclip-Backups/[^/]+/` so Paperclip-Backups-evil/... is rejected.
 export function isValidCleanupLeafPath(path: string): boolean {
   if (typeof path !== "string" || path.length === 0) return false;
-  // Strip any leading remote prefix (e.g. "gdrive/" or "gdrive:") so the
-  // regex match works on either "Paperclip-Backups/..." or
-  // "gdrive:Paperclip-Backups/..." or "gdrive/Paperclip-Backups/...".
-  const stripped = path.replace(/^[a-zA-Z0-9_-]+[:/]/, "");
+  // Strip an optional leading rclone remote prefix (e.g. "gdrive/" or
+  // "gdrive:" or "s3:bucket/") but ONLY when the path is not already
+  // rooted in the "Paperclip-Backups" tier. The earlier regex matched
+  // any [a-zA-Z0-9_-]+[:/] segment, which silently consumed
+  // "Paperclip-Backups/" when the leaf was passed without a remote
+  // prefix (the way the UI hands it to the worker).
+  const stripped = path.startsWith("Paperclip-Backups")
+    ? path
+    : path.replace(/^[a-zA-Z0-9_-]+[:/]/, "");
   if (/^Paperclip-Backups-evil(\/|$)/.test(stripped)) return false;
   return (
     /^Paperclip-Backups\/[^/]+\//.test(stripped) ||
@@ -733,17 +777,17 @@ async function readOffsiteBackups(
 
   async function walkPerCompany(): Promise<void> {
     const prefix = `Paperclip-Backups/${companyId}`;
-    const years = newestFirst(await lsjsonDir(`${remote}:${prefix}/`, cfg.rcloneConfig, pass));
+    const years = newestFirst(await listDir(`${remote}:${prefix}/`, cfg.rcloneConfig, pass));
     for (const y of years) {
       if (leaves.length >= MAX_LEAVES) break;
       if (!y.IsDir) continue;
       const monthsRaw = newestFirst(
-        await lsjsonDir(`${remote}:${prefix}/${y.Path}/`, cfg.rcloneConfig, pass),
+        await listDir(`${remote}:${prefix}/${y.Path}/`, cfg.rcloneConfig, pass),
       ).slice(0, MAX_MONTHS_PER_YEAR);
       const monthPaths = monthsRaw.filter((m) => m.IsDir).map((m) => ({ y: y.Path, m }));
       const dayLists = await runWithCap(monthPaths, PARALLEL, async ({ y, m }) =>
         newestFirst(
-          await lsjsonDir(`${remote}:${prefix}/${y}/${m.Path}/`, cfg.rcloneConfig, pass),
+          await listDir(`${remote}:${prefix}/${y}/${m.Path}/`, cfg.rcloneConfig, pass),
         ).slice(0, MAX_DAYS_PER_MONTH),
       );
       const dayPaths: Array<{ y: string; m: string; d: { Path: string; Name: string; IsDir: boolean } }> = [];
@@ -754,7 +798,7 @@ async function readOffsiteBackups(
       }
       const hourLists = await runWithCap(dayPaths, PARALLEL, async ({ y, m, d }) =>
         newestFirst(
-          await lsjsonDir(`${remote}:${prefix}/${y}/${m}/${d.Path}/`, cfg.rcloneConfig, pass),
+          await listDir(`${remote}:${prefix}/${y}/${m}/${d.Path}/`, cfg.rcloneConfig, pass),
         ).slice(0, MAX_HOURS_PER_DAY),
       );
       for (let i = 0; i < hourLists.length; i += 1) {
@@ -778,7 +822,7 @@ async function readOffsiteBackups(
   async function walkTier(tier: "hourly" | "daily"): Promise<void> {
     const prefix = `Paperclip-Backups/${tier}`;
     const entries = newestFirst(
-      await lsjsonDir(`${remote}:${prefix}/`, cfg.rcloneConfig, pass),
+      await listDir(`${remote}:${prefix}/`, cfg.rcloneConfig, pass),
     )
       .filter((e) => e.IsDir)
       .slice(0, MAX_TIER_LEAVES);
@@ -805,7 +849,7 @@ async function readOffsiteBackups(
   // MAX_LEAVES × ~2s ≈ 4 min worst case (cached for LISTING_TTL_MS).
   const backups: OffsiteBackup[] = [];
   const leafDetails = await runWithCap(leaves, PARALLEL, async (leaf) => {
-    const files = await lsjsonDir(leaf.remotePath, cfg.rcloneConfig, pass, { dirsOnly: false });
+    const files = await listDir(leaf.remotePath, cfg.rcloneConfig, pass, { dirsOnly: false });
     // If the per-leaf follow-up returned empty, the leaf was either deleted
     // between the directory walk and the follow-up, or the rclone call hit
     // a transient error. Either way, surfacing a row with sizeBytes=0 and
@@ -1907,8 +1951,12 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
       }
       const cfg = readInstanceConfig();
       const pass = getRclonePass();
-      // Normalize the leaf path to "<remote>:<path-without-remote-prefix>"
-      const stripped = leaf.replace(/^[a-zA-Z0-9_-]+[:/]/, "");
+      // Normalize the leaf path to "<remote>:<path-without-remote-prefix>".
+      // Only strip a leading remote prefix; never the "Paperclip-Backups"
+      // tier root itself (see isValidCleanupLeafPath for the same trap).
+      const stripped = leaf.startsWith("Paperclip-Backups")
+        ? leaf
+        : leaf.replace(/^[a-zA-Z0-9_-]+[:/]/, "");
       const remote = `${cfg.rcloneRemote}:${stripped}`;
       const sidecarRemote = remote.endsWith("/")
         ? `${remote}.golden.json`
@@ -1987,7 +2035,17 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
 
       const cfg = readInstanceConfig();
       const companyId = resolveCompanyId(p);
-      const roots = await listCleanupRoots(cfg, companyId);
+      const { roots, scopeErrors } = await listCleanupRoots(cfg, companyId);
+      if (scopeErrors.length > 0) {
+        return {
+          ok: false,
+          scope,
+          dryRun,
+          thresholdDays,
+          deleted: 0,
+          errors: [...errors, ...scopeErrors],
+        };
+      }
       const decision = decideCleanupTargets(roots, { scope, thresholdDays });
       const { wouldDelete } = decision;
       const wouldDeleteBytes = wouldDelete.reduce(
@@ -2035,7 +2093,7 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         }
       }
       // Invalidate the listing cache so the next read reflects the deletes.
-      cleanupListingCache = null;
+      cleanupListingCache.delete(companyId);
       return {
         ok: errors.length === 0,
         scope,
@@ -2157,7 +2215,7 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         (cfg as { rcloneRemote?: string }).rcloneRemote || "gdrive";
       const listTier = async (tier: "daily" | "hourly") => {
         try {
-          const items = await lsjsonDir(
+          const items = await listDir(
             `${remote}:${tierRoot}/${tier}/`,
             cfg.rcloneConfig,
             rclonePass,
@@ -2365,6 +2423,7 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
     async function walkCleanupTier(
       cfg: ReturnType<typeof readInstanceConfig>,
       tier: { kind: "perCompany" | "hourly" | "daily"; remote: string; prefix: string },
+      scopeErrors: string[],
     ): Promise<CleanupTierSummary> {
       // The per-company tier has 4 levels of nesting and many rclone
       // calls. To fit in the 30s RPC timeout we limit the walk to the
@@ -2374,30 +2433,28 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
       const MAX_DAYS = tier.kind === "perCompany" ? 7 : 1;
       const pass = getRclonePass();
       const leaves: CleanupLeaf[] = [];
+      const lsjsonStrictDir = (remotePath: string) =>
+        listDir(remotePath, cfg.rcloneConfig, pass, { strict: true });
       try {
         if (tier.kind === "perCompany") {
           // per-company: YYYY/MM/DD/HHMM (data may be shallower)
           const year = (
-            await lsjsonDir(`${tier.remote}:${tier.prefix}/`, cfg.rcloneConfig, pass)
+            await lsjsonStrictDir(`${tier.remote}:${tier.prefix}/`)
           ).filter((y) => y.IsDir && /^\d{4}$/.test(y.Name))[0];
           if (!year) {
             return emptyTierSummary(tier);
           }
           const months = (
-            await lsjsonDir(
+            await lsjsonStrictDir(
               `${tier.remote}:${tier.prefix}/${year.Name}/`,
-              cfg.rcloneConfig,
-              pass,
             )
           )
             .filter((m) => m.IsDir && /^\d{2}$/.test(m.Name))
             .slice(0, MAX_MONTHS);
           for (const m of months) {
             const days = (
-              await lsjsonDir(
+              await lsjsonStrictDir(
                 `${tier.remote}:${tier.prefix}/${year.Name}/${m.Name}/`,
-                cfg.rcloneConfig,
-                pass,
               )
             )
               .filter((d) => d.IsDir && /^\d{2}$/.test(d.Name))
@@ -2425,7 +2482,7 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         } else {
           // hourly / daily: YYYY-MM-DD-HHMM leaves (1 level)
           const entries = (
-            await lsjsonDir(`${tier.remote}:${tier.prefix}/`, cfg.rcloneConfig, pass)
+            await lsjsonStrictDir(`${tier.remote}:${tier.prefix}/`)
           )
             .filter((e) => e.IsDir)
             .slice(0, 40);
@@ -2439,8 +2496,10 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
             });
           }
         }
-      } catch {
-        // fall through — empty tier
+      } catch (err) {
+        scopeErrors.push(
+          `cleanup-listing degraded (${tier.kind}:${tier.prefix}): ${formatError(err)}`,
+        );
       }
       // Read manifest.json for each leaf to get authoritative totalBytes /
       // deltaBytes. The upload script writes these values after each
@@ -2483,45 +2542,54 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
     async function listCleanupRoots(
       cfg: ReturnType<typeof readInstanceConfig>,
       companyId: string,
-    ): Promise<CleanupTierSummary[]> {
-      const results: CleanupTierSummary[] = [];
-      try {
-        results.push(
-          await walkCleanupTier(cfg, {
+    ): Promise<{ roots: CleanupTierSummary[]; scopeErrors: string[] }> {
+      const roots: CleanupTierSummary[] = [];
+      const scopeErrors: string[] = [];
+      roots.push(
+        await walkCleanupTier(
+          cfg,
+          {
             kind: "perCompany",
             remote: cfg.rcloneRemote,
             prefix: `Paperclip-Backups/${companyId}`,
-          }),
-        );
-      } catch {
-        results.push(emptyTierSummary({
-          kind: "perCompany",
-          remote: cfg.rcloneRemote,
-          prefix: `Paperclip-Backups/${companyId}`,
-        }));
-      }
-      results.push(
-        await walkCleanupTier(cfg, {
-          kind: "hourly",
-          remote: cfg.rcloneRemote,
-          prefix: "Paperclip-Backups/hourly",
-        }),
+          },
+          scopeErrors,
+        ),
       );
-      results.push(
-        await walkCleanupTier(cfg, {
-          kind: "daily",
-          remote: cfg.rcloneRemote,
-          prefix: "Paperclip-Backups/daily",
-        }),
+      roots.push(
+        await walkCleanupTier(
+          cfg,
+          {
+            kind: "hourly",
+            remote: cfg.rcloneRemote,
+            prefix: "Paperclip-Backups/hourly",
+          },
+          scopeErrors,
+        ),
       );
-      results.push(
-        await walkCleanupTier(cfg, {
-          kind: "perCompany",
-          remote: cfg.rcloneRemote,
-          prefix: CLEANUP_TEST_PREFIX,
-        }),
+      roots.push(
+        await walkCleanupTier(
+          cfg,
+          {
+            kind: "daily",
+            remote: cfg.rcloneRemote,
+            prefix: "Paperclip-Backups/daily",
+          },
+          scopeErrors,
+        ),
       );
-      return results;
+      roots.push(
+        await walkCleanupTier(
+          cfg,
+          {
+            kind: "perCompany",
+            remote: cfg.rcloneRemote,
+            prefix: CLEANUP_TEST_PREFIX,
+          },
+          scopeErrors,
+        ),
+      );
+      return { roots, scopeErrors };
     }
 
     function decideCleanupTargets(
@@ -2576,48 +2644,131 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
       return { wouldDelete, goldenSkipped, ageKept, scopeErrors };
     }
 
-    // Cleanup panel listing cache (60s TTL) — the walk does 1+ rclone
-    // calls per tier which can take a few seconds combined.
-    let cleanupListingCache: {
-      expiresAt: number;
-      payload: {
-        roots: CleanupTierSummary[];
-        totals: { count: number; totalBytes: number; goldenCount: number; goldenBytes: number };
-        config: ReturnType<typeof readInstanceConfig>;
-        cleanupPath: string;
-        testPrefix: string;
+    type CleanupListingPayload = {
+      roots: CleanupTierSummary[];
+      totals: { count: number; totalBytes: number; goldenCount: number; goldenBytes: number };
+      config: ReturnType<typeof readInstanceConfig>;
+      cleanupPath: string;
+      testPrefix: string;
+      loading: boolean;
+      scopeErrors: string[];
+    };
+
+    function cleanupPayload(
+      roots: CleanupTierSummary[],
+      cfg: ReturnType<typeof readInstanceConfig>,
+      loading: boolean,
+      scopeErrors: string[] = [],
+    ): CleanupListingPayload {
+      const totals = roots.reduce(
+        (acc, root) => {
+          acc.count += root.count;
+          acc.totalBytes += root.totalBytes;
+          acc.goldenCount += root.goldenCount;
+          acc.goldenBytes += root.goldenBytes;
+          return acc;
+        },
+        { count: 0, totalBytes: 0, goldenCount: 0, goldenBytes: 0 },
+      );
+      return {
+        roots,
+        totals,
+        config: cfg,
+        cleanupPath: `${cfg.rcloneRemote}/Paperclip-Backups/`,
+        testPrefix: CLEANUP_TEST_PREFIX,
+        loading,
+        scopeErrors,
       };
-    } | null = null;
+    }
+
+    function projectManagerListing(
+      listing: unknown,
+      cfg: ReturnType<typeof readInstanceConfig>,
+      companyId: string,
+    ): CleanupListingPayload {
+      const backups = (listing as { offsite?: { backups?: OffsiteBackup[] } })?.offsite?.backups ?? [];
+      const tiers: Array<{ kind: OffsiteKind; prefix: string }> = [
+        { kind: "perCompany", prefix: `Paperclip-Backups/${companyId}` },
+        { kind: "hourly", prefix: "Paperclip-Backups/hourly" },
+        { kind: "daily", prefix: "Paperclip-Backups/daily" },
+      ];
+      const roots: CleanupTierSummary[] = tiers.map(({ kind, prefix }) => {
+        const leaves: CleanupLeaf[] = backups
+          .filter((backup) => backup.kind === kind)
+          .map((backup) => ({
+            path: `${cfg.rcloneRemote}:${backup.path}`,
+            modified: backup.modified ?? "",
+            sizeBytes: backup.sizeBytes,
+            coreBytes: backup.sizeBytes,
+            kind,
+            golden: false,
+          }));
+        const totalBytes = leaves.reduce((sum, leaf) => sum + leaf.sizeBytes, 0);
+        return {
+          kind,
+          remote: `${cfg.rcloneRemote}/${prefix}`,
+          prefix,
+          count: leaves.length,
+          totalBytes,
+          goldenCount: 0,
+          goldenBytes: 0,
+          leaves,
+        };
+      });
+      roots.push(emptyTierSummary({
+        kind: "perCompany",
+        remote: cfg.rcloneRemote,
+        prefix: CLEANUP_TEST_PREFIX,
+      }));
+      return cleanupPayload(roots, cfg, true);
+    }
+
+    const cleanupListingCache = new Map<
+      string,
+      { expiresAt: number; payload: CleanupListingPayload; refreshing: boolean }
+    >();
     const CLEANUP_LISTING_TTL_MS = 60_000;
 
     ctx.data.register(CLEANUP_DATA_KEYS.listing, async (params: unknown) => {
       const p = (params ?? {}) as Record<string, unknown>;
       const forceRefresh = p._forceRefresh === true;
       const now = Date.now();
-      if (!forceRefresh && cleanupListingCache && cleanupListingCache.expiresAt > now) {
-        return cleanupListingCache.payload;
-      }
       const cfg = readInstanceConfig();
       const companyId = resolveCompanyId(p);
-      const roots = await listCleanupRoots(cfg, companyId);
-      const totals = roots.reduce(
-        (acc, r) => {
-          acc.count += r.count;
-          acc.totalBytes += r.totalBytes;
-          acc.goldenCount += r.goldenCount;
-          acc.goldenBytes += r.goldenBytes;
-          return acc;
-        },
-        { count: 0, totalBytes: 0, goldenCount: 0, goldenBytes: 0 },
-      );
-      const payload = {
-        roots,
-        totals,
-        config: cfg,
-        cleanupPath: `${cfg.rcloneRemote}/Paperclip-Backups/`,
-        testPrefix: CLEANUP_TEST_PREFIX,
-      };
-      cleanupListingCache = { payload, expiresAt: now + CLEANUP_LISTING_TTL_MS };
+      const cached = cleanupListingCache.get(companyId);
+      if (!forceRefresh && cached && cached.expiresAt > now) {
+        return cached.payload;
+      }
+      if (cached?.refreshing) {
+        return cached.payload;
+      }
+
+      const managerListing = listingCache.get(companyId)?.listing;
+      const payload = cached?.payload ?? projectManagerListing(managerListing, cfg, companyId);
+      cleanupListingCache.set(companyId, { payload, expiresAt: now, refreshing: true });
+      void listCleanupRoots(cfg, companyId)
+        .then(({ roots, scopeErrors }) => {
+          cleanupListingCache.set(companyId, {
+            payload: cleanupPayload(roots, cfg, false, scopeErrors),
+            expiresAt: Date.now() + CLEANUP_LISTING_TTL_MS,
+            refreshing: false,
+          });
+        })
+        .catch((err) => {
+          const msg = formatError(err);
+          ctx.logger.warn(
+            `paperclip-backup: cleanup listing refresh failed: companyId=${companyId} err=${msg}`,
+          );
+          cleanupListingCache.set(companyId, {
+            payload: {
+              ...payload,
+              loading: false,
+              scopeErrors: [`cleanup-listing degraded: ${msg}`],
+            },
+            expiresAt: Date.now() + CLEANUP_LISTING_TTL_MS,
+            refreshing: false,
+          });
+        });
       return payload;
     });
 
@@ -2626,7 +2777,30 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
     // "would delete" list before the user confirms a real cleanup.
     ctx.data.register(CLEANUP_DATA_KEYS.preview, async (params: unknown) => {
       const p = (params ?? {}) as Record<string, unknown>;
-      const cfg = readInstanceConfig();
+      // Wrap in try/catch so a sync throw from readInstanceConfig / resolveCompanyId
+      // (e.g. corrupted PAPERCLIP_BACKUP_CONFIG) doesn't crash the provider —
+      // return a dryRun=true zeroed-out payload with the error in scopeErrors
+      // so the UI can still render the panel without freezing.
+      let cfg: ReturnType<typeof readInstanceConfig>;
+      try {
+        cfg = readInstanceConfig();
+      } catch (err) {
+        const msg = formatError(err);
+        ctx.logger.warn(
+          `paperclip-backup: cleanup preview sync throw caught: err=${msg}`,
+        );
+        return {
+          scope: "testOnly",
+          thresholdDays: 14,
+          dryRun: true,
+          wouldDelete: [],
+          wouldDeleteCount: 0,
+          wouldDeleteBytes: 0,
+          goldenSkippedCount: 0,
+          ageKeptCount: 0,
+          scopeErrors: [`cleanup-preview degraded: ${msg}`],
+        };
+      }
       const thresholdDays = Math.max(
         1,
         Math.min(365, Number(p.thresholdDays) || 14),
@@ -2638,13 +2812,11 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
           : "testOnly";
       const allowActiveBtcCompany = p.allowActiveBtcCompany === true;
       const companyId = resolveCompanyId(p);
-      const roots = await listCleanupRoots(cfg, companyId);
+      const { roots, scopeErrors: listingScopeErrors } = await listCleanupRoots(cfg, companyId);
       const decision = decideCleanupTargets(roots, { scope, thresholdDays, allowActiveBtcCompany });
-      // If the scope guard rejected the request, surface wouldDelete=0
-      // so the UI can't accidentally render a "would delete" list from a
-      // refused preview. The guard message is in scopeErrors.
-      const wouldDeleteCount = decision.scopeErrors.length > 0 ? 0 : decision.wouldDelete.length;
-      const wouldDeleteBytes = decision.scopeErrors.length > 0
+      const scopeErrors = [...listingScopeErrors, ...decision.scopeErrors];
+      const wouldDeleteCount = scopeErrors.length > 0 ? 0 : decision.wouldDelete.length;
+      const wouldDeleteBytes = scopeErrors.length > 0
         ? 0
         : decision.wouldDelete.reduce((s, l) => s + l.sizeBytes, 0);
       return {
@@ -2661,7 +2833,7 @@ export const pluginInstance: PaperclipPlugin = definePlugin({
         wouldDeleteBytes,
         goldenSkippedCount: decision.goldenSkipped.length,
         ageKeptCount: decision.ageKept.length,
-        scopeErrors: decision.scopeErrors,
+        scopeErrors,
       };
     });
 
