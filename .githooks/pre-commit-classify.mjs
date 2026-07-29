@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 const JOURNAL = "packages/db/src/migrations/meta/_journal.json";
 const MIGRATION_PREFIX = "packages/db/src/migrations/";
@@ -32,12 +30,9 @@ function stagedPaths(repo) {
     .filter(Boolean);
 }
 
-function stagedJournal(repo, journalPath) {
-  try {
-    return git(repo, ["show", `:${journalPath}`]);
-  } catch {
-    return readFileSync(path.join(repo, journalPath), "utf8");
-  }
+function stagedJournal(repo, journalPath, journalIsStaged) {
+  if (!journalIsStaged) return headJournal(repo);
+  return git(repo, ["show", `:${journalPath}`]);
 }
 
 function headJournal(repo) {
@@ -52,7 +47,8 @@ export function classifyFailure({ staged, stagedTags, headTags }) {
   const stagedSql = staged
     .filter(isMigrationSql)
     .map((file) => file.slice(MIGRATION_PREFIX.length, -4));
-  const sqlOrphans = stagedSql.filter((tag) => !stagedTags.has(tag));
+  const journalIsStaged = staged.includes(JOURNAL);
+  const sqlOrphans = stagedSql.filter((tag) => !journalIsStaged || !stagedTags.has(tag));
   const headSqlOrphans = sqlOrphans.filter((tag) => headTags.has(tag));
   const newJournalTags = [...stagedTags].filter((tag) => !headTags.has(tag));
   const journalOrphans = newJournalTags.filter(
@@ -79,7 +75,7 @@ export function main(repo = process.argv[2] ?? process.cwd()) {
   );
   if (migrationPaths.length === 0) return 0;
 
-  const stagedTags = journalTags(stagedJournal(repo, JOURNAL));
+  const stagedTags = journalTags(stagedJournal(repo, JOURNAL, staged.includes(JOURNAL)));
   const headTags = journalTags(headJournal(repo));
   const result = classifyFailure({ staged, stagedTags, headTags });
 
