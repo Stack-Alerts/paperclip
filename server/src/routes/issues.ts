@@ -6046,14 +6046,19 @@ export function issueRoutes(
         }
       };
       const resolveLocalRepoCwd = async () => {
-        if (!existing.executionWorkspaceId) return null;
+        let executionWorkspaceId = existing.executionWorkspaceId;
+        if (existing.originKind === "stranded_issue_recovery" && existing.originId) {
+          const sourceIssue = await svc.getById(existing.originId);
+          executionWorkspaceId = sourceIssue?.executionWorkspaceId ?? executionWorkspaceId;
+        }
+        if (!executionWorkspaceId) return null;
         try {
-          const ws = await executionWorkspacesSvc.getById(existing.executionWorkspaceId);
+          const ws = await executionWorkspacesSvc.getById(executionWorkspaceId);
           const localPath = ws?.providerRef ?? ws?.cwd ?? null;
           return typeof localPath === "string" && localPath.length > 0 ? localPath : null;
         } catch (err) {
           logger.warn(
-            { err, issueId: existing.id, executionWorkspaceId: existing.executionWorkspaceId },
+            { err, issueId: existing.id, executionWorkspaceId },
             "closure-gate: failed to load execution workspace for local repo path",
           );
           return null;
@@ -6076,9 +6081,11 @@ export function issueRoutes(
       };
       const gateOutcome = await closureGateSvc.assertAllowed({
         companyMode,
+        issueTitle: existing.title,
         actor: { actorType: actor.actorType, agentId: actor.agentId ?? null },
         commentBody: typeof commentBody === "string" ? commentBody : null,
         fallbackCommentBody: gateFallbackCommentBody,
+        noCodeKindsResolver: () => gateCompany?.closureGateNoCodeKinds ?? [],
         resolveRepoUrl,
         resolveLocalRepoCwd,
         hasApprovedBoardOverride,

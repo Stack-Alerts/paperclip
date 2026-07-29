@@ -9,6 +9,9 @@ const ownerRunId = "55555555-5555-4555-8555-555555555555";
 const REAL_SHA = "abcdef0123456789abcdef0123456789abcdef01";
 const FAKE_SHA = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
 const REPO_URL = "https://example.com/repo.git";
+const SOURCE_ISSUE_ID = "66666666-6666-4666-8666-666666666666";
+const LOCAL_ONLY_SHA = "c419831a9456e324b957ff3d2d8f8e6ff1c4edec";
+const SOURCE_REPO_CWD = "/workspace/source-repo";
 
 const mockIssueService = vi.hoisted(() => ({
   addComment: vi.fn(),
@@ -29,6 +32,7 @@ const mockIssueService = vi.hoisted(() => ({
 
 const mockAccessService = vi.hoisted(() => ({
   canUser: vi.fn(),
+  decide: vi.fn(),
   hasPermission: vi.fn(),
 }));
 
@@ -78,11 +82,13 @@ const mockClosureGate = vi.hoisted(() => {
     reject: boolean;
     reason: string;
     reachableShas: Set<string>;
+    localShas: Set<string>;
   } = {
     mode: "off",
     reject: false,
     reason: "missing_fix_sha",
     reachableShas: new Set(["abcdef0123456789abcdef0123456789abcdef01"]),
+    localShas: new Set(),
   };
 
   return {
@@ -90,8 +96,6 @@ const mockClosureGate = vi.hoisted(() => {
     captured: [] as Array<Record<string, unknown>>,
     assertAllowed: vi.fn(async (input: Record<string, unknown>) => {
       mockClosureGate.captured.push(input);
-      // eslint-disable-next-line no-console
-      console.log("[test] assertAllowed called", { mode: gateBehavior.mode, reject: gateBehavior.reject });
       if (gateBehavior.reject) {
         return {
           allowed: false,
@@ -130,6 +134,17 @@ const mockClosureGate = vi.hoisted(() => {
       }
       const sha = shaMatch[1].toLowerCase();
       if (!gateBehavior.reachableShas.has(sha)) {
+        const resolveLocalRepoCwd = input.resolveLocalRepoCwd as (() => Promise<string | null>) | undefined;
+        const localRepoCwd = resolveLocalRepoCwd ? await resolveLocalRepoCwd() : null;
+        if (localRepoCwd === SOURCE_REPO_CWD && gateBehavior.localShas.has(sha)) {
+          return {
+            allowed: true,
+            mode: gateBehavior.mode,
+            fixSha: { sha, target: "main" },
+            verified: "local",
+            verificationFailed: false,
+          };
+        }
         if (gateBehavior.mode === "advisory") {
           return {
             allowed: true,
@@ -210,6 +225,24 @@ function registerRouteMocks() {
     issueService: () => mockIssueService,
   }));
 
+  vi.doMock("../services/task-watchdog-scope.js", () => ({
+    TASK_WATCHDOG_ORIGIN_KIND: "task_watchdog",
+    resolveTaskWatchdogMutationScope: vi.fn(async () => ({ kind: "none" })),
+    taskWatchdogScopeAllowsIssueMutation: vi.fn(async () => true),
+  }));
+
+  vi.doMock("../services/source-trust.js", () => ({
+    buildPromotedSourceTrust: vi.fn(),
+    isLowTrustQuarantined: vi.fn(() => false),
+    redactQuarantinedBodyForHigherTrust: vi.fn((body: string) => body),
+    resolveActorSourceTrustForIssue: vi.fn(async () => ({
+      trustLevel: "trusted",
+      decision: "allow",
+      source: "test",
+    })),
+    sanitizeQuarantinedCommentForHigherTrust: vi.fn((body: string) => body),
+  }));
+
   vi.doMock("../services/work-products.js", () => ({
     workProductService: () => mockWorkProductService,
   }));
@@ -222,6 +255,7 @@ function registerRouteMocks() {
     accessService: () => mockAccessService,
     agentService: () => mockAgentService,
     companyService: () => mockCompanyService,
+    documentAnnotationService: () => ({}),
     documentService: () => mockDocumentService,
     executionWorkspaceService: () => mockExecutionWorkspaceService,
     feedbackService: () => ({
@@ -286,6 +320,8 @@ function makeIssue(overrides: Record<string, unknown> = {}) {
     createdByUserId: "board-user",
     identifier: "PAP-1649",
     title: "Owned active issue",
+    originKind: "manual",
+    originId: null,
     executionPolicy: null,
     executionState: null,
     hiddenAt: null,
@@ -375,6 +411,7 @@ describe("issue closure-gate route integration", () => {
     vi.clearAllMocks();
 
     mockAccessService.canUser.mockResolvedValue(true);
+    mockAccessService.decide.mockResolvedValue({ allowed: true, reason: "test" });
     mockAccessService.hasPermission.mockResolvedValue(false);
     mockAgentService.getById.mockImplementation(async (id: string) =>
       id === ownerAgentId ? makeAgent(ownerAgentId) : null,
@@ -389,8 +426,8 @@ describe("issue closure-gate route integration", () => {
     mockIssueService.getWakeableParentAfterChildCompletion.mockResolvedValue(null);
     mockIssueService.findMentionedAgents.mockResolvedValue([]);
     mockIssueService.listComments.mockResolvedValue([]);
-    mockIssueService.update.mockImplementation(async (_id: string, patch: Record<string, unknown>) => ({
-      ...makeIssue(),
+    mockIssueService.update.mockImplementation(async (id: string, patch: Record<string, unknown>) => ({
+      ...makeIssue({ id }),
       ...patch,
     }));
     mockIssueService.addComment.mockResolvedValue({
@@ -429,6 +466,7 @@ describe("issue closure-gate route integration", () => {
     mockClosureGate.gateBehavior.reject = false;
     mockClosureGate.gateBehavior.reason = "missing_fix_sha";
     mockClosureGate.gateBehavior.reachableShas = new Set(["abcdef0123456789abcdef0123456789abcdef01"]);
+    mockClosureGate.gateBehavior.localShas = new Set();
   });
 
   it("does not require a Fix-SHA when the company mode is off", async () => {
@@ -460,6 +498,37 @@ describe("issue closure-gate route integration", () => {
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(res.body).toMatchObject({ id: issueId, status: "done" });
     expect(mockIssueService.update).toHaveBeenCalled();
+  });
+
+  it("accepts a local-only Fix-SHA from a stranded recovery issue's source workspace", async () => {
+    const recoveryIssue = makeIssue({
+      originKind: "stranded_issue_recovery",
+      originId: SOURCE_ISSUE_ID,
+      executionWorkspaceId: "recovery-ws",
+    });
+    const sourceIssue = makeIssue({
+      id: SOURCE_ISSUE_ID,
+      identifier: "PAP-1648",
+      executionWorkspaceId: "source-ws",
+    });
+    mockIssueService.getById.mockImplementation(async (id: string) =>
+      id === SOURCE_ISSUE_ID ? sourceIssue : recoveryIssue,
+    );
+    mockExecutionWorkspaceService.getById.mockImplementation(async (id: string) =>
+      id === "source-ws"
+        ? { id, companyId, repoUrl: REPO_URL, providerRef: SOURCE_REPO_CWD }
+        : { id, companyId, repoUrl: REPO_URL, providerRef: "/workspace/recovery-repo" },
+    );
+    mockCompanyService.getById.mockResolvedValue({ id: companyId, closureGateFixSha: "enforce" });
+    mockClosureGate.gateBehavior.mode = "enforce";
+    mockClosureGate.gateBehavior.localShas = new Set([LOCAL_ONLY_SHA]);
+
+    const res = await request(await createApp(ownerActor()))
+      .patch(`/api/issues/${issueId}`)
+      .send({ status: "done", comment: `Fix-SHA: ${LOCAL_ONLY_SHA}\nFix-Target: main` });
+
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(mockExecutionWorkspaceService.getById).toHaveBeenCalledWith("source-ws");
   });
 
   it("rejects an agent closure with 422 under enforce when Fix-SHA is missing", async () => {
