@@ -226,7 +226,7 @@ export async function verifyFixShaLocally(
   try {
     await execFileAsync(
       "git",
-      ["rev-parse", "--verify", `${normalized}^{object}`],
+      ["rev-parse", "--verify", `${normalized}^{commit}`],
       { cwd, timeout: timeoutMs, maxBuffer: 1024 * 1024 },
     );
     return { ok: true, source: "local" };
@@ -237,12 +237,14 @@ export async function verifyFixShaLocally(
       /unknown revision/i.test(rawMessage) ||
       /bad revision/i.test(rawMessage) ||
       /Needed a single revision/i.test(rawMessage) ||
-      /fatal: ambiguous argument/i.test(rawMessage)
+      /fatal: ambiguous argument/i.test(rawMessage) ||
+      /expected commit type/i.test(rawMessage) ||
+      /is not a commit/i.test(rawMessage)
     ) {
       return {
         ok: false,
         reason: "unreachable_sha",
-        message: `Fix-SHA ${normalized} is not present in the local object database at ${cwd}: ${rawMessage.trim()}`,
+        message: `Fix-SHA ${normalized} is not a reachable commit in the local object database at ${cwd}: ${rawMessage.trim()}`,
       };
     }
     return {

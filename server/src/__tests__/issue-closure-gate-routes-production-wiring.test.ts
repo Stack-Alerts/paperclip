@@ -411,4 +411,35 @@ describe("issue closure-gate route — production wiring of local verifier", () 
     });
     expect(mockIssueService.update).not.toHaveBeenCalled();
   });
+
+  it("rejects a Fix-SHA that resolves to a non-commit object in the source workspace", async () => {
+    realWorkspace = await initRealGitWorkspace();
+    mockExecutionWorkspaceService.getById.mockResolvedValue({
+      id: "ws-1",
+      companyId,
+      repoUrl: "https://example.com/repo.git",
+      providerRef: realWorkspace.cwd,
+    });
+    mockCompanyService.getById.mockResolvedValue({ id: companyId, closureGateFixSha: "enforce" });
+
+    const blobSha = execFileSync("git", ["hash-object", "-w", "--stdin"], {
+      cwd: realWorkspace.cwd,
+      input: "not a commit",
+    })
+      .toString()
+      .trim();
+
+    const res = await request(await createApp(ownerActor()))
+      .patch(`/api/issues/${issueId}`)
+      .send({
+        status: "done",
+        comment: `Fix-SHA: ${blobSha}\nFix-Target: main`,
+      });
+
+    expect(res.status, JSON.stringify(res.body)).toBe(422);
+    expect(res.body).toMatchObject({
+      details: expect.objectContaining({ reason: "unreachable_sha" }),
+    });
+    expect(mockIssueService.update).not.toHaveBeenCalled();
+  });
 });
