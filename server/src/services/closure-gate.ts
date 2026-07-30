@@ -210,6 +210,49 @@ export function parseLsRemoteOutput(stdout: string): Set<string> {
   return shas;
 }
 
+export async function verifyFixShaLocally(
+  cwd: string,
+  sha: string,
+  timeoutMs: number = CLOSURE_GATE_LS_REMOTE_TIMEOUT_MS,
+): Promise<LocalVerifyResult> {
+  if (typeof sha !== "string" || !/^[0-9a-f]{40}$/i.test(sha)) {
+    return {
+      ok: false,
+      reason: "unreachable_sha",
+      message: `Fix-SHA ${sha} is not a valid 40-hex SHA`,
+    };
+  }
+  const normalized = sha.toLowerCase();
+  try {
+    await execFileAsync(
+      "git",
+      ["rev-parse", "--verify", `${normalized}^{object}`],
+      { cwd, timeout: timeoutMs, maxBuffer: 1024 * 1024 },
+    );
+    return { ok: true, source: "local" };
+  } catch (err) {
+    const rawMessage = err instanceof Error ? err.message : String(err);
+    if (
+      /Not a valid object name/i.test(rawMessage) ||
+      /unknown revision/i.test(rawMessage) ||
+      /bad revision/i.test(rawMessage) ||
+      /Needed a single revision/i.test(rawMessage) ||
+      /fatal: ambiguous argument/i.test(rawMessage)
+    ) {
+      return {
+        ok: false,
+        reason: "unreachable_sha",
+        message: `Fix-SHA ${normalized} is not present in the local object database at ${cwd}: ${rawMessage.trim()}`,
+      };
+    }
+    return {
+      ok: false,
+      reason: "git_error",
+      message: `git local verification failed for Fix-SHA ${normalized} at ${cwd}: ${rawMessage.trim()}`,
+    };
+  }
+}
+
 export async function verifyFixShaOnRemote(args: {
   repoUrl: string;
   target: string;
