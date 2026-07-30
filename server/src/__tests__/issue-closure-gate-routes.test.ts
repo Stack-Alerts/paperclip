@@ -215,6 +215,7 @@ function registerRouteMocks() {
     // module identity with the real errors.js / errorHandler.
     throwIfClosureGateRejected: (outcome: unknown) =>
       liveThrowIfClosureGateRejected(outcome),
+    verifyFixShaLocally: vi.fn(),
   }));
 
   vi.doMock("../services/execution-workspaces.js", () => ({

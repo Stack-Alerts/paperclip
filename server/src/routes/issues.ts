@@ -111,6 +111,7 @@ import { assertBoard, assertCompanyAccess, getActorInfo } from "./authz.js";
 import {
   createClosureGate,
   throwIfClosureGateRejected,
+  verifyFixShaLocally,
 } from "../services/closure-gate.js";
 import {
   assertNoAgentHostWorkspaceCommandMutation,
@@ -1140,7 +1141,7 @@ export function issueRoutes(
     return searchSvc;
   };
   const searchRateLimiter = opts.searchRateLimiter ?? defaultCompanySearchRateLimiter;
-  const closureGateSvc = createClosureGate({ logger });
+  const closureGateSvc = createClosureGate({ logger, localVerifyImpl: verifyFixShaLocally });
   const instanceSettings = instanceSettingsService(db);
   const agentsSvc = agentService(db);
   const projectsSvc = projectService(db);
