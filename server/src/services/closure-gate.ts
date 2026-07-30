@@ -3,6 +3,8 @@ import { promisify } from "node:util";
 import {
   CLOSURE_GATE_FIX_SHA_LINE_REGEX,
   CLOSURE_GATE_FIX_REPO_LINE_REGEX,
+  CLOSURE_GATE_KIND_LINE_REGEX,
+  CLOSURE_GATE_ISSUE_TITLE_KIND_PREFIX_REGEX,
   CLOSURE_GATE_VERIFY_CACHE_TTL_MS,
   type ClosureGateFixShaMode,
 } from "@paperclipai/shared";
@@ -36,6 +38,13 @@ const execFileAsync = promisify(execFile);
 
 export const CLOSURE_GATE_DEFAULT_TARGET = "main";
 export const CLOSURE_GATE_LS_REMOTE_TIMEOUT_MS = 10_000;
+const CLOSURE_GATE_CTO_OVERRIDE_MARKER_REGEX = /^CTO-Override:\s*skip-verify\s*$/im;
+
+export type LocalVerifyResult =
+  | { ok: true; source: "local" }
+  | { ok: false; reason: "unreachable_sha" | "git_error"; message: string };
+
+export type LocalVerifyImpl = (cwd: string, sha: string) => Promise<LocalVerifyResult>;
 
 export type ClosureGateFixSha = {
   sha: string;
@@ -63,6 +72,25 @@ export type ClosureGateAssertInput = {
   commentBody: string | null | undefined;
   fallbackCommentBody?: string | null;
   resolveRepoUrl: () => Promise<string | null> | string | null;
+  /**
+   * Optional resolver for a local git repo working directory. When this
+   * returns a usable path, the gate verifies the Fix-SHA against the LOCAL
+   * object database (`git rev-parse --verify` + `git cat-file -t`) instead
+   * of the canonical-ref `git ls-remote` check. This eliminates false
+   * positives on SHAs that exist on the working branch but have not yet
+   * been pushed to the canonical remote ref.
+   */
+  resolveLocalRepoCwd?: () => Promise<string | null> | string | null;
+  /**
+   * Optional approval lookup, evaluated when the closure comment body
+   * contains the `CTO-Override: skip-verify` marker. When this returns
+   * `true`, the override marker bypasses SHA verification entirely
+   * (board Option B path). When absent or `false`, the override marker
+   * is treated as advisory only and verification still runs.
+   */
+  hasApprovedBoardOverride?: () => Promise<boolean> | boolean;
+  issueTitle?: string | null;
+  noCodeKindsResolver?: () => Promise<readonly string[]> | readonly string[];
   defaultTarget?: string;
   clock?: () => number;
   fetchImpl?: (repoUrl: string, target: string) => Promise<Set<string>>;
@@ -70,8 +98,10 @@ export type ClosureGateAssertInput = {
 };
 
 export type ClosureGateOutcome =
-  | { allowed: true; mode: ClosureGateFixShaMode; fixSha: ClosureGateFixSha; verified: "fresh" | "cache"; verificationFailed?: false }
+  | { allowed: true; mode: ClosureGateFixShaMode; fixSha: ClosureGateFixSha; verified: "fresh" | "cache" | "local"; verificationFailed?: false }
   | { allowed: true; mode: ClosureGateFixShaMode; fixSha: ClosureGateFixSha; verified: null; verificationFailed: true }
+  | { allowed: true; mode: ClosureGateFixShaMode; fixSha: ClosureGateFixSha; verified: null; verificationFailed: false; override: "cto_fix_sha_skip_verify" }
+  | { allowed: true; mode: ClosureGateFixShaMode; fixSha: null; verified: null; verificationFailed: false; override: "no_code_kind_marker"; kind: string }
   | { allowed: true; mode: ClosureGateFixShaMode; fixSha: null; verified: null; verificationFailed?: boolean }
   | { allowed: false; mode: ClosureGateFixShaMode; reason: ClosureGateRejectReason; message: string };
 
@@ -103,6 +133,14 @@ export function extractFixRepo(body: string | null | undefined): string | null {
   if (!match) return null;
   const url = match[1]?.trim();
   return url && url.length > 0 ? url : null;
+}
+
+export function extractClosureKind(body: string | null | undefined): string | null {
+  if (!body) return null;
+  const match = CLOSURE_GATE_KIND_LINE_REGEX.exec(body);
+  if (!match) return null;
+  const kind = match[1]?.trim();
+  return kind && kind.length > 0 ? kind : null;
 }
 
 export function createClosureGateCache(ttlMs: number = CLOSURE_GATE_VERIFY_CACHE_TTL_MS) {
@@ -227,6 +265,7 @@ export function createClosureGate(
     cache?: ReturnType<typeof createClosureGateCache>;
     clock?: () => number;
     fetchImpl?: (repoUrl: string, target: string) => Promise<Set<string>>;
+    localVerifyImpl?: LocalVerifyImpl;
     logger?: ClosureGateLogger;
     defaultTarget?: string;
   } = {},
@@ -234,6 +273,7 @@ export function createClosureGate(
   const cache = options.cache ?? createClosureGateCache();
   const clock = options.clock ?? Date.now;
   const fetchImpl = options.fetchImpl;
+  const localVerifyImpl = options.localVerifyImpl;
   const logger = options.logger;
   const defaultTarget = options.defaultTarget ?? CLOSURE_GATE_DEFAULT_TARGET;
 
@@ -251,6 +291,47 @@ export function createClosureGate(
     const combinedBody = [input.commentBody, input.fallbackCommentBody]
       .filter((b): b is string => typeof b === "string" && b.length > 0)
       .join("\n");
+
+    if (input.noCodeKindsResolver && input.issueTitle) {
+      const kind = extractClosureKind(combinedBody);
+      if (kind) {
+        const titleMatch = CLOSURE_GATE_ISSUE_TITLE_KIND_PREFIX_REGEX.exec(input.issueTitle);
+        const titleKind = titleMatch ? titleMatch[1] : null;
+        if (titleKind === kind) {
+          const allowedKinds = await input.noCodeKindsResolver();
+          if (Array.isArray(allowedKinds) && allowedKinds.includes(kind)) {
+            logger?.warn(
+              {
+                mode,
+                kind,
+                issueTitle: input.issueTitle,
+                override: "no_code_kind_marker",
+              },
+              "closure-gate: no-code escape hatch honored via Kind marker + title prefix + company allowlist",
+            );
+            return {
+              allowed: true,
+              mode,
+              fixSha: null,
+              verified: null,
+              verificationFailed: false,
+              override: "no_code_kind_marker",
+              kind,
+            };
+          }
+          logger?.warn(
+            { mode, kind, allowedKinds, override: "no_code_kind_marker" },
+            "closure-gate: Kind marker matches title prefix but kind is not in the company allowlist; continuing normal SHA verification",
+          );
+        } else {
+          logger?.warn(
+            { mode, kind, titleKind, issueTitle: input.issueTitle, override: "no_code_kind_marker" },
+            "closure-gate: Kind marker does not match the issue title's [TAG] prefix; continuing normal SHA verification",
+          );
+        }
+      }
+    }
+
     const fixSha = extractFixSha(combinedBody);
 
     if (!fixSha) {
@@ -271,9 +352,69 @@ export function createClosureGate(
     }
 
     const target = fixSha.target || defaultTarget;
+
+    if (
+      input.hasApprovedBoardOverride &&
+      CLOSURE_GATE_CTO_OVERRIDE_MARKER_REGEX.test(combinedBody)
+    ) {
+      const approved = await input.hasApprovedBoardOverride();
+      if (approved) {
+        logger?.warn(
+          { mode, fixSha: fixSha.sha, target, override: "cto_fix_sha_skip_verify" },
+          "closure-gate: CTO-Override marker + approved board approval bypasses SHA verification",
+        );
+        return {
+          allowed: true,
+          mode,
+          fixSha: { sha: fixSha.sha, target },
+          verified: null,
+          verificationFailed: false,
+          override: "cto_fix_sha_skip_verify",
+        };
+      }
+      logger?.warn(
+        { mode, fixSha: fixSha.sha, target, override: "cto_fix_sha_skip_verify" },
+        "closure-gate: CTO-Override marker present but no approved board approval linked; continuing normal SHA verification",
+      );
+    }
+
     const fixRepoOverride = extractFixRepo(combinedBody);
     const resolvedRepoUrl = await input.resolveRepoUrl();
     const repoUrl = fixRepoOverride ?? resolvedRepoUrl;
+
+    const localCwd = input.resolveLocalRepoCwd ? await input.resolveLocalRepoCwd() : null;
+    if (localCwd && localVerifyImpl) {
+      const localResult = await localVerifyImpl(localCwd, fixSha.sha);
+      if (localResult.ok) {
+        return {
+          allowed: true,
+          mode,
+          fixSha: { sha: fixSha.sha, target },
+          verified: "local",
+          verificationFailed: false,
+        };
+      }
+      if (mode === "advisory") {
+        logger?.warn(
+          { mode, reason: localResult.reason, fixSha: fixSha.sha, target, localCwd, message: localResult.message },
+          "closure-gate advisory: local Fix-SHA verification failed",
+        );
+        return {
+          allowed: true,
+          mode,
+          fixSha: { sha: fixSha.sha, target },
+          verified: null,
+          verificationFailed: true,
+        };
+      }
+      return {
+        allowed: false,
+        mode,
+        reason: localResult.reason,
+        message: localResult.message,
+      };
+    }
+
     if (!repoUrl) {
       if (mode === "advisory") {
         logger?.warn(

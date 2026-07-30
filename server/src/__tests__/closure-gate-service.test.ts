@@ -406,6 +406,248 @@ describe("throwIfClosureGateRejected", () => {
   });
 });
 
+describe("createClosureGate.assertAllowed — local SHA verification", () => {
+  it("passes a real local SHA that is not yet on the canonical remote ref", async () => {
+    const localVerifyImpl = async () => ({ ok: true, source: "local" as const });
+    const fetchImpl = async () => new Set([REAL_SHA]);
+    const gate = createClosureGate({ localVerifyImpl, fetchImpl });
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      commentBody: `Done.\n\nFix-SHA: ${REAL_SHA}\n`,
+      resolveRepoUrl: async () => "https://example.com/repo.git",
+      resolveLocalRepoCwd: async () => "/tmp/workspace",
+    });
+    expect(out.allowed).toBe(true);
+    if (!out.allowed) return;
+    expect(out.verified).toBe("local");
+    expect(out.fixSha?.sha).toBe(REAL_SHA);
+  });
+
+  it("rejects a fabricated SHA via the local object database check", async () => {
+    const localVerifyImpl = async () => ({
+      ok: false as const,
+      reason: "unreachable_sha" as const,
+      message: `Fix-SHA ${FAKE_SHA} is not present in the local object database at /tmp/workspace`,
+    });
+    const gate = createClosureGate({ localVerifyImpl });
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      commentBody: `Done.\n\nFix-SHA: ${FAKE_SHA}\n`,
+      resolveRepoUrl: async () => "https://example.com/repo.git",
+      resolveLocalRepoCwd: async () => "/tmp/workspace",
+    });
+    expect(out.allowed).toBe(false);
+    if (out.allowed) return;
+    expect(out.reason).toBe("unreachable_sha");
+  });
+
+  it("falls back to the remote `git ls-remote` check when no local cwd is resolvable", async () => {
+    const localVerifyImpl = async () => ({ ok: true, source: "local" as const });
+    const calls: Array<{ repoUrl: string; target: string }> = [];
+    const fetchImpl = async (repoUrl: string, target: string) => {
+      calls.push({ repoUrl, target });
+      return new Set([REAL_SHA]);
+    };
+    const gate = createClosureGate({ localVerifyImpl, fetchImpl });
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      commentBody: `Done.\n\nFix-SHA: ${REAL_SHA}\n`,
+      resolveRepoUrl: async () => "https://example.com/repo.git",
+      resolveLocalRepoCwd: async () => null,
+    });
+    expect(out.allowed).toBe(true);
+    if (!out.allowed) return;
+    expect(out.verified).toBe("fresh");
+    expect(calls).toEqual([{ repoUrl: "https://example.com/repo.git", target: "main" }]);
+  });
+
+  it("local git errors fall through to git_error, not unreachable_sha", async () => {
+    const localVerifyImpl = async () => ({
+      ok: false as const,
+      reason: "git_error" as const,
+      message: "git local verification failed for Fix-SHA at /tmp/not-a-repo",
+    });
+    const gate = createClosureGate({ localVerifyImpl });
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      commentBody: `Fix-SHA: ${REAL_SHA}\n`,
+      resolveRepoUrl: async () => "https://example.com/repo.git",
+      resolveLocalRepoCwd: async () => "/tmp/not-a-repo",
+    });
+    expect(out.allowed).toBe(false);
+    if (out.allowed) return;
+    expect(out.reason).toBe("git_error");
+  });
+});
+
+describe("createClosureGate.assertAllowed — CTO-Override gating", () => {
+  it("skips verification when the marker is present AND a board approval is linked and approved", async () => {
+    const localVerifyImpl = async () => ({ ok: true, source: "local" as const });
+    const fetchImpl = async () => new Set([REAL_SHA]);
+    const gate = createClosureGate({ localVerifyImpl, fetchImpl });
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      commentBody: `Done.\n\nFix-SHA: ${REAL_SHA}\nCTO-Override: skip-verify\n`,
+      resolveRepoUrl: async () => "https://example.com/repo.git",
+      hasApprovedBoardOverride: async () => true,
+    });
+    expect(out.allowed).toBe(true);
+    if (!out.allowed) return;
+    expect(out.override).toBe("cto_fix_sha_skip_verify");
+    expect(out.fixSha?.sha).toBe(REAL_SHA);
+  });
+
+  it("does NOT skip verification when the marker is present but no approved board approval is linked", async () => {
+    const localVerifyImpl = async () => ({ ok: true, source: "local" as const });
+    const gate = createClosureGate({ localVerifyImpl });
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      commentBody: `Done.\n\nFix-SHA: ${REAL_SHA}\nCTO-Override: skip-verify\n`,
+      resolveRepoUrl: async () => "https://example.com/repo.git",
+      resolveLocalRepoCwd: async () => "/tmp/workspace",
+      hasApprovedBoardOverride: async () => false,
+    });
+    expect(out.allowed).toBe(true);
+    if (!out.allowed) return;
+    expect(out.override).toBeUndefined();
+    expect(out.verified).toBe("local");
+  });
+
+  it("still rejects a fabricated SHA when the marker is present but no approved board approval is linked", async () => {
+    const localVerifyImpl = async () => ({
+      ok: false as const,
+      reason: "unreachable_sha" as const,
+      message: `Fix-SHA ${FAKE_SHA} is not present in the local object database`,
+    });
+    const gate = createClosureGate({ localVerifyImpl });
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      commentBody: `Done.\n\nFix-SHA: ${FAKE_SHA}\nCTO-Override: skip-verify\n`,
+      resolveRepoUrl: async () => "https://example.com/repo.git",
+      resolveLocalRepoCwd: async () => "/tmp/workspace",
+      hasApprovedBoardOverride: async () => false,
+    });
+    expect(out.allowed).toBe(false);
+    if (out.allowed) return;
+    expect(out.reason).toBe("unreachable_sha");
+  });
+
+  it("treats a missing hasApprovedBoardOverride resolver as no override (verification still runs)", async () => {
+    const localVerifyImpl = async () => ({ ok: true, source: "local" as const });
+    const gate = createClosureGate({ localVerifyImpl });
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      commentBody: `Done.\n\nFix-SHA: ${REAL_SHA}\nCTO-Override: skip-verify\n`,
+      resolveRepoUrl: async () => "https://example.com/repo.git",
+      resolveLocalRepoCwd: async () => "/tmp/workspace",
+    });
+    expect(out.allowed).toBe(true);
+    if (!out.allowed) return;
+    expect(out.override).toBeUndefined();
+    expect(out.verified).toBe("local");
+  });
+});
+
+describe("createClosureGate.assertAllowed — no-code kind marker", () => {
+  it("skips Fix-SHA when marker, title prefix, and allowlist agree", async () => {
+    const gate = createClosureGate();
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      issueTitle: "[DATA] Correct board metadata",
+      commentBody: "Updated the board metadata.\n\nKind: DATA\n",
+      noCodeKindsResolver: () => ["DATA", "UI"],
+      resolveRepoUrl: () => null,
+    });
+
+    expect(out).toMatchObject({
+      allowed: true,
+      mode: "enforce",
+      fixSha: null,
+      verified: null,
+      verificationFailed: false,
+      override: "no_code_kind_marker",
+      kind: "DATA",
+    });
+  });
+
+  it("falls through when the issue title has no matching kind prefix", async () => {
+    const gate = createClosureGate();
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      issueTitle: "Correct board metadata",
+      commentBody: "Kind: DATA\n",
+      noCodeKindsResolver: () => ["DATA"],
+      resolveRepoUrl: () => null,
+    });
+
+    expect(out).toMatchObject({ allowed: false, reason: "missing_fix_sha" });
+  });
+
+  it("falls through when the company allowlist is empty", async () => {
+    const gate = createClosureGate();
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      issueTitle: "[DATA] Correct board metadata",
+      commentBody: "Kind: DATA\n",
+      noCodeKindsResolver: () => [],
+      resolveRepoUrl: () => null,
+    });
+
+    expect(out).toMatchObject({ allowed: false, reason: "missing_fix_sha" });
+  });
+
+  it("preserves the normal Fix-SHA flow when no Kind marker is present", async () => {
+    const gate = createClosureGate();
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      issueTitle: "[DATA] Correct board metadata",
+      commentBody: "Updated the board metadata.\n",
+      noCodeKindsResolver: () => ["DATA"],
+      resolveRepoUrl: () => null,
+    });
+
+    expect(out).toMatchObject({ allowed: false, reason: "missing_fix_sha" });
+  });
+});
+
+describe("createClosureGate.assertAllowed — local verification in advisory mode", () => {
+  it("logs warning but allows when local verification fails in advisory mode", async () => {
+    const warnings: Array<{ msg: string; payload: Record<string, unknown> }> = [];
+    const logger = {
+      warn: (payload: Record<string, unknown>, msg: string) => {
+        warnings.push({ msg, payload });
+      },
+    };
+    const localVerifyImpl = async () => ({
+      ok: false as const,
+      reason: "unreachable_sha" as const,
+      message: "Fix-SHA not present locally",
+    });
+    const gate = createClosureGate({ logger, localVerifyImpl });
+    const out = await gate.assertAllowed({
+      companyMode: "advisory",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      commentBody: `Fix-SHA: ${FAKE_SHA}\n`,
+      resolveRepoUrl: async () => "https://example.com/repo.git",
+      resolveLocalRepoCwd: async () => "/tmp/workspace",
+    });
+    expect(out.allowed).toBe(true);
+    expect(warnings.some((w) => w.payload.reason === "unreachable_sha")).toBe(true);
+  });
+});
+
 describe("closure-gate constants integration", () => {
   it("uses the shared regex from @paperclipai/shared", () => {
     expect(CLOSURE_GATE_FIX_SHA_LINE_REGEX).toBeInstanceOf(RegExp);

@@ -6181,6 +6181,8 @@ export function issueRoutes(
         fallbackCommentBody: gateFallbackCommentBody,
         noCodeKindsResolver: () => gateCompany?.closureGateNoCodeKinds ?? [],
         resolveRepoUrl,
+        resolveLocalRepoCwd,
+        hasApprovedBoardOverride,
       });
       throwIfClosureGateRejected(gateOutcome);
     }
