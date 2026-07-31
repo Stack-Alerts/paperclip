@@ -241,13 +241,28 @@ do_snapshot() {
   # (default ~/.paperclip/rclone-creds-bootstrap.key), so a stolen
   # snapshot alone cannot decrypt the credentials, and the bootstrap
   # key is independent of the credentials (no chicken-and-egg loop).
-  if "$SCRIPT_DIR/rclone-credentials-package.sh" "$snap_dir" 2>&1 | sed 's/^/  /'; then
-    if [[ -f "$snap_dir/config/rclone/MANIFEST.json" ]]; then
-      note "  rclone credentials encrypted under config/rclone/ (see MANIFEST.json for sha256s)"
+  #
+  # BTCAAAAA-41666: rclone-credentials-package.sh is operator-managed
+  # (see BTCAAAAA-41550) and lives at $PAPERCLIP_RCLONE_PKG (default
+  # ~/.paperclip/scripts/rclone-credentials-package.sh). The BTCAAAAA-41590
+  # destructive merge invalidated the repo-sibling layout this script
+  # originally assumed; consult the operator path first, fall back to a
+  # repo-local sibling for older layouts.
+  local pkg_helper=""
+  for cand in "${PAPERCLIP_RCLONE_PKG:-/home/sirrus/.paperclip/scripts/rclone-credentials-package.sh}" "$SCRIPT_DIR/rclone-credentials-package.sh"; do
+    if [[ -x "$cand" ]]; then pkg_helper="$cand"; break; fi
+  done
+  if [[ -n "$pkg_helper" ]]; then
+    if "$pkg_helper" "$snap_dir" 2>&1 | sed 's/^/  /'; then
+      if [[ -f "$snap_dir/config/rclone/MANIFEST.json" ]]; then
+        note "  rclone credentials encrypted under config/rclone/ (see MANIFEST.json for sha256s)"
+      fi
+    else
+      local pkg_rc=$?
+      note "  WARN: rclone-credentials-package.sh exited $pkg_rc — snapshot has no decryptable credentials; restore will require manual OAuth"
     fi
   else
-    local pkg_rc=$?
-    note "  WARN: rclone-credentials-package.sh exited $pkg_rc — snapshot has no decryptable credentials; restore will require manual OAuth"
+    note "  WARN: rclone-credentials-package.sh not found in operator path (\$PAPERCLIP_RCLONE_PKG or ~/.paperclip/scripts/) or repo sibling ($SCRIPT_DIR) — snapshot has no decryptable credentials; restore will require manual OAuth"
   fi
 
   # ---- 3. manifest ----
@@ -674,11 +689,24 @@ do_restore() {
   # already confirmed with "restore yes" or --yes at the top of do_restore.
   if [[ -f "$staging/config/rclone/MANIFEST.json" ]]; then
     log "  restoring encrypted rclone credentials from snapshot..."
-    if "$SCRIPT_DIR/rclone-credentials-restore.sh" "$staging" --force 2>&1 | sed 's/^/    /'; then
-      :
+    # BTCAAAAA-41666: rclone-credentials-restore.sh is operator-managed and
+    # lives next to rclone-credentials-package.sh (see BTCAAAAA-41550). The
+    # destructive merge that removed the package helper from the repo also
+    # removed the restore helper; resolve from the operator path with a
+    # sibling fallback.
+    local restore_helper=""
+    for cand in "/home/sirrus/.paperclip/scripts/rclone-credentials-restore.sh" "$SCRIPT_DIR/rclone-credentials-restore.sh"; do
+      if [[ -x "$cand" ]]; then restore_helper="$cand"; break; fi
+    done
+    if [[ -n "$restore_helper" ]]; then
+      if "$restore_helper" "$staging" --force 2>&1 | sed 's/^/    /'; then
+        :
+      else
+        local rcr_rc=$?
+        note "  WARN: rclone-credentials-restore.sh exited $rcr_rc — GDrive access will require manual OAuth on this host"
+      fi
     else
-      local rcr_rc=$?
-      note "  WARN: rclone-credentials-restore.sh exited $rcr_rc — GDrive access will require manual OAuth on this host"
+      note "  WARN: rclone-credentials-restore.sh not found in operator path (/home/sirrus/.paperclip/scripts/) or repo sibling ($SCRIPT_DIR) — GDrive access will require manual OAuth on this host"
     fi
   else
     note "  (snapshot has no encrypted rclone credentials — host will need manual OAuth)"
