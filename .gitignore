@@ -64,3 +64,5 @@ tests/release-smoke/playwright-report/
 .claude/
 patch[0-9]*.json
 verify.json
+
+paperclip-ai-search/node_modules/

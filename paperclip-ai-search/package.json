@@ -1,0 +1,27 @@
+{
+  "name": "paperclip-ai-search",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "AI-powered search across Paperclip. Presets for common queries, natural language for the rest. Uses the model assigned to the CEO, light on tokens.",
+  "paperclipPlugin": {
+    "manifest": "./dist/manifest.js",
+    "worker": "./dist/worker.js",
+    "ui": "./dist/ui/"
+  },
+  "keywords": [
+    "paperclip",
+    "plugin",
+    "search",
+    "ai",
+    "productivity"
+  ],
+  "author": "Stack-Alerts",
+  "license": "MIT",
+  "dependencies": {
+    "@paperclipai/plugin-sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}

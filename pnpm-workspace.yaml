@@ -9,6 +9,9 @@ packages:
   # Keep this smoke fixture installable as a local plugin example without
   # forcing PRs to commit pnpm-lock.yaml for a new workspace importer.
   - "!packages/plugins/examples/plugin-orchestration-smoke-example"
+  # Root-level plugin restored from btcaaaaa-41490-claude-local-403-fallback
+  # (BTCAAAAA-41654). Pre-built dist/ is committed; no separate build step.
+  - paperclip-ai-search
   - server
   - ui
   - cli
