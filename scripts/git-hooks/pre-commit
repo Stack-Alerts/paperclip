@@ -1,0 +1,23 @@
+#!/bin/bash
+# paperclip-btcaaaaa-main pre-commit hook
+#
+# Reject orphaned DB migrations before taking the recovery snapshot.
+
+set -euo pipefail
+REPO="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+[ -n "$REPO" ] || exit 0
+
+case "$REPO" in
+  *paperclip-btcaaaaa-main*) ;;
+  *) exit 0 ;;
+esac
+
+"$REPO/scripts/check-db-migration-staging.sh"
+
+RECOVERY="$REPO/scripts/recovery.sh"
+[ -x "$RECOVERY" ] || exit 0
+
+git diff --cached --stat 2>/dev/null | grep -q '|' || exit 0
+
+( "$RECOVERY" snapshot --no-upload >> "/home/sirrus/.paperclip/logs/recovery.log" 2>&1 ) &
+disown || true

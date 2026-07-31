@@ -1,0 +1,29 @@
+#!/bin/bash
+# paperclip-btcaaaaa-main post-merge hook
+#
+# Captures a snapshot every time a merge lands in the worktree. Wired via:
+#   git config core.hooksPath /home/sirrus/paperclip-btcaaaaa-main/scripts/git-hooks
+# or via:
+#   ln -sf ../../scripts/git-hooks/post-merge .git/hooks/post-merge
+#
+# The hook is non-blocking: it kicks off the snapshot in the background
+# so the merge itself doesn't hang on the snapshot (~50s local / ~5 min
+# with upload). Stale snapshots older than 30 days are pruned to keep
+# the gdrive directory bounded.
+
+set -euo pipefail
+REPO="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+[ -n "$REPO" ] || exit 0
+RECOVERY="$REPO/scripts/recovery.sh"
+[ -x "$RECOVERY" ] || exit 0
+
+# skip if this isn't the paperclip-btcaaaaa-main worktree (avoids affecting
+# other worktrees that share the main repo's hooks/ via core.hooksPath)
+case "$REPO" in
+  *paperclip-btcaaaaa-main*) ;;
+  *) exit 0 ;;
+esac
+
+# run the snapshot in the background and exit immediately so the merge isn't blocked
+( "$RECOVERY" snapshot --no-upload >> "/home/sirrus/.paperclip/logs/recovery.log" 2>&1 ) &
+disown || true

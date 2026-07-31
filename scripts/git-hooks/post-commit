@@ -1,0 +1,21 @@
+#!/bin/bash
+# Audit migration commits that skipped the pre-commit hook with --no-verify.
+
+set -euo pipefail
+
+REPO="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+[ -n "$REPO" ] || exit 0
+
+changed="$(git diff-tree --root --no-commit-id --name-only -r HEAD 2>/dev/null || true)"
+has_migration=0
+has_journal=0
+while IFS= read -r path; do
+  [[ "$path" == packages/db/src/migrations/*.sql ]] && has_migration=1
+  [[ "$path" == packages/db/src/migrations/meta/_journal.json ]] && has_journal=1
+done <<< "$changed"
+
+if [[ "$has_migration" -eq 1 && "$has_journal" -eq 0 ]]; then
+  audit_log="${PAPERCLIP_GIT_HOOK_BYPASS_LOG:-$HOME/.paperclip/git-hook-bypasses.log}"
+  mkdir -p "$(dirname "$audit_log")"
+  printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ) warning: migration commit $(git rev-parse HEAD) bypassed the pre-commit journal guard (--no-verify suspected)" >> "$audit_log"
+fi
