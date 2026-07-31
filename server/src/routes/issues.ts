@@ -110,6 +110,7 @@ import { conflict, forbidden, HttpError, notFound, unauthorized, unprocessable }
 import { assertBoard, assertCompanyAccess, getActorInfo } from "./authz.js";
 import {
   createClosureGate,
+  fetchAndVerifyAncestor,
   throwIfClosureGateRejected,
   verifyFixShaLocally,
 } from "../services/closure-gate.js";
@@ -1141,7 +1142,11 @@ export function issueRoutes(
     return searchSvc;
   };
   const searchRateLimiter = opts.searchRateLimiter ?? defaultCompanySearchRateLimiter;
-  const closureGateSvc = createClosureGate({ logger, localVerifyImpl: verifyFixShaLocally });
+  const closureGateSvc = createClosureGate({
+    logger,
+    localVerifyImpl: verifyFixShaLocally,
+    ancestorFetchImpl: fetchAndVerifyAncestor,
+  });
   const instanceSettings = instanceSettingsService(db);
   const agentsSvc = agentService(db);
   const projectsSvc = projectService(db);

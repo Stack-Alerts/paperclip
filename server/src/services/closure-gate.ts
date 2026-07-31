@@ -46,6 +46,23 @@ export type LocalVerifyResult =
 
 export type LocalVerifyImpl = (cwd: string, sha: string) => Promise<LocalVerifyResult>;
 
+/**
+ * Verifies that `sha` is reachable as an ancestor of `<repoUrl>@<target>`.
+ * Default implementation runs `git fetch <repoUrl> <target>` then
+ * `git merge-base --is-ancestor <sha> FETCH_HEAD`. The caller is responsible
+ * for strict commit-object validation; this primitive only checks ancestry.
+ */
+export type AncestorFetchImpl = (args: {
+  cwd: string;
+  repoUrl: string;
+  target: string;
+  sha: string;
+  timeoutMs?: number;
+}) => Promise<
+  | { ok: true }
+  | { ok: false; reason: "unreachable_sha" | "git_error"; message: string }
+>;
+
 export type ClosureGateFixSha = {
   sha: string;
   target: string;
@@ -98,10 +115,31 @@ export type ClosureGateAssertInput = {
 };
 
 export type ClosureGateOutcome =
-  | { allowed: true; mode: ClosureGateFixShaMode; fixSha: ClosureGateFixSha; verified: "fresh" | "cache" | "local"; verificationFailed?: false }
+  | {
+      allowed: true;
+      mode: ClosureGateFixShaMode;
+      fixSha: ClosureGateFixSha;
+      verified: "fresh" | "cache" | "local" | "ancestor";
+      verificationFailed?: false;
+    }
   | { allowed: true; mode: ClosureGateFixShaMode; fixSha: ClosureGateFixSha; verified: null; verificationFailed: true }
-  | { allowed: true; mode: ClosureGateFixShaMode; fixSha: ClosureGateFixSha; verified: null; verificationFailed: false; override: "cto_fix_sha_skip_verify" }
-  | { allowed: true; mode: ClosureGateFixShaMode; fixSha: null; verified: null; verificationFailed: false; override: "no_code_kind_marker"; kind: string }
+  | {
+      allowed: true;
+      mode: ClosureGateFixShaMode;
+      fixSha: ClosureGateFixSha;
+      verified: null;
+      verificationFailed: false;
+      override: "cto_fix_sha_skip_verify";
+    }
+  | {
+      allowed: true;
+      mode: ClosureGateFixShaMode;
+      fixSha: null;
+      verified: null;
+      verificationFailed: false;
+      override: "no_code_kind_marker";
+      kind: string;
+    }
   | { allowed: true; mode: ClosureGateFixShaMode; fixSha: null; verified: null; verificationFailed?: boolean }
   | { allowed: false; mode: ClosureGateFixShaMode; reason: ClosureGateRejectReason; message: string };
 
@@ -143,25 +181,39 @@ export function extractClosureKind(body: string | null | undefined): string | nu
   return kind && kind.length > 0 ? kind : null;
 }
 
+export type ClosureGateCacheNamespace = "ls-remote" | "ancestor";
+
 export function createClosureGateCache(ttlMs: number = CLOSURE_GATE_VERIFY_CACHE_TTL_MS) {
   const entries = new Map<string, { value: Set<string>; expiresAt: number }>();
 
-  function key(repoUrl: string, target: string) {
-    return `${repoUrl}::${target}`;
+  function key(repoUrl: string, target: string, namespace: ClosureGateCacheNamespace) {
+    return `${namespace}::${repoUrl}::${target}`;
   }
 
-  function get(repoUrl: string, target: string, now: number): Set<string> | undefined {
-    const entry = entries.get(key(repoUrl, target));
+  function get(
+    repoUrl: string,
+    target: string,
+    now: number,
+    namespace: ClosureGateCacheNamespace = "ls-remote",
+  ): Set<string> | undefined {
+    const k = key(repoUrl, target, namespace);
+    const entry = entries.get(k);
     if (!entry) return undefined;
     if (entry.expiresAt <= now) {
-      entries.delete(key(repoUrl, target));
+      entries.delete(k);
       return undefined;
     }
     return entry.value;
   }
 
-  function set(repoUrl: string, target: string, value: Set<string>, now: number) {
-    entries.set(key(repoUrl, target), { value, expiresAt: now + ttlMs });
+  function set(
+    repoUrl: string,
+    target: string,
+    value: Set<string>,
+    now: number,
+    namespace: ClosureGateCacheNamespace = "ls-remote",
+  ) {
+    entries.set(key(repoUrl, target, namespace), { value, expiresAt: now + ttlMs });
   }
 
   function clear() {
@@ -176,6 +228,129 @@ export class ClosureGateGitError extends Error {
     super(message);
     this.name = "ClosureGateGitError";
   }
+}
+
+function execErrMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+export async function fetchAndVerifyAncestor(args: {
+  cwd: string;
+  repoUrl: string;
+  target: string;
+  sha: string;
+  timeoutMs?: number;
+}): Promise<
+  | { ok: true }
+  | { ok: false; reason: "unreachable_sha" | "git_error"; message: string }
+> {
+  const { cwd, repoUrl, target, sha } = args;
+  const timeoutMs = args.timeoutMs ?? CLOSURE_GATE_LS_REMOTE_TIMEOUT_MS;
+
+  try {
+    const { stdout: shallowOutput } = await execFileAsync(
+      "git",
+      ["rev-parse", "--is-shallow-repository"],
+      { cwd, timeout: timeoutMs, maxBuffer: 1024 * 1024 },
+    );
+    const depthArgs = shallowOutput.trim() === "true" ? ["--unshallow"] : [];
+    await execFileAsync(
+      "git",
+      ["fetch", "--quiet", "--no-tags", ...depthArgs, repoUrl, target],
+      { cwd, timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 },
+    );
+  } catch (err) {
+    return {
+      ok: false,
+      reason: "git_error",
+      message: `git fetch failed for ${repoUrl}@${target} at ${cwd}: ${execErrMessage(err).trim()}`,
+    };
+  }
+
+  try {
+    await execFileAsync(
+      "git",
+      ["merge-base", "--is-ancestor", sha, "FETCH_HEAD"],
+      { cwd, timeout: timeoutMs, maxBuffer: 1024 * 1024 },
+    );
+    return { ok: true };
+  } catch (err) {
+    const rawMessage = execErrMessage(err);
+    const exitCode = (err as { code?: number })?.code ?? 1;
+    if (exitCode === 1) {
+      return {
+        ok: false,
+        reason: "unreachable_sha",
+        message: `Fix-SHA ${sha} is not an ancestor of ${repoUrl}@${target} (canonical branch has diverged): ${rawMessage.trim()}`,
+      };
+    }
+    return {
+      ok: false,
+      reason: "git_error",
+      message: `git merge-base failed for Fix-SHA ${sha} vs ${repoUrl}@${target} at ${cwd}: ${rawMessage.trim()}`,
+    };
+  }
+}
+
+export async function verifyFixShaAsAncestorOnRemote(args: {
+  cwd: string;
+  repoUrl: string;
+  target: string;
+  sha: string;
+  cache?: ReturnType<typeof createClosureGateCache>;
+  clock?: () => number;
+  timeoutMs?: number;
+  fetchImpl?: AncestorFetchImpl;
+}): Promise<
+  | { ok: true; source: "fresh" | "cache" }
+  | { ok: false; reason: "unreachable_sha" | "git_error"; message: string }
+> {
+  const { cwd, repoUrl, target, sha } = args;
+  const clock = args.clock ?? Date.now;
+  const timeoutMs = args.timeoutMs ?? CLOSURE_GATE_LS_REMOTE_TIMEOUT_MS;
+  const fetchImpl = args.fetchImpl ?? fetchAndVerifyAncestor;
+  const cache = args.cache;
+  const normalized = sha.toLowerCase();
+
+  if (cache) {
+    const cached = cache.get(repoUrl, target, clock(), "ancestor");
+    if (cached) {
+      return cached.has(normalized)
+        ? { ok: true, source: "cache" }
+        : {
+            ok: false,
+            reason: "unreachable_sha",
+            message: `Fix-SHA ${normalized} is not an ancestor of ${repoUrl}@${target} (cached miss)`,
+          };
+    }
+  }
+
+  let result: Awaited<ReturnType<AncestorFetchImpl>>;
+  try {
+    result = await fetchImpl({ cwd, repoUrl, target, sha: normalized, timeoutMs });
+  } catch (err) {
+    return {
+      ok: false,
+      reason: "git_error",
+      message: `git ancestor fetch threw for ${repoUrl}@${target}: ${execErrMessage(err)}`,
+    };
+  }
+
+  if (cache) {
+    const entry = cache.get(repoUrl, target, clock(), "ancestor");
+    const next = entry ? new Set(entry) : new Set<string>();
+    if (result.ok) next.add(normalized);
+    cache.set(repoUrl, target, next, clock(), "ancestor");
+  }
+
+  if (result.ok) {
+    return { ok: true, source: "fresh" };
+  }
+  return {
+    ok: false,
+    reason: result.reason,
+    message: result.message,
+  };
 }
 
 export async function fetchReachableShasFromRemote(
@@ -311,6 +486,7 @@ export function createClosureGate(
     clock?: () => number;
     fetchImpl?: (repoUrl: string, target: string) => Promise<Set<string>>;
     localVerifyImpl?: LocalVerifyImpl;
+    ancestorFetchImpl?: AncestorFetchImpl;
     logger?: ClosureGateLogger;
     defaultTarget?: string;
   } = {},
@@ -319,6 +495,7 @@ export function createClosureGate(
   const clock = options.clock ?? Date.now;
   const fetchImpl = options.fetchImpl;
   const localVerifyImpl = options.localVerifyImpl;
+  const ancestorFetchImpl = options.ancestorFetchImpl;
   const logger = options.logger;
   const defaultTarget = options.defaultTarget ?? CLOSURE_GATE_DEFAULT_TARGET;
 
@@ -428,21 +605,64 @@ export function createClosureGate(
     const repoUrl = fixRepoOverride ?? resolvedRepoUrl;
 
     const localCwd = input.resolveLocalRepoCwd ? await input.resolveLocalRepoCwd() : null;
+    let localStrictPass = false;
     if (localCwd && localVerifyImpl) {
       const localResult = await localVerifyImpl(localCwd, fixSha.sha);
       if (localResult.ok) {
+        localStrictPass = true;
+      } else if (mode === "advisory") {
+        logger?.warn(
+          { mode, reason: localResult.reason, fixSha: fixSha.sha, target, localCwd, message: localResult.message },
+          "closure-gate advisory: local Fix-SHA verification failed",
+        );
         return {
           allowed: true,
           mode,
           fixSha: { sha: fixSha.sha, target },
-          verified: "local",
+          verified: null,
+          verificationFailed: true,
+        };
+      } else {
+        return {
+          allowed: false,
+          mode,
+          reason: localResult.reason,
+          message: localResult.message,
+        };
+      }
+    }
+
+    if (localStrictPass && localCwd && repoUrl && ancestorFetchImpl) {
+      const ancestorResult = await verifyFixShaAsAncestorOnRemote({
+        cwd: localCwd,
+        repoUrl,
+        target,
+        sha: fixSha.sha,
+        cache,
+        clock,
+        fetchImpl: ancestorFetchImpl,
+      });
+      if (ancestorResult.ok) {
+        return {
+          allowed: true,
+          mode,
+          fixSha: { sha: fixSha.sha, target },
+          verified: "ancestor",
           verificationFailed: false,
         };
       }
       if (mode === "advisory") {
         logger?.warn(
-          { mode, reason: localResult.reason, fixSha: fixSha.sha, target, localCwd, message: localResult.message },
-          "closure-gate advisory: local Fix-SHA verification failed",
+          {
+            mode,
+            reason: ancestorResult.reason,
+            fixSha: fixSha.sha,
+            target,
+            repoUrl,
+            localCwd,
+            message: ancestorResult.message,
+          },
+          "closure-gate advisory: canonical Fix-Target ancestor verification failed",
         );
         return {
           allowed: true,
@@ -455,8 +675,18 @@ export function createClosureGate(
       return {
         allowed: false,
         mode,
-        reason: localResult.reason,
-        message: localResult.message,
+        reason: ancestorResult.reason,
+        message: ancestorResult.message,
+      };
+    }
+
+    if (localStrictPass) {
+      return {
+        allowed: true,
+        mode,
+        fixSha: { sha: fixSha.sha, target },
+        verified: "local",
+        verificationFailed: false,
       };
     }
 

@@ -1,3 +1,8 @@
+import { execFile } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import {
   CLOSURE_GATE_FIX_SHA_LINE_REGEX,
@@ -9,12 +14,14 @@ import {
   createClosureGateCache,
   extractFixRepo,
   extractFixSha,
+  fetchAndVerifyAncestor,
   parseLsRemoteOutput,
   verifyFixShaOnRemote,
   throwIfClosureGateRejected,
 } from "../services/closure-gate.js";
 import { HttpError } from "../errors.js";
 
+const execFileAsync = promisify(execFile);
 const REAL_SHA = "abcdef0123456789abcdef0123456789abcdef01";
 const FAKE_SHA = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
 
@@ -162,6 +169,43 @@ describe("verifyFixShaOnRemote", () => {
     expect(res.ok).toBe(false);
     if (res.ok) return;
     expect(res.reason).toBe("git_error");
+  });
+});
+
+describe("fetchAndVerifyAncestor", () => {
+  it.each([
+    { state: "non-shallow", preShallow: false },
+    { state: "pre-shallowed", preShallow: true },
+  ])("accepts an existing local commit below the fetched target tip in a $state repository", async ({ preShallow }) => {
+    const root = await mkdtemp(join(tmpdir(), "closure-gate-ancestor-"));
+    const remote = join(root, "remote.git");
+    const source = join(root, "source");
+    const verifier = join(root, "verifier");
+
+    try {
+      await execFileAsync("git", ["init", "--bare", remote]);
+      await execFileAsync("git", ["init", "-b", "main", source]);
+      await execFileAsync("git", ["-C", source, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "ancestor"]);
+      await execFileAsync("git", ["-C", source, "remote", "add", "origin", remote]);
+      await execFileAsync("git", ["-C", source, "push", "-u", "origin", "main"]);
+      await execFileAsync("git", ["clone", remote, verifier]);
+      const { stdout } = await execFileAsync("git", ["-C", source, "rev-parse", "HEAD"]);
+      const ancestorSha = stdout.trim();
+      await execFileAsync("git", ["-C", source, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "tip"]);
+      await execFileAsync("git", ["-C", source, "push", "origin", "main"]);
+      if (preShallow) {
+        await execFileAsync("git", ["-C", verifier, "fetch", "--depth=1", remote, "main"]);
+      }
+
+      await expect(fetchAndVerifyAncestor({
+        cwd: verifier,
+        repoUrl: remote,
+        target: "main",
+        sha: ancestorSha,
+      })).resolves.toEqual({ ok: true });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 
@@ -407,30 +451,50 @@ describe("throwIfClosureGateRejected", () => {
 });
 
 describe("createClosureGate.assertAllowed — local SHA verification", () => {
-  it("passes a real local SHA that is not yet on the canonical remote ref", async () => {
+  it("accepts a non-tip commit that is an ancestor of the configured target", async () => {
     const localVerifyImpl = async () => ({ ok: true, source: "local" as const });
-    const fetchImpl = async () => new Set([REAL_SHA]);
-    const gate = createClosureGate({ localVerifyImpl, fetchImpl });
+    const calls: Array<{ cwd: string; repoUrl: string; target: string; sha: string }> = [];
+    const ancestorFetchImpl = async (args: {
+      cwd: string;
+      repoUrl: string;
+      target: string;
+      sha: string;
+    }) => {
+      calls.push(args);
+      return { ok: true as const };
+    };
+    const gate = createClosureGate({ localVerifyImpl, ancestorFetchImpl });
     const out = await gate.assertAllowed({
       companyMode: "enforce",
       actor: { actorType: "agent", agentId: "agent-1" },
-      commentBody: `Done.\n\nFix-SHA: ${REAL_SHA}\n`,
+      commentBody: `Done.\n\nFix-SHA: ${REAL_SHA}\nFix-Target: release\n`,
       resolveRepoUrl: async () => "https://example.com/repo.git",
       resolveLocalRepoCwd: async () => "/tmp/workspace",
     });
     expect(out.allowed).toBe(true);
     if (!out.allowed) return;
-    expect(out.verified).toBe("local");
-    expect(out.fixSha?.sha).toBe(REAL_SHA);
+    expect(out.verified).toBe("ancestor");
+    expect(calls).toEqual([{
+      cwd: "/tmp/workspace",
+      repoUrl: "https://example.com/repo.git",
+      target: "release",
+      sha: REAL_SHA,
+      timeoutMs: 10_000,
+    }]);
   });
 
-  it("rejects a fabricated SHA via the local object database check", async () => {
+  it("rejects a missing commit before checking target ancestry", async () => {
+    let ancestorCalls = 0;
     const localVerifyImpl = async () => ({
       ok: false as const,
       reason: "unreachable_sha" as const,
       message: `Fix-SHA ${FAKE_SHA} is not present in the local object database at /tmp/workspace`,
     });
-    const gate = createClosureGate({ localVerifyImpl });
+    const ancestorFetchImpl = async () => {
+      ancestorCalls += 1;
+      return { ok: true as const };
+    };
+    const gate = createClosureGate({ localVerifyImpl, ancestorFetchImpl });
     const out = await gate.assertAllowed({
       companyMode: "enforce",
       actor: { actorType: "agent", agentId: "agent-1" },
@@ -441,6 +505,28 @@ describe("createClosureGate.assertAllowed — local SHA verification", () => {
     expect(out.allowed).toBe(false);
     if (out.allowed) return;
     expect(out.reason).toBe("unreachable_sha");
+    expect(ancestorCalls).toBe(0);
+  });
+
+  it("rejects a commit outside the configured target history", async () => {
+    const localVerifyImpl = async () => ({ ok: true, source: "local" as const });
+    const ancestorFetchImpl = async () => ({
+      ok: false as const,
+      reason: "unreachable_sha" as const,
+      message: `Fix-SHA ${REAL_SHA} is not an ancestor of the configured target`,
+    });
+    const gate = createClosureGate({ localVerifyImpl, ancestorFetchImpl });
+    const out = await gate.assertAllowed({
+      companyMode: "enforce",
+      actor: { actorType: "agent", agentId: "agent-1" },
+      commentBody: `Done.\n\nFix-SHA: ${REAL_SHA}\nFix-Target: release\n`,
+      resolveRepoUrl: async () => "https://example.com/repo.git",
+      resolveLocalRepoCwd: async () => "/tmp/workspace",
+    });
+    expect(out.allowed).toBe(false);
+    if (out.allowed) return;
+    expect(out.reason).toBe("unreachable_sha");
+    expect(out.message).toContain("not an ancestor");
   });
 
   it("falls back to the remote `git ls-remote` check when no local cwd is resolvable", async () => {
